@@ -1150,3 +1150,157 @@ fn datum_and_attachment_errors_fail_even_in_unused_definitions_before_geometry()
     raw["assemblies"][0]["instances"][0]["attachment"]["typo"] = "oops".into();
     assert!(serde_json::from_value::<Recipe>(raw).is_err());
 }
+
+fn transformed_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({
+        "schema_version":2,"units":"mm",
+        "features":[
+            {"op":"rectangle","id":"p","width":8,"depth":4},
+            {"op":"extrude","id":"b","profile":"p","height":2},
+            {"op":"transform","id":"spin","body":"b","offset":[3,5,7],"rotation":[0,0,(std::f64::consts::PI/8.0).sin(),(std::f64::consts::PI/8.0).cos()]},
+            {"op":"transform","id":"tilt","body":"spin","offset":[11,13,17],"rotation":[0,(std::f64::consts::PI/12.0).sin(),0,(std::f64::consts::PI/12.0).cos()]}
+        ],
+        "outputs":[{"name":"result","feature":"tilt"}],
+        "face_assertions":[{"id":"cap","selector":{"anchor_feature":"b","role":"end_cap","target_feature":"tilt","cardinality":{"kind":"exactly","count":1}}}]
+    })).unwrap()
+}
+
+#[test]
+fn rigid_transform_chain_preserves_volume_semantic_faces_and_analytic_bounds() {
+    let input = transformed_recipe();
+    let first = build(&input).unwrap();
+    let model = &first.outputs["result"].result.model;
+    assert!((model.volume() - 64.0).abs() < 1e-9);
+    assert!(model.validate(Tolerance::default()).valid);
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    // Independent R_y(30) * (R_z(45) * p + [3,5,7]) + [11,13,17].
+    for x in [0.0, 8.0] {
+        for y in [0.0, 4.0] {
+            for z in [0.0, 2.0] {
+                let a = (x - y) * std::f64::consts::FRAC_1_SQRT_2 + 3.0;
+                let b = (x + y) * std::f64::consts::FRAC_1_SQRT_2 + 5.0;
+                let c = z + 7.0;
+                let p = [
+                    3.0_f64.sqrt() / 2.0 * a + 0.5 * c + 11.0,
+                    b + 13.0,
+                    -0.5 * a + 3.0_f64.sqrt() / 2.0 * c + 17.0,
+                ];
+                for i in 0..3 {
+                    min[i] = min[i].min(p[i]);
+                    max[i] = max[i].max(p[i]);
+                }
+            }
+        }
+    }
+    let bounds = model.bounds();
+    for i in 0..3 {
+        assert!((bounds.min[i] - min[i]).abs() < 1e-10);
+        assert!((bounds.max[i] - max[i]).abs() < 1e-10);
+    }
+    let cap = &first.face_assertions["cap"];
+    assert_eq!(cap.status, FaceResolutionStatus::Resolved);
+    assert_eq!(cap.witnesses.len(), 1);
+    let mut reordered = input.clone();
+    reordered.features.reverse();
+    let second = build(&reordered).unwrap();
+    assert_eq!(first.feature_hashes, second.feature_hashes);
+    assert_eq!(
+        serde_json::to_string(&*first.outputs["result"].result).unwrap(),
+        serde_json::to_string(&*second.outputs["result"].result).unwrap()
+    );
+}
+
+#[test]
+fn rigid_transform_cache_tracks_frames_but_not_logical_aliases() {
+    let mut input = transformed_recipe();
+    let mut engine = BuildEngine::default();
+    let first = engine.build(&input).unwrap();
+    assert_eq!(first.stats.computed_solids, 3);
+    assert_eq!(engine.build(&input).unwrap().stats.computed_solids, 0);
+    if let Feature::Transform { offset, .. } = &mut input.features[3] {
+        offset[0] += 0.25;
+    }
+    let moved = engine.build(&input).unwrap();
+    assert_eq!(moved.stats.computed_solids, 1);
+    assert_eq!(moved.stats.cache_hits, 2);
+    assert_ne!(first.feature_hashes["tilt"], moved.feature_hashes["tilt"]);
+    if let Feature::Transform { id, .. } = &mut input.features[3] {
+        *id = "alias".into();
+    }
+    input.outputs[0].feature = "alias".into();
+    input.face_assertions[0].selector.target_feature = "alias".into();
+    let alias = engine.build(&input).unwrap();
+    assert_eq!(alias.stats.computed_solids, 0);
+    assert_eq!(alias.feature_hashes["alias"], moved.feature_hashes["tilt"]);
+    assert!(Arc::ptr_eq(
+        &alias.outputs["result"].result,
+        &moved.outputs["result"].result
+    ));
+    assert_eq!(
+        alias.face_assertions["cap"].witnesses[0].target_feature,
+        "alias"
+    );
+    if let Feature::Transform { rotation, .. } = &mut input.features[2] {
+        *rotation = [0.0, 0.0, 0.0, 1.0];
+    }
+    let rotated = engine.build(&input).unwrap();
+    assert_eq!(rotated.stats.computed_solids, 2);
+    assert_eq!(rotated.stats.cache_hits, 1);
+    assert_ne!(rotated.feature_hashes["spin"], alias.feature_hashes["spin"]);
+}
+
+#[test]
+fn rigid_transform_strict_json_and_invalid_frames_fail_before_geometry() {
+    let valid =
+        r#"{"op":"transform","id":"t","body":"b","offset":[0.5,1e-3,0],"rotation":[0,0,0,1]}"#;
+    let feature: Feature = serde_json::from_str(valid).unwrap();
+    assert!(matches!(feature,Feature::Transform{offset,..} if offset==[0.5,0.001,0.0]));
+    for bad in [
+        valid.replace("\"body\"", "\"unknown\""),
+        valid.replace("[0,0,0,1]", "[0,0,1]"),
+        valid.replace("\"op\":\"transform\"", "\"op\":\"translate\""),
+        valid.replace(
+            "\"rotation\":[0,0,0,1]",
+            "\"rotation\":[0,0,0,1],\"rotation\":[0,0,0,1]",
+        ),
+    ] {
+        assert!(serde_json::from_str::<Feature>(&bad).is_err(), "{bad}");
+    }
+    for rotation in [
+        [0.0; 4],
+        [0.0, 0.0, 0.0, 2.0],
+        [f64::NAN, 0.0, 0.0, 1.0],
+        [0.0, 0.0, 0.0, 1.0 + 1e-10],
+    ] {
+        let mut input = transformed_recipe();
+        if let Feature::Transform { rotation: q, .. } = &mut input.features[2] {
+            *q = rotation;
+        }
+        assert!(matches!(
+            build(&input),
+            Err(BuildError::TransformFrame { .. })
+        ));
+    }
+    let mut input = transformed_recipe();
+    if let Feature::Transform { offset, .. } = &mut input.features[2] {
+        offset[2] = f64::INFINITY;
+    }
+    assert!(matches!(
+        build(&input),
+        Err(BuildError::TransformFrame { .. })
+    ));
+    let mut input = transformed_recipe();
+    if let Feature::Transform { body, .. } = &mut input.features[2] {
+        *body = "p".into();
+    }
+    assert!(matches!(build(&input), Err(BuildError::InputType { .. })));
+    let mut input = transformed_recipe();
+    if let Feature::Transform { op_version, .. } = &mut input.features[2] {
+        *op_version = 2;
+    }
+    assert!(matches!(
+        build(&input),
+        Err(BuildError::OperationVersion { .. })
+    ));
+}

@@ -16,7 +16,8 @@ A local, CLI-first CAD product built around our own Rust B-rep kernel. Recipes
 are plain text suitable for Git, results are inspectable JSON, and exports are
 STEP and STL. Modeling currently supports **orthogonal solids and strictly convex
 polygon extrusions**: slotted brackets, open trays, triangular ramps, and polygonal
-seating blocks. Reusable assemblies can place these parts with rigid rotations;
+seating blocks. Convex solids also support native rigid transforms. Reusable
+assemblies can place these parts with rigid rotations;
 Boolean modeling remains restricted to orthogonal geometry.
 
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
@@ -331,6 +332,7 @@ output(name = "bracket", feature = finished)
 | `polygon(id, points)` | Strictly convex CCW XY profile with 3–256 `[x, y]` vertices |
 | `extrude(id, profile, height)` | Extrude a rectangle or convex polygon along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
+| `transform(id, body, offset, rotation)` | Rotate exact geometry using unit quaternion `[x,y,z,w]`, then translate; both default to identity |
 | `union(id, left, right)` | Combine orthogonal material |
 | `cut(id, left, right)` | Remove right-hand orthogonal material from the left |
 | `intersect(id, left, right)` | Keep common orthogonal material |
@@ -349,6 +351,31 @@ profile = polygon(id = "ramp_profile", points = [[0, 0], [40, 0], [0, 20]])
 ramp = extrude(id = "ramp", profile = profile, height = 30)
 output(name = "ramp", feature = ramp)
 ```
+
+`transform` changes the native solid coordinates, line directions and plane
+normals; STEP/STL therefore contain the transformed part itself. It applies
+`R * point + offset`. Assembly `instance` placement remains a separate operation
+that reuses a part definition. Neither operation accepts scale, reflection or
+implicit quaternion normalization.
+
+General rotations currently support one strictly convex solid or an empty body.
+Exactly represented axis-permutation matrices also preserve the orthogonal
+nonconvex/multiple-solid domain. Near-axis rotations are not snapped: even a
+nominal quarter turn expressed with floating-point square roots may require the
+convex path. General rotated Boolean operations remain unsupported. Numeric
+range and post-transform validity are checked before publication.
+
+```python
+upright = transform(id = "upright", body = ramp,
+    rotation = [0.7071067811865476, 0, 0, 0.7071067811865476])
+placed = transform(id = "placed", body = upright, offset = [10, 20, 4],
+    rotation = [0, 0, 0.25881904510252074, 0.9659258262890683])
+```
+
+`examples/tilted_jig.star` chains these operations into two angled tools on a
+slotted base. Semantic cap/wall assertions follow the original extrusion through
+both transforms. The default jig has three solids and 18560 mm³ of material;
+parameter-edit tests check tool vertices against independent scalar formulas.
 
 All lengths are millimetres. `mm(value)` is a numeric annotation, not
 dimension-aware arithmetic. Feature references are strings; the graph builder
@@ -601,7 +628,8 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 
 - Rectangle profiles and strict CCW convex polygon profiles with 3–256 vertices.
 - Native positive-Z extrusion with authoritative polygonal caps and planar walls.
-- Translation of supported solids. Unions, cuts, intersections, open pockets,
+- Translation of supported solids; rigid exact transforms within the domain above.
+  Unions, cuts, intersections, open pockets,
   through-slots, and separated multiple solids in the orthogonal domain only.
 - General planar validation restricted to one strictly convex solid with
   supporting outward face planes. Multiple general solids are explicitly
@@ -610,7 +638,7 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 - Explicit rejection of enclosed cavities, nonmanifold contacts, unsupported
   geometry, and computations outside the numerical/resource envelope.
 
-Round holes, circles/cylinders, rotated-solid modeling, sketch constraints, general
+Round holes, circles/cylinders, general rotated nonconvex modeling, sketch constraints, general
 polygon Booleans, profiles with holes, nonconvex profiles, curved surfaces,
 fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
@@ -661,12 +689,14 @@ npm run test:depth
 npm run test:assembly
 npm run test:nested
 npm run test:polygon
+npm run test:transform
 npm run test:datums
 npm run test:gpu
 npm run test:stream
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.
+For `test:transform`, build `examples/tilted_jig.star` into `out/tilted_jig`.
 For `test:polygon`, build `examples/angled_fixture.star` into `out/angled_fixture`
 using the command above; the test checks the triangular ramp silhouette and
 picking against an independent XY half-plane oracle, including empty corners

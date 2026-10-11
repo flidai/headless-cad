@@ -203,7 +203,9 @@ impl BuildResult {
                 continue;
             }
             let slots: Vec<_> = match &graph.nodes[id] {
-                Feature::Translate { body, .. } => vec![("input", body)],
+                Feature::Translate { body, .. } | Feature::Transform { body, .. } => {
+                    vec![("input", body)]
+                }
                 Feature::Union { left, right, .. }
                 | Feature::Cut { left, right, .. }
                 | Feature::Intersect { left, right, .. } => vec![("left", left), ("right", right)],

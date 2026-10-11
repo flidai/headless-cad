@@ -195,7 +195,18 @@ Independent analytic and OCCT checks cover triangle/trapezoid/pentagon measures;
 `npm run test:polygon` checks the ramp silhouette and picking in the browser.
 This is an M2 increment, not completion of general planar or analytic modeling.
 
-Progress through rigid transforms, planar profiles with holes, curved extrusion,
+Native rigid transforms now rotate line/plane geometry and vertices, then apply
+translation. They preserve topology and explicit input-face lineage. General
+rotations are validated for one strictly convex solid; exactly represented signed
+axis permutations additionally support existing orthogonal nonconvex and
+multiple-solid inputs. No near-axis snapping or implicit quaternion normalization
+is performed. Arithmetic uncertainty, translation loss, edge displacement and
+postconditions have explicit checks. This does not enable general rotated
+Booleans or arbitrary nonconvex planar validation. `tilted_jig.star` supplies
+chained noncommuting rotations, source assertions and independent expected part
+coordinates across parameter edits.
+
+Progress through general nonconvex transforms, planar profiles with holes, curved extrusion,
 revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,
 and controlled import repair. Include open shells and cavity orientation in the
 data model before promising shelling. Each operation declares supported input
@@ -222,8 +233,8 @@ nearest face after a split. Store selector intent with source, and persist the
 resolved witness in build reports for review and regression tests.
 
 The current `cad select` query implements the first scoped contract: anchor a
-generated face role to a logical feature, follow explicit orthogonal Boolean and
-translation lineage to a target feature, and require one, N, or all nonempty
+generated face role to a logical feature, follow explicit orthogonal Boolean, translation and
+rigid-transform lineage to a target feature, and require one, N, or all nonempty
 descendants. Reports distinguish resolved, deleted, ambiguous, and unsupported,
 with snapshot fingerprints and face/operation witnesses. This is recomputed from
 source intent on each build; it is not persistent numbering. General geometric
@@ -527,7 +538,7 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation and scoped exact rigid transforms; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Topology-associated datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |

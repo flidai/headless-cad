@@ -236,6 +236,22 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(id.to_owned())
     }
 
+    /// Apply a native proper rigid transform; this produces a new solid feature.
+    fn transform(
+        id: &str,
+        body: &str,
+        offset: Option<Value>,
+        rotation: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let frame = frame(offset, rotation)?;
+        store(eval)?.feature(serde_json::json!({
+            "op":"transform", "id":id, "op_version":1, "body":body,
+            "offset":frame.translation, "rotation":frame.rotation,
+        }))?;
+        Ok(id.to_owned())
+    }
+
     fn union(id: &str, left: &str, right: &str, eval: &mut Evaluator) -> anyhow::Result<String> {
         store(eval)?.feature(serde_json::json!({
             "op":"union", "id":id, "op_version":1, "left":left, "right":right,
@@ -1141,6 +1157,52 @@ mod datum_tests {
             assert!(
                 from_starlark("bad.star", source).is_err(),
                 "accepted {source}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod transform_tests {
+    use super::*;
+
+    #[test]
+    fn native_transform_roundtrip_defaults_and_face_assertions() {
+        let source = "p=rectangle(id='p',width=8,depth=4)\nb=extrude(id='b',profile=p,height=2)\ni=transform(id='identity',body=b)\nm=transform(id='moved',body=i,offset=[0.5,1e-3,2],rotation=[0,0,1,0])\nassert_faces(id='cap',from_feature=b,role='end_cap',in_feature=m)\noutput(name='result',feature=m)";
+        let recipe = from_starlark("transform.star", source).unwrap();
+        let json = serde_json::to_string(&recipe).unwrap();
+        let restored: cad_build::Recipe = serde_json::from_str(&json).unwrap();
+        assert_eq!(json, serde_json::to_string(&restored).unwrap());
+        let first = cad_build::build(&recipe).unwrap();
+        let second = cad_build::build(&restored).unwrap();
+        assert_eq!(first.feature_hashes, second.feature_hashes);
+        assert_eq!(
+            first.face_assertions["cap"].status,
+            cad_build::FaceResolutionStatus::Resolved
+        );
+        let bounds = first.outputs["result"].result.model.bounds();
+        assert_eq!(bounds.min, [-7.5, -3.999, 2.0]);
+        assert_eq!(bounds.max, [0.5, 0.001, 4.0]);
+    }
+
+    #[test]
+    fn native_transform_rejects_invalid_quaternions_coordinates_and_fields() {
+        for arguments in [
+            "rotation=[0,0,0,0]",
+            "rotation=[0,0,0,2]",
+            "rotation=[0,0,1]",
+            "rotation=[False,0,0,1]",
+            "offset=[1,2]",
+            "offset=[1,2,True]",
+            "scale=2",
+        ] {
+            assert!(
+                from_starlark(
+                    "invalid.star",
+                    &format!("transform(id='t',body='b',{arguments})")
+                )
+                .is_err(),
+                "{arguments}"
             );
         }
     }

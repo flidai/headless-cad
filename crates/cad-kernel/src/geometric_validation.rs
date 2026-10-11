@@ -45,7 +45,7 @@ pub(super) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<Valid
 // face must be a strict supporting plane of the common convex vertex hull.
 // This excludes crossing/folded shells, coincident subdivisions, duplicate
 // geometric vertices, and inward surfaces; no generic intersection claim is made.
-fn validate_convex(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
+pub(crate) fn validate_convex(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
     if model.solids.len() != 1 || model.shells.len() != 1 {
         return issue("unsupported_geometry", "general planar geometry currently requires one convex solid; multiple general solids are unsupported");
     }

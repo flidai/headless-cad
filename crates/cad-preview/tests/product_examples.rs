@@ -193,3 +193,69 @@ fn ambitious_assemblies_remain_parametric_and_match_material_accounting() {
     assert_eq!(model.solid_count(), 2);
     assert_eq!(model.bounds().unwrap().max, [enclosure_width, 68.0, 51.0]);
 }
+
+#[test]
+fn tilted_jig_parameter_edits_preserve_exact_tool_coordinates_and_cap_intent() {
+    use cad_build::{FaceCardinality, FaceResolutionStatus, FaceSelector};
+    use std::collections::BTreeMap;
+    let source = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/tilted_jig.star"),
+    )
+    .unwrap();
+    let cosine = 3.0_f64.sqrt() / 2.0;
+    for (length, rise, span) in [(30.0, 12.0, 8.0), (10.0, 3.0, 3.0), (20.0, 20.0, 6.0)] {
+        let params = BTreeMap::from([
+            ("tool_length".into(), length),
+            ("tool_rise".into(), rise),
+            ("tool_span".into(), span),
+        ]);
+        let recipe =
+            cad_recipe::from_starlark_with_params("tilted_jig.star", &source, &params).unwrap();
+        let built = cad_build::build(&recipe).unwrap();
+        let model = &built.outputs["left_tool"].result.model;
+        // Independent scalar coordinates: stand the triangular section upright,
+        // then turn its X/thickness basis by 30 degrees in the base plane.
+        let mut expected_points = Vec::new();
+        for thickness in [0.0, span] {
+            for (along, up) in [(0.0, 0.0), (length, 0.0), (0.0, rise)] {
+                expected_points.push([
+                    10.0 + cosine * along + 0.5 * thickness,
+                    20.0 + 0.5 * along - cosine * thickness,
+                    4.0 + up,
+                ]);
+            }
+        }
+        assert_eq!(model.vertices.len(), expected_points.len());
+        for expected in expected_points {
+            assert_eq!(
+                model
+                    .vertices
+                    .iter()
+                    .filter(|vertex| {
+                        (0..3).all(|axis| (vertex.position[axis] - expected[axis]).abs() < 1e-7)
+                    })
+                    .count(),
+                1,
+                "missing or duplicated analytic point {expected:?}"
+            );
+        }
+        assert!((model.volume() - length * rise * span / 2.0).abs() < 1e-7);
+        assert!(
+            (built.assemblies["tilted_jig"].material_volume() - (15680.0 + length * rise * span))
+                .abs()
+                < 1e-7
+        );
+        let selection = built.resolve_faces(&FaceSelector {
+            anchor_feature: "tool_blank".into(),
+            role: "end_cap".into(),
+            target_feature: "left_tool".into(),
+            cardinality: FaceCardinality::Exactly { count: 1 },
+        });
+        assert_eq!(selection.status, FaceResolutionStatus::Resolved);
+        let face = &model.faces[selection.witnesses[0].target_face.0];
+        let expected_normal = [0.5, -cosine, 0.0];
+        for (actual, expected) in face.plane.normal.into_iter().zip(expected_normal) {
+            assert!((actual - expected).abs() < 1e-12);
+        }
+    }
+}

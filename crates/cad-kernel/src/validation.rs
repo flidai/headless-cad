@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 #[path = "geometric_validation.rs"]
-mod geometry;
+pub(crate) mod geometry;
 
 // Bound aggregate quadratic face-orientation work before following topology.
 // A per-face vertex cap alone does not bound repeated/malformed face references.

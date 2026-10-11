@@ -117,3 +117,39 @@ fn rotated_triangular_prism_assembly_has_correct_world_mesh() {
     assert_eq!(step.matches("FACE_SURFACE(").count(), 5);
     assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 1);
 }
+
+#[test]
+fn rigid_solid_transform_exports_exact_planes_and_closed_oriented_mesh() {
+    let tolerance = Tolerance::default();
+    let original =
+        cad_kernel::extrude_polygon(&[[0., 0.], [8., 0.], [0., 6.]], 5., tolerance).unwrap();
+    let q = std::f64::consts::FRAC_1_SQRT_2;
+    let first =
+        cad_kernel::transform(&original.model, [10., 0., 0.], [q, 0., 0., q], tolerance).unwrap();
+    let result =
+        cad_kernel::transform(&first.model, [0., 20., 0.], [0., q, 0., q], tolerance).unwrap();
+    let stl = to_stl(&result.model, tolerance).unwrap();
+    check_mesh(&stl, 120., 8);
+    for line in stl
+        .lines()
+        .filter(|line| line.trim_start().starts_with("vertex "))
+    {
+        let p: Vec<f64> = line
+            .split_whitespace()
+            .skip(1)
+            .map(|v| v.parse().unwrap())
+            .collect();
+        // Independent Rx90 then Ry90 composition, including both translations.
+        assert!(original.model.vertices.iter().any(|vertex| {
+            let [x, y, z] = vertex.position;
+            p.iter()
+                .zip([y, 20. - z, -10. - x])
+                .all(|(a, b)| (a - b).abs() < 1e-12)
+        }));
+    }
+    let step = to_step(&result.model, tolerance).unwrap();
+    assert_eq!(step.matches("FACE_SURFACE(").count(), 5);
+    assert_eq!(step.matches("PLANE(").count(), 5);
+    assert_eq!(step.matches("FACETED_BREP('").count(), 1);
+    assert_eq!(step, to_step(&result.model, tolerance).unwrap());
+}

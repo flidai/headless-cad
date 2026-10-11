@@ -5,8 +5,8 @@
 
 pub use cad_kernel::MAX_POLYGON_POINTS;
 use cad_kernel::{
-    boolean, extrude_polygon, extrude_rectangle, translate, validate_polygon, BooleanOp,
-    OperationResult, Tolerance, KERNEL_BUILD_ID, KERNEL_VERSION,
+    boolean, extrude_polygon, extrude_rectangle, transform, translate, validate_polygon,
+    validate_transform, BooleanOp, OperationResult, Tolerance, KERNEL_BUILD_ID, KERNEL_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -167,6 +167,13 @@ pub enum Feature {
         offset: [f64; 3],
         op_version: u32,
     },
+    Transform {
+        id: String,
+        body: String,
+        offset: [f64; 3],
+        rotation: [f64; 4],
+        op_version: u32,
+    },
     Union {
         id: String,
         left: String,
@@ -212,6 +219,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut height = None;
                 let mut body = None;
                 let mut offset = None;
+                let mut rotation = None;
                 let mut left = None;
                 let mut right = None;
                 let mut seen = Vec::new();
@@ -235,6 +243,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "height" => read_field!(height, f64),
                         "body" => read_field!(body, String),
                         "offset" => read_field!(offset, [f64; 3]),
+                        "rotation" => read_field!(rotation, [f64; 4]),
                         "left" => read_field!(left, String),
                         "right" => read_field!(right, String),
                         _ => {
@@ -251,6 +260,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "height",
                                     "body",
                                     "offset",
+                                    "rotation",
                                     "left",
                                     "right",
                                 ],
@@ -267,6 +277,7 @@ impl<'de> Deserialize<'de> for Feature {
                     "polygon" => &["op", "id", "op_version", "points"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
+                    "transform" => &["op", "id", "op_version", "body", "offset", "rotation"],
                     "union" => &["op", "id", "op_version", "left", "right"],
                     "cut" => &["op", "id", "op_version", "left", "right"],
                     "intersect" => &["op", "id", "op_version", "left", "right"],
@@ -278,6 +289,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "polygon",
                                 "extrude",
                                 "translate",
+                                "transform",
                                 "union",
                                 "cut",
                                 "intersect",
@@ -314,6 +326,13 @@ impl<'de> Deserialize<'de> for Feature {
                         body: body.ok_or_else(|| M::Error::missing_field("body"))?,
                         offset: offset.ok_or_else(|| M::Error::missing_field("offset"))?,
                     },
+                    "transform" => Feature::Transform {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        offset: offset.ok_or_else(|| M::Error::missing_field("offset"))?,
+                        rotation: rotation.ok_or_else(|| M::Error::missing_field("rotation"))?,
+                    },
                     "union" => Feature::Union {
                         id,
                         op_version,
@@ -347,6 +366,7 @@ impl Feature {
             | Self::Polygon { id, .. }
             | Self::Extrude { id, .. }
             | Self::Translate { id, .. }
+            | Self::Transform { id, .. }
             | Self::Union { id, .. }
             | Self::Cut { id, .. }
             | Self::Intersect { id, .. } => id,
@@ -356,7 +376,7 @@ impl Feature {
         match self {
             Self::Rectangle { .. } | Self::Polygon { .. } => vec![],
             Self::Extrude { profile, .. } => vec![profile],
-            Self::Translate { body, .. } => vec![body],
+            Self::Translate { body, .. } | Self::Transform { body, .. } => vec![body],
             Self::Union { left, right, .. }
             | Self::Cut { left, right, .. }
             | Self::Intersect { left, right, .. } => vec![left, right],
@@ -371,6 +391,7 @@ impl Feature {
             | Self::Polygon { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Translate { op_version, .. }
+            | Self::Transform { op_version, .. }
             | Self::Union { op_version, .. }
             | Self::Cut { op_version, .. }
             | Self::Intersect { op_version, .. } => *op_version,
@@ -382,6 +403,7 @@ impl Feature {
             Self::Polygon { .. } => "polygon",
             Self::Extrude { .. } => "extrude",
             Self::Translate { .. } => "translate",
+            Self::Transform { .. } => "transform",
             Self::Union { .. } => "union",
             Self::Cut { .. } => "cut",
             Self::Intersect { .. } => "intersect",
@@ -480,6 +502,8 @@ pub enum BuildError {
     },
     #[error("feature '{feature}' offset must contain finite lengths")]
     Offset { feature: String },
+    #[error("feature '{feature}' has an invalid rigid transform: {message}")]
+    TransformFrame { feature: String, message: String },
     #[error("feature '{feature}' parameter '{parameter}' must be finite and positive")]
     Dimension {
         feature: String,
@@ -616,6 +640,13 @@ fn hash_feature(
         }
         Feature::Extrude { height, .. } => {
             hash.update(&height.to_le_bytes());
+        }
+        Feature::Transform {
+            offset, rotation, ..
+        } => {
+            for value in offset.iter().chain(rotation.iter()) {
+                hash.update(&value.to_le_bytes());
+            }
         }
         Feature::Translate { offset, .. } => {
             for value in offset {
@@ -825,6 +856,17 @@ impl BuildEngine {
                         message: error.to_string(),
                     })?,
                 Feature::Extrude { id, height, .. } => dimension(id, "height", *height)?,
+                Feature::Transform {
+                    id,
+                    offset,
+                    rotation,
+                    ..
+                } => validate_transform(*offset, *rotation).map_err(|error| {
+                    BuildError::TransformFrame {
+                        feature: id.clone(),
+                        message: error.to_string(),
+                    }
+                })?,
                 Feature::Translate { id, offset, .. } if offset.iter().any(|x| !x.is_finite()) => {
                     return Err(BuildError::Offset {
                         feature: id.clone(),
@@ -893,6 +935,12 @@ impl BuildEngine {
                             }
                             _ => unreachable!("profile types validated before execution"),
                         },
+                        Feature::Transform {
+                            body,
+                            offset,
+                            rotation,
+                            ..
+                        } => transform(&evaluated[body].model, *offset, *rotation, tolerance),
                         Feature::Translate { body, offset, .. } => {
                             translate(&evaluated[body].model, *offset, tolerance)
                         }
