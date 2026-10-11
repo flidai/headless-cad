@@ -1887,3 +1887,235 @@ fn semantic_datum_diff_tracks_intent_even_when_resolved_frame_is_unchanged() {
     assert_eq!(datum["before"]["frame"], datum["after"]["frame"]);
     assert_ne!(datum["before"]["definition"], datum["after"]["definition"]);
 }
+
+const SELECTIVE_RECIPE: &str = r#"
+h = param(name="unused_height", default=7)
+def box(id, width, height):
+    return extrude(id=id,profile=rectangle(id=id+"_profile",width=width,depth=3),height=height)
+a = box("a",2,4)
+b = box("b",5,h)
+output(name="first",feature=a)
+output(name="second",feature=b)
+"#;
+
+#[test]
+fn selected_generations_skip_work_keep_source_and_replace_all_previous_artifacts() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("scope.star");
+    let out = dir.path().join("out");
+    let cache = dir.path().join("cache");
+    fs::write(&recipe, SELECTIVE_RECIPE).unwrap();
+    let args = [
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ];
+    let full = successful_json(cli(&args));
+    assert_eq!(full["scope"]["mode"], "all");
+    assert!(out.join("second.step").exists());
+    let mut selected = args.to_vec();
+    selected.extend(["--output", "first"]);
+    let result = successful_json(cli(&selected));
+    assert_eq!(result["scope"]["mode"], "selected");
+    assert_eq!(
+        result["scope"]["requested_outputs"],
+        serde_json::json!(["first"])
+    );
+    assert_eq!(
+        result["scope"]["evaluated_features"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        result["scope"]["skipped_features"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(result["outputs"].as_object().unwrap().len(), 1);
+    assert!(!out.join("second.step").exists());
+    assert_eq!(
+        fs::read_to_string(out.join("recipe.star")).unwrap(),
+        SELECTIVE_RECIPE
+    );
+    let captured: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("recipe.json")).unwrap()).unwrap();
+    assert_eq!(captured["outputs"].as_array().unwrap().len(), 2);
+    assert_ne!(full["recipe_context_hash"], result["recipe_context_hash"]);
+    let mut unrelated = selected.clone();
+    unrelated.extend(["--param", "unused_height=9"]);
+    let changed = successful_json(cli(&unrelated));
+    assert_eq!(
+        changed["outputs"]["first"]["content_hash"],
+        result["outputs"]["first"]["content_hash"]
+    );
+    assert_eq!(changed["stats"]["disk_cache_hits"], 1);
+    assert_eq!(changed["stats"]["computed_solids"], 0);
+    let original = artifact_bytes(&out);
+    let mut unknown = args.to_vec();
+    unknown.extend(["--output", "missing"]);
+    let failed = cli(&unknown);
+    assert!(!failed.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+    assert_eq!(error["code"], "unknown_selected_output");
+    assert_eq!(error["output"], "missing");
+    assert_eq!(artifact_bytes(&out), original);
+    let inspected = successful_json(cli(&[
+        "inspect",
+        recipe.to_str().unwrap(),
+        "--output",
+        "second",
+        "--output",
+        "first",
+        "--output",
+        "second",
+    ]));
+    assert_eq!(
+        inspected["scope"]["requested_outputs"],
+        serde_json::json!(["first", "second"])
+    );
+    assert_eq!(inspected["outputs"].as_object().unwrap().len(), 2);
+    let properties = successful_json(cli(&[
+        "properties",
+        recipe.to_str().unwrap(),
+        "--output",
+        "first",
+    ]));
+    assert_eq!(properties["scope"]["mode"], "selected");
+    assert_eq!(
+        properties["scope"]["evaluated_features"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn selected_builds_enforce_global_assertions_and_check_remains_eager() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("scope.star");
+    let out = dir.path().join("out");
+    fs::write(&recipe, SELECTIVE_RECIPE).unwrap();
+    let args = [
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--output",
+        "first",
+    ];
+    successful_json(cli(&args));
+    let original = artifact_bytes(&out);
+    fs::write(&recipe, format!("{SELECTIVE_RECIPE}\nassert_faces(id=\"global\",from_feature=b,role=\"end_cap\",in_feature=b,count=2)\n")).unwrap();
+    let failed = cli(&args);
+    assert!(!failed.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+    assert_eq!(error["code"], "face_assertion_failed");
+    assert_eq!(artifact_bytes(&out), original);
+    fs::write(
+        &recipe,
+        SELECTIVE_RECIPE.replace("b = box(\"b\",5,h)", "b = box(\"b\",5,-1)"),
+    )
+    .unwrap();
+    assert!(!cli(&["check", recipe.to_str().unwrap()]).status.success());
+    fs::write(&recipe, SELECTIVE_RECIPE).unwrap();
+    let eager = successful_json(cli(&["check", recipe.to_str().unwrap()]));
+    assert_eq!(eager["scope"]["mode"], "all");
+    assert_eq!(
+        eager["scope"]["evaluated_features"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+    assert_eq!(eager["outputs"].as_object().unwrap().len(), 2);
+}
+
+#[test]
+fn watch_forwards_output_scope_and_bom_evaluates_selected_assembly() {
+    struct Running(std::process::Child);
+    impl Drop for Running {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("scope.star");
+    let out = dir.path().join("out");
+    fs::write(&recipe, SELECTIVE_RECIPE).unwrap();
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_cad"))
+            .args([
+                "watch",
+                recipe.to_str().unwrap(),
+                "--out-dir",
+                out.to_str().unwrap(),
+                "--output",
+                "first",
+                "--interval-ms",
+                "10",
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let wait = |volume| {
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        loop {
+            if let Ok(bytes) = fs::read(out.join("manifest.json")) {
+                let manifest: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+                if manifest["outputs"]["first"]["volume_mm3"] == volume {
+                    return manifest;
+                }
+            }
+            assert!(
+                std::time::Instant::now() < end,
+                "watch did not publish expected volume"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    };
+    let first = wait(serde_json::json!(24.));
+    assert_eq!(
+        first["scope"]["requested_outputs"],
+        serde_json::json!(["first"])
+    );
+    assert!(!out.join("second.step").exists());
+    fs::write(
+        &recipe,
+        SELECTIVE_RECIPE.replace("a = box(\"a\",2,4)", "a = box(\"a\",2,5)"),
+    )
+    .unwrap();
+    let next = wait(serde_json::json!(30.));
+    assert_eq!(next["scope"]["mode"], "selected");
+    assert!(!out.join("second.step").exists());
+    drop(_running);
+    fs::write(&recipe, format!("{SELECTIVE_RECIPE}\np=part(id=\"part\",body=a)\nassembly_output(name=\"group\",assembly=assembly(id=\"group\",instances=[instance(id=\"item\",part=p)]))\n")).unwrap();
+    let bom = successful_json(cli(&[
+        "bom",
+        recipe.to_str().unwrap(),
+        "--assembly",
+        "group",
+    ]));
+    assert_eq!(bom["build_scope"]["mode"], "selected");
+    assert_eq!(
+        bom["build_scope"]["requested_outputs"],
+        serde_json::json!(["group"])
+    );
+    assert_eq!(
+        bom["build_scope"]["evaluated_features"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+}

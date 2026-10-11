@@ -22,6 +22,7 @@ jobs:
       - run: cargo run --locked -p cad-cli -- build examples/clipped_tools.star --out-dir out/clipped_tools
       - run: cargo run --locked -p cad-cli -- build examples/balance_arm.star --out-dir out/balance_arm
       - run: cargo run --locked -p cad-cli -- build examples/surface_mount.star --out-dir out/surface_mount
+      - run: cargo run --locked -p cad-cli -- build examples/workcell_line.star --output service_station --out-dir out/service_station
       - run: cargo run --locked -p cad-cli -- properties examples/balance_arm.star --output balance_arm
       - run: python3 crates/cad-export/tools/check_bom_csv.py out/modular_rack/modular_rack.bom.csv out/modular_rack/modular_rack.bom.json
       - run: cargo run --locked -p cad-cli -- select examples/reference_fixture.star --from blank --role end_cap --in finished --all

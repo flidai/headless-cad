@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "description": "Inspect 1000 stations / 40 tool variants; no explicit geometry cache; alternating all/selected fresh processes.",
+  "limitations": "Local shared-host observations, not release gates. RSS includes compiler, full structural checks, selected geometry, assembly materialization and JSON reporting. OS file caches are uncontrolled. No exact-body residency limit.",
+  "platform": "Linux-6.18.54-x86_64-with-glibc2.42",
+  "logical_cpus": 16,
+  "binary_sha256": "a9b804a12360cf15ce54375c3b84c6b880b20e5197ad6de82ac12855c485f0bc",
+  "recipe_sha256": "b084ffd011d19f8327b9bd6547d60a809c66a33023b130481ab2d9f5dad56aca",
+  "executor_build_id": "ba3712ef762ba506cd965b10de23f5580079cf79c1b482a7cf5ed9cdbd347ef0",
+  "parameters": {
+    "stations": 1000,
+    "columns": 25,
+    "variants": 40
+  },
+  "samples": {
+    "all": [
+      {
+        "wall_seconds": 0.08030062890611589,
+        "peak_rss_kib": 23312,
+        "user_seconds": 0.072673,
+        "system_seconds": 0.006056,
+        "stats": {
+          "cache_hits": 0,
+          "computed_solids": 43,
+          "disk_cache_hits": 0
+        },
+        "evaluated_features": 86,
+        "skipped_features": 0,
+        "outputs": [
+          "service_station",
+          "workcell_line"
+        ]
+      },
+      {
+        "wall_seconds": 0.07215449202340096,
+        "peak_rss_kib": 23216,
+        "user_seconds": 0.064772,
+        "system_seconds": 0.006974999999999999,
+        "stats": {
+          "cache_hits": 0,
+          "computed_solids": 43,
+          "disk_cache_hits": 0
+        },
+        "evaluated_features": 86,
+        "skipped_features": 0,
+        "outputs": [
+          "service_station",
+          "workcell_line"
+        ]
+      },
+      {
+        "wall_seconds": 0.08846758503932506,
+        "peak_rss_kib": 23116,
+        "user_seconds": 0.07511,
+        "system_seconds": 0.013019999999999999,
+        "stats": {
+          "cache_hits": 0,
+          "computed_solids": 43,
+          "disk_cache_hits": 0
+        },
+        "evaluated_features": 86,
+        "skipped_features": 0,
+        "outputs": [
+          "service_station",
+          "workcell_line"
+        ]
+      }
+    ],
+    "service_station": [
+      {
+        "wall_seconds": 0.02594988199416548,
+        "peak_rss_kib": 21244,
+        "user_seconds": 0.018474,
+        "system_seconds": 0.007183999999999999,
+        "stats": {
+          "cache_hits": 0,
+          "computed_solids": 4,
+          "disk_cache_hits": 0
+        },
+        "evaluated_features": 8,
+        "skipped_features": 78,
+        "outputs": [
+          "service_station"
+        ]
+      },
+      {
+        "wall_seconds": 0.025094765005633235,
+        "peak_rss_kib": 21200,
+        "user_seconds": 0.017848,
+        "system_seconds": 0.006940999999999999,
+        "stats": {
+          "cache_hits": 0,
+          "computed_solids": 4,
+          "disk_cache_hits": 0
+        },
+        "evaluated_features": 8,
+        "skipped_features": 78,
+        "outputs": [
+          "service_station"
+        ]
+      },
+      {
+        "wall_seconds": 0.027451968984678388,
+        "peak_rss_kib": 21200,
+        "user_seconds": 0.016078,
+        "system_seconds": 0.011053,
+        "stats": {
+          "cache_hits": 0,
+          "computed_solids": 4,
+          "disk_cache_hits": 0
+        },
+        "evaluated_features": 8,
+        "skipped_features": 78,
+        "outputs": [
+          "service_station"
+        ]
+      }
+    ]
+  },
+  "medians": {
+    "all": {
+      "wall_seconds": 0.08030062890611589,
+      "peak_rss_kib": 23216
+    },
+    "service_station": {
+      "wall_seconds": 0.02594988199416548,
+      "peak_rss_kib": 21200
+    }
+  }
+}

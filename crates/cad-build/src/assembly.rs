@@ -177,10 +177,19 @@ pub(super) fn evaluate(
     evaluated: &HashMap<String, Arc<OperationResult>>,
     tolerance: Tolerance,
     face_datums: &ResolvedFaceDatums,
+    requested_outputs: &[String],
 ) -> Result<BTreeMap<String, BuiltAssembly>, BuildError> {
+    let selected: Vec<_> = recipe
+        .assembly_outputs
+        .iter()
+        .filter(|o| requested_outputs.binary_search(&o.name).is_ok())
+        .collect();
+    let (needed_assemblies, needed_parts) =
+        demand::assembly_closure(recipe, selected.iter().map(|o| o.assembly.as_str()));
     let parts: BTreeMap<_, _> = recipe
         .parts
         .iter()
+        .filter(|definition| needed_parts.contains(definition.id.as_str()))
         .map(|definition| {
             (
                 definition.id.clone(),
@@ -211,11 +220,12 @@ pub(super) fn evaluate(
     let definitions: BTreeMap<_, _> = recipe
         .assemblies
         .iter()
+        .filter(|definition| needed_assemblies.contains(definition.id.as_str()))
         .map(|definition| (definition.id.clone(), definition.clone()))
         .collect();
     let mut built = HashMap::new();
     let mut outputs = BTreeMap::new();
-    for output in &recipe.assembly_outputs {
+    for output in selected {
         if !built.contains_key(&output.assembly) {
             let assembly = BuiltAssembly::from_definitions(
                 output.assembly.clone(),

@@ -217,6 +217,7 @@ mod tests {
                 crate::Cli {
                     command: crate::Command::Build {
                         display_only: false,
+                        outputs: Vec::new(),
                         recipe: recipe.clone(),
                         out_dir: output.clone(),
                     },
@@ -287,6 +288,7 @@ mod tests {
                 crate::Cli {
                     command: crate::Command::Build {
                         display_only: false,
+                        outputs: Vec::new(),
                         recipe: recipe.clone(),
                         out_dir: output.clone(),
                     },

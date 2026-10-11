@@ -333,8 +333,22 @@ The target builder evaluates the dependency closure of requested outputs and
 validation policies, reuses verified immutable results, and loads exact bodies
 only for operations that require them. Bound exact-body residency separately
 from display caches; allow eviction and recomputation without losing provenance.
-The present eager local evaluation is not this demand-driven build service.
-Benchmark a one-part edit inside a large assembly as well as opening its viewer.
+The local builder now supports explicit output selection while retaining eager
+`build()` and full `check` behavior. It validates the whole recipe structurally,
+then evaluates selected body/assembly dependencies plus every global assertion
+and face-datum dependency. Reports list requested outputs, evaluated/skipped
+features and validation roots. Unknown outputs fail before geometry evaluation;
+only selected assemblies are materialized. Published source stays complete,
+and selected publication replaces a complete selected generation rather than
+merging artifacts from different scopes.
+
+This is dependency-based execution, not yet bounded exact-body residency:
+evaluated intermediates and the engine's memory cache remain resident. Source
+compilation, structural validation and global obligations still have full-recipe
+cost. Benchmark a one-part edit inside a large assembly as well as opening its
+viewer. `workcell_line.star` provides a separately requested service station;
+independent tests cover unselected edits, one-tool regeneration and a 1,000-station
+recipe with 40 unique tool variants.
 
 A configuration identity must include the pinned definition revision, resolved
 parameters, suppression rules and material overrides. Specify whether a
@@ -649,6 +663,28 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 `node tools/preview-check/stream-benchmark.cjs` after serving the workcell; set
 `CAD_BROWSER` to the browser executable and optionally `CAD_STREAM_URL`.
 
+### Recorded selective-regeneration sample
+
+A local Linux run inspected `workcell_line.star` with 1,000 stations, 25 columns
+and 40 tool variants. Three alternating fresh-process samples per mode used the
+release CLI without an explicit geometry cache. The full output has 5,000 leaf
+occurrences; the separately selected service station has five.
+
+| Mode | Evaluated features / computed unique solids | Median process wall time | Median peak resident memory |
+| --- | --- | --- | --- |
+| All outputs | 86 / 43 | 80.3 ms | 23,216 KiB |
+| Service station | 8 / 4 | 25.9 ms | 21,200 KiB |
+
+This small planar-geometry workload measures compilation, whole-recipe structural
+checks, geometry execution, selected assembly materialization and inspect JSON
+reporting together. It excludes exports/viewing; OS file caches are uncontrolled.
+These shared-host observations are not latency guarantees or evidence of bounded
+exact-body memory. [Raw samples](benchmarks/selective-workcell-local.json) include
+binary/recipe digests, executor identity, CPU count and per-process `wait4` data.
+Reproduce with `python3 scripts/benchmark_selective.py --report /tmp/selective.json`
+after building the release CLI. Independent edit tests separately verify zero
+new solids for an unselected-tool edit and one for the selected tool.
+
 ## Implemented baseline and remaining work
 
 | Area | Implemented now | Target work |
@@ -657,7 +693,7 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 | Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation and scoped exact rigid transforms and bounded convex intersection; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
-| Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
+| Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, frustum culling, bounded geometry cache and proxy fallback | Spatial BVHs, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
 | Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |

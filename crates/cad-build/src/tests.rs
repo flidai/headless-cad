@@ -1602,3 +1602,183 @@ fn associative_face_datums_resolve_through_convex_intersections_and_rigid_transf
         assert!((a - b).abs() < 1e-12);
     }
 }
+
+#[test]
+fn selected_outputs_skip_runtime_unsupported_branches_but_never_structural_validation() {
+    let mut recipe = convex_intersection_recipe(3.0);
+    recipe.face_assertions.clear();
+    recipe.features[5] = Feature::Union {
+        id: "overlap".into(),
+        left: "square".into(),
+        right: "diamond".into(),
+        op_version: 1,
+    };
+    recipe.outputs.push(Output {
+        name: "simple".into(),
+        feature: "square".into(),
+    });
+    let mut engine = BuildEngine::default();
+    let selected = engine
+        .build_outputs(&recipe, &["simple".into(), "simple".into()])
+        .unwrap();
+    assert_eq!(selected.stats.computed_solids, 1);
+    assert_eq!(selected.scope.mode, BuildMode::Selected);
+    assert_eq!(selected.scope.requested_outputs, vec!["simple"]);
+    assert_eq!(
+        selected.scope.evaluated_features,
+        vec!["square", "square_profile"]
+    );
+    assert_eq!(
+        selected.scope.skipped_features,
+        vec!["diamond", "overlap", "tool", "tool_profile"]
+    );
+    assert_eq!(selected.feature_hashes.len(), 2);
+    for (anchor, target) in [("diamond", "diamond"), ("square", "overlap")] {
+        let report = selected.resolve_faces(&FaceSelector {
+            anchor_feature: anchor.into(),
+            role: "end_cap".into(),
+            target_feature: target.into(),
+            cardinality: FaceCardinality::Exactly { count: 1 },
+        });
+        assert_eq!(report.status, FaceResolutionStatus::Unsupported);
+        assert!(report
+            .diagnostic
+            .contains("not evaluated in this build scope"));
+    }
+    assert!(matches!(
+        engine.build(&recipe),
+        Err(BuildError::Kernel { .. })
+    ));
+    assert!(matches!(
+        engine.build_outputs(&recipe, &[]),
+        Err(BuildError::EmptyOutputSelection)
+    ));
+    assert!(matches!(
+        engine.build_outputs(&recipe, &["typo".into()]),
+        Err(BuildError::UnknownSelectedOutput(_))
+    ));
+    let original = recipe.features.clone();
+    recipe.features[5] = Feature::Union {
+        id: "overlap".into(),
+        left: "overlap".into(),
+        right: "diamond".into(),
+        op_version: 1,
+    };
+    assert!(matches!(
+        engine.build_outputs(&recipe, &["simple".into()]),
+        Err(BuildError::Cycle(_))
+    ));
+    recipe.features = original;
+    if let Feature::Rectangle { width, .. } = &mut recipe.features[2] {
+        *width = -1.0;
+    }
+    assert!(matches!(
+        engine.build_outputs(&recipe, &["simple".into()]),
+        Err(BuildError::Dimension { .. })
+    ));
+}
+
+#[test]
+fn selected_nested_assembly_closure_shares_parts_and_unrelated_edits_compute_nothing() {
+    let mut recipe = nested_recipe();
+    recipe.features.extend([
+        Feature::Rectangle {
+            id: "unused_profile".into(),
+            width: 7.0,
+            depth: 9.0,
+            op_version: 1,
+        },
+        Feature::Extrude {
+            id: "unused_body".into(),
+            profile: "unused_profile".into(),
+            height: 2.0,
+            op_version: 1,
+        },
+    ]);
+    let mut part = recipe.parts[0].clone();
+    part.id = "unused_part".into();
+    part.feature = "unused_body".into();
+    recipe.parts.push(part);
+    let mut assembly = recipe.assemblies[0].clone();
+    assembly.id = "unused_assembly".into();
+    assembly.instances[0].part = "unused_part".into();
+    recipe.assemblies.push(assembly);
+    recipe.assembly_outputs.push(AssemblyOutput {
+        name: "unused".into(),
+        assembly: "unused_assembly".into(),
+    });
+    let mut engine = BuildEngine::default();
+    let first = engine.build_outputs(&recipe, &["assembly".into()]).unwrap();
+    assert_eq!(first.stats.computed_solids, 1);
+    assert_eq!(first.assemblies.len(), 1);
+    assert_eq!(first.assemblies["assembly"].instances.len(), 2);
+    assert_eq!(first.assemblies["assembly"].parts.len(), 1);
+    assert_eq!(first.assemblies["assembly"].hierarchy.len(), 3);
+    assert_eq!(
+        first.scope.skipped_features,
+        vec!["unused_body", "unused_profile"]
+    );
+    if let Feature::Extrude { height, .. } = &mut recipe.features[3] {
+        *height = 3.0;
+    }
+    let second = engine.build_outputs(&recipe, &["assembly".into()]).unwrap();
+    assert_eq!(second.stats.computed_solids, 0);
+    assert_eq!(second.stats.cache_hits, 1);
+    assert_eq!(first.feature_hashes, second.feature_hashes);
+    assert_eq!(
+        first.assemblies["assembly"].content_hash,
+        second.assemblies["assembly"].content_hash
+    );
+    let eager = engine.build(&recipe).unwrap();
+    assert_eq!(eager.scope.mode, BuildMode::All);
+    assert!(eager.scope.skipped_features.is_empty());
+    assert_eq!(eager.assemblies.len(), 2);
+}
+
+#[test]
+fn selected_outputs_keep_all_global_assertion_and_datum_obligations() {
+    let mut recipe = convex_intersection_recipe(3.0);
+    recipe.outputs.push(Output {
+        name: "simple".into(),
+        feature: "square".into(),
+    });
+    let result = BuildEngine::default()
+        .build_outputs(&recipe, &["simple".into()])
+        .unwrap();
+    assert_eq!(result.outputs.len(), 1);
+    assert_eq!(result.face_assertions.len(), 4);
+    assert_eq!(result.scope.evaluated_features.len(), 6);
+    assert_eq!(
+        result.scope.validation_roots,
+        vec!["overlap", "square", "tool"]
+    );
+    recipe.face_assertions[0].selector.role = "absent".into();
+    assert!(matches!(
+        BuildEngine::default().build_outputs(&recipe, &["simple".into()]),
+        Err(BuildError::FaceAssertionFailed { .. })
+    ));
+    recipe.face_assertions[0].selector.anchor_feature = "missing".into();
+    assert!(matches!(
+        BuildEngine::default().build_outputs(&recipe, &["simple".into()]),
+        Err(BuildError::FaceAssertionFailed { .. })
+    ));
+    for (cut_x, cut_width, success) in [(-1.0, 3.0, true), (4.0, 2.0, false), (-1.0, 12.0, false)] {
+        let mut recipe = face_datum_recipe(4.0, cut_x, cut_width);
+        recipe.outputs.push(Output {
+            name: "block".into(),
+            feature: "block".into(),
+        });
+        let built = BuildEngine::default().build_outputs(&recipe, &["block".into()]);
+        if success {
+            let built = built.unwrap();
+            assert!(built.assemblies.is_empty());
+            assert_eq!(
+                built.face_datums["basepart"]["seat"].frame.translation,
+                [7.0, 6.0, 7.0]
+            );
+            assert!(built.scope.validation_roots.contains(&"trimmed".to_owned()));
+        } else {
+            assert!(matches!(built, Err(BuildError::FaceDatumFailed { .. })));
+        }
+    }
+}

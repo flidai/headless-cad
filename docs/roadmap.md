@@ -87,6 +87,14 @@ contain their transformed native coordinates.
    plus `angled_fixture.star` and the browser `test:polygon` silhouette/picking
    regression as curved primitives and trim handling are introduced.
 
+Selected-output execution now evaluates a requested dependency closure while
+retaining complete structural checks and all global semantic obligations.
+`workcell_line.star --output service_station` builds four unique solids; an edit
+to an unselected tool computes none, and an edit to the selected tool computes
+one. A 1,000-station/40-tool test verifies the same four-solid closure. This is
+rebuild-count evidence, not a peak-memory or latency gate: bounded exact-body
+residency, parallel scheduling and isolated workers remain to implement.
+
 The M6 mass-properties increment uses `balance_arm.star`: a rotated beam,
 mixed-density payload/counterweight, and rigid attachment chain. Position edits
 change the material center and inertia while reusing part geometry. Independent

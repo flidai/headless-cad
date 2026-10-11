@@ -4,6 +4,9 @@
 count_value = param(name = "stations", default = 12)
 columns_value = param(name = "columns", default = 4)
 variants_value = param(name = "variants", default = 12)
+edited_variant_value = param(name = "edited_variant", default = 0)
+tool_rise_extra = param(name = "tool_rise_extra", default = 0)
+edited_variant = int(edited_variant_value)
 count = int(count_value)
 columns = int(columns_value)
 variants = int(variants_value)
@@ -12,6 +15,10 @@ def check_parameters():
         fail("stations, columns, and variants must be integers")
     if count < 1 or count > 1000 or columns < 1 or columns > count:
         fail("stations must be 1..1000 and columns must be 1..stations")
+    if edited_variant != edited_variant_value or edited_variant < 0 or edited_variant >= variants:
+        fail("edited_variant must identify one declared variant")
+    if tool_rise_extra < -2 or tool_rise_extra > 10:
+        fail("tool_rise_extra must be -2..10 millimetres")
     if variants < 1 or variants > 40 or variants > count:
         fail("variants must be 1..40 and no greater than stations")
 check_parameters()
@@ -31,7 +38,7 @@ beam = part(id = "beam", body = box("beam_body", 76, 10, 6), part_number = "CELL
 def make_station(index):
     prefix = "variant_" + str(index)
     width = 12 + index
-    rise = 8 + index / 2
+    rise = 8 + index / 2 + (tool_rise_extra if index == edited_variant else 0)
     profile = polygon(id = prefix + "/tool_profile", points = [[0, 0], [width, 0], [0, rise]])
     tool = part(id = prefix + "/tool", body = extrude(id = prefix + "/tool_body", profile = profile, height = 6),
                 part_number = "CELL-TOOL-" + str(index), datums = {
@@ -61,3 +68,7 @@ def cells():
     return result
 line = assembly(id = "workcell_line", instances = cells())
 assembly_output(name = "workcell_line", assembly = line)
+
+# Build just the service station with --output service_station. The complete
+# source stays authoritative; the other tools need no exact evaluation.
+assembly_output(name = "service_station", assembly = station_types[0])

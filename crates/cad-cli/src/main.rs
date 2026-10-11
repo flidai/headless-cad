@@ -101,6 +101,9 @@ enum Command {
         /// Publish compact previews without engineering export artifacts.
         #[arg(long)]
         display_only: bool,
+        /// Select outputs (repeatable); replaces the complete published generation.
+        #[arg(long = "output", value_name = "NAME")]
+        outputs: Vec<String>,
     },
     /// Serve generated previews and exports through a read-only local viewer.
     Serve {
@@ -120,7 +123,12 @@ enum Command {
     /// Compile a .star or .json recipe into the versioned JSON feature graph.
     Compile { recipe: PathBuf },
     /// Evaluate a recipe and report geometry, provenance, and validation as JSON.
-    Inspect { recipe: PathBuf },
+    Inspect {
+        recipe: PathBuf,
+        /// Evaluate only selected outputs and all global semantic requirements.
+        #[arg(long = "output", value_name = "NAME")]
+        outputs: Vec<String>,
+    },
     /// Build and validate every output; exits nonzero on any invalid result.
     Check { recipe: PathBuf },
     /// Write each output as B-rep JSON, STEP, and STL, plus a build manifest.
@@ -131,6 +139,9 @@ enum Command {
         /// Publish compact previews without B-rep, STEP, STL, or SVG exports.
         #[arg(long)]
         display_only: bool,
+        /// Select outputs (repeatable); replaces the complete published generation.
+        #[arg(long = "output", value_name = "NAME")]
+        outputs: Vec<String>,
     },
 }
 
@@ -203,6 +214,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "units": recipe.units,
         "tolerance": recipe.tolerance.unwrap_or_default(),
         "stats": build.stats,
+        "scope": build.scope,
         "feature_hashes": build.feature_hashes,
         "face_assertions": build.face_assertions,
         "face_datums": build.face_datums,
@@ -448,7 +460,7 @@ fn difference(before: &Value, after: &Value) -> Value {
             (part.clone(), json!(changes))
         })
         .collect();
-    json!({"outputs":changes,"face_assertions":assertions,"face_datums":datums,"comparison":"build hashes, measured properties, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"face_assertions":assertions,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -701,6 +713,7 @@ fn properties_report(
         "assembly_build_id": if kind == "assembly" { Some(cad_assembly::assembly_build_id()) } else { None },
     });
     report["stats"] = json!(build.stats);
+    report["scope"] = json!(build.scope);
     Ok(report)
 }
 
@@ -722,7 +735,15 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         Command::Bom { recipe, assembly } => {
             let source = fs::read(recipe)?;
             let recipe = load_source(recipe, std::str::from_utf8(&source)?, &parameters)?;
-            let built = engine(&cli.cache_dir).build(&recipe)?;
+            if !recipe
+                .assembly_outputs
+                .iter()
+                .any(|output| &output.name == assembly)
+            {
+                return Err(format!("unknown assembly output '{assembly}'").into());
+            }
+            let built =
+                engine(&cli.cache_dir).build_outputs(&recipe, std::slice::from_ref(assembly))?;
             let model = built
                 .assemblies
                 .get(assembly)
@@ -732,6 +753,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             result["recipe_source_hash"] = json!(blake3::hash(&source).to_hex().to_string());
             result["parameter_overrides"] = json!(parameters);
             result["stats"] = json!(built.stats);
+            result["build_scope"] = json!(built.scope);
             return Ok(result);
         }
         Command::Select {
@@ -780,6 +802,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             out_dir,
             interval_ms,
             display_only,
+            outputs,
         } => {
             return watch::run(
                 recipe,
@@ -791,6 +814,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                                 recipe: recipe.clone(),
                                 out_dir: out_dir.clone(),
                                 display_only: *display_only,
+                                outputs: outputs.clone(),
                             },
                             params: cli.params.clone(),
                             cache_dir: cli.cache_dir.clone(),
@@ -837,7 +861,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
     }
     let path = match &cli.command {
         Command::Compile { recipe }
-        | Command::Inspect { recipe }
+        | Command::Inspect { recipe, .. }
         | Command::Check { recipe }
         | Command::Build { recipe, .. }
         | Command::Properties { recipe, .. } => recipe,
@@ -863,7 +887,19 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             return Err("density must be finite and positive in kg/m³".into());
         }
     }
-    let build = engine(&cli.cache_dir).build(&recipe)?;
+    let selected = match &cli.command {
+        Command::Build { outputs, .. } | Command::Inspect { outputs, .. }
+            if !outputs.is_empty() =>
+        {
+            Some(outputs.as_slice())
+        }
+        Command::Properties { output, .. } => Some(std::slice::from_ref(output)),
+        _ => None,
+    };
+    let build = match selected {
+        Some(outputs) => engine(&cli.cache_dir).build_outputs(&recipe, outputs)?,
+        None => engine(&cli.cache_dir).build(&recipe)?,
+    };
     if let Command::Properties {
         output,
         density_kg_per_m3,
@@ -938,6 +974,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             "source_hash": summary["recipe_source_hash"],
             "source": summary["recipe_source"],
             "generation_mode": summary["generation_mode"],
+            "scope": summary["scope"],
         }))?)
         .to_hex()
         .to_string());
@@ -1198,6 +1235,13 @@ fn main() {
                         report["code"] = json!("invalid_face_datum");
                         report["part"] = json!(part);
                         report["datum"] = json!(name);
+                    }
+                    cad_build::BuildError::UnknownSelectedOutput(output) => {
+                        report["code"] = json!("unknown_selected_output");
+                        report["output"] = json!(output);
+                    }
+                    cad_build::BuildError::EmptyOutputSelection => {
+                        report["code"] = json!("empty_output_selection");
                     }
                     cad_build::BuildError::Kernel { feature, .. } => {
                         report["code"] = json!("kernel_operation_failed");

@@ -571,6 +571,37 @@ requires a solid; no previous artifact generation is replaced.
 
 ## Rebuilds and reproducibility
 
+Build a dependency closure for one or more outputs with repeatable `--output`:
+
+```sh
+cad build examples/workcell_line.star --output service_station --cache-dir .cad-cache --out-dir out/service_station
+cad inspect examples/workcell_line.star --output service_station
+cad watch examples/workcell_line.star --output service_station --out-dir out/service_station
+```
+
+`build`, `inspect`, and `watch` without this flag retain full evaluation.
+`properties --output` and `bom --assembly` evaluate their requested output.
+`check` always evaluates the full recipe. All modes validate the complete recipe's
+structure and enforce **every** global face assertion and face-derived datum;
+those obligations can require geometry outside the selected output. Unselected
+geometry operations without such obligations are not executed. A selected
+success therefore does not certify every other output's geometry.
+
+Build/inspect reports expose `scope`: requested outputs, evaluated/skipped feature IDs,
+and validation roots. Source and compiled recipe snapshots remain complete.
+A selected build publishes a **complete generation of the selected outputs** in
+its destination, replacing any previous owned generation there; it does not
+merge into an existing full build. Use a separate destination to retain both.
+Unknown output names and failed validation preserve the previous generation.
+
+The workcell's `service_station` needs four unique solids even when the full
+recipe describes 1,000 stations with 40 unique tool variants. Editing
+`tool_rise_extra` for `edited_variant=1` leaves service-station geometry cached;
+editing variant 0 rebuilds its single tool. The builder still parses and
+structurally validates the full source, and retains evaluated intermediates and
+in-memory cache entries. Selective execution is not yet a memory-bounded job
+scheduler or an out-of-core exact-body store.
+
 ```sh
 cad build examples/bracket.star --cache-dir .cad-cache --out-dir out/bracket
 cad build examples/bracket.star --cache-dir .cad-cache --out-dir out/bracket

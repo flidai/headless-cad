@@ -359,6 +359,22 @@
           42
         ]
       ]
+    },
+    "service_station": {
+      "volume_mm3": 33968,
+      "solids": 5,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          60,
+          42
+        ]
+      ]
     }
   },
   "tilted_jig.star": {

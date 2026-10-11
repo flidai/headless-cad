@@ -15,6 +15,8 @@ use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
 mod assembly;
+mod demand;
+pub use demand::{BuildMode, BuildScope};
 mod face_datums;
 pub use face_datums::{
     FaceDatumDefinition, FaceDatumResolution, ResolvedFaceDatums, MAX_FACE_DATUMS,
@@ -47,6 +49,7 @@ pub fn executor_build_id() -> &'static str {
         for source in [
             include_bytes!("lib.rs").as_slice(),
             include_bytes!("assembly.rs").as_slice(),
+            include_bytes!("demand.rs").as_slice(),
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
@@ -458,6 +461,7 @@ pub struct BuildStats {
 
 #[derive(Debug)]
 pub struct BuildResult {
+    pub scope: BuildScope,
     pub outputs: BTreeMap<String, BuiltOutput>,
     pub assemblies: BTreeMap<String, cad_assembly::BuiltAssembly>,
     pub feature_hashes: BTreeMap<String, String>,
@@ -469,6 +473,10 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("output selection must contain at least one output name")]
+    EmptyOutputSelection,
+    #[error("unknown selected output '{0}'")]
+    UnknownSelectedOutput(String),
     #[error("face datums require recipe schema version 2")]
     FaceDatumSchema,
     #[error("invalid face datum '{part}/{name}': {message}")]
@@ -821,6 +829,24 @@ impl BuildEngine {
     }
 
     pub fn build(&mut self, recipe: &Recipe) -> Result<BuildResult, BuildError> {
+        self.build_scoped(recipe, None)
+    }
+
+    /// Evaluate selected outputs plus all global semantic validation obligations.
+    /// Structural validation still covers the entire recipe.
+    pub fn build_outputs(
+        &mut self,
+        recipe: &Recipe,
+        outputs: &[String],
+    ) -> Result<BuildResult, BuildError> {
+        self.build_scoped(recipe, Some(outputs))
+    }
+
+    fn build_scoped(
+        &mut self,
+        recipe: &Recipe,
+        requested: Option<&[String]>,
+    ) -> Result<BuildResult, BuildError> {
         if !matches!(recipe.schema_version, 1 | 2) {
             return Err(BuildError::SchemaVersion(recipe.schema_version));
         }
@@ -946,11 +972,20 @@ impl BuildEngine {
             }
         }
         assembly::validate(recipe, &indices, &mut output_names)?;
+        let scope = demand::scope(recipe, requested, &indices)?;
+        let wanted: BTreeSet<_> = scope
+            .evaluated_features
+            .iter()
+            .map(String::as_str)
+            .collect();
         let mut hashes = BTreeMap::new();
         let mut evaluated: HashMap<String, Arc<OperationResult>> = HashMap::new();
         let mut stats = BuildStats::default();
         for &index in &order {
             let feature = &recipe.features[index];
+            if !wanted.contains(feature.id()) {
+                continue;
+            }
             let hash = hash_feature(recipe, tolerance, feature, &hashes);
             if feature.is_solid() {
                 let result = if let Some(cached) = self.solids.get(&hash) {
@@ -1024,6 +1059,7 @@ impl BuildEngine {
         let outputs = recipe
             .outputs
             .iter()
+            .filter(|output| scope.requested_outputs.binary_search(&output.name).is_ok())
             .map(|output| {
                 let feature = &recipe.features[indices[output.feature.as_str()]];
                 (
@@ -1046,6 +1082,7 @@ impl BuildEngine {
             .collect();
         let selection_graph = selection::SelectionGraph::new(recipe, order, evaluated.clone());
         let mut result = BuildResult {
+            scope,
             outputs,
             assemblies: BTreeMap::new(),
             feature_hashes: hashes,
@@ -1089,6 +1126,7 @@ impl BuildEngine {
             &evaluated,
             tolerance,
             &result.face_datums,
+            &result.scope.requested_outputs,
         )?;
         Ok(result)
     }

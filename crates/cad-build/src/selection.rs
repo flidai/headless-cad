@@ -144,11 +144,29 @@ impl BuildResult {
             .saturating_add(selector.target_feature.len()));
         let graph = &self.selection_graph;
         let Some(anchor) = graph.results.get(&selector.anchor_feature) else {
-            resolution.diagnostic = "anchor must identify an existing solid feature".into();
+            resolution.diagnostic = if graph
+                .nodes
+                .get(&selector.anchor_feature)
+                .is_some_and(Feature::is_solid)
+            {
+                "anchor was not evaluated in this build scope"
+            } else {
+                "anchor must identify an existing solid feature"
+            }
+            .into();
             return resolution;
         };
         if !graph.results.contains_key(&selector.target_feature) {
-            resolution.diagnostic = "target must identify an existing solid feature".into();
+            resolution.diagnostic = if graph
+                .nodes
+                .get(&selector.target_feature)
+                .is_some_and(Feature::is_solid)
+            {
+                "target was not evaluated in this build scope"
+            } else {
+                "target must identify an existing solid feature"
+            }
+            .into();
             return resolution;
         }
         if matches!(selector.cardinality, FaceCardinality::Exactly { count: 0 }) {
