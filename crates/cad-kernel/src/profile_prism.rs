@@ -411,7 +411,9 @@ impl ModelSnapshot {
             return Err(KernelError::InvalidTolerance);
         }
         if self.has_curved_geometry() && crate::analytic::recognize(self, Some(tol)).is_err() {
-            recognize(self, tol).map(Some)
+            recognize(self, tol)
+                .map(Some)
+                .or_else(|_| crate::revolve::recognize(self, tol).map(|_| None))
         } else {
             let r = self.validate(tol);
             if r.valid {

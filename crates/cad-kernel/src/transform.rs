@@ -22,7 +22,7 @@ pub fn validate_transform(offset: [f64; 3], rotation: [f64; 4]) -> Result<(), Ke
 /// Apply `R(rotation) * point + offset` to native curves and surfaces.
 /// General rotations require one strictly convex solid, a validated right prism
 /// with a simple outer ring and convex through-hole rings, a validated analytic
-/// circular extrusion, or an empty model.
+/// circular extrusion, an orthogonal meridian revolution, or an empty model.
 /// Exactly represented signed-permutation rotations additionally support the
 /// existing orthogonal nonconvex/multiple-solid domain. Near-axis rotations are
 /// never snapped. Topology IDs and outward winding remain unchanged; provenance

@@ -848,5 +848,73 @@
         ]
       ]
     }
+  },
+  "stepped_spindle.star": {
+    "shaft": {
+      "volume_mm3": 10976.724731642737,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -15,
+          -15,
+          0
+        ],
+        [
+          15,
+          15,
+          50
+        ]
+      ]
+    },
+    "housing": {
+      "volume_mm3": 34406.72274211542,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -25,
+          -25,
+          0
+        ],
+        [
+          25,
+          25,
+          32
+        ]
+      ]
+    },
+    "blind_cap": {
+      "volume_mm3": 33677.87324648258,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -20,
+          -20,
+          0
+        ],
+        [
+          20,
+          20,
+          30
+        ]
+      ]
+    },
+    "stepped_spindle": {
+      "volume_mm3": 79061.32072024074,
+      "solids": 3,
+      "instances": 3,
+      "definitions": 3,
+      "bounds_mm": [
+        [
+          -25,
+          -25,
+          0
+        ],
+        [
+          140,
+          25,
+          50
+        ]
+      ]
+    }
   }
 }

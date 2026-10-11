@@ -111,7 +111,8 @@ impl ModelSnapshot {
                 .and_then(|g| g.properties())
                 .or_else(|_| {
                     crate::profile_prism::recognize(self, tolerance)?.properties(tolerance)
-                });
+                })
+                .or_else(|_| crate::revolve::recognize(self, tolerance)?.properties());
         }
         let report = self.validate(tolerance);
         if !report.valid {

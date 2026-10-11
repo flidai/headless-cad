@@ -185,6 +185,11 @@ pub enum Feature {
         circular_holes: Vec<cad_kernel::CircleHole>,
         op_version: u32,
     },
+    Revolve {
+        id: String,
+        profile: String,
+        op_version: u32,
+    },
     Extrude {
         id: String,
         profile: String,
@@ -327,6 +332,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "holes",
                         "circular_holes",
                     ],
+                    "revolve" => &["op", "id", "op_version", "profile"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
                     "transform" => &["op", "id", "op_version", "body", "offset", "rotation"],
@@ -341,6 +347,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "rectangle",
                                 "polygon",
                                 "extrude",
+                                "revolve",
                                 "translate",
                                 "transform",
                                 "union",
@@ -374,6 +381,11 @@ impl<'de> Deserialize<'de> for Feature {
                         points: points.ok_or_else(|| M::Error::missing_field("points"))?,
                         holes: holes.unwrap_or_default(),
                         circular_holes: circular_holes.unwrap_or_default(),
+                    },
+                    "revolve" => Feature::Revolve {
+                        id,
+                        op_version,
+                        profile: profile.ok_or_else(|| M::Error::missing_field("profile"))?,
                     },
                     "extrude" => Feature::Extrude {
                         id,
@@ -431,6 +443,7 @@ impl Feature {
             | Self::Rectangle { id, .. }
             | Self::Polygon { id, .. }
             | Self::Extrude { id, .. }
+            | Self::Revolve { id, .. }
             | Self::Translate { id, .. }
             | Self::Transform { id, .. }
             | Self::Union { id, .. }
@@ -441,7 +454,7 @@ impl Feature {
     pub fn dependencies(&self) -> Vec<&str> {
         match self {
             Self::Circle { .. } | Self::Rectangle { .. } | Self::Polygon { .. } => vec![],
-            Self::Extrude { profile, .. } => vec![profile],
+            Self::Extrude { profile, .. } | Self::Revolve { profile, .. } => vec![profile],
             Self::Translate { body, .. } | Self::Transform { body, .. } => vec![body],
             Self::Union { left, right, .. }
             | Self::Cut { left, right, .. }
@@ -460,6 +473,7 @@ impl Feature {
             | Self::Rectangle { op_version, .. }
             | Self::Polygon { op_version, .. }
             | Self::Extrude { op_version, .. }
+            | Self::Revolve { op_version, .. }
             | Self::Translate { op_version, .. }
             | Self::Transform { op_version, .. }
             | Self::Union { op_version, .. }
@@ -473,6 +487,7 @@ impl Feature {
             Self::Rectangle { .. } => "rectangle",
             Self::Polygon { .. } => "polygon",
             Self::Extrude { .. } => "extrude",
+            Self::Revolve { .. } => "revolve",
             Self::Translate { .. } => "translate",
             Self::Transform { .. } => "transform",
             Self::Union { .. } => "union",
@@ -1027,6 +1042,30 @@ impl BuildEngine {
                     feature: id.clone(),
                     message: error.to_string(),
                 })?,
+                Feature::Revolve { id, profile, .. } => {
+                    match &recipe.features[indices[profile.as_str()]] {
+                        Feature::Polygon {
+                            points,
+                            holes,
+                            circular_holes,
+                            ..
+                        } if holes.is_empty() && circular_holes.is_empty() => {
+                            cad_kernel::validate_revolve_profile(points, tolerance).map_err(
+                                |error| BuildError::Kernel {
+                                    feature: id.clone(),
+                                    message: error.to_string(),
+                                },
+                            )?;
+                        }
+                        _ => {
+                            return Err(BuildError::InputType {
+                                feature: id.clone(),
+                                dependency: profile.clone(),
+                                expected: "polygon profile without holes",
+                            })
+                        }
+                    }
+                }
                 Feature::Extrude { id, height, .. } => dimension(id, "height", *height)?,
                 Feature::Transform {
                     id,
@@ -1047,7 +1086,8 @@ impl BuildEngine {
                 _ => {}
             }
             for dependency in feature.dependencies() {
-                let needs_profile = matches!(feature, Feature::Extrude { .. });
+                let needs_profile =
+                    matches!(feature, Feature::Extrude { .. } | Feature::Revolve { .. });
                 if recipe.features[indices[dependency]].is_solid() == needs_profile {
                     return Err(BuildError::InputType {
                         feature: feature.id().into(),
@@ -1105,6 +1145,14 @@ impl BuildEngine {
                     result
                 } else {
                     let operation = match feature {
+                        Feature::Revolve { profile, .. } => {
+                            match &recipe.features[indices[profile.as_str()]] {
+                                Feature::Polygon { points, .. } => {
+                                    cad_kernel::revolve_polygon(points, tolerance)
+                                }
+                                _ => unreachable!("revolve profile validated before execution"),
+                            }
+                        }
                         Feature::Extrude {
                             profile, height, ..
                         } => match &recipe.features[indices[profile.as_str()]] {

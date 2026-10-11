@@ -181,6 +181,9 @@ pub fn tessellate_analytic(
     tolerance: Tolerance,
     policy: TessellationPolicy,
 ) -> Result<CylinderMesh, KernelError> {
+    if let Some(geometry) = model.revolve_geometry(tolerance)? {
+        return tessellate_revolve(model, &geometry, policy);
+    }
     let Some(g) = model.profile_prism_geometry(tolerance)? else {
         return tessellate_cylinder(model, tolerance, policy);
     };
@@ -311,9 +314,160 @@ pub fn tessellate_analytic(
     })
 }
 
+fn tessellate_revolve(
+    model: &ModelSnapshot,
+    geometry: &crate::RevolveGeometry,
+    policy: TessellationPolicy,
+) -> Result<CylinderMesh, KernelError> {
+    use std::collections::BTreeMap;
+    let circles: Vec<_> = model
+        .edges
+        .iter()
+        .enumerate()
+        .filter_map(|(id, edge)| {
+            if let crate::Curve::Circle(circle) = &edge.curve {
+                Some((EdgeId(id), circle))
+            } else {
+                None
+            }
+        })
+        .collect();
+    let radius = circles.iter().map(|(_, c)| c.radius).fold(0., f64::max);
+    let scale = circles
+        .iter()
+        .flat_map(|(_, c)| c.origin)
+        .map(f64::abs)
+        .fold(radius, f64::max);
+    let (n, error) = circle_resolution(radius, 4. * scale, [0.; 3], policy)?;
+    if n.checked_mul(geometry.segments.len())
+        .is_none_or(|count| count > 200_000)
+    {
+        return Err(KernelError::ResourceLimit(
+            "revolved display exceeds 200000 patches".into(),
+        ));
+    }
+    // Every shared circle is sampled once. Adjacent planar and curved patches
+    // reuse bit-identical points, including across changes in shoulder radius.
+    let rings: BTreeMap<_, Vec<[f64; 3]>> = circles
+        .iter()
+        .map(|(id, c)| {
+            let y = cross(c.axis, c.x_direction);
+            let points = (0..n)
+                .map(|i| {
+                    let (s, co) = (std::f64::consts::TAU * i as f64 / n as f64).sin_cos();
+                    std::array::from_fn(|a| {
+                        c.origin[a] + c.radius * (co * c.x_direction[a] + s * y[a])
+                    })
+                })
+                .collect();
+            (*id, points)
+        })
+        .collect();
+    let mut patches = Vec::with_capacity(n * geometry.segments.len());
+    for segment in &geometry.segments {
+        if segment.start[0] == segment.end[0] {
+            let start = &rings[&segment.start_circle.unwrap()];
+            let end = &rings[&segment.end_circle.unwrap()];
+            let sign = (segment.end[1] - segment.start[1]).signum();
+            let y = cross(geometry.axis, geometry.x_direction);
+            for i in 0..n {
+                let j = (i + 1) % n;
+                let (s, c) = (std::f64::consts::TAU * (i as f64 + 0.5) / n as f64).sin_cos();
+                patches.push(MeshPatch {
+                    face: segment.face,
+                    points: vec![start[i], start[j], end[j], end[i]],
+                    normal: std::array::from_fn(|a| {
+                        sign * (c * geometry.x_direction[a] + s * y[a])
+                    }),
+                    boundary_edges: vec![segment.start_circle, None, segment.end_circle, None],
+                });
+            }
+        } else {
+            let (outer_id, inner_id) = if segment.start[0] > segment.end[0] {
+                (segment.start_circle.unwrap(), segment.end_circle)
+            } else {
+                (segment.end_circle.unwrap(), segment.start_circle)
+            };
+            let outer = &rings[&outer_id];
+            let inner = inner_id.map(|id| &rings[&id]);
+            let crate::Curve::Circle(circle) = &model.edges[outer_id.0].curve else {
+                unreachable!()
+            };
+            let normal = model.faces[segment.face.0].try_plane().unwrap().normal;
+            let reverse = segment.start[0] < segment.end[0];
+            for i in 0..n {
+                let j = (i + 1) % n;
+                let (points, edges) = match inner {
+                    Some(inner) if reverse => (
+                        vec![inner[i], inner[j], outer[j], outer[i]],
+                        vec![inner_id, None, Some(outer_id), None],
+                    ),
+                    Some(inner) => (
+                        vec![inner[i], outer[i], outer[j], inner[j]],
+                        vec![None, Some(outer_id), None, inner_id],
+                    ),
+                    None if reverse => (
+                        vec![circle.origin, outer[j], outer[i]],
+                        vec![None, Some(outer_id), None],
+                    ),
+                    None => (
+                        vec![circle.origin, outer[i], outer[j]],
+                        vec![None, Some(outer_id), None],
+                    ),
+                };
+                patches.push(MeshPatch {
+                    face: segment.face,
+                    points,
+                    normal,
+                    boundary_edges: edges,
+                });
+            }
+        }
+    }
+    Ok(CylinderMesh {
+        patches,
+        segments: n,
+        chordal_error_bound: error,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn revolve_mesh_resource_limit_preserves_native_model() {
+        let t = Tolerance::default();
+        let model = crate::revolve_polygon(
+            &[
+                [0., 0.],
+                [5., 0.],
+                [5., 10.],
+                [3., 10.],
+                [3., 20.],
+                [0., 20.],
+            ],
+            t,
+        )
+        .unwrap()
+        .model;
+        let before = serde_json::to_vec(&model).unwrap();
+        let error = tessellate_analytic(
+            &model,
+            t,
+            TessellationPolicy {
+                chordal_error: 1e-8,
+                max_segments: 65536,
+            },
+        )
+        .unwrap_err();
+        assert!(
+            matches!(error, KernelError::ResourceLimit(message) if message.contains("200000 patches"))
+        );
+        assert_eq!(serde_json::to_vec(&model).unwrap(), before);
+        assert!(model.validate(t).valid);
+        assert!(tessellate_analytic(&model, t, TessellationPolicy::default()).is_ok());
+    }
+
     #[test]
     fn mixed_cap_budget_fails_without_changing_authoritative_geometry() {
         let tolerance = Tolerance::default();

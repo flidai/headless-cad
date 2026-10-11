@@ -7,7 +7,9 @@
 //! explicit edges and vertices; open pockets, through-holes, empty results, and
 //! disconnected solids are supported in that domain.
 //! Circular extrusions additionally retain exact circles, planar caps, a cylindrical
-//! wall, and an explicit periodic seam. Enclosed cavities, general curved
+//! wall, and an explicit periodic seam. Full-turn orthogonal meridian revolutions
+//! additionally support connected stepped shafts and coaxial counterbores with
+//! exact planar shoulders and cylindrical walls. Enclosed cavities, general curved
 //! Booleans, and nonmanifold contacts remain unsupported.
 //! General rigid rotations support a single strictly convex solid or a validated
 //! right prism with a simple outer boundary and convex disjoint through holes. Exactly represented axis
@@ -31,6 +33,7 @@ mod orthogonal;
 mod polygon;
 mod prism;
 mod profile_prism;
+mod revolve;
 mod simple_polygon;
 mod tessellation;
 mod transform;
@@ -51,6 +54,7 @@ pub use profile_prism::{
     extrude_polygon_with_circular_holes, validate_polygon_with_circular_holes, CircleHole,
     ProfilePrismGeometry,
 };
+pub use revolve::{revolve_polygon, validate_revolve_profile, RevolveGeometry, RevolveSegment};
 use serde::{Deserialize, Serialize};
 pub use simple_polygon::face_is_convex;
 use std::collections::BTreeMap;
@@ -290,6 +294,7 @@ impl ModelSnapshot {
             return analytic::recognize(self, None)
                 .map(|g| g.volume())
                 .or_else(|_| profile_prism::volume(self))
+                .or_else(|_| revolve::volume(self))
                 .unwrap_or(f64::NAN);
         }
         self.shells

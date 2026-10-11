@@ -553,7 +553,9 @@ impl ModelSnapshot {
         if self.has_curved_geometry() {
             match recognize(self, Some(tolerance)) {
                 Ok(g) => Ok(Some(g)),
-                Err(_) => crate::profile_prism::recognize(self, tolerance).map(|_| None),
+                Err(_) => crate::profile_prism::recognize(self, tolerance)
+                    .map(|_| None)
+                    .or_else(|_| crate::revolve::recognize(self, tolerance).map(|_| None)),
             }
         } else {
             let report = self.validate(tolerance);

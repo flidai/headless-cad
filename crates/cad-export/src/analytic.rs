@@ -233,6 +233,102 @@ mod tests {
     }
 
     #[test]
+    fn revolved_shoulder_and_bore_exports_preserve_closed_boundaries() {
+        let t = Tolerance::default();
+        for (profile, expected_volume, cylinders) in [
+            (
+                vec![
+                    [0., 0.],
+                    [8., 0.],
+                    [8., 20.],
+                    [15., 20.],
+                    [15., 26.],
+                    [6., 26.],
+                    [6., 50.],
+                    [0., 50.],
+                ],
+                3494. * std::f64::consts::PI,
+                3,
+            ),
+            (
+                vec![
+                    [8., 0.],
+                    [25., 0.],
+                    [25., 8.],
+                    [20., 8.],
+                    [20., 32.],
+                    [12., 32.],
+                    [12., 12.],
+                    [8., 12.],
+                ],
+                10952. * std::f64::consts::PI,
+                4,
+            ),
+            (
+                vec![
+                    [0., 0.],
+                    [20., 0.],
+                    [20., 30.],
+                    [8., 30.],
+                    [8., 10.],
+                    [0., 10.],
+                ],
+                10720. * std::f64::consts::PI,
+                2,
+            ),
+        ] {
+            let model = cad_kernel::revolve_polygon(&profile, t).unwrap().model;
+            for model in [
+                model.clone(),
+                cad_kernel::transform(&model, [12., -7., 4.], [0.5, 0.5, 0., 0.5_f64.sqrt()], t)
+                    .unwrap()
+                    .model,
+            ] {
+                let step = to_step(&model, t).unwrap();
+                assert_eq!(step.matches("CYLINDRICAL_SURFACE(").count(), cylinders);
+                assert_eq!(step.matches("SEAM_CURVE(").count(), cylinders);
+                assert!(!step.contains("FACETED_BREP("));
+                let stl = to_stl(&model, t).unwrap();
+                let points: Vec<Point> = stl
+                    .lines()
+                    .filter_map(|line| line.trim().strip_prefix("vertex "))
+                    .map(|line| {
+                        let p: Vec<f64> = line
+                            .split_whitespace()
+                            .map(|n| n.parse().unwrap())
+                            .collect();
+                        [p[0], p[1], p[2]]
+                    })
+                    .collect();
+                let mut incidence = std::collections::BTreeMap::new();
+                let mut volume = 0.;
+                for triangle in points.as_chunks::<3>().0 {
+                    let normal =
+                        cross(sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
+                    assert!(dot(normal, normal) > 0.);
+                    volume += dot(triangle[0], cross(triangle[1], triangle[2])) / 6.;
+                    for i in 0..3 {
+                        let key = |p: Point| p.map(|x| if x == 0. { 0 } else { x.to_bits() });
+                        let a = key(triangle[i]);
+                        let b = key(triangle[(i + 1) % 3]);
+                        let (edge, sign) = if a < b { ((a, b), 1) } else { ((b, a), -1) };
+                        let entry = incidence.entry(edge).or_insert((0, 0));
+                        entry.0 += 1;
+                        entry.1 += sign;
+                    }
+                }
+                assert!(incidence
+                    .values()
+                    .all(|&(count, sign)| count == 2 && sign == 0));
+                assert!(
+                    volume < expected_volume
+                        && (expected_volume - volume) / expected_volume < 0.002
+                );
+            }
+        }
+    }
+
+    #[test]
     fn drilled_stl_is_closed_and_cap_triangles_do_not_fill_bores() {
         let t = Tolerance::default();
         let circles = [

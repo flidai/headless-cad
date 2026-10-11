@@ -402,6 +402,21 @@ bounded extrusion family, not general curved intersection or arbitrary trimmed
 surface validation. `drilled_bearing_mount.star` composes these plates with
 annular parts, associative cap placement and reused nested fasteners.
 
+The first revolution increment turns a simple orthogonal CCW meridian through
+360 degrees about +Z. It creates a connected planar/cylindrical B-rep with shared
+circle edges and periodic seams, including stepped shafts, annular shoulders,
+counterbores and blind axial bores. Radius is nonnegative; at most one continuous
+axis-contact interval is supported. Source segment roles preserve feature intent.
+Canonical recognition reconstructs the meridian from geometric supports and
+compares topology and bounded geometry; it does not trust operation provenance.
+Positive annular axial slices provide compensated volume/centroid/inertia
+integration, with independent composite-cylinder formulas and OCCT STEP checks.
+Planar datums use the axis-centered material centroid. Derived meshes share ring
+samples across shoulder and wall faces. Sloped profiles, cones, partial turns,
+general trim topology and curved Booleans remain future work.
+`stepped_spindle.star` exercises connected solids, parameter edits and analytic
+STEP alongside an exploded assembly inspection view.
+
 ## Constraints and assemblies
 
 The current M1 attachment increment resolves explicit named part frames without
@@ -913,7 +928,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped revolutions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

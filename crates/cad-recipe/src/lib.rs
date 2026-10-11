@@ -244,6 +244,13 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(id.to_owned())
     }
 
+    fn revolve(id: &str, profile: &str, eval: &mut Evaluator) -> anyhow::Result<String> {
+        store(eval)?.feature(serde_json::json!({
+            "op": "revolve", "id": id, "op_version": 1, "profile": profile,
+        }))?;
+        Ok(id.to_owned())
+    }
+
     fn extrude(
         id: &str,
         profile: &str,
@@ -1583,6 +1590,44 @@ mod circular_hole_tests {
                 &BTreeMap::from([(name.into(), value)])
             )
             .is_err());
+        }
+    }
+}
+
+#[cfg(test)]
+mod revolve_tests {
+    use super::*;
+
+    #[test]
+    fn starlark_revolve_retains_parameterized_meridian_and_native_volume() {
+        let source = "r=param(name='journal_radius',default=3)\np=polygon(id='meridian',points=[[0,0],[5,0],[5,10],[r,10],[r,20],[0,20]])\ns=revolve(id='shaft',profile=p)\noutput(name='shaft',feature=s)";
+        for radius in [2., 3., 4.] {
+            let recipe = from_starlark_with_params(
+                "shaft.star",
+                source,
+                &BTreeMap::from([("journal_radius".into(), radius)]),
+            )
+            .unwrap();
+            let built = cad_build::build(&recipe).unwrap();
+            let expected = std::f64::consts::PI * (25. * 10. + radius * radius * 10.);
+            assert!((built.outputs["shaft"].result.model.volume() - expected).abs() < 1e-9);
+            assert!(
+                matches!(&recipe.features[1], cad_build::Feature::Revolve { profile, op_version: 1, .. } if profile == "meridian")
+            );
+        }
+    }
+
+    #[test]
+    fn starlark_revolve_rejects_unknown_angle_and_missing_profile() {
+        for source in [
+            "revolve(id='r',profile='p',angle=180)",
+            "revolve(id='r')",
+            "revolve(id='r',profile=42)",
+        ] {
+            assert!(
+                from_starlark("bad-revolve.star", source).is_err(),
+                "accepted {source}"
+            );
         }
     }
 }

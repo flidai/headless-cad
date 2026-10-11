@@ -35,6 +35,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             crate::analytic::recognize(model, Some(tolerance))
                 .map(|_| ())
                 .or_else(|_| crate::profile_prism::recognize(model, tolerance).map(|_| ()))
+                .or_else(|_| crate::revolve::recognize(model, tolerance).map(|_| ()))
         } else {
             Err(crate::KernelError::InvalidTolerance)
         };

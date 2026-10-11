@@ -2112,3 +2112,122 @@ fn unused_circular_holes_still_receive_geometric_preflight() {
         ));
     }
 }
+
+fn revolved_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({
+        "schema_version": 2, "units": "mm", "features": [
+            {"op":"polygon","id":"meridian","points":[[0,0],[5,0],[5,10],[3,10],[3,20],[0,20]]},
+            {"op":"revolve","id":"shaft","profile":"meridian"},
+            {"op":"translate","id":"moved","body":"shaft","offset":[10,-4,2]},
+            {"op":"rectangle","id":"rp","width":2,"depth":3},
+            {"op":"extrude","id":"other","profile":"rp","height":4}
+        ], "outputs":[{"name":"shaft","feature":"shaft"},{"name":"moved","feature":"moved"},{"name":"other","feature":"other"}]
+    })).unwrap()
+}
+
+#[test]
+fn revolve_stepped_shaft_volume_cache_and_dependency_order() {
+    let mut recipe = revolved_recipe();
+    recipe.face_assertions.push(FaceAssertion {
+        id: "shoulder".into(),
+        selector: FaceSelector {
+            anchor_feature: "shaft".into(),
+            role: "segment_2".into(),
+            target_feature: "moved".into(),
+            cardinality: FaceCardinality::Exactly { count: 1 },
+        },
+    });
+    let mut engine = BuildEngine::default();
+    let first = engine.build(&recipe).unwrap();
+    assert_eq!(
+        first.face_assertions["shoulder"].status,
+        FaceResolutionStatus::Resolved
+    );
+    // Two coaxial cylinders, independently integrated across their axial spans.
+    let expected = std::f64::consts::PI * (25. * 10. + 9. * 10.);
+    assert!((first.outputs["shaft"].result.model.volume() - expected).abs() < 1e-9);
+    assert!((first.outputs["moved"].result.model.volume() - expected).abs() < 1e-9);
+    assert_eq!(first.stats.computed_solids, 3);
+    assert_eq!(engine.build(&recipe).unwrap().stats.computed_solids, 0);
+    if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
+        points[3][0] = 4.;
+        points[4][0] = 4.;
+    }
+    let changed = engine.build(&recipe).unwrap();
+    assert_eq!(changed.stats.computed_solids, 2);
+    assert_eq!(changed.stats.cache_hits, 1);
+    assert_ne!(
+        first.feature_hashes["shaft"],
+        changed.feature_hashes["shaft"]
+    );
+    assert_ne!(
+        first.feature_hashes["moved"],
+        changed.feature_hashes["moved"]
+    );
+    assert_eq!(
+        first.feature_hashes["other"],
+        changed.feature_hashes["other"]
+    );
+    let expected = std::f64::consts::PI * (25. * 10. + 16. * 10.);
+    assert!((changed.outputs["shaft"].result.model.volume() - expected).abs() < 1e-9);
+    recipe.features.reverse();
+    assert_eq!(
+        engine.build(&recipe).unwrap().feature_hashes,
+        changed.feature_hashes
+    );
+    let decoded: Recipe = serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+    assert_eq!(
+        build(&decoded).unwrap().feature_hashes,
+        changed.feature_hashes
+    );
+}
+
+#[test]
+fn revolve_schema_is_strict_and_profile_type_is_explicit() {
+    for raw in [
+        r#"{"op":"revolve","id":"r"}"#,
+        r#"{"op":"revolve","id":"r","profile":"p","angle":360}"#,
+        r#"{"op":"revolve","id":"r","profile":"p","height":4}"#,
+        r#"{"op":"revolve","id":"r","profile":"p","profile":"q"}"#,
+        r#"{"op":"revolve","id":"r","profile":2}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<Feature>(raw).is_err(),
+            "accepted {raw}"
+        );
+    }
+    for input in [
+        serde_json::json!({"op":"rectangle","id":"meridian","width":5,"depth":10}),
+        serde_json::json!({"op":"circle","id":"meridian","radius":5}),
+        serde_json::json!({"op":"polygon","id":"meridian","points":[[0,0],[5,0],[5,10],[0,10]],"holes":[[[1,1],[1,2],[2,2],[2,1]]]}),
+        serde_json::json!({"op":"polygon","id":"meridian","points":[[0,0],[5,0],[5,10],[0,10]],"circular_holes":[{"center":[2,2],"radius":0.5}]}),
+    ] {
+        let mut recipe = revolved_recipe();
+        recipe.features[0] = serde_json::from_value(input).unwrap();
+        assert!(matches!(build(&recipe), Err(BuildError::InputType { .. })));
+    }
+    let mut recipe = revolved_recipe();
+    if let Feature::Revolve { profile, .. } = &mut recipe.features[1] {
+        *profile = "other".into();
+    }
+    assert!(matches!(build(&recipe), Err(BuildError::InputType { .. })));
+}
+
+#[test]
+fn unselected_revolve_still_requires_valid_meridian_and_version() {
+    let mut recipe = revolved_recipe();
+    // Valid simple polygon, but a sloped meridian edge is outside this operation.
+    if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
+        *points = vec![[0., 0.], [5., 0.], [4., 10.], [0., 10.]];
+    }
+    assert!(
+        matches!(BuildEngine::default().build_outputs(&recipe, &["other".into()]), Err(BuildError::Kernel { feature, .. }) if feature == "shaft")
+    );
+    let mut recipe = revolved_recipe();
+    if let Feature::Revolve { op_version, .. } = &mut recipe.features[1] {
+        *op_version = 2;
+    }
+    assert!(BuildEngine::default()
+        .build_outputs(&recipe, &["other".into()])
+        .is_err());
+}
