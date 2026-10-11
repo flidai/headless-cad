@@ -206,3 +206,41 @@ fn convex_intersection_exports_new_cut_plane_and_closed_mesh() {
         .all(|v| v.position[0] + v.position[1] <= leg + 1e-12));
     assert_eq!(step, to_step(&cut.model, tolerance).unwrap());
 }
+
+#[test]
+fn through_holes_preserve_native_bounds_and_closed_triangle_material() {
+    let outer = [[0., 0.], [20., 0.], [20., 10.], [0., 10.]];
+    let holes = vec![
+        vec![[2., 2.], [2., 6.], [6., 6.], [6., 2.]],
+        vec![[12., 2.], [12., 6.], [16., 2.]],
+    ];
+    let model = cad_kernel::extrude_polygon_with_holes(&outer, &holes, 3., Tolerance::default())
+        .unwrap()
+        .model;
+    let step = to_step(&model, Tolerance::default()).unwrap();
+    assert_eq!(step.matches("FACE_OUTER_BOUND(").count(), 13);
+    assert_eq!(step.matches("FACE_BOUND(").count(), 4);
+    assert_eq!(step.matches("POLY_LOOP(").count(), 17);
+    assert_eq!(step.matches("FACETED_BREP(").count(), 1);
+    check_mesh(&to_stl(&model, Tolerance::default()).unwrap(), 528., 48);
+    let angle = 0.4_f64;
+    let rotated = cad_kernel::transform(
+        &model,
+        [3., 4., 5.],
+        [angle.sin(), 0., 0., angle.cos()],
+        Tolerance::default(),
+    )
+    .unwrap();
+    check_mesh(
+        &to_stl(&rotated.model, Tolerance::default()).unwrap(),
+        528.,
+        48,
+    );
+    assert_eq!(
+        to_step(&rotated.model, Tolerance::default())
+            .unwrap()
+            .matches("FACE_BOUND(")
+            .count(),
+        4
+    );
+}

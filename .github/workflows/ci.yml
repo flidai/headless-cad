@@ -21,6 +21,7 @@ jobs:
       - run: cargo run --locked -p cad-cli -- build examples/tilted_jig.star --out-dir out/tilted_jig
       - run: cargo run --locked -p cad-cli -- build examples/clipped_tools.star --out-dir out/clipped_tools
       - run: cargo run --locked -p cad-cli -- build examples/balance_arm.star --out-dir out/balance_arm
+      - run: cargo run --locked -p cad-cli -- build examples/perforated_mount.star --out-dir out/perforated_mount
       - run: cargo run --locked -p cad-cli -- build examples/surface_mount.star --out-dir out/surface_mount
       - run: cargo run --locked -p cad-cli -- build examples/workcell_line.star --output service_station --out-dir out/service_station
       - run: cargo run --locked -p cad-cli -- properties examples/balance_arm.star --output balance_arm
@@ -43,6 +44,7 @@ jobs:
       - run: npm run test:polygon --prefix tools/preview-check
       - run: npm run test:transform --prefix tools/preview-check
       - run: npm run test:clipped --prefix tools/preview-check
+      - run: npm run test:holes --prefix tools/preview-check
       - run: npm run test:datums --prefix tools/preview-check
       - run: npm run test:gpu --prefix tools/preview-check
       - run: npm run test:stream --prefix tools/preview-check

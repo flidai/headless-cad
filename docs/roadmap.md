@@ -20,7 +20,7 @@ explicit exchange-loss report.
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums/sibling attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
-| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: strict convex CCW polygon extrusion (3–256 vertices), polygon caps and single-convex-solid planar validation implemented; scoped exact rigid transforms and bounded convex intersection with face lineage implemented; holes, curves, general nonconvex transforms/Booleans and trim/seam handling remain |
+| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: strict convex CCW polygon extrusion (3–256 vertices), polygon caps and single-convex-solid planar validation implemented; scoped exact rigid transforms and bounded convex intersection with face lineage implemented; convex-ring through-hole prisms with true inner cap loops implemented; curves, nonconvex boundary profiles/Booleans and trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, frustum culling and bounded cache implemented; LOD, spatial hierarchy and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
@@ -36,7 +36,7 @@ hierarchies, bounded-error LOD and hardware performance gates remain. Numerical 
 
 M1 instance transforms describe placement and display reuse. The M2 `transform`
 operation now bakes rigid rotations and translations into exact geometry within
-its single-convex-solid or exact axis-permutation domain. It does not enable
+its single-convex-solid, supported holed-prism or exact axis-permutation domain. It does not enable
 general union/cut across rotated solids or modeling across assembly instances. `tilted_jig.star`
 adds two transformed tools with cap/wall lineage assertions; manufacturing files
 contain their transformed native coordinates.
@@ -77,7 +77,9 @@ contain their transformed native coordinates.
    three shared frame meshes and its own tool; panning to a different station
    should reuse the frame meshes and fetch one new tool.
 5. Extend the implemented convex polygon extrusion with a general geometry/trim
-   contract and profiles with holes before curved Boolean claims. Preserve the
+   contract and nonconvex boundary profiles before curved Boolean claims.
+   Convex-ring through-hole extrusion now preserves true inner cap loops,
+   signed material moments, semantic wall roles and hole-aware STEP/display output. Preserve the
    current explicit limits: strict CCW 3–256-vertex profiles, one general convex
    solid per kernel snapshot, orthogonal-only union/cut and at most 48 input
    planes for general convex intersection. `clipped_tools.star` adds oblique
@@ -94,6 +96,13 @@ to an unselected tool computes none, and an edit to the selected tool computes
 one. A 1,000-station/40-tool test verifies the same four-solid closure. This is
 rebuild-count evidence, not a peak-memory or latency gate: bounded exact-body
 residency, parallel scheduling and isolated workers remain to implement.
+
+The through-hole increment uses `perforated_mount.star`: an octagonal plate
+with rectangular and triangular openings, four supports, and a locator attached
+to the remaining top face's centroid. Varying a hole width tests associative
+placement and independently integrated mass properties. Browser rays through
+both holes must select the base below; STEP must preserve inner face bounds.
+This does not implement curved holes, nonconvex rings, or general hole Booleans.
 
 The M6 mass-properties increment uses `balance_arm.star`: a rotated beam,
 mixed-density payload/counterweight, and rigid attachment chain. Position edits

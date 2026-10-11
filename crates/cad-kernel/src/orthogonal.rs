@@ -196,6 +196,11 @@ fn rectangular_faces(model: &ModelSnapshot) -> Result<Vec<RectFace>, KernelError
         .faces
         .iter()
         .map(|face| {
+            if face.loops.len() != 1 {
+                return Err(KernelError::Unsupported(
+                    "orthogonal Booleans do not accept multi-loop faces".into(),
+                ));
+            }
             let axis = (0..3)
                 .find(|&axis| {
                     face.plane.normal[axis].abs() == 1.0

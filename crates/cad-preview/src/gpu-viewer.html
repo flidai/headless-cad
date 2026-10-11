@@ -5,7 +5,7 @@
 <script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
 <script>
 'use strict';
-const compactScene = JSON.parse(document.getElementById('cad-scene-data').textContent);
+const compactScene = JSON.parse((document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
 const recipeContext = JSON.parse(document.getElementById('cad-recipe-data').textContent);
 window.compactScene = compactScene;
 window.recipeContext = recipeContext;
@@ -154,14 +154,21 @@ void main(){if(uPick){color=encode(uint(vInstance)+1u);faceColor=uProxy?vec4(0):
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program) || 'Shader link failed');
   gl.deleteShader(vs); gl.deleteShader(fs);
   const uniforms = Object.fromEntries(['uRight', 'uUp', 'uEye', 'uScale', 'uPick', 'uProxy', 'uSelected'].map(name => [name, gl.getUniformLocation(program, name)]));
+function faceTriangles(face){return face.triangles??Array.from({length:face.points.length-2},(_,i)=>[0,i+1,i+2])}
+function validFaceTopology(face){
+ const n=face.points.length,starts=face.loop_starts;
+ if(starts!==undefined&&(!Array.isArray(starts)||starts.length<1||starts.length>33||starts[0]!==0||starts.some((v,i)=>!Number.isInteger(v)||v<0||v>=n||(i>0&&v-starts[i-1]<3))||n-starts.at(-1)<3||!Array.isArray(face.triangles)))return false;
+ return face.triangles===undefined||(Array.isArray(face.triangles)&&face.triangles.length>0&&face.triangles.length<=n+64&&face.triangles.every(t=>Array.isArray(t)&&t.length===3&&new Set(t).size===3&&t.every(i=>Number.isInteger(i)&&i>=0&&i<n)));
+}
+function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.find(s=>s>i)??face.points.length;return i+1===end?starts.findLast(s=>s<=i):i+1}
   function validateMesh(mesh, descriptor) {
     if (!mesh || !Array.isArray(mesh.faces) || mesh.faces.length > 50000 || !validBounds(mesh.bounds)) throw Error('Invalid mesh payload.');
     let points = 0, gpuBytes = 0; const ids = new Set();
     for (const face of mesh.faces) {
       if (!Number.isInteger(face.id) || face.id < 0 || face.id >= 16777215 || ids.has(face.id)
         || !finite3(face.normal) || Math.abs(Math.hypot(...face.normal) - 1) > 1e-5
-        || !Array.isArray(face.points) || face.points.length < 3 || face.points.length > 256) throw Error('Invalid bounded face payload.');
-      ids.add(face.id); points += face.points.length; gpuBytes += (face.points.length - 2) * 3 * 28;
+        || !Array.isArray(face.points) || face.points.length < 3 || face.points.length > 256 || !validFaceTopology(face)) throw Error('Invalid bounded face payload.');
+      ids.add(face.id); points += face.points.length; gpuBytes += faceTriangles(face).length * 3 * 28;
       if (points > 200000) throw Error('Mesh point budget exceeded.');
       for (const point of face.points) {
         if (!finite3(point) || !mesh.bounds || point.some((v, i) => v < mesh.bounds[0][i] || v > mesh.bounds[1][i])) throw Error('Mesh point lies outside declared bounds.');
@@ -175,8 +182,8 @@ void main(){if(uPick){color=encode(uint(vInstance)+1u);faceColor=uProxy?vec4(0):
     validateMesh(mesh, streamed && !proxy ? assets[hash] : null);
     const local = mesh.bounds, center = local ? local[0].map((v, i) => v + (local[1][i] - v) / 2) : [0, 0, 0];
     const vertices = [];
-    for (const face of mesh.faces) for (let i = 1; i < face.points.length - 1; i++) {
-      for (const point of [face.points[0], face.points[i], face.points[i + 1]]) vertices.push(...sub(point, center), ...face.normal, face.id);
+    for (const face of mesh.faces) for (const ids of faceTriangles(face)) {
+      for (const point of ids.map(i=>face.points[i])) vertices.push(...sub(point, center), ...face.normal, face.id);
     }
     const floats = new Float32Array(vertices.map(gpuFloat));
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);

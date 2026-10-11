@@ -183,7 +183,7 @@ collinear, crossed, nonconvex, and tolerance-uncertain profiles are rejected.
 `start_cap`, `end_cap`, and `walls` roles accompany `wall_i`, which identifies
 input edge `i → (i + 1) % n`; source vertex ordering is part of that role intent.
 
-General planar validation currently accepts one strictly convex solid: closed
+The initial general planar validator accepts one strictly convex solid: closed
 oriented topology, convex planar faces, positive volume, and strict supporting
 face half-spaces must agree. Multiple general solids in one snapshot are
 explicitly unsupported. The existing orthogonal validator still handles its
@@ -198,7 +198,8 @@ This is an M2 increment, not completion of general planar or analytic modeling.
 
 Native rigid transforms now rotate line/plane geometry and vertices, then apply
 translation. They preserve topology and explicit input-face lineage. General
-rotations are validated for one strictly convex solid; exactly represented signed
+rotations are validated for one strictly convex solid or one supported holed
+right prism; exactly represented signed
 axis permutations additionally support existing orthogonal nonconvex and
 multiple-solid inputs. No near-axis snapping or implicit quaternion normalization
 is performed. Arithmetic uncertainty, translation loss, edge displacement and
@@ -223,7 +224,30 @@ oracle additionally asks OCCT to compute Common from the original operand STEP
 files, comparing area, volume, bounds and both directed difference volumes with
 the native result. Browser depth/picking checks use independent analytic faces.
 
-Progress through general nonconvex transforms, planar profiles with holes, curved extrusion,
+The next planar increment adds convex-ring right prisms with polygonal
+through-holes. A convex CCW outer ring encloses disjoint convex CW holes, with at
+most 256 total vertices and 32 holes. Multi-loop cap faces remain authoritative;
+wall faces preserve source-ring roles. Validation recognizes a matched-cap,
+straight-wall prism and rejects unsupported general nonconvex geometry.
+Signed boundary integration subtracts holes from volume, centroid, inertia and
+face-frame centroids. STEP retains inner face bounds; derived display/STL
+triangles preserve the openings and semantic face identity. The pinned ISC
+`earcutr` dependency supplies triangulation candidates, independently checked
+before use; it is not the modeling kernel. Adaptive orientation predicates from
+permissively licensed `robust` check triangle signs and overlap. Aligned-hole
+bridge T-junctions are restored at native vertices before boundary-incidence and
+coverage checks. Prism correspondence follows native longitudinal edges and
+rejects deviations beyond its arithmetic envelope; hole separation includes
+operand-based error bounds. `perforated_mount.star` combines two
+openings and a centroid-associated locator with independent planar-moment,
+STEP and browser through-hole picking evidence. Preview APIs now propagate the
+recipe tolerance. Multi-loop scenes use an explicit embedded capability marker:
+new clients can refresh between plain and holed scenes, while older Canvas
+clients reject the unsupported replacement and require a reload. Older streamed
+clients reject the changed triangle-byte descriptor rather than rendering a fan
+across an opening.
+
+Progress through general nonconvex transforms and boundary profiles, curved extrusion,
 revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,
 and controlled import repair. Include open shells and cavity orientation in the
 data model before promising shelling. Each operation declares supported input
@@ -690,7 +714,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation and scoped exact rigid transforms and bounded convex intersection; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion and convex-ring through-hole prisms; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap holed-prism validation | Nonconvex boundary profiles, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

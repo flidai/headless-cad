@@ -544,5 +544,39 @@
         ]
       ]
     }
+  },
+  "perforated_mount.star": {
+    "plate": {
+      "volume_mm3": 20100,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          50,
+          6
+        ]
+      ]
+    },
+    "perforated_mount": {
+      "volume_mm3": 33428,
+      "solids": 7,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          50,
+          29
+        ]
+      ]
+    }
   }
 }

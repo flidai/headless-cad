@@ -117,21 +117,28 @@ impl ModelSnapshot {
         let reference = points[0];
         let mut area = Sum::default();
         let mut moment = [Sum::default(); 3];
-        for pair in points[1..].windows(2) {
-            let a = sub(pair[0], reference);
-            let b = sub(pair[1], reference);
-            let weight = dot(cross(a, b), z_axis) / 2.;
-            if !weight.is_normal() || weight <= 0. {
-                return Err(KernelError::NumericRange);
-            }
-            area.add(weight)?;
-            for i in 0..3 {
-                let center = a[i] / 3. + b[i] / 3.;
-                let contribution = weight * center;
-                if center != 0. && !contribution.is_normal() {
+        for (boundary_index, &loop_id) in face.loops.iter().enumerate() {
+            let points = self.loop_points(loop_id).unwrap();
+            let base = sub(points[0], reference);
+            for pair in points[1..].windows(2) {
+                let a = sub(pair[0], reference);
+                let b = sub(pair[1], reference);
+                let weight = dot(cross(sub(a, base), sub(b, base)), z_axis) / 2.;
+                if !weight.is_normal()
+                    || (boundary_index == 0 && weight <= 0.)
+                    || (boundary_index > 0 && weight >= 0.)
+                {
                     return Err(KernelError::NumericRange);
                 }
-                moment[i].add(contribution)?;
+                area.add(weight)?;
+                for i in 0..3 {
+                    let center = base[i] / 3. + a[i] / 3. + b[i] / 3.;
+                    let contribution = weight * center;
+                    if center != 0. && !contribution.is_normal() {
+                        return Err(KernelError::NumericRange);
+                    }
+                    moment[i].add(contribution)?;
+                }
             }
         }
         if !area.value.is_normal() || area.value <= 0. {
@@ -140,7 +147,9 @@ impl ModelSnapshot {
         let mut centroid = [0.; 3];
         for i in 0..3 {
             let local = moment[i].value / area.value;
-            let error = (moment[i].absolute / area.value + local.abs()) * (128. * f64::EPSILON);
+            let error = (moment[i].absolute / area.value
+                + local.abs() * area.absolute / area.value)
+                * (128. * f64::EPSILON);
             if !error.is_finite() || error > tolerance.linear / 16. {
                 return Err(KernelError::NumericRange);
             }

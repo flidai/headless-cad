@@ -3,11 +3,12 @@
 //! Logical identity belongs to the recipe. Kernel results and their topology
 //! history are independent of recipe IDs, so identical features can share them.
 
-pub use cad_kernel::MAX_POLYGON_POINTS;
 use cad_kernel::{
-    boolean, extrude_polygon, extrude_rectangle, transform, translate, validate_polygon,
-    validate_transform, BooleanOp, OperationResult, Tolerance, KERNEL_BUILD_ID, KERNEL_VERSION,
+    boolean, extrude_polygon_with_holes, extrude_rectangle, transform, translate,
+    validate_polygon_with_holes, validate_transform, BooleanOp, OperationResult, Tolerance,
+    KERNEL_BUILD_ID, KERNEL_VERSION,
 };
+pub use cad_kernel::{MAX_POLYGON_HOLES, MAX_POLYGON_POINTS};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -172,6 +173,8 @@ pub enum Feature {
     Polygon {
         id: String,
         points: Vec<[f64; 2]>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        holes: Vec<Vec<[f64; 2]>>,
         op_version: u32,
     },
     Extrude {
@@ -235,6 +238,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut depth = None;
                 let mut profile = None;
                 let mut points = None;
+                let mut holes = None;
                 let mut height = None;
                 let mut body = None;
                 let mut offset = None;
@@ -259,6 +263,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "depth" => read_field!(depth, f64),
                         "profile" => read_field!(profile, String),
                         "points" => read_field!(points, Vec<[f64; 2]>),
+                        "holes" => read_field!(holes, Vec<Vec<[f64; 2]>>),
                         "height" => read_field!(height, f64),
                         "body" => read_field!(body, String),
                         "offset" => read_field!(offset, [f64; 3]),
@@ -276,6 +281,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "depth",
                                     "profile",
                                     "points",
+                                    "holes",
                                     "height",
                                     "body",
                                     "offset",
@@ -293,7 +299,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let op_version = op_version.unwrap_or_else(operation_version);
                 let allowed: &[&str] = match op.as_str() {
                     "rectangle" => &["op", "id", "op_version", "width", "depth"],
-                    "polygon" => &["op", "id", "op_version", "points"],
+                    "polygon" => &["op", "id", "op_version", "points", "holes"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
                     "transform" => &["op", "id", "op_version", "body", "offset", "rotation"],
@@ -332,6 +338,7 @@ impl<'de> Deserialize<'de> for Feature {
                         id,
                         op_version,
                         points: points.ok_or_else(|| M::Error::missing_field("points"))?,
+                        holes: holes.unwrap_or_default(),
                     },
                     "extrude" => Feature::Extrude {
                         id,
@@ -677,11 +684,18 @@ fn hash_feature(
             hash.update(&width.to_le_bytes());
             hash.update(&depth.to_le_bytes());
         }
-        Feature::Polygon { points, .. } => {
+        Feature::Polygon { points, holes, .. } => {
             hash.update(&(points.len() as u64).to_le_bytes());
             for point in points {
                 for value in point {
                     hash.update(&value.to_le_bytes());
+                }
+            }
+            hash.update(&(holes.len() as u64).to_le_bytes());
+            for hole in holes {
+                hash.update(&(hole.len() as u64).to_le_bytes());
+                for coordinate in hole.iter().flatten() {
+                    hash.update(&coordinate.to_le_bytes());
                 }
             }
         }
@@ -916,11 +930,14 @@ impl BuildEngine {
                     dimension(id, "width", *width)?;
                     dimension(id, "depth", *depth)?;
                 }
-                Feature::Polygon { id, points, .. } => validate_polygon(points, tolerance)
-                    .map_err(|error| BuildError::PolygonProfile {
+                Feature::Polygon {
+                    id, points, holes, ..
+                } => validate_polygon_with_holes(points, holes, tolerance).map_err(|error| {
+                    BuildError::PolygonProfile {
                         feature: id.clone(),
                         message: error.to_string(),
-                    })?,
+                    }
+                })?,
                 Feature::Extrude { id, height, .. } => dimension(id, "height", *height)?,
                 Feature::Transform {
                     id,
@@ -1005,8 +1022,8 @@ impl BuildEngine {
                             Feature::Rectangle { width, depth, .. } => {
                                 extrude_rectangle(*width, *depth, *height, tolerance)
                             }
-                            Feature::Polygon { points, .. } => {
-                                extrude_polygon(points, *height, tolerance)
+                            Feature::Polygon { points, holes, .. } => {
+                                extrude_polygon_with_holes(points, holes, *height, tolerance)
                             }
                             _ => unreachable!("profile types validated before execution"),
                         },

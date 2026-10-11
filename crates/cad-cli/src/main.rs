@@ -1000,7 +1000,13 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     cad_export::to_step(model, tolerance)?,
                 ));
                 artifacts.push((format!("{name}.stl"), cad_export::to_stl(model, tolerance)?));
-                artifacts.push((format!("{name}.preview.svg"), cad_preview::to_svg(model)?));
+                artifacts.push((
+                    format!("{name}.preview.svg"),
+                    cad_preview::to_svg_with_tolerance(
+                        model,
+                        recipe.tolerance.unwrap_or_default(),
+                    )?,
+                ));
             }
             let context = cad_preview::RecipeContext {
                 language: language.to_owned(),
@@ -1017,7 +1023,11 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             };
             artifacts.push((
                 format!("{name}.preview.html"),
-                cad_preview::to_html_with_recipe(model, &context)?,
+                cad_preview::to_html_with_recipe_and_tolerance(
+                    model,
+                    &context,
+                    recipe.tolerance.unwrap_or_default(),
+                )?,
             ));
             summary["outputs"][name]["available_files"] = json!(artifacts[artifact_start..]
                 .iter()
@@ -1082,9 +1092,15 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             artifacts.push((
                 format!("{name}.display.json"),
                 if *display_only {
-                    cad_preview::to_assembly_gpu_scene_json(assembly)?
+                    cad_preview::to_assembly_gpu_scene_json_with_tolerance(
+                        assembly,
+                        recipe.tolerance.unwrap_or_default(),
+                    )?
                 } else {
-                    cad_preview::to_assembly_scene_json(assembly)?
+                    cad_preview::to_assembly_scene_json_with_tolerance(
+                        assembly,
+                        recipe.tolerance.unwrap_or_default(),
+                    )?
                 },
             ));
             if !display_only {
@@ -1098,7 +1114,10 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 ));
                 artifacts.push((
                     format!("{name}.preview.svg"),
-                    cad_preview::to_assembly_svg(assembly)?,
+                    cad_preview::to_assembly_svg_with_tolerance(
+                        assembly,
+                        recipe.tolerance.unwrap_or_default(),
+                    )?,
                 ));
             }
             let context = cad_preview::RecipeContext {
@@ -1114,14 +1133,28 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             if !display_only {
                 artifacts.push((
                     format!("{name}.preview.html"),
-                    cad_preview::to_assembly_html(assembly, &context)?,
+                    cad_preview::to_assembly_html_with_tolerance(
+                        assembly,
+                        &context,
+                        recipe.tolerance.unwrap_or_default(),
+                    )?,
                 ));
             }
             artifacts.push((
                 format!("{name}.gpu.html"),
-                cad_preview::to_assembly_gpu_html_with_fallback(assembly, &context, !display_only)?,
+                cad_preview::to_assembly_gpu_html_with_fallback_and_tolerance(
+                    assembly,
+                    &context,
+                    !display_only,
+                    recipe.tolerance.unwrap_or_default(),
+                )?,
             ));
-            let bundle = cad_preview::to_assembly_stream_bundle(assembly, &context, !display_only)?;
+            let bundle = cad_preview::to_assembly_stream_bundle_with_tolerance(
+                assembly,
+                &context,
+                !display_only,
+                recipe.tolerance.unwrap_or_default(),
+            )?;
             artifacts.push((format!("{name}.stream.html"), bundle.html));
             artifacts.push((format!("{name}.stream.json"), bundle.scene_json));
             for asset in bundle.assets {

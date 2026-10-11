@@ -1,13 +1,17 @@
 //! A deliberately narrow, native Rust boundary-representation kernel.
 //!
-//! Supports rectangular and strictly convex polygon extrusions, rigid placements,
-//! orthogonal solid Booleans, and bounded convex planar intersection. Polygon
-//! caps remain analytic planar faces.
-//! Boolean faces stay rectangular and share explicit edges and vertices; open
-//! pockets, through-holes, empty results, and disconnected solids are supported.
+//! Supports rectangular and convex polygon extrusions, including disjoint convex
+//! through holes, rigid placements, orthogonal solid Booleans, and bounded convex
+//! planar intersection. Polygon caps remain analytic planar faces with explicit
+//! inner loops where needed. Orthogonal Boolean faces stay rectangular and share
+//! explicit edges and vertices; open pockets, through-holes, empty results, and
+//! disconnected solids are supported in that domain.
 //! Enclosed cavities, curved surfaces, and nonmanifold contacts are unsupported.
-//! General rigid rotations require a single strictly convex solid; exactly
-//! represented axis permutations also retain the orthogonal solid domain.
+//! General rigid rotations support a single strictly convex solid or a validated
+//! right prism with convex disjoint through holes. Exactly represented axis
+//! permutations also retain the orthogonal solid domain. Multi-loop prism caps
+//! support signed-loop properties; Boolean operations on these prisms are not yet
+//! supported.
 //! All coordinates, dimensions, and linear tolerances are millimetres; volume is
 //! mm³. Results contain analytic lines and planes and explicit oriented topology.
 //! Validated mass properties integrate volume, centroid, and central volume
@@ -20,7 +24,9 @@ mod mass_properties;
 mod math;
 mod orthogonal;
 mod polygon;
+mod prism;
 mod transform;
+mod triangulation;
 mod validation;
 
 pub use face_frame::FaceFrame;
@@ -29,10 +35,12 @@ pub use math::Tolerance;
 use math::{cross, dot, sub};
 pub use orthogonal::{boolean, translate, BooleanOp};
 pub use polygon::{extrude_polygon, validate_polygon, MAX_POLYGON_POINTS};
+pub use prism::{extrude_polygon_with_holes, validate_polygon_with_holes, MAX_POLYGON_HOLES};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;
 pub use transform::{transform, validate_transform};
+pub use triangulation::triangulate_face;
 pub use validation::{ValidationIssue, ValidationReport};
 
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");

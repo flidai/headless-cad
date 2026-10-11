@@ -210,7 +210,7 @@ pub fn assembly_to_stl(
         writeln!(output, "solid {label}").unwrap();
         for polygon in &local[&instance.part] {
             let normal = instance.transform.vector(polygon.normal);
-            for i in 1..polygon.points.len() - 1 {
+            for triangle in &polygon.triangles {
                 writeln!(
                     output,
                     "  facet normal {} {} {}\n    outer loop",
@@ -219,7 +219,7 @@ pub fn assembly_to_stl(
                     real(normal[2])
                 )
                 .unwrap();
-                for point in [polygon.points[0], polygon.points[i], polygon.points[i + 1]] {
+                for &point in triangle {
                     let p = instance.transform.point(point);
                     if p.iter().any(|v| !v.is_finite()) {
                         return Err(ExportError::InvalidModel(

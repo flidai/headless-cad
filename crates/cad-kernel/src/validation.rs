@@ -1,7 +1,9 @@
 //! Validation for closed orientable planar B-reps. In the orthogonal domain,
 //! nonconvex solids, handles, and disconnected solids are supported. General
-//! planar geometry is restricted to a single strictly convex solid. Each solid
-//! currently requires one connected shell; enclosed cavities are unsupported.
+//! planar geometry is restricted to a single strictly convex solid or a validated
+//! right prism with a convex outer profile and disjoint convex through holes.
+//! Each solid currently requires one connected shell; enclosed cavities are
+//! unsupported.
 //! Geometric intersection and containment checks follow the topology checks.
 use crate::math::{cross, dot, finite, norm, sub};
 use crate::{ModelSnapshot, Tolerance};
@@ -205,10 +207,10 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
     }
     let mut loop_owners = vec![Vec::new(); model.loops.len()];
     for (index, face) in model.faces.iter().enumerate() {
-        if face.loops.len() != 1 {
+        if face.loops.is_empty() || face.loops.len() > crate::MAX_POLYGON_HOLES + 1 {
             issue(
                 "unsupported_face",
-                format!("Face {index}: only one convex outer loop is supported"),
+                format!("Face {index}: one convex outer loop and at most 32 convex inner loops are supported"),
             );
         }
         let normal_norm = norm(face.plane.normal);
@@ -221,7 +223,8 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 format!("Face {index} needs a finite plane with a unit normal"),
             );
         }
-        for &loop_id in &face.loops {
+        for (boundary_index, &loop_id) in face.loops.iter().enumerate() {
+            let orientation = if boundary_index == 0 { 1.0 } else { -1.0 };
             let Some(owners) = loop_owners.get_mut(loop_id.0) else {
                 issue(
                     "invalid_loop_reference",
@@ -265,7 +268,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                         continue;
                     }
                     let side = dot(sub(point, a), inward);
-                    if !side.is_finite() || side <= 0.0 {
+                    if !side.is_finite() || side * orientation <= 0.0 {
                         issue(
                             "face_orientation_or_degeneracy",
                             format!("Face {index} is not strictly convex and outward-oriented"),
@@ -288,7 +291,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 }
                 area_twice += triangle_area_twice;
             }
-            if !(area_twice / 2.0).is_normal() || area_twice <= 0.0 {
+            if !(area_twice / 2.0).is_normal() || area_twice * orientation <= 0.0 {
                 issue(
                     "degenerate_face",
                     format!("Face {index} needs positive oriented area in the normal f64 range"),
@@ -462,7 +465,11 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 }
             }
         }
-        let characteristic = vertices.len() as i128 - edges.len() as i128 + members.len() as i128;
+        let face_characteristic: i128 = members
+            .iter()
+            .map(|&id| 2 - model.faces[id].loops.len() as i128)
+            .sum();
+        let characteristic = vertices.len() as i128 - edges.len() as i128 + face_characteristic;
         if characteristic > 2 || characteristic % 2 != 0 {
             issue(
                 "euler_characteristic",

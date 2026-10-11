@@ -1013,6 +1013,7 @@ fn invalid_unused_polygons_and_unsupported_booleans_fail_explicitly() {
         recipe.features.push(Feature::Polygon {
             id: "unused".into(),
             points,
+            holes: vec![],
             op_version: 1,
         });
         assert!(
@@ -1781,4 +1782,109 @@ fn selected_outputs_keep_all_global_assertion_and_datum_obligations() {
             assert!(matches!(built, Err(BuildError::FaceDatumFailed { .. })));
         }
     }
+}
+
+fn holed_profile_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({"schema_version":2,"units":"mm","features":[
+        {"op":"polygon","id":"profile","points":[[0,0],[10,0],[10,8],[0,8]],"holes":[[[2,2],[2,4],[4,4],[4,2]],[[6,2],[6,5],[8,5],[8,2]]]},
+        {"op":"extrude","id":"body","profile":"profile","height":3},
+        {"op":"translate","id":"moved","body":"body","offset":[1,2,3]},
+        {"op":"rectangle","id":"other_profile","width":1,"depth":1},
+        {"op":"extrude","id":"other","profile":"other_profile","height":1}
+    ],"outputs":[{"name":"plate","feature":"moved"},{"name":"other","feature":"other"}],"face_assertions":[
+        {"id":"cap","selector":{"anchor_feature":"body","role":"end_cap","target_feature":"moved","cardinality":{"kind":"exactly","count":1}}},
+        {"id":"bore","selector":{"anchor_feature":"body","role":"hole_0_wall_1","target_feature":"moved","cardinality":{"kind":"exactly","count":1}}}
+    ]})).unwrap()
+}
+
+#[test]
+fn polygon_holes_preserve_semantics_and_incremental_demand_validation() {
+    let mut recipe = holed_profile_recipe();
+    let mut engine = BuildEngine::default();
+    let first = engine.build_outputs(&recipe, &["plate".into()]).unwrap();
+    assert_eq!(first.outputs["plate"].result.model.volume(), 210.0);
+    assert_eq!(
+        first.outputs["plate"].result.model.bounds().min,
+        [1.0, 2.0, 3.0]
+    );
+    assert_eq!(
+        first.outputs["plate"].result.model.bounds().max,
+        [11.0, 10.0, 6.0]
+    );
+    assert_eq!(first.face_assertions.len(), 2);
+    assert_eq!(first.scope.skipped_features, vec!["other", "other_profile"]);
+    let all_holes = first.resolve_faces(&FaceSelector {
+        anchor_feature: "body".into(),
+        role: "hole_walls".into(),
+        target_feature: "moved".into(),
+        cardinality: FaceCardinality::Exactly { count: 8 },
+    });
+    assert_eq!(all_holes.status, FaceResolutionStatus::Resolved);
+    assert_eq!(
+        engine
+            .build_outputs(&recipe, &["plate".into()])
+            .unwrap()
+            .stats
+            .computed_solids,
+        0
+    );
+    if let Feature::Polygon { holes, .. } = &mut recipe.features[0] {
+        holes[0][2][0] = 5.0;
+        holes[0][3][0] = 5.0;
+    }
+    let changed = engine.build_outputs(&recipe, &["plate".into()]).unwrap();
+    assert_eq!(changed.stats.computed_solids, 2);
+    assert_eq!(changed.outputs["plate"].result.model.volume(), 204.0);
+    assert_ne!(
+        changed.feature_hashes["profile"],
+        first.feature_hashes["profile"]
+    );
+    // An unrelated requested output still evaluates the global hole/cap contracts.
+    let other = engine.build_outputs(&recipe, &["other".into()]).unwrap();
+    assert_eq!(other.face_assertions.len(), 2);
+    assert!(other.feature_hashes.contains_key("moved"));
+    recipe.face_assertions[1].selector.role = "hole_8_wall_0".into();
+    assert!(matches!(
+        engine.build_outputs(&recipe, &["other".into()]),
+        Err(BuildError::FaceAssertionFailed { .. })
+    ));
+}
+
+#[test]
+fn polygon_holes_json_is_strict_and_invalid_unused_holes_cannot_be_skipped() {
+    let recipe = holed_profile_recipe();
+    let json = serde_json::to_string(&recipe).unwrap();
+    assert_eq!(
+        serde_json::to_string(&serde_json::from_str::<Recipe>(&json).unwrap()).unwrap(),
+        json
+    );
+    for invalid in [
+        json.replace("\"holes\":", "\"misspelled_holes\":"),
+        json.replace("\"holes\":[", "\"holes\":[],\"holes\":["),
+    ] {
+        assert!(serde_json::from_str::<Recipe>(&invalid).is_err());
+    }
+    for hole in [
+        vec![[2.0, 2.0], [4.0, 2.0], [4.0, 4.0], [2.0, 4.0]],
+        vec![[0.0, 2.0], [0.0, 4.0], [4.0, 4.0], [4.0, 2.0]],
+        vec![[9.0, 2.0], [9.0, 4.0], [11.0, 4.0], [11.0, 2.0]],
+    ] {
+        let mut recipe = recipe.clone();
+        recipe.face_assertions.clear();
+        if let Feature::Polygon { holes, .. } = &mut recipe.features[0] {
+            holes[0] = hole;
+        }
+        assert!(matches!(
+            BuildEngine::default().build_outputs(&recipe, &["other".into()]),
+            Err(BuildError::PolygonProfile { .. })
+        ));
+    }
+    let mut reversed = recipe.clone();
+    if let Feature::Polygon { holes, .. } = &mut reversed.features[0] {
+        holes.swap(0, 1);
+    }
+    assert_ne!(
+        build(&recipe).unwrap().feature_hashes["profile"],
+        build(&reversed).unwrap().feature_hashes["profile"]
+    );
 }

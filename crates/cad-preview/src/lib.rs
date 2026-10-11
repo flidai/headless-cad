@@ -1,7 +1,7 @@
 //! Self-contained previews derived from B-rep face loops, with no graphics stack.
 //! Previews are visualization artifacts; they are not geometry validity checks.
 
-use cad_kernel::ModelSnapshot;
+use cad_kernel::{ModelSnapshot, Tolerance};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -9,8 +9,11 @@ use thiserror::Error;
 
 mod assembly;
 pub use assembly::{
-    to_assembly_gpu_html, to_assembly_gpu_html_with_fallback, to_assembly_gpu_scene_json,
-    to_assembly_html, to_assembly_scene_json, to_assembly_stream_bundle, to_assembly_svg,
+    to_assembly_gpu_html, to_assembly_gpu_html_with_fallback,
+    to_assembly_gpu_html_with_fallback_and_tolerance, to_assembly_gpu_scene_json,
+    to_assembly_gpu_scene_json_with_tolerance, to_assembly_html, to_assembly_html_with_tolerance,
+    to_assembly_scene_json, to_assembly_scene_json_with_tolerance, to_assembly_stream_bundle,
+    to_assembly_stream_bundle_with_tolerance, to_assembly_svg, to_assembly_svg_with_tolerance,
     DisplayMeshAsset, StreamBundle,
 };
 
@@ -48,6 +51,31 @@ struct Face {
     points: Vec<[f64; 3]>,
     edges: Vec<usize>,
     normal: [f64; 3],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    triangles: Option<Vec<[usize; 3]>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    loop_starts: Option<Vec<usize>>,
+}
+impl Face {
+    fn triangle_indices(&self) -> Vec<[usize; 3]> {
+        self.triangles
+            .clone()
+            .unwrap_or_else(|| (1..self.points.len() - 1).map(|i| [0, i, i + 1]).collect())
+    }
+    fn next_point(&self, index: usize) -> usize {
+        let starts = self.loop_starts.as_deref().unwrap_or(&[0]);
+        let start = *starts.iter().rev().find(|&&start| start <= index).unwrap();
+        let end = starts
+            .iter()
+            .copied()
+            .find(|&start| start > index)
+            .unwrap_or(self.points.len());
+        if index + 1 == end {
+            start
+        } else {
+            index + 1
+        }
+    }
 }
 
 #[derive(Clone, Serialize)]
@@ -62,6 +90,13 @@ struct Scene {
 }
 
 fn scene(model: &ModelSnapshot) -> Result<Scene, PreviewError> {
+    scene_with_tolerance(model, Tolerance::default())
+}
+
+fn scene_with_tolerance(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+) -> Result<Scene, PreviewError> {
     let invalid = PreviewError::Geometry;
     if model.faces.len() > 50_000 {
         return Err(invalid("software preview exceeds 50,000 faces"));
@@ -76,43 +111,64 @@ fn scene(model: &ModelSnapshot) -> Result<Scene, PreviewError> {
     let mut faces = Vec::new();
     let mut face_points = 0usize;
     for (id, face) in model.faces.iter().enumerate() {
-        if face.loops.len() != 1 {
-            return Err(invalid("preview supports one outer loop per face"));
+        if face.loops.is_empty() {
+            return Err(invalid("missing face loop"));
         }
         if face.plane.normal.iter().any(|n| !n.is_finite()) {
             return Err(invalid("nonfinite normal"));
         }
-        let boundary = model
-            .loops
-            .get(face.loops[0].0)
-            .ok_or(invalid("missing face loop"))?;
-        face_points += boundary.edges.len();
+        let mut points = Vec::new();
+        let mut edges = Vec::new();
+        let mut starts = Vec::new();
+        let mut vertex_indices = BTreeMap::new();
+        for loop_id in &face.loops {
+            let boundary = model
+                .loops
+                .get(loop_id.0)
+                .ok_or(invalid("missing face loop"))?;
+            if boundary.edges.len() < 3 {
+                return Err(invalid("face loop has fewer than three vertices"));
+            }
+            starts.push(points.len());
+            for usage in &boundary.edges {
+                let edge = model
+                    .edges
+                    .get(usage.edge.0)
+                    .ok_or(invalid("missing edge"))?;
+                let vertex = edge.vertices[usize::from(usage.reversed)];
+                vertex_indices.insert(vertex.0, points.len());
+                points.push(
+                    model
+                        .vertices
+                        .get(vertex.0)
+                        .ok_or(invalid("missing vertex"))?
+                        .position,
+                );
+                edges.push(usage.edge.0);
+            }
+        }
+        face_points += points.len();
         if face_points > 200_000 {
             return Err(invalid("software preview exceeds 200,000 face points"));
         }
-        let mut points = Vec::new();
-        for usage in &boundary.edges {
-            let edge = model
-                .edges
-                .get(usage.edge.0)
-                .ok_or(invalid("missing edge"))?;
-            let vertex = edge.vertices[usize::from(usage.reversed)];
-            points.push(
-                model
-                    .vertices
-                    .get(vertex.0)
-                    .ok_or(invalid("missing vertex"))?
-                    .position,
-            );
-        }
-        if points.len() < 3 {
-            return Err(invalid("face has fewer than three vertices"));
-        }
+        let triangles = if starts.len() > 1 {
+            Some(
+                cad_kernel::triangulate_face(model, cad_kernel::FaceId(id), tolerance)
+                    .map_err(|_| invalid("face triangulation failed"))?
+                    .into_iter()
+                    .map(|ids| ids.map(|id| vertex_indices[&id.0]))
+                    .collect(),
+            )
+        } else {
+            None
+        };
         faces.push(Face {
             id,
             points,
-            edges: boundary.edges.iter().map(|e| e.edge.0).collect(),
+            edges,
             normal: face.plane.normal,
+            triangles,
+            loop_starts: (starts.len() > 1).then_some(starts),
         });
     }
     let bounds = (!model.vertices.is_empty()).then(|| {
@@ -154,6 +210,28 @@ pub fn to_html_with_recipe(
     html(model, Some(recipe))
 }
 
+/// Render exact captured source using the model's build tolerance.
+pub fn to_html_with_recipe_and_tolerance(
+    model: &ModelSnapshot,
+    recipe: &RecipeContext,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
+    render_html(&scene_with_tolerance(model, tolerance)?, Some(recipe))
+}
+/// Render geometry using the model's build tolerance.
+pub fn to_html_with_tolerance(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
+    render_html(&scene_with_tolerance(model, tolerance)?, None)
+}
+pub fn to_svg_with_tolerance(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
+    render_svg(&scene_with_tolerance(model, tolerance)?)
+}
+
 fn script_json(value: &impl Serialize) -> Result<String, serde_json::Error> {
     // JSON escaping alone does not protect an HTML script element: the HTML
     // parser recognizes </script> even inside a JavaScript string. Escape all
@@ -190,6 +268,23 @@ fn render_html_template(
             return Err(PreviewError::Recipe("parameter overrides must be finite"));
         }
     }
+    let value = serde_json::to_value(data)?;
+    let has_holes = |body: &serde_json::Value| {
+        body["faces"]
+            .as_array()
+            .is_some_and(|faces| faces.iter().any(|face| face.get("triangles").is_some()))
+    };
+    let requires_loops = has_holes(&value)
+        || value["meshes"]
+            .as_object()
+            .is_some_and(|meshes| meshes.values().any(has_holes));
+    // Old live viewers require the exact legacy marker. A capability-specific
+    // element makes them reject an unsupported replacement and retain the old scene.
+    let scene_id = if requires_loops {
+        "cad-scene-data-v2"
+    } else {
+        "cad-scene-data"
+    };
     let data = script_json(data)?;
     let context = script_json(&recipe)?;
     // Match complete template elements. Embedded JSON escapes '<', so an
@@ -197,7 +292,7 @@ fn render_html_template(
     Ok(template
         .replace(
             "<script id=\"cad-scene-data\" type=\"application/json\">/*SCENE_DATA*/null</script>",
-            &format!("<script id=\"cad-scene-data\" type=\"application/json\">{data}</script>"),
+            &format!("<script id=\"{scene_id}\" type=\"application/json\">{data}</script>"),
         )
         .replace(
             "<script id=\"cad-recipe-data\" type=\"application/json\">/*RECIPE_DATA*/null</script>",
@@ -268,29 +363,60 @@ fn render_svg(scene: &Scene) -> Result<String, PreviewError> {
         depth(a).total_cmp(&depth(b))
     });
     for face in faces {
-        let points = face
-            .points
-            .iter()
-            .map(|p| {
-                let p = project(*p);
-                format!("{:.4},{:.4}", 480.0 + scale * p[0], 375.0 + scale * p[1])
-            })
-            .collect::<Vec<_>>()
-            .join(" ");
+        let starts = face.loop_starts.as_deref().unwrap_or(&[0]);
+        let mut path = String::new();
+        for (loop_index, &start) in starts.iter().enumerate() {
+            let end = starts
+                .get(loop_index + 1)
+                .copied()
+                .unwrap_or(face.points.len());
+            for (index, point) in face.points[start..end].iter().enumerate() {
+                let p = project(*point);
+                write!(
+                    path,
+                    "{} {:.4} {:.4} ",
+                    if index == 0 { "M" } else { "L" },
+                    480.0 + scale * p[0],
+                    375.0 + scale * p[1]
+                )
+                .unwrap();
+            }
+            path.push_str("Z ");
+        }
         let light = dot(face.normal, [0.3, -0.5, 0.8]).clamp(-1.0, 1.0);
         let shade = (175.0 + 55.0 * light) as u8;
-        write!(
-            output,
-            "<polygon points=\"{points}\" fill=\"rgb({},{},{})\"/>",
-            shade.saturating_sub(18),
-            shade,
-            shade.saturating_sub(5)
-        )
-        .unwrap();
+        if face.loop_starts.is_some() {
+            write!(
+                output,
+                "<path d=\"{path}\" fill-rule=\"evenodd\" fill=\"rgb({},{},{})\"/>",
+                shade.saturating_sub(18),
+                shade,
+                shade.saturating_sub(5)
+            )
+            .unwrap();
+        } else {
+            let points = face
+                .points
+                .iter()
+                .map(|p| {
+                    let p = project(*p);
+                    format!("{:.4},{:.4}", 480. + scale * p[0], 375. + scale * p[1])
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            write!(
+                output,
+                "<polygon points=\"{points}\" fill=\"rgb({},{},{})\"/>",
+                shade.saturating_sub(18),
+                shade,
+                shade.saturating_sub(5)
+            )
+            .unwrap();
+        }
         for (i, edge) in face.edges.iter().enumerate() {
             if scene.crease_edges.binary_search(edge).is_ok() {
                 let a = project(face.points[i]);
-                let b = project(face.points[(i + 1) % face.points.len()]);
+                let b = project(face.points[face.next_point(i)]);
                 write!(output, "<path d=\"M {:.4} {:.4} L {:.4} {:.4}\" fill=\"none\" stroke=\"#46605a\" stroke-width=\"1\"/>", 480.0+scale*a[0], 375.0+scale*a[1], 480.0+scale*b[0], 375.0+scale*b[1]).unwrap();
             }
         }
@@ -339,7 +465,7 @@ mod tests {
             serde_json::from_str::<serde_json::Value>(raw).unwrap(),
             data
         );
-        assert!(html.contains("JSON.parse(document.getElementById('cad-scene-data').textContent)"));
+        assert!(html.contains("JSON.parse((document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent)"));
         assert!(!html.contains("<script>bad()"));
     }
 

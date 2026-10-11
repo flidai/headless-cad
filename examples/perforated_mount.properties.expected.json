@@ -1,0 +1,89 @@
+{
+  "oracle": "Exact rational Green-theorem boundary integrals: signed area and planar first/second moments, then constant-height prism integration; independent of 3D tetrahedral kernel integration. Outer CCW, holes CW.",
+  "cases": [
+    {
+      "slot_width": 10,
+      "thickness": 3,
+      "area": 3450.0,
+      "volume": 10350.0,
+      "centroid": [
+        40.507246376811594,
+        25.0,
+        1.5
+      ],
+      "central_inertia": [
+        [
+          2195262.5,
+          0.0,
+          0
+        ],
+        [
+          0.0,
+          5243224.456521739,
+          0
+        ],
+        [
+          0,
+          0,
+          7422961.956521739
+        ]
+      ]
+    },
+    {
+      "slot_width": 15,
+      "thickness": 6,
+      "area": 3350.0,
+      "volume": 20100.0,
+      "centroid": [
+        40.8955223880597,
+        25.0,
+        3.0
+      ],
+      "central_inertia": [
+        [
+          4415300.0,
+          0.0,
+          0
+        ],
+        [
+          0.0,
+          10425430.597014925,
+          0
+        ],
+        [
+          0,
+          0,
+          14720130.597014925
+        ]
+      ]
+    },
+    {
+      "slot_width": 20,
+      "thickness": 10,
+      "area": 3250.0,
+      "volume": 32500.0,
+      "centroid": [
+        41.15384615384615,
+        25.0,
+        5.0
+      ],
+      "central_inertia": [
+        [
+          7495833.333333333,
+          0.0,
+          0
+        ],
+        [
+          0.0,
+          17471314.102564104,
+          0
+        ],
+        [
+          0,
+          0,
+          24425480.769230768
+        ]
+      ]
+    }
+  ]
+}

@@ -19,6 +19,8 @@ crates are omitted from the table.
 | blake3 | 1.8.2 | CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception | cad-assembly, cad-build, cad-cli, cad-kernel |
 | cap-std | 4.0.3 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli |
 | clap | 4.6.7 | MIT OR Apache-2.0 | cad-cli |
+| earcutr | 0.5.0 | ISC | cad-kernel; derived face triangulation |
+| robust | 1.2.0 | MIT OR Apache-2.0 | cad-kernel; adaptive orientation checks |
 | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli, Linux target |
 | serde | 1.0.229 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-kernel, cad-preview |
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-cli, cad-kernel, cad-preview, cad-recipe |
@@ -27,9 +29,13 @@ crates are omitted from the table.
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | cad-build, cad-cli |
 | thiserror | 2.0.21 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-export, cad-kernel, cad-preview, cad-recipe |
 
-Every direct dependency listed declares Apache-2.0 as its license or as an
-available alternative. Using that alternative supports this project's Apache-2.0
-distribution plan; it does not remove upstream attribution or notice obligations.
+Direct dependencies use permissive licenses. Most offer Apache-2.0; `earcutr`
+uses ISC. Its pinned package license was checked locally and is included in
+[the earcutr notice](third-party-earcutr-license.txt), which is copied into the
+local distribution with the documentation. Supporting triangulation does not
+replace the original analytic kernel. Upstream licenses and attribution remain
+in force; first-party code remains Apache-2.0. The pinned `robust` package
+also includes its Apache/MIT license texts in this documentation bundle.
 No copyleft-only dependency was added by this licensing change.
 
 The local source packages contain top-level license files for each listed package
@@ -52,7 +58,7 @@ Before distributing a binary or dependency source bundle:
 4. Refresh this table whenever direct dependencies or their resolved versions
    change.
 
-The resolved metadata contains 222 packages including seven workspace crates. That
+The resolved metadata contains 224 packages including seven workspace crates. That
 count is an inventory starting point, not a claim that every package is shipped
 or audited. For example, transitive `r-efi` 6.0.0 declares
 `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; its Apache-2.0 alternative is available,

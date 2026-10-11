@@ -14,8 +14,8 @@ See the [dependency license inventory](docs/dependency-licenses.md).
 
 A local, CLI-first CAD product built around our own Rust B-rep kernel. Recipes
 are plain text suitable for Git, results are inspectable JSON, and exports are
-STEP and STL. Modeling currently supports **orthogonal solids and strictly convex
-polygon extrusions**: slotted brackets, open trays, triangular ramps, and polygonal
+STEP and STL. Modeling currently supports **orthogonal solids, convex polygon extrusions, and convex-ring profiles with
+polygonal through-holes**: slotted brackets, open trays, triangular ramps, and polygonal
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union and cut remain orthogonal-only; intersection also supports bounded,
@@ -105,6 +105,7 @@ cad build examples/reference_fixture.star --out-dir out/reference_fixture
 cad build examples/modular_rack.star --out-dir out/modular_rack
 cad build examples/angled_fixture.star --out-dir out/angled_fixture
 cad build examples/datum_gantry.star --out-dir out/datum_gantry
+cad build examples/perforated_mount.star --out-dir out/perforated_mount
 ```
 
 | Example | What it exercises | Independently calculated result |
@@ -119,6 +120,7 @@ cad build examples/datum_gantry.star --out-dir out/datum_gantry
 | Reference fixture | Three grooves and raised stops; ancestral top-face selection | 23,296 mm³, one solid, 80 × 40 × 20 mm |
 | Modular rack | Reused rows and carriages, nested rotations and occurrence paths | 63,648 mm³ summed material, 17 component occurrences, four part definitions |
 | Angled fixture | Two rotated triangular-prism ramps, four hexagonal seats, and an orthogonal slotted base | 47,346.83063257983 mm³ summed material, seven occurrences; each ramp is 12,000 mm³ |
+| Perforated mount | Octagonal plate with two polygonal openings and a locator following the remaining cap centroid | Plate 20,100 mm³; seven-part assembly 33,428 mm³ |
 | Datum gantry | Sibling datum attachments for posts, bridge, tool and clamps; two repeated stations | 80,440 mm³ and seven occurrences per gantry; inspection line doubles both |
 
 The examples progress from single-part modeling to reusable functions, repeated
@@ -391,8 +393,8 @@ output(name = "bracket", feature = finished)
 | Function | Meaning |
 | --- | --- |
 | `rectangle(id, width, depth)` | Profile on XY, starting at the origin |
-| `polygon(id, points)` | Strictly convex CCW XY profile with 3–256 `[x, y]` vertices |
-| `extrude(id, profile, height)` | Extrude a rectangle or convex polygon along positive Z |
+| `polygon(id, points, holes=[])` | Convex CCW outer XY ring with optional convex CW holes; 256 total vertices, at most 32 holes |
+| `extrude(id, profile, height)` | Extrude a rectangle or supported polygon profile along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
 | `transform(id, body, offset, rotation)` | Rotate exact geometry using unit quaternion `[x,y,z,w]`, then translate; both default to identity |
 | `union(id, left, right)` | Combine orthogonal material |
@@ -406,7 +408,29 @@ repeat the first point at the end. Repeated points, crossings, collinear turns,
 edges at/below tolerance, and numerically uncertain turns are rejected rather
 than repaired. The exact B-rep retains one planar polygon face per cap and one
 quadrilateral per side; display and STL triangles are derived from those faces.
-Profiles with holes and nonconvex profiles remain unsupported.
+Optional `holes` are convex **clockwise** rings strictly inside the outer
+boundary. Holes must be disjoint, nonnested and separated by more than the
+numerical/tolerance envelope; touching or uncertain arrangements fail explicitly.
+There are at most 32 holes and 256 total profile vertices. Caps retain their
+inner loops in the exact B-rep and STEP; derived STL/display triangles leave
+openings empty. General nonconvex boundary rings remain unsupported.
+
+```python
+profile = polygon(id = "frame_profile",
+    points = [[0, 0], [40, 0], [40, 30], [0, 30]],
+    holes = [[[10, 10], [10, 20], [30, 20], [30, 10]]])
+frame = extrude(id = "frame", profile = profile, height = 5)
+```
+
+Outer edge roles remain `wall_i`; inner edges use `hole_i_wall_j` in source ring
+order. `walls` includes all walls and `hole_walls` selects only opening walls.
+Cap roles still resolve to one face each. Measurements and face-derived datums
+subtract the holes: the cap's area centroid need not lie on remaining material.
+See `perforated_mount.star` for two openings and an attached centroid locator.
+Holed prisms do not support the general convex Boolean intersection path.
+All build renderers use the recipe's tolerance. Holed preview scenes use a
+versioned embedded marker; older already-open Canvas clients retain their last
+valid scene and require a reload after this upgrade.
 
 ```python
 profile = polygon(id = "ramp_profile", points = [[0, 0], [40, 0], [0, 20]])
@@ -420,7 +444,8 @@ normals; STEP/STL therefore contain the transformed part itself. It applies
 that reuses a part definition. Neither operation accepts scale, reflection or
 implicit quaternion normalization.
 
-General rotations currently support one strictly convex solid or an empty body.
+General rotations support one strictly convex solid, one validated convex-ring
+through-hole prism, or an empty body.
 Exactly represented axis-permutation matrices also preserve the orthogonal
 nonconvex/multiple-solid domain. Near-axis rotations are not snapped: even a
 nominal quarter turn expressed with floating-point square roots may require the
@@ -735,20 +760,22 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 
 ## Supported domain and current limits
 
-- Rectangle profiles and strict CCW convex polygon profiles with 3–256 vertices.
+- Rectangle profiles and convex CCW polygon outer rings with optional convex CW
+  holes; 256 total vertices and at most 32 disjoint interior holes.
 - Native positive-Z extrusion with authoritative polygonal caps and planar walls.
 - Translation of supported solids; rigid exact transforms within the domain above.
   Unions, cuts, intersections, open pockets,
   through-slots, and separated multiple solids in the orthogonal domain only.
-- General planar validation restricted to one strictly convex solid with
-  supporting outward face planes. Multiple general solids are explicitly
+- General planar validation supports one strictly convex solid with supporting
+  outward face planes, or one matched-cap right prism with convex-ring holes.
+  Multiple general solids are explicitly
   unsupported in one kernel snapshot; assemblies retain separate definitions.
 - Closed orientable shells, including through-hole topology.
 - Explicit rejection of enclosed cavities, nonmanifold contacts, unsupported
   geometry, and computations outside the numerical/resource envelope.
 
 Round holes, circles/cylinders, general rotated nonconvex modeling, sketch constraints, general
-polygon union/cut and nonconvex polygon Booleans, profiles with holes, nonconvex profiles, curved surfaces,
+polygon union/cut and nonconvex polygon Booleans, nonconvex boundary rings, curved surfaces,
 fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
 boundaries and millimetre units, with occurrence relationships for assemblies; it does not preserve the executable recipe.
@@ -759,7 +786,7 @@ toward the commercial CAD goal. Nested assemblies, scoped face references and
 shared display assets are implemented.
 Named part datums and sibling attachments are implemented. Next come
 reference-driven modeling, bounded-error display LOD,
-profiles with holes, curved analytic geometry, and trim/seam correctness.
+nonconvex boundary profiles, curved analytic geometry, and trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence
 for curved modeling, constraints, large assemblies, and manufacturing workflows.
 

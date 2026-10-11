@@ -2119,3 +2119,54 @@ fn watch_forwards_output_scope_and_bom_evaluates_selected_assembly() {
         2
     );
 }
+
+#[test]
+fn custom_tolerance_flows_to_holed_body_and_assembly_previews() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("small.star");
+    fs::write(&source, "p=polygon(id='p',points=[[0,0],[0.00001,0],[0.00001,0.00001],[0,0.00001]],holes=[[[0.00000005,0.000002],[0.00000005,0.000008],[0.000004,0.000008],[0.000004,0.000002]]])\nb=extrude(id='b',profile=p,height=0.000003)\ndefinition=part(id='part',body=b)\na=assembly(id='assembly',instances=[instance(id='only',part=definition)])\noutput(name='body',feature=b)\nassembly_output(name='assembly',assembly=a)\n").unwrap();
+    let compiled = cli(&["compile", source.to_str().unwrap()]);
+    assert!(
+        compiled.status.success(),
+        "{}",
+        String::from_utf8_lossy(&compiled.stderr)
+    );
+    let mut recipe: serde_json::Value = serde_json::from_slice(&compiled.stdout).unwrap();
+    recipe["tolerance"] = serde_json::json!({"linear": 1e-10});
+    let input = directory.path().join("small.json");
+    fs::write(&input, serde_json::to_vec(&recipe).unwrap()).unwrap();
+    let destination = directory.path().join("built");
+    let built = cli(&[
+        "build",
+        input.to_str().unwrap(),
+        "--out-dir",
+        destination.to_str().unwrap(),
+    ]);
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&built.stdout).unwrap();
+    let expected = (1e-10 - (4e-6 - 5e-8) * 6e-6) * 3e-6;
+    let volume = report["outputs"]["body"]["volume_mm3"].as_f64().unwrap();
+    assert!((volume - expected).abs() < expected * 1e-10);
+    for file in [
+        "body.preview.html",
+        "body.preview.svg",
+        "body.step",
+        "body.stl",
+        "assembly.preview.html",
+        "assembly.preview.svg",
+        "assembly.gpu.html",
+        "assembly.stream.html",
+        "assembly.display.json",
+    ] {
+        assert!(destination.join(file).is_file(), "missing {file}");
+    }
+    // The 5e-8 mm clearance is below the default 1e-7 mm tolerance. This fixture
+    // must fail under that policy rather than accidentally exercising defaults.
+    recipe["tolerance"] = serde_json::json!({"linear": 1e-7});
+    fs::write(&input, serde_json::to_vec(&recipe).unwrap()).unwrap();
+    assert!(!cli(&["check", input.to_str().unwrap()]).status.success());
+}

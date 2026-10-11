@@ -22,6 +22,12 @@ fn issue(code: &str, message: impl Into<String>) -> Vec<ValidationIssue> {
 }
 
 pub(super) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
+    if model.faces.iter().any(|f| f.loops.len() > 1) {
+        return match crate::prism::validate_prism(model, tolerance) {
+            Ok(()) => vec![],
+            Err(error) => issue("unsupported_geometry", error.to_string()),
+        };
+    }
     let orthogonal = model.faces.iter().all(|face| {
         model.loops[face.loops[0].0].edges.len() == 4
             && (0..3).any(|axis| {
@@ -46,6 +52,12 @@ pub(super) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<Valid
 // This excludes crossing/folded shells, coincident subdivisions, duplicate
 // geometric vertices, and inward surfaces; no generic intersection claim is made.
 pub(crate) fn validate_convex(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
+    if model.faces.iter().any(|face| face.loops.len() != 1) {
+        return issue(
+            "unsupported_geometry",
+            "convex geometry cannot contain inner face boundaries",
+        );
+    }
     if model.solids.len() != 1 || model.shells.len() != 1 {
         return issue("unsupported_geometry", "general planar geometry currently requires one convex solid; multiple general solids are unsupported");
     }

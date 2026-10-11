@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cad_build::{
     Recipe, MAX_ASSEMBLIES, MAX_FACE_ASSERTIONS, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS,
-    MAX_PARTS, MAX_POLYGON_POINTS,
+    MAX_PARTS, MAX_POLYGON_HOLES, MAX_POLYGON_POINTS,
 };
 use starlark::any::ProvidesStaticType;
 use starlark::environment::{GlobalsBuilder, Module};
@@ -136,9 +136,14 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         number(value)
     }
 
-    /// Declare a named numeric parameter. Repeated declarations must agree on
-    /// A strictly convex counter-clockwise profile, without repeated closing point.
-    fn polygon(id: &str, points: Value, eval: &mut Evaluator) -> anyhow::Result<String> {
+    /// Convex counter-clockwise outer ring and optional clockwise convex holes.
+    /// Rings omit their repeated closing point; hole order is semantic.
+    fn polygon(
+        id: &str,
+        points: Value,
+        holes: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
         let points: Vec<[f64; 2]> = serde_json::from_str(&points.to_json()?)
             .map_err(|_| anyhow::anyhow!("polygon points must be pairs of finite coordinates"))?;
         anyhow::ensure!(
@@ -149,12 +154,33 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             points.iter().flatten().all(|value| value.is_finite()),
             "polygon coordinates must be finite"
         );
-        store(eval)?
-            .feature(serde_json::json!({"op":"polygon","id":id,"points":points,"op_version":1}))?;
+        let holes: Vec<Vec<[f64; 2]>> = match holes {
+            Some(value) => serde_json::from_str(&value.to_json()?)
+                .map_err(|_| anyhow::anyhow!("polygon holes must be lists of coordinate pairs"))?,
+            None => vec![],
+        };
+        anyhow::ensure!(holes.len() <= MAX_POLYGON_HOLES, "too many polygon holes");
+        anyhow::ensure!(
+            holes.iter().all(|hole| hole.len() >= 3),
+            "each polygon hole requires at least three points"
+        );
+        let total = holes
+            .iter()
+            .fold(points.len(), |n, hole| n.saturating_add(hole.len()));
+        anyhow::ensure!(
+            total <= MAX_POLYGON_POINTS,
+            "polygon exceeds total point budget"
+        );
+        anyhow::ensure!(
+            holes.iter().flatten().flatten().all(|v| v.is_finite()),
+            "polygon hole coordinates must be finite"
+        );
+        store(eval)?.feature(serde_json::json!({"op":"polygon","id":id,"points":points,"holes":holes,"op_version":1}))?;
         Ok(id.to_owned())
     }
 
-    /// their default. CLI overrides are applied before dimensions are computed.
+    /// Declare a numeric parameter. Repeated declarations must agree on their
+    /// default. CLI overrides are applied before dimensions are computed.
     fn param(name: &str, default: Value, eval: &mut Evaluator) -> anyhow::Result<f64> {
         anyhow::ensure!(
             !name.is_empty() && name.trim() == name,
@@ -1354,5 +1380,43 @@ mod face_datum_tests {
             .is_err());
         }
         assert!(from_starlark("bad.star","part(id='p',body='b',datums={'x':{'kind':'face_datum','anchor_feature':'b','role':'end_cap','x_direction':[1,0,0],'typo':1}})").is_err());
+    }
+}
+
+#[cfg(test)]
+mod holed_polygon_tests {
+    use super::*;
+    #[test]
+    fn holed_profile_dsl_roundtrips_and_exposes_inner_wall_roles() {
+        let source="w=param(name='hole_width',default=2)\np=polygon(id='p',points=[[0,0],[10,0],[10,8],[0,8]],holes=[[[2,2],[2,4],[2+w,4],[2+w,2]]])\nb=extrude(id='b',profile=p,height=3)\nassert_faces(id='inner',from_feature=b,role='hole_0_wall_0',in_feature=b)\noutput(name='body',feature=b)";
+        let mut engine = cad_build::BuildEngine::default();
+        for (width, expected) in [(2.0, 228.0), (3.0, 222.0)] {
+            let recipe = from_starlark_with_params(
+                "holes.star",
+                source,
+                &BTreeMap::from([("hole_width".into(), width)]),
+            )
+            .unwrap();
+            let roundtrip: Recipe =
+                serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+            let built = engine.build(&roundtrip).unwrap();
+            assert_eq!(built.outputs["body"].result.model.volume(), expected);
+            assert_eq!(built.face_assertions.len(), 1);
+            assert_eq!(engine.build(&roundtrip).unwrap().stats.computed_solids, 0);
+        }
+        for holes in [
+            "None",
+            "[[[1,1],[2,1]]]",
+            "[[[True,1],[1,2],[2,1]]]",
+            "[[[1,1,3],[1,2],[2,1]]]",
+            "[[[1,1],[1,2],[2,1]]]*33",
+        ] {
+            let source =
+                format!("polygon(id='p',points=[[0,0],[10,0],[10,10],[0,10]],holes={holes})");
+            assert!(
+                from_starlark("invalid.star", &source).is_err(),
+                "accepted {holes}"
+            );
+        }
     }
 }

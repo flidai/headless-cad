@@ -30,7 +30,8 @@ pub enum ExportError {
 type Point = [f64; 3];
 
 struct Polygon {
-    indices: Vec<usize>,
+    boundaries: Vec<Vec<usize>>,
+    triangles: Vec<[Point; 3]>,
     points: Vec<Point>,
     normal: Point,
 }
@@ -39,6 +40,7 @@ fn sub(a: Point, b: Point) -> Point {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
+#[cfg(test)]
 fn cross(a: Point, b: Point) -> Point {
     [
         a[1] * b[2] - a[2] * b[1],
@@ -47,6 +49,7 @@ fn cross(a: Point, b: Point) -> Point {
     ]
 }
 
+#[cfg(test)]
 fn dot(a: Point, b: Point) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
@@ -97,53 +100,41 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
                 face: face_index,
                 reason,
             };
-            if face.loops.len() != 1 {
-                return Err(unsupported("faces with holes are not supported"));
-            }
-            let indices: Vec<usize> = model.loops[face.loops[0].0]
-                .edges
+            let boundaries: Vec<Vec<usize>> = face
+                .loops
                 .iter()
-                .map(|edge_use| {
-                    model.edges[edge_use.edge.0].vertices[usize::from(edge_use.reversed)].0
+                .map(|id| {
+                    model.loops[id.0]
+                        .edges
+                        .iter()
+                        .map(|usage| {
+                            model.edges[usage.edge.0].vertices[usize::from(usage.reversed)].0
+                        })
+                        .collect()
                 })
                 .collect();
-            let points: Vec<Point> = indices
+            let points: Vec<Point> = boundaries[0]
                 .iter()
-                .map(|&index| model.vertices[index].position)
+                .map(|&id| model.vertices[id].position)
                 .collect();
-            if points.len() < 3 {
-                return Err(unsupported("fewer than three boundary points"));
-            }
             let normal =
                 normalized(face.plane.normal).ok_or_else(|| unsupported("invalid plane normal"))?;
-            // A fan is valid only for convex, consistently wound polygons. Check
-            // every point against every directed boundary edge, including nonlocal
-            // points, rather than relying only on consecutive turn directions.
-            for index in 0..points.len() {
-                let a = points[index];
-                let b = points[(index + 1) % points.len()];
-                let edge =
-                    normalized(sub(b, a)).ok_or_else(|| unsupported("degenerate boundary edge"))?;
-                for point in &points {
-                    let side = dot(cross(edge, sub(*point, a)), normal);
-                    if !side.is_finite() || side < -tolerance.linear {
-                        return Err(unsupported("non-convex or inconsistent boundary winding"));
-                    }
-                }
-            }
-            for triangle in points[1..].windows(2) {
-                let a = normalized(sub(triangle[0], points[0]))
-                    .ok_or_else(|| unsupported("degenerate triangle"))?;
-                let b = normalized(sub(triangle[1], points[0]))
-                    .ok_or_else(|| unsupported("degenerate triangle"))?;
-                if dot(cross(a, b), normal) <= 0.0 {
-                    return Err(unsupported(
-                        "degenerate triangle or inconsistent boundary winding",
-                    ));
-                }
-            }
+            let triangles = if face.loops.len() == 1 {
+                // Native validation certifies convex single-loop faces. Preserve
+                // the existing deterministic fan without revalidating the model per face.
+                (1..points.len() - 1)
+                    .map(|i| [points[0], points[i], points[i + 1]])
+                    .collect()
+            } else {
+                cad_kernel::triangulate_face(model, cad_kernel::FaceId(face_index), tolerance)
+                    .map_err(|error| ExportError::InvalidModel(error.to_string()))?
+                    .into_iter()
+                    .map(|ids| ids.map(|id| model.vertices[id.0].position))
+                    .collect()
+            };
             Ok(Polygon {
-                indices,
+                boundaries,
+                triangles,
                 points,
                 normal,
             })
@@ -156,12 +147,7 @@ pub fn to_stl(model: &ModelSnapshot, tolerance: Tolerance) -> Result<String, Exp
     let polygons = polygons(model, tolerance)?;
     let mut output = String::from("solid headless_cad\n");
     for polygon in polygons {
-        for index in 1..polygon.points.len() - 1 {
-            let [a, b, c] = [
-                polygon.points[0],
-                polygon.points[index],
-                polygon.points[index + 1],
-            ];
+        for [a, b, c] in polygon.triangles {
             writeln!(
                 output,
                 "  facet normal {} {} {}",
@@ -215,19 +201,27 @@ fn step_solids(step: &mut Step, model: &ModelSnapshot, polygons: Vec<Polygon>) -
         .collect();
     let mut faces = Vec::new();
     for polygon in polygons {
-        let point_ids: Vec<usize> = polygon.indices.iter().map(|&index| points[index]).collect();
-        let loop_id = step.add(format!("POLY_LOOP('',({}))", refs(&point_ids)));
-        let bound = step.add(format!("FACE_OUTER_BOUND('',#{loop_id},.T.)"));
+        let mut bounds = Vec::new();
+        for (index, boundary) in polygon.boundaries.iter().enumerate() {
+            let ids: Vec<usize> = boundary.iter().map(|&index| points[index]).collect();
+            let loop_id = step.add(format!("POLY_LOOP('',({}))", refs(&ids)));
+            let kind = if index == 0 {
+                "FACE_OUTER_BOUND"
+            } else {
+                "FACE_BOUND"
+            };
+            bounds.push(step.add(format!("{kind}('',#{loop_id},.T.)")));
+        }
         let normal = step.add(format!("DIRECTION('',({}))", triple(polygon.normal)));
         let x_direction =
             normalized(sub(polygon.points[1], polygon.points[0])).expect("validated edge");
         let reference = step.add(format!("DIRECTION('',({}))", triple(x_direction)));
         let placement = step.add(format!(
             "AXIS2_PLACEMENT_3D('',#{},#{normal},#{reference})",
-            point_ids[0]
+            points[polygon.boundaries[0][0]]
         ));
         let plane = step.add(format!("PLANE('',#{placement})"));
-        faces.push(step.add(format!("FACE_SURFACE('',(#{bound}),#{plane},.T.)")));
+        faces.push(step.add(format!("FACE_SURFACE('',({}),#{plane},.T.)", refs(&bounds))));
     }
     let mut solids = Vec::new();
     for solid in &model.solids {

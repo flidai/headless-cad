@@ -3,7 +3,8 @@
 //! viewer retains shared meshes with a larger occurrence budget. Neither browser
 //! viewer loads or evaluates the exact B-rep.
 use super::{
-    render_html, render_html_template, render_svg, scene, Face, PreviewError, RecipeContext, Scene,
+    render_html, render_html_template, render_svg, scene_with_tolerance, Face, PreviewError,
+    RecipeContext, Scene,
 };
 use cad_assembly::{BuiltAssembly, Instance};
 use cad_kernel::Tolerance;
@@ -75,9 +76,18 @@ struct MeshAssetDescriptor {
     gpu_bytes: usize,
 }
 
+#[cfg(test)]
 fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, PreviewError> {
+    assembly_scene_with_tolerance(assembly, gpu, Tolerance::default())
+}
+
+fn assembly_scene_with_tolerance(
+    assembly: &BuiltAssembly,
+    gpu: bool,
+    tolerance: Tolerance,
+) -> Result<AssemblyScene, PreviewError> {
     assembly
-        .validate(Tolerance::default())
+        .validate(tolerance)
         .map_err(|error| PreviewError::Assembly(error.to_string()))?;
     let instance_limit = if gpu { 100_000 } else { MAX_INSTANCES };
     if assembly.instances.len() > instance_limit {
@@ -99,7 +109,7 @@ fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, 
             }
         }
         if !meshes.contains_key(&part.content_hash) {
-            let local = scene(&part.result.model)?;
+            let local = scene_with_tolerance(&part.result.model, tolerance)?;
             unique_faces += local.faces.len();
             unique_points += local
                 .faces
@@ -153,7 +163,7 @@ fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, 
         ));
     }
     let bom = assembly
-        .bill_of_materials(Tolerance::default())
+        .bill_of_materials(tolerance)
         .map_err(|error| PreviewError::Assembly(error.to_string()))?;
     Ok(AssemblyScene {
         schema_version: 1,
@@ -180,9 +190,16 @@ fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, 
 /// Versioned display JSON: one local face mesh per content hash plus instances.
 /// Material volume sums occurrences; overlaps are counted, not Boolean-unioned.
 pub fn to_assembly_scene_json(assembly: &BuiltAssembly) -> Result<String, PreviewError> {
-    Ok(serde_json::to_string_pretty(&assembly_scene(
-        assembly, false,
-    )?)?)
+    to_assembly_scene_json_with_tolerance(assembly, Tolerance::default())
+}
+
+pub fn to_assembly_scene_json_with_tolerance(
+    assembly: &BuiltAssembly,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
+    Ok(serde_json::to_string_pretty(
+        &assembly_scene_with_tolerance(assembly, false, tolerance)?,
+    )?)
 }
 
 /// A standalone occurrence-aware viewer with exact source/provenance context.
@@ -190,20 +207,38 @@ pub fn to_assembly_html(
     assembly: &BuiltAssembly,
     recipe: &RecipeContext,
 ) -> Result<String, PreviewError> {
+    to_assembly_html_with_tolerance(assembly, recipe, Tolerance::default())
+}
+
+pub fn to_assembly_html_with_tolerance(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
     if recipe.content_hash != assembly.content_hash {
         return Err(PreviewError::Recipe(
             "recipe output identity does not match assembly",
         ));
     }
-    render_html(&assembly_scene(assembly, false)?, Some(recipe))
+    render_html(
+        &assembly_scene_with_tolerance(assembly, false, tolerance)?,
+        Some(recipe),
+    )
 }
 
 /// Compact GPU display JSON with up to 100,000 occurrences. Unique local meshes
 /// remain bounded; instance geometry is not expanded into software face arrays.
 pub fn to_assembly_gpu_scene_json(assembly: &BuiltAssembly) -> Result<String, PreviewError> {
-    Ok(serde_json::to_string_pretty(&assembly_scene(
-        assembly, true,
-    )?)?)
+    to_assembly_gpu_scene_json_with_tolerance(assembly, Tolerance::default())
+}
+
+pub fn to_assembly_gpu_scene_json_with_tolerance(
+    assembly: &BuiltAssembly,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
+    Ok(serde_json::to_string_pretty(
+        &assembly_scene_with_tolerance(assembly, true, tolerance)?,
+    )?)
 }
 
 /// Opt-in WebGL2 occurrence viewer, preserving shared meshes on the GPU.
@@ -221,12 +256,26 @@ pub fn to_assembly_gpu_html_with_fallback(
     recipe: &RecipeContext,
     portable_preview_available: bool,
 ) -> Result<String, PreviewError> {
+    to_assembly_gpu_html_with_fallback_and_tolerance(
+        assembly,
+        recipe,
+        portable_preview_available,
+        Tolerance::default(),
+    )
+}
+
+pub fn to_assembly_gpu_html_with_fallback_and_tolerance(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    portable_preview_available: bool,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
     if recipe.content_hash != assembly.content_hash {
         return Err(PreviewError::Recipe(
             "recipe output identity does not match assembly",
         ));
     }
-    let mut scene = assembly_scene(assembly, true)?;
+    let mut scene = assembly_scene_with_tolerance(assembly, true, tolerance)?;
     scene.portable_preview_available = Some(portable_preview_available);
     render_html_template(&scene, Some(recipe), include_str!("gpu-viewer.html"))
 }
@@ -239,12 +288,26 @@ pub fn to_assembly_stream_bundle(
     recipe: &RecipeContext,
     portable_preview_available: bool,
 ) -> Result<StreamBundle, PreviewError> {
+    to_assembly_stream_bundle_with_tolerance(
+        assembly,
+        recipe,
+        portable_preview_available,
+        Tolerance::default(),
+    )
+}
+
+pub fn to_assembly_stream_bundle_with_tolerance(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    portable_preview_available: bool,
+    tolerance: Tolerance,
+) -> Result<StreamBundle, PreviewError> {
     if recipe.content_hash != assembly.content_hash {
         return Err(PreviewError::Recipe(
             "recipe output identity does not match assembly",
         ));
     }
-    let mut scene = assembly_scene(assembly, true)?;
+    let mut scene = assembly_scene_with_tolerance(assembly, true, tolerance)?;
     scene.schema_version = 2;
     scene.portable_preview_available = Some(portable_preview_available);
     let mut assets = BTreeMap::<String, String>::new();
@@ -266,7 +329,7 @@ pub fn to_assembly_stream_bundle(
             gpu_bytes: mesh
                 .faces
                 .iter()
-                .map(|face| (face.points.len().saturating_sub(2)) * 3 * 7 * 4)
+                .map(|face| face.triangle_indices().len() * 3 * 7 * 4)
                 .sum(),
         };
         if let Some(previous) = assets.insert(name, content.clone()) {
@@ -323,6 +386,8 @@ fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
                 points,
                 edges: face.edges.iter().map(|id| id + edge_offset).collect(),
                 normal,
+                triangles: face.triangles.clone(),
+                loop_starts: face.loop_starts.clone(),
             });
         }
         result
@@ -336,7 +401,16 @@ fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
 
 /// Deterministic isometric thumbnail; meshes expand only while drawing the SVG.
 pub fn to_assembly_svg(assembly: &BuiltAssembly) -> Result<String, PreviewError> {
-    render_svg(&expand(&assembly_scene(assembly, false)?)?)
+    to_assembly_svg_with_tolerance(assembly, Tolerance::default())
+}
+
+pub fn to_assembly_svg_with_tolerance(
+    assembly: &BuiltAssembly,
+    tolerance: Tolerance,
+) -> Result<String, PreviewError> {
+    render_svg(&expand(&assembly_scene_with_tolerance(
+        assembly, false, tolerance,
+    )?)?)
 }
 
 #[cfg(test)]

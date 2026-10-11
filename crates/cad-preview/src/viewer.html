@@ -13,15 +13,22 @@ main.recipe-open{grid-template-columns:minmax(0,1fr) minmax(340px,440px)}#recipe
 <script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
 <script>
 'use strict';
-let scene = JSON.parse(document.getElementById('cad-scene-data').textContent);
+let scene = JSON.parse((document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
 let recipeContext = JSON.parse(document.getElementById('cad-recipe-data').textContent);
+function faceTriangles(face){return face.triangles??Array.from({length:face.points.length-2},(_,i)=>[0,i+1,i+2])}
+function validFaceTopology(face){
+ const n=face.points.length,starts=face.loop_starts;
+ if(starts!==undefined&&(!Array.isArray(starts)||starts.length<1||starts.length>33||starts[0]!==0||starts.some((v,i)=>!Number.isInteger(v)||v<0||v>=n||(i>0&&v-starts[i-1]<3))||n-starts.at(-1)<3||!Array.isArray(face.triangles)))return false;
+ return face.triangles===undefined||(Array.isArray(face.triangles)&&face.triangles.length>0&&face.triangles.length<=n+64&&face.triangles.every(t=>Array.isArray(t)&&t.length===3&&new Set(t).size===3&&t.every(i=>Number.isInteger(i)&&i>=0&&i<n)));
+}
+function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.find(s=>s>i)??face.points.length;return i+1===end?starts.findLast(s=>s<=i):i+1}
 function validBody(body){
  const vector=value=>Array.isArray(value)&&value.length===3&&value.every(Number.isFinite);
  return body&&Array.isArray(body.faces)&&body.faces.length<=50000&&Array.isArray(body.crease_edges)&&body.crease_edges.every(Number.isInteger)
  &&['vertices','edges','solids'].every(key=>Number.isInteger(body[key])&&body[key]>=0)
  &&(body.volume===null||Number.isFinite(body.volume))
  &&(body.bounds===null||(Array.isArray(body.bounds)&&body.bounds.length===2&&body.bounds.every(vector)))
- &&body.faces.every(face=>Number.isInteger(face.id)&&vector(face.normal)&&Array.isArray(face.points)&&face.points.length>=3&&face.points.every(vector)&&Array.isArray(face.edges)&&face.edges.length===face.points.length&&face.edges.every(Number.isInteger));
+ &&body.faces.every(face=>Number.isInteger(face.id)&&vector(face.normal)&&Array.isArray(face.points)&&face.points.length>=3&&face.points.every(vector)&&Array.isArray(face.edges)&&face.edges.length===face.points.length&&face.edges.every(Number.isInteger)&&validFaceTopology(face));
 }
 function normalizeScene(raw){
  if(raw?.kind!=='assembly'){if(!validBody(raw))throw Error('Incomplete scene');return raw}
@@ -40,7 +47,7 @@ function normalizeScene(raw){
    points+=face.points.length;if(faces.length>=50000||points>200000)throw Error('Software display limit exceeded');
    const transformed=face.points.map(p=>rotate(p,q).map((v,i)=>v+t[i])),normal=rotate(face.normal,q);
    if(!transformed.every(p=>p.every(Number.isFinite))||!normal.every(Number.isFinite))throw Error('Display coordinate overflow');
-   faces.push({id:faces.length,local_face_id:face.id,instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id,points:transformed,normal,edges:face.edges.map(id=>id+edges)});
+   faces.push({id:faces.length,local_face_id:face.id,instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id,points:transformed,normal,triangles:face.triangles,loop_starts:face.loop_starts,edges:face.edges.map(id=>id+edges)});
   }
   crease_edges.push(...mesh.crease_edges.map(id=>id+edges));vertices+=mesh.vertices;edges+=mesh.edges;solids+=mesh.solids;
  }
@@ -117,7 +124,7 @@ function draw(){
  for(const {f,points} of visible){
   const shade=Math.round(175+55*Math.max(-1,Math.min(1,dot(f.normal,[.3,-.5,.8]))));
   const color=f.id===selected||f.instance_id===selectedInstance?[143,206,184]:[shade-18,shade,shade-5];
-  for(let i=1;i+1<points.length;i++)triangle(points[0],points[i],points[i+1],f.id,color);
+  for(const [a,b,c] of faceTriangles(f))triangle(points[a],points[b],points[c],f.id,color);
  }
  function edge(a,b,faceId,highlight){
   const span=Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1])),steps=Math.max(1,Math.ceil(span));
@@ -143,7 +150,7 @@ function draw(){
    }
   }
  }
- for(const {f,points} of visible)for(let i=0;i<points.length;i++)if(f.id===selected||(drawEdges&&creaseEdges.has(f.edges[i])))edge(points[i],points[(i+1)%points.length],f.id,f.id===selected);
+ for(const {f,points} of visible)for(let i=0;i<points.length;i++)if(f.id===selected||(drawEdges&&creaseEdges.has(f.edges[i])))edge(points[i],points[nextFacePoint(f,i)],f.id,f.id===selected);
  surfaceContext.putImageData(image,0,0);ctx.drawImage(surface,0,0,width,height);
  if(!scene.faces.length){ctx.fillStyle='#728379';ctx.textAlign='center';ctx.font='16px system-ui';ctx.fillText('Empty result',width/2,height/2)}
  const origin=[width-65,height-65];for(const [axis,color,label] of [[[1,0,0],'#bc625a','X'],[[0,1,0],'#548e6b','Y'],[[0,0,1],'#587eaa','Z']]){const p=[dot(axis,right)*30,-dot(axis,up)*30];ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(...origin);ctx.lineTo(origin[0]+p[0],origin[1]+p[1]);ctx.stroke();ctx.font='11px ui-monospace';ctx.textAlign='center';ctx.fillText(label,origin[0]+p[0]*1.3,origin[1]+p[1]*1.3+4)}
@@ -152,7 +159,7 @@ function select(x,y){
  const px=Math.floor(x*renderRatio),py=Math.floor(y*renderRatio);
  selected=px>=0&&py>=0&&px<bufferWidth&&py<bufferHeight?faceBuffer[py*bufferWidth+px]:-1;
  const element=document.getElementById('selection'),face=scene.faces.find(f=>f.id===selected);
- if(face){selectedInstance=face.instance_id||null;selectionContext=face.instance_id?face:null;let area=0;for(let i=1;i+1<face.points.length;i++){const c=cross(sub(face.points[i],face.points[0]),sub(face.points[i+1],face.points[0]));area+=Math.hypot(...c)/2}element.textContent=`Face ${face.local_face_id??face.id} · ${face.points.length} edges${face.instance_id?`\nOccurrence: ${occurrenceLabel(face.instance_id)}\nDefinition: ${face.part_id}\nFeature: ${face.feature_id}`:''}\nArea: ${fmt(area)} mm²\nNormal: [${face.normal.map(fmt).join(', ')}]`;element.style.whiteSpace='pre-line'}else{selectedInstance=null;selectionContext=null;element.textContent='Select a face in the viewport.'}document.getElementById('occurrence-select').value=selectedInstance||'';recipeOverview();draw();
+ if(face){selectedInstance=face.instance_id||null;selectionContext=face.instance_id?face:null;let area=0;for(const [a,b,d] of faceTriangles(face)){const c=cross(sub(face.points[b],face.points[a]),sub(face.points[d],face.points[a]));area+=Math.hypot(...c)/2}element.textContent=`Face ${face.local_face_id??face.id} · ${face.points.length} edges${face.instance_id?`\nOccurrence: ${occurrenceLabel(face.instance_id)}\nDefinition: ${face.part_id}\nFeature: ${face.feature_id}`:''}\nArea: ${fmt(area)} mm²\nNormal: [${face.normal.map(fmt).join(', ')}]`;element.style.whiteSpace='pre-line'}else{selectedInstance=null;selectionContext=null;element.textContent='Select a face in the viewport.'}document.getElementById('occurrence-select').value=selectedInstance||'';recipeOverview();draw();
 }
 document.getElementById('occurrence-select').addEventListener('change',event=>{selected=-1;selectedInstance=event.target.value||null;const instance=scene.instances?.find(item=>item.id===selectedInstance);selectionContext=instance?{instance_id:instance.id,part_id:instance.part,feature_id:scene.definitions[instance.part].feature_id}:null;document.getElementById('selection').textContent=instance?`Occurrence: ${occurrenceLabel(instance.id)}\nDefinition: ${instance.part}\nSelect a face for local topology details.`:'Select a face in the viewport.';recipeOverview();draw()});
 let drag=null;canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY};canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-drag.lastX)*.008;pitch=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch+(e.clientY-drag.lastY)*.008));drag.lastX=e.clientX;drag.lastY=e.clientY;draw()});canvas.addEventListener('pointerup',e=>{if(drag&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<4){const r=canvas.getBoundingClientRect();select(e.clientX-r.left,e.clientY-r.top)}drag=null});canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.1,Math.min(15,zoom*Math.exp(-e.deltaY*.001)));draw()},{passive:false});
@@ -175,7 +182,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
   return JSON.stringify([entries.map(([name,output])=>[name,output.content_hash]).sort(([a],[b])=>a.localeCompare(b)),manifest.recipe_context_hash??manifest.recipe_source_hash??null,manifest.recipe_source?.parameter_overrides??null]);
  }
  function replacement(html){
-  const embedded=html.match(/<script id="cad-scene-data" type="application\/json">([^\r\n]*)<\/script>/);if(!embedded)throw Error('Incomplete preview');
+  const embedded=html.match(/<script id="cad-scene-data(?:-v2)?" type="application\/json">([^\r\n]*)<\/script>/);if(!embedded)throw Error('Incomplete preview');
   const raw=JSON.parse(embedded[1]),next=normalizeScene(raw);
   const contextData=html.match(/<script id="cad-recipe-data" type="application\/json">([^\r\n]*)<\/script>/);if(!contextData)throw Error('Incomplete recipe context');
   const context=JSON.parse(contextData[1]);
