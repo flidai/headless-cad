@@ -1304,3 +1304,115 @@ fn rigid_transform_strict_json_and_invalid_frames_fail_before_geometry() {
         Err(BuildError::OperationVersion { .. })
     ));
 }
+
+fn convex_intersection_recipe(radius: f64) -> Recipe {
+    // A square [0,4]^2 clipped by a centered diamond of L1 radius r in (2,4).
+    // Four removed corner triangles each have leg 4-r; both prisms have height2.
+    serde_json::from_value(serde_json::json!({
+        "schema_version":2,"units":"mm",
+        "features":[
+            {"op":"rectangle","id":"square_profile","width":4,"depth":4},
+            {"op":"extrude","id":"square","profile":"square_profile","height":2},
+            {"op":"rectangle","id":"tool_profile","width":radius*2.0_f64.sqrt(),"depth":radius*2.0_f64.sqrt()},
+            {"op":"extrude","id":"tool","profile":"tool_profile","height":2},
+            {"op":"transform","id":"diamond","body":"tool","offset":[2,2.0-radius,0],"rotation":[0,0,(std::f64::consts::PI/8.0).sin(),(std::f64::consts::PI/8.0).cos()]},
+            {"op":"intersect","id":"overlap","left":"square","right":"diamond"}
+        ],
+        "outputs":[{"name":"overlap","feature":"overlap"}],
+        "face_assertions":[
+            {"id":"left_cap","selector":{"anchor_feature":"square","role":"end_cap","target_feature":"overlap","cardinality":{"kind":"exactly","count":1}}},
+            {"id":"right_cap","selector":{"anchor_feature":"tool","role":"end_cap","target_feature":"overlap","cardinality":{"kind":"exactly","count":1}}},
+            {"id":"left_walls","selector":{"anchor_feature":"square","role":"walls","target_feature":"overlap","cardinality":{"kind":"exactly","count":4}}},
+            {"id":"right_walls","selector":{"anchor_feature":"tool","role":"walls","target_feature":"overlap","cardinality":{"kind":"exactly","count":4}}}
+        ]
+    })).unwrap()
+}
+
+#[test]
+fn rotated_convex_intersection_has_analytic_volume_bounds_and_both_operand_lineage() {
+    let mut engine = BuildEngine::default();
+    for (index, radius) in [2.2, 2.5, 3.0, 3.5, 3.8].into_iter().enumerate() {
+        let recipe = convex_intersection_recipe(radius);
+        let built = engine.build(&recipe).unwrap();
+        let model = &built.outputs["overlap"].result.model;
+        let expected = 32.0 - 4.0 * (4.0 - radius).powi(2);
+        assert!((model.volume() - expected).abs() < 1e-8, "radius {radius}");
+        let bounds = model.bounds();
+        for axis in 0..3 {
+            assert!(bounds.min[axis].abs() < 1e-8);
+            assert!((bounds.max[axis] - [4.0, 4.0, 2.0][axis]).abs() < 1e-8);
+        }
+        assert_eq!(model.faces.len(), 10);
+        assert_eq!(built.stats.computed_solids, if index == 0 { 4 } else { 3 });
+        assert_eq!(built.stats.cache_hits, if index == 0 { 0 } else { 1 });
+        let left = &built.face_assertions["left_cap"].witnesses;
+        let right = &built.face_assertions["right_cap"].witnesses;
+        // Coincident caps have dual provenance, not two fabricated output faces.
+        assert_eq!(left[0].target_face, right[0].target_face);
+        let left_walls: std::collections::BTreeSet<_> = built.face_assertions["left_walls"]
+            .witnesses
+            .iter()
+            .map(|w| w.target_face)
+            .collect();
+        let right_walls: std::collections::BTreeSet<_> = built.face_assertions["right_walls"]
+            .witnesses
+            .iter()
+            .map(|w| w.target_face)
+            .collect();
+        assert_eq!(left_walls.len(), 4);
+        assert_eq!(right_walls.len(), 4);
+        assert!(left_walls.is_disjoint(&right_walls));
+        assert_eq!(engine.build(&recipe).unwrap().stats.computed_solids, 0);
+    }
+}
+
+#[test]
+fn general_convex_union_and_cut_remain_explicitly_unsupported() {
+    for operation in ["union", "cut"] {
+        let mut json = serde_json::to_value(convex_intersection_recipe(3.0)).unwrap();
+        json["features"][5]["op"] = operation.into();
+        let recipe: Recipe = serde_json::from_value(json).unwrap();
+        match build(&recipe) {
+            Err(BuildError::Kernel { feature, message }) => {
+                assert_eq!(feature, "overlap");
+                assert!(message.to_lowercase().contains("unsupported"), "{message}");
+            }
+            other => panic!("Expected explicit unsupported {operation}, got {other:?}"),
+        }
+    }
+}
+
+#[test]
+fn convex_intersection_lineage_distinguishes_deleted_tool_walls_and_empty_overlap() {
+    let mut recipe = convex_intersection_recipe(5.0);
+    recipe
+        .face_assertions
+        .retain(|assertion| assertion.id != "right_walls");
+    let contained = build(&recipe).unwrap();
+    assert!((contained.outputs["overlap"].result.model.volume() - 32.0).abs() < 1e-8);
+    let deleted = contained.resolve_faces(&FaceSelector {
+        anchor_feature: "tool".into(),
+        role: "walls".into(),
+        target_feature: "overlap".into(),
+        cardinality: FaceCardinality::All,
+    });
+    assert_eq!(deleted.status, FaceResolutionStatus::Deleted);
+    assert!(deleted.witnesses.is_empty());
+    let mut disjoint = convex_intersection_recipe(3.0);
+    disjoint.face_assertions.clear();
+    if let Feature::Transform { offset, .. } = &mut disjoint.features[4] {
+        offset[0] = 50.0;
+    }
+    let empty = build(&disjoint).unwrap();
+    assert!(empty.outputs["overlap"].result.model.solids.is_empty());
+    for anchor in ["square", "tool"] {
+        let deleted = empty.resolve_faces(&FaceSelector {
+            anchor_feature: anchor.into(),
+            role: "end_cap".into(),
+            target_feature: "overlap".into(),
+            cardinality: FaceCardinality::Exactly { count: 1 },
+        });
+        assert_eq!(deleted.status, FaceResolutionStatus::Deleted);
+        assert!(deleted.witnesses.is_empty());
+    }
+}

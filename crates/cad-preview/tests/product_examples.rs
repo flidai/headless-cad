@@ -259,3 +259,85 @@ fn tilted_jig_parameter_edits_preserve_exact_tool_coordinates_and_cap_intent() {
         }
     }
 }
+
+#[test]
+fn clipped_tools_edits_match_independent_cross_sections_and_both_operand_references() {
+    use cad_build::{FaceCardinality, FaceResolutionStatus, FaceSelector};
+    use std::collections::BTreeMap;
+    let source = std::fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/clipped_tools.star"),
+    )
+    .unwrap();
+    for (crop_height, shoulder_height) in [(6.0, 15.0), (2.0, 11.0), (4.0, 18.0)] {
+        let parameters = BTreeMap::from([
+            ("crop_height".into(), crop_height),
+            ("shoulder_height".into(), shoulder_height),
+        ]);
+        let recipe =
+            cad_recipe::from_starlark_with_params("clipped_tools.star", &source, &parameters)
+                .unwrap();
+        let built = cad_build::build(&recipe).unwrap();
+        // Octagonal section: 12*14 rectangle minus four right triangles with legs of length 3.
+        let octagonal_volume = 150.0 * crop_height;
+        // Shoulder section: 20*h rectangle minus two right triangles with legs of length (h-10).
+        let shoulder_volume = 10.0 * (20.0 * shoulder_height - (shoulder_height - 10.0).powi(2));
+        assert!((built.outputs["octagonal"].result.model.volume() - octagonal_volume).abs() < 1e-7);
+        let model = &built.outputs["shouldered"].result.model;
+        assert!((model.volume() - shoulder_volume).abs() < 1e-7);
+        assert!(
+            (built.assemblies["clipped_tools"].material_volume()
+                - (5250.0 + octagonal_volume + shoulder_volume))
+                .abs()
+                < 1e-7
+        );
+        let section = [
+            [0.0, 0.0],
+            [20.0, 0.0],
+            [20.0, 10.0],
+            [30.0 - shoulder_height, shoulder_height],
+            [shoulder_height - 10.0, shoulder_height],
+            [0.0, 10.0],
+        ];
+        assert_eq!(model.vertices.len(), 12);
+        for y in [0.0, 10.0] {
+            for [x, z] in section {
+                assert_eq!(
+                    model
+                        .vertices
+                        .iter()
+                        .filter(|v| {
+                            (v.position[0] - x).abs() < 1e-7
+                                && (v.position[1] - y).abs() < 1e-7
+                                && (v.position[2] - z).abs() < 1e-7
+                        })
+                        .count(),
+                    1,
+                    "missing analytic section vertex [{x},{y},{z}]"
+                );
+            }
+        }
+        for (anchor, normal) in [
+            (
+                "shoulder_operand",
+                [
+                    std::f64::consts::FRAC_1_SQRT_2,
+                    0.0,
+                    std::f64::consts::FRAC_1_SQRT_2,
+                ],
+            ),
+            ("shoulder_crop", [0.0, 0.0, 1.0]),
+        ] {
+            let selection = built.resolve_faces(&FaceSelector {
+                anchor_feature: anchor.into(),
+                role: "end_cap".into(),
+                target_feature: "shouldered".into(),
+                cardinality: FaceCardinality::Exactly { count: 1 },
+            });
+            assert_eq!(selection.status, FaceResolutionStatus::Resolved);
+            let face = &model.faces[selection.witnesses[0].target_face.0];
+            for (actual, expected) in face.plane.normal.into_iter().zip(normal) {
+                assert!((actual - expected).abs() < 1e-12);
+            }
+        }
+    }
+}

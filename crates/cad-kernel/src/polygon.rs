@@ -51,7 +51,8 @@ pub fn validate_polygon(points: &[[f64; 2]], tolerance: Tolerance) -> Result<(),
 
 /// Extrude a strictly convex CCW polygon along +Z, with polygonal cap topology.
 /// Coordinates and height are millimetres. Supports translation/export; the
-/// orthogonal Boolean operator still rejects nonrectangular input explicitly.
+/// Boolean union/difference still reject nonorthogonal input explicitly;
+/// intersection also supports bounded single convex planar solids.
 pub fn extrude_polygon(
     points: &[[f64; 2]],
     height: f64,

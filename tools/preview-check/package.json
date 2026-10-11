@@ -12,7 +12,8 @@
     "test:datums": "node datum-check.cjs",
     "test:gpu": "node gpu-check.cjs",
     "test:stream": "node stream-check.cjs",
-    "test:transform": "node transform-check.cjs"
+    "test:transform": "node transform-check.cjs",
+    "test:clipped": "node clipped-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

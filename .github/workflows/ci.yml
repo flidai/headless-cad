@@ -19,6 +19,7 @@ jobs:
       - run: cargo run --locked -p cad-cli -- build examples/angled_fixture.star --out-dir out/angled_fixture
       - run: cargo run --locked -p cad-cli -- build examples/datum_gantry.star --out-dir out/datum_gantry
       - run: cargo run --locked -p cad-cli -- build examples/tilted_jig.star --out-dir out/tilted_jig
+      - run: cargo run --locked -p cad-cli -- build examples/clipped_tools.star --out-dir out/clipped_tools
       - run: python3 crates/cad-export/tools/check_bom_csv.py out/modular_rack/modular_rack.bom.csv out/modular_rack/modular_rack.bom.json
       - run: cargo run --locked -p cad-cli -- select examples/reference_fixture.star --from blank --role end_cap --in finished --all
       - uses: actions/setup-node@v4
@@ -37,6 +38,7 @@ jobs:
       - run: npm run test:nested --prefix tools/preview-check
       - run: npm run test:polygon --prefix tools/preview-check
       - run: npm run test:transform --prefix tools/preview-check
+      - run: npm run test:clipped --prefix tools/preview-check
       - run: npm run test:datums --prefix tools/preview-check
       - run: npm run test:gpu --prefix tools/preview-check
       - run: npm run test:stream --prefix tools/preview-check

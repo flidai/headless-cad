@@ -18,7 +18,8 @@ STEP and STL. Modeling currently supports **orthogonal solids and strictly conve
 polygon extrusions**: slotted brackets, open trays, triangular ramps, and polygonal
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
-Boolean modeling remains restricted to orthogonal geometry.
+Union and cut remain orthogonal-only; intersection also supports bounded,
+well-conditioned convex planar solids, including rotated inputs.
 
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
 optional independent interoperability oracle in development.
@@ -158,7 +159,8 @@ assembly_output(name = "pair", assembly = pair)
 
 Rotations are unit quaternions in `[x, y, z, w]` order; translations are
 millimetres. A placement rotates a reusable part without changing its local
-B-rep. It does not enable rotated-solid Boolean operations in the kernel.
+B-rep. Modeling across placed instances requires explicit kernel operations;
+`transform` and scoped convex `intersect` operate on exact part geometry.
 Parts must reference solid features. Assemblies support both part occurrences
 and nested subassembly occurrences, with named part datums and deterministic
 sibling attachments. Joints and nonlinear constraint solving remain planned.
@@ -335,7 +337,7 @@ output(name = "bracket", feature = finished)
 | `transform(id, body, offset, rotation)` | Rotate exact geometry using unit quaternion `[x,y,z,w]`, then translate; both default to identity |
 | `union(id, left, right)` | Combine orthogonal material |
 | `cut(id, left, right)` | Remove right-hand orthogonal material from the left |
-| `intersect(id, left, right)` | Keep common orthogonal material |
+| `intersect(id, left, right)` | Keep common material: orthogonal solids or two supported convex planar solids |
 | `param(name, default)` | Declare a numeric parameter the CLI may override |
 | `output(name, feature)` | Declare a solid result to inspect or export |
 
@@ -362,7 +364,8 @@ General rotations currently support one strictly convex solid or an empty body.
 Exactly represented axis-permutation matrices also preserve the orthogonal
 nonconvex/multiple-solid domain. Near-axis rotations are not snapped: even a
 nominal quarter turn expressed with floating-point square roots may require the
-convex path. General rotated Boolean operations remain unsupported. Numeric
+convex path. Rotated convex intersection is supported within the limits below; general
+rotated union and cut remain unsupported. Numeric
 range and post-transform validity are checked before publication.
 
 ```python
@@ -376,6 +379,20 @@ placed = transform(id = "placed", body = upright, offset = [10, 20, 4],
 slotted base. Semantic cap/wall assertions follow the original extrusion through
 both transforms. The default jig has three solids and 18560 mm³ of material;
 parameter-edit tests check tool vertices against independent scalar formulas.
+
+Convex `intersect` reconstructs analytic polygon faces from the operands' plane
+half-spaces. It retains face ancestry from both inputs; exactly coincident
+supporting faces can contribute to the same result face. It currently accepts
+at most 48 input planes, with two single strictly convex solids (or an empty
+operand). Near-dependent plane systems, unresolved near-coincidence and
+lower-dimensional contact are rejected explicitly. The existing orthogonal
+intersection path retains its broader nonconvex/multiple-solid support.
+
+`examples/clipped_tools.star` intersects a rotated square prism with a rectangular
+crop, and a tilted solid with a box to form two sloping shoulders. Independent
+cross-section formulas give 900 and 2750 mm³ respectively; parameter edits check
+both volumes and semantic references from each operand. The assembly's material
+volume is 8900 mm³. General nonconvex planar Booleans remain future work.
 
 All lengths are millimetres. `mm(value)` is a numeric annotation, not
 dimension-aware arithmetic. Feature references are strings; the graph builder
@@ -639,7 +656,7 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
   geometry, and computations outside the numerical/resource envelope.
 
 Round holes, circles/cylinders, general rotated nonconvex modeling, sketch constraints, general
-polygon Booleans, profiles with holes, nonconvex profiles, curved surfaces,
+polygon union/cut and nonconvex polygon Booleans, profiles with holes, nonconvex profiles, curved surfaces,
 fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
 boundaries and millimetre units, with occurrence relationships for assemblies; it does not preserve the executable recipe.
@@ -672,7 +689,18 @@ and repeated-instance recipes.
 
 Independent STEP checks use the optional script in
 `crates/cad-export/tools/check_step_ocp.py`. Install `cadquery-ocp` in a disposable
-Python environment to run it. OCP is never a runtime dependency. CI runs format,
+Python environment to run it. `check_common_ocp.py` also recomputes intersection
+from two operand STEP files and compares both directed difference volumes:
+
+```sh
+cargo run --locked -p cad-export --example export_intersection -- /tmp/cad-common
+python crates/cad-export/tools/check_common_ocp.py /tmp/cad-common/left.step /tmp/cad-common/right.step /tmp/cad-common/common.step
+```
+
+Append `skew` to the exporter example command to exercise two independently
+rotated cubes, then run the same oracle on that directory.
+
+OCP is never a runtime dependency. CI runs format,
 lint, tests, and example builds, then uploads the generated artifacts.
 
 The optional browser smoke test verifies view switching, face selection, edge
@@ -690,12 +718,14 @@ npm run test:assembly
 npm run test:nested
 npm run test:polygon
 npm run test:transform
+npm run test:clipped
 npm run test:datums
 npm run test:gpu
 npm run test:stream
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.
+For `test:clipped`, build `examples/clipped_tools.star` into `out/clipped_tools`.
 For `test:transform`, build `examples/tilted_jig.star` into `out/tilted_jig`.
 For `test:polygon`, build `examples/angled_fixture.star` into `out/angled_fixture`
 using the command above; the test checks the triangular ramp silhouette and

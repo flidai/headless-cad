@@ -153,3 +153,56 @@ fn rigid_solid_transform_exports_exact_planes_and_closed_oriented_mesh() {
     assert_eq!(step.matches("FACETED_BREP('").count(), 1);
     assert_eq!(step, to_step(&result.model, tolerance).unwrap());
 }
+
+#[test]
+fn convex_intersection_exports_new_cut_plane_and_closed_mesh() {
+    let tolerance = Tolerance::default();
+    let triangle =
+        cad_kernel::extrude_polygon(&[[0., 0.], [8., 0.], [0., 6.]], 5., tolerance).unwrap();
+    let clip = cad_kernel::extrude_rectangle(6., 6., 5., tolerance).unwrap();
+    let clip = cad_kernel::translate(&clip.model, [2., 0., 0.], tolerance).unwrap();
+    let result = cad_kernel::boolean(
+        &triangle.model,
+        &clip.model,
+        cad_kernel::BooleanOp::Intersection,
+        tolerance,
+    )
+    .unwrap();
+    check_mesh(&to_stl(&result.model, tolerance).unwrap(), 67.5, 8);
+    let step = to_step(&result.model, tolerance).unwrap();
+    assert_eq!(step.matches("FACE_SURFACE(").count(), 5);
+    assert_eq!(step.matches("FACETED_BREP('").count(), 1);
+    assert!(result
+        .model
+        .vertices
+        .iter()
+        .all(|v| v.position[0] >= 2. - 1e-12));
+
+    let cube = cad_kernel::extrude_rectangle(4., 4., 4., tolerance).unwrap();
+    let tool = cad_kernel::extrude_rectangle(4., 8., 8., tolerance).unwrap();
+    let tool = cad_kernel::transform(
+        &tool.model,
+        [2., -4., -2.],
+        [0., 0., 0.3826834323650898, 0.9238795325112867],
+        tolerance,
+    )
+    .unwrap();
+    let cut = cad_kernel::boolean(
+        &cube.model,
+        &tool.model,
+        cad_kernel::BooleanOp::Intersection,
+        tolerance,
+    )
+    .unwrap();
+    // Tool's local x<=4 plane becomes x+y <= 4*sqrt(2)-2.
+    let leg = 4. * 2f64.sqrt() - 2.;
+    check_mesh(&to_stl(&cut.model, tolerance).unwrap(), 2. * leg * leg, 8);
+    let step = to_step(&cut.model, tolerance).unwrap();
+    assert_eq!(step.matches("FACE_SURFACE(").count(), 5);
+    assert!(cut
+        .model
+        .vertices
+        .iter()
+        .all(|v| v.position[0] + v.position[1] <= leg + 1e-12));
+    assert_eq!(step, to_step(&cut.model, tolerance).unwrap());
+}

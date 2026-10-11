@@ -187,7 +187,8 @@ General planar validation currently accepts one strictly convex solid: closed
 oriented topology, convex planar faces, positive volume, and strict supporting
 face half-spaces must agree. Multiple general solids in one snapshot are
 explicitly unsupported. The existing orthogonal validator still handles its
-nonconvex and disconnected domain; the Boolean engine remains orthogonal-only.
+nonconvex and disconnected domain. Union/cut remain orthogonal-only; intersection
+now also supports conditioned convex planar inputs as described below.
 Assembly placement can rotate and reuse polygon solids without baking those
 rotations into Boolean operands. `examples/angled_fixture.star` exercises this
 boundary with triangular ramps, hexagonal seats, and an orthogonally cut base.
@@ -202,9 +203,25 @@ axis permutations additionally support existing orthogonal nonconvex and
 multiple-solid inputs. No near-axis snapping or implicit quaternion normalization
 is performed. Arithmetic uncertainty, translation loss, edge displacement and
 postconditions have explicit checks. This does not enable general rotated
-Booleans or arbitrary nonconvex planar validation. `tilted_jig.star` supplies
+union/cut or arbitrary nonconvex planar validation. `tilted_jig.star` supplies
 chained noncommuting rotations, source assertions and independent expected part
 coordinates across parameter edits.
+
+The first general convex intersection increment uses bounded plane half-space
+reconstruction. Plane-triplet intersections form candidate vertices; active
+support planes determine polygon faces and shared oriented topology. This keeps
+analytic planes and face ancestry from both operands. Input support is currently
+two strict single-convex solids with at most 48 total input planes; the existing
+orthogonal intersection retains its nonconvex/multiple-solid domain. Conditioning,
+incidence uncertainty and result validity are checked before publication. Unresolved
+near-coincidence and tangent/lower-dimensional contact are explicit errors, not
+snapped or silently repaired results. This is not general nonconvex Boolean support.
+
+`clipped_tools.star` demonstrates octagonal cropping and two oblique shoulders,
+with independent cross-section volumes and parameter-edit checks. The export
+oracle additionally asks OCCT to compute Common from the original operand STEP
+files, comparing area, volume, bounds and both directed difference volumes with
+the native result. Browser depth/picking checks use independent analytic faces.
 
 Progress through general nonconvex transforms, planar profiles with holes, curved extrusion,
 revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,
@@ -538,8 +555,8 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation and scoped exact rigid transforms; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
-| References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Topology-associated datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
+| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation and scoped exact rigid transforms and bounded convex intersection; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Topology-associated datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, frustum culling, bounded geometry cache and proxy fallback | Spatial BVHs, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |

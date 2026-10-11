@@ -1,7 +1,8 @@
 //! A deliberately narrow, native Rust boundary-representation kernel.
 //!
 //! Supports rectangular and strictly convex polygon extrusions, rigid placements,
-//! and orthogonal solid Booleans. Polygon caps remain analytic planar faces.
+//! orthogonal solid Booleans, and bounded convex planar intersection. Polygon
+//! caps remain analytic planar faces.
 //! Boolean faces stay rectangular and share explicit edges and vertices; open
 //! pockets, through-holes, empty results, and disconnected solids are supported.
 //! Enclosed cavities, curved surfaces, and nonmanifold contacts are unsupported.
@@ -11,6 +12,7 @@
 //! mm³. Results contain analytic lines and planes and explicit oriented topology.
 //! There is no external CAD kernel, mesh approximation, or stored volume shortcut.
 
+mod convex_intersection;
 mod math;
 mod orthogonal;
 mod polygon;

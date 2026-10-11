@@ -1207,3 +1207,39 @@ mod transform_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod convex_intersection_tests {
+    use super::*;
+
+    #[test]
+    fn transformed_intersection_parameter_edits_compile_reproducibly() {
+        let source = "r=param(name='radius',default=3)\na=extrude(id='a',profile=rectangle(id='ap',width=4,depth=4),height=2)\nb=extrude(id='b',profile=rectangle(id='bp',width=r*1.4142135623730951,depth=r*1.4142135623730951),height=2)\nt=transform(id='t',body=b,offset=[2,2-r,0],rotation=[0,0,0.3826834323650898,0.9238795325112867])\nc=intersect(id='c',left=a,right=t)\nassert_faces(id='a_cap',from_feature=a,role='end_cap',in_feature=c)\nassert_faces(id='b_cap',from_feature=b,role='end_cap',in_feature=c)\noutput(name='part',feature=c)";
+        let mut engine = cad_build::BuildEngine::default();
+        let first = from_starlark("clip.star", source).unwrap();
+        let built = engine.build(&first).unwrap();
+        assert!((built.outputs["part"].result.model.volume() - 28.0).abs() < 1e-8);
+        let compiled = serde_json::to_string(&first).unwrap();
+        let restored: Recipe = serde_json::from_str(&compiled).unwrap();
+        assert_eq!(
+            built.feature_hashes,
+            engine.build(&restored).unwrap().feature_hashes
+        );
+        let edited = from_starlark_with_params(
+            "clip.star",
+            source,
+            &BTreeMap::from([("radius".into(), 2.5)]),
+        )
+        .unwrap();
+        let changed = engine.build(&edited).unwrap();
+        assert!((changed.outputs["part"].result.model.volume() - 23.0).abs() < 1e-8);
+        assert_eq!(changed.stats.computed_solids, 3);
+        assert_eq!(changed.stats.cache_hits, 1);
+        assert_eq!(built.feature_hashes["a"], changed.feature_hashes["a"]);
+        assert_ne!(built.feature_hashes["c"], changed.feature_hashes["c"]);
+        assert_eq!(
+            changed.face_assertions["a_cap"].witnesses[0].target_face,
+            changed.face_assertions["b_cap"].witnesses[0].target_face
+        );
+    }
+}

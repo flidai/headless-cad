@@ -306,6 +306,10 @@ fn neighbor(mut cell: [usize; 3], direction: usize, shape: [usize; 3]) -> Option
 /// planes, not a fixed-resolution voxel approximation. Through-holes and
 /// disconnected solids are supported. Cavities and nonmanifold contacts return
 /// explicit Unsupported errors. Distinct plane gaps <= tolerance are rejected.
+/// Intersection additionally supports two single strictly convex planar solids
+/// (48 input planes maximum) through analytic supporting-plane reconstruction.
+/// Unresolved near-coincidence, ill-conditioned plane triples, and tangent or
+/// lower-dimensional intersections in that general domain are explicit errors.
 pub fn boolean(
     a: &ModelSnapshot,
     b: &ModelSnapshot,
@@ -314,8 +318,14 @@ pub fn boolean(
 ) -> Result<OperationResult, KernelError> {
     validated(a, tolerance)?;
     validated(b, tolerance)?;
-    let a_faces = rectangular_faces(a)?;
-    let b_faces = rectangular_faces(b)?;
+    let rectangles = (rectangular_faces(a), rectangular_faces(b));
+    if matches!(operation, BooleanOp::Intersection)
+        && (rectangles.0.is_err() || rectangles.1.is_err())
+    {
+        return crate::convex_intersection::intersect(a, b, tolerance);
+    }
+    let a_faces = rectangles.0?;
+    let b_faces = rectangles.1?;
     if a.vertices.is_empty() && b.vertices.is_empty() {
         return boolean_result(empty(), &a_faces, &b_faces, operation);
     }

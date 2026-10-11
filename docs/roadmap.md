@@ -13,7 +13,7 @@ regression performance. A green test count alone does not close a milestone.
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums/sibling attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associated datums, broader selectors and downstream modeling consumers remain |
-| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: strict convex CCW polygon extrusion (3–256 vertices), polygon caps and single-convex-solid planar validation implemented; scoped exact rigid transforms with face lineage implemented; holes, curves, general nonconvex transforms/Booleans and trim/seam handling remain |
+| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: strict convex CCW polygon extrusion (3–256 vertices), polygon caps and single-convex-solid planar validation implemented; scoped exact rigid transforms and bounded convex intersection with face lineage implemented; holes, curves, general nonconvex transforms/Booleans and trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, frustum culling and bounded cache implemented; LOD, spatial hierarchy and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
@@ -30,7 +30,7 @@ hierarchies, bounded-error LOD and hardware performance gates remain. Numerical 
 M1 instance transforms describe placement and display reuse. The M2 `transform`
 operation now bakes rigid rotations and translations into exact geometry within
 its single-convex-solid or exact axis-permutation domain. It does not enable
-general Booleans across rotated solids or assembly instances. `tilted_jig.star`
+general union/cut across rotated solids or modeling across assembly instances. `tilted_jig.star`
 adds two transformed tools with cap/wall lineage assertions; manufacturing files
 contain their transformed native coordinates.
 
@@ -68,9 +68,11 @@ contain their transformed native coordinates.
 5. Extend the implemented convex polygon extrusion with a general geometry/trim
    contract and profiles with holes before curved Boolean claims. Preserve the
    current explicit limits: strict CCW 3–256-vertex profiles, one general convex
-   solid per kernel snapshot, and orthogonal-only Booleans. Polygon `wall_i`
-   roles follow input edge order; translation has lineage, general polygon
-   Booleans do not. Retain triangle/trapezoid/pentagon analytic and STEP oracles,
+   solid per kernel snapshot, orthogonal-only union/cut and at most 48 input
+   planes for general convex intersection. `clipped_tools.star` adds oblique
+   shoulders and an octagonal crop, with references inherited from both operands. Polygon `wall_i`
+   roles follow input edge order; translation/rigid transforms and supported convex intersection have lineage;
+   general polygon union/cut remain unsupported. Retain triangle/trapezoid/pentagon analytic and STEP oracles,
    plus `angled_fixture.star` and the browser `test:polygon` silhouette/picking
    regression as curved primitives and trim handling are introduced.
 
