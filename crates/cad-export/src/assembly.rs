@@ -92,10 +92,10 @@ pub fn assembly_to_step(
     let mut assemblies = BTreeMap::new();
     let mut placements = BTreeMap::new();
     let resolved =
-        cad_assembly::resolve_hierarchy_instances(&assembly.parts, &assembly.hierarchy, tolerance)
+        cad_assembly::resolve_hierarchy_placements(&assembly.parts, &assembly.hierarchy, tolerance)
             .map_err(|error| ExportError::InvalidModel(error.to_string()))?;
-    for (name, definition) in &assembly.hierarchy {
-        let leaves = &resolved[name];
+    for (name, definition) in &resolved {
+        let leaves = &definition.instances;
         let local: Vec<_> = leaves
             .iter()
             .map(|i| &i.transform)
@@ -152,9 +152,10 @@ pub fn assembly_to_step(
         ));
         definitions.insert(name, (definition, representation));
     }
-    for (parent, definition) in &assembly.hierarchy {
+    for (parent, definition) in &resolved {
         let (parent_definition, parent_representation) = assemblies[parent];
-        let children = resolved[parent]
+        let children = definition
+            .instances
             .iter()
             .map(|i| (&i.id, definitions[&i.part]))
             .chain(
@@ -350,11 +351,13 @@ mod tests {
             instances: vec![],
             assemblies: vec![
                 AssemblyInstance {
+                    attachment: None,
                     id: "left".into(),
                     assembly: "block".into(),
                     transform: RigidTransform::default(),
                 },
                 AssemblyInstance {
+                    attachment: None,
                     id: "right".into(),
                     assembly: "block".into(),
                     transform: RigidTransform {
@@ -588,6 +591,7 @@ mod tests {
             }],
             assemblies: vec![
                 AssemblyInstance {
+                    attachment: None,
                     id: "holder".into(),
                     assembly: "module".into(),
                     transform: RigidTransform {
@@ -596,6 +600,7 @@ mod tests {
                     },
                 },
                 AssemblyInstance {
+                    attachment: None,
                     id: "spare".into(),
                     assembly: "module".into(),
                     transform: RigidTransform {
@@ -631,6 +636,83 @@ mod tests {
         assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 5);
         assert_eq!(assembly.instance_count(), 5);
         assert!((assembly.material_volume() - 120.).abs() < 1e-10);
+    }
+
+    #[test]
+    fn step_exports_resolved_subassembly_placements_while_reusing_its_definition() {
+        use cad_assembly::{AssemblyAttachment, AssemblyDefinition, AssemblyInstance};
+        let tolerance = Tolerance::default();
+        let mut parts = two_instances().parts;
+        parts.get_mut("block").unwrap().datums = BTreeMap::from([
+            ("origin".into(), RigidTransform::default()),
+            (
+                "foot".into(),
+                RigidTransform {
+                    translation: [1., 0., 0.],
+                    ..Default::default()
+                },
+            ),
+        ]);
+        let module = AssemblyDefinition {
+            id: "module".into(),
+            assemblies: vec![],
+            instances: vec![Instance {
+                id: "leaf".into(),
+                part: "block".into(),
+                attachment: None,
+                transform: RigidTransform {
+                    translation: [5., 0., 0.],
+                    ..Default::default()
+                },
+            }],
+        };
+        let root = AssemblyDefinition {
+            id: "root".into(),
+            instances: vec![Instance {
+                id: "base".into(),
+                part: "block".into(),
+                attachment: None,
+                transform: RigidTransform {
+                    translation: [20., 0., 0.],
+                    rotation: [0., 0., 1., 0.],
+                },
+            }],
+            assemblies: [("left", 0.), ("right", 10.)]
+                .into_iter()
+                .map(|(id, gap)| AssemblyInstance {
+                    id: id.into(),
+                    assembly: "module".into(),
+                    transform: RigidTransform {
+                        translation: [0., gap, 0.],
+                        ..Default::default()
+                    },
+                    attachment: Some(AssemblyAttachment {
+                        instance: "base".into(),
+                        target_path: vec![],
+                        source_path: vec!["leaf".into()],
+                        datum: "foot".into(),
+                        target_datum: "origin".into(),
+                    }),
+                })
+                .collect(),
+        };
+        let built = BuiltAssembly::from_definitions(
+            "root".into(),
+            parts,
+            BTreeMap::from([("root".into(), root), ("module".into(), module)]),
+            tolerance,
+        )
+        .unwrap();
+        let step = assembly_to_step(&built, tolerance).unwrap();
+        // Inverting the internal foot at x=6 puts the module origin at x=26
+        // after the base's half-turn. Source offsets alone would be incorrect.
+        assert!(step.contains("CARTESIAN_POINT('',(26.,0.,0.))"));
+        assert!(step.contains("CARTESIAN_POINT('',(26.,-10.,0.))"));
+        assert!(step.contains("CARTESIAN_POINT('',(5.,0.,0.))"));
+        assert_eq!(step.matches("PRODUCT(").count(), 3);
+        assert_eq!(step.matches("FACETED_BREP('").count(), 1);
+        assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 4);
+        assert_eq!(built.instance_count(), 3);
     }
 
     #[test]

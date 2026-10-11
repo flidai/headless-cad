@@ -145,7 +145,7 @@ The geometric topology is not necessarily a DAG: boundary loops and incidence
 are inherently cyclic. Constraints also form graphs with loops. An assembly is
 not a Boolean union of its parts. Fixtures and enclosures use explicit part
 instances; the modular rack reuses nested rows and carriages. Older examples can
-still use disjoint unions. Named part frames and deterministic sibling/descendant datum
+still use disjoint unions. Named part frames and deterministic part/rigid-module datum
 attachments are implemented; joints and nonlinear constraint solving remain
 target work.
 
@@ -453,14 +453,29 @@ the new field rather than resolve the wrong sibling. Empty paths serialize as
 the original sibling form.
 
 Preflight validates every declared path and datum, including unused definitions,
-before geometry evaluation. Sibling dependency cycles, chains beyond 64 leaves
+before geometry evaluation. Mixed part/module dependency cycles, chains beyond 64 occurrences
 and paths beyond 64 components fail explicitly. Existing assembly depth,
 expansion and work budgets also apply. Each reusable definition resolves once
 bottom-up; indexed path lookup composes child occurrence transforms and the
 terminal part’s resolved placement, including its own attachment. The result
 is local to the containing definition, so two instances of a module can place
-differently without changing its internal solution. Sources remain leaf parts;
-attaching an entire subassembly or referring upward requires further work.
+differently without changing its internal solution. Sources may be leaf parts
+or whole rigid subassemblies. A subassembly attachment adds a required nonempty
+`source_path` inside its referenced definition, ending at a part with the named
+source datum. The source frame includes all resolved internal placements. Its
+local placement is `target_frame × offset × inverse(internal_source_frame)`.
+The solver does not alter internal placements or clone shared geometry.
+
+Local dependency ordering spans both leaf and child occurrences. The first
+target occurrence is the dependency even when a path descends further; this
+rejects self-descendant targets and mixed part/module cycles. Child definitions
+resolve before parent occurrences, and traversal uses resolved placements for
+attached children on both source and target paths. `resolve_hierarchy_placements`
+returns derived definitions with all attachments cleared, while the published
+native hierarchy retains the original intent. Expansion and STEP use the
+derived leaf **and child** transforms. The optional child `attachment` field
+is another explicit schema-2 extension that old strict readers reject. Upward
+references, flexible subassemblies and simultaneous mating remain future work.
 
 Source hierarchy preserves attachment intent; flattened placements and STEP
 occurrence transforms use the resolved result. Native validation recomputes and
@@ -495,6 +510,12 @@ The independent STEP oracle also resolves source attachment intent with matrix
 arithmetic and compares imported local and world placements, hierarchy and
 definition sharing. These checks establish this downward-reference contract,
 not general mating, collision freedom or flexible subassembly solving.
+`mounted_drive_module.star` adds two whole-module attachments with noncommuting
+internal source frames and a sensor following an attached child. Its acceptance
+tests check every cartridge leaf placement, geometry reuse across docking edits,
+source-intent round trips, invalid source paths, mixed dependency cycles and
+independent imported STEP child placements. Both examples share the same
+physical volume formula but exercise different authored placement contracts.
 
 Build a constraint service separately from geometric construction. The 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
@@ -971,7 +992,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped/tapered revolutions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling/descendant attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Whole-subassembly attachments, joints/constraints and configurations |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache and proxy fallback | Paged assembly/part spatial indexes, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |

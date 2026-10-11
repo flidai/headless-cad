@@ -44,73 +44,107 @@ impl RigidTransform {
     }
 }
 
-fn attachment_order<'a>(
-    definition: &AssemblyDefinition,
-    mut datums: impl FnMut(&str) -> Option<&'a BTreeMap<String, RigidTransform>>,
-    external: &BTreeMap<String, String>,
-) -> Result<Vec<usize>, AssemblyError> {
-    if definition.instances.len() > MAX_INSTANCES {
+/// Attach a rigid child occurrence through a descendant part datum.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AssemblyAttachment {
+    pub instance: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub target_path: Vec<String>,
+    /// Full nonempty path inside this child definition, ending at a part.
+    pub source_path: Vec<String>,
+    pub datum: String,
+    pub target_datum: String,
+}
+#[derive(Clone, Copy)]
+enum Occurrence {
+    Leaf(usize),
+    Child(usize),
+}
+type OccurrenceIndex = BTreeMap<String, BTreeMap<String, Occurrence>>;
+fn occurrence_index(definitions: &BTreeMap<String, AssemblyDefinition>) -> OccurrenceIndex {
+    definitions
+        .iter()
+        .map(|(id, d)| {
+            let mut map = BTreeMap::new();
+            for (i, x) in d.instances.iter().enumerate() {
+                map.insert(x.id.clone(), Occurrence::Leaf(i));
+            }
+            for (i, x) in d.assemblies.iter().enumerate() {
+                map.insert(x.id.clone(), Occurrence::Child(i));
+            }
+            (id.clone(), map)
+        })
+        .collect()
+}
+fn walk<'a>(
+    definition: &'a AssemblyDefinition,
+    path: &[&str],
+    definitions: &'a BTreeMap<String, AssemblyDefinition>,
+    index: &OccurrenceIndex,
+) -> Result<(Vec<&'a RigidTransform>, &'a Instance), AssemblyError> {
+    if path.is_empty() {
+        return Err(AssemblyError::Attachment(
+            "datum path must end at a part".into(),
+        ));
+    }
+    if path.len() > 64 {
         return Err(AssemblyError::ResourceLimit);
     }
-    let mut index = BTreeMap::new();
-    for (i, leaf) in definition.instances.iter().enumerate() {
-        identifier("instance", &leaf.id)?;
-        leaf.transform.validate()?;
-        if index.insert(leaf.id.as_str(), i).is_some() {
-            return Err(AssemblyError::DuplicateInstance(leaf.id.clone()));
-        }
-    }
-    let mut dependencies = vec![None; definition.instances.len()];
-    for (i, leaf) in definition.instances.iter().enumerate() {
-        let source_datums = datums(&leaf.part).ok_or_else(|| AssemblyError::MissingPart {
-            instance: leaf.id.clone(),
-            part: leaf.part.clone(),
-        })?;
-        if let Some(attachment) = &leaf.attachment {
-            for name in [
-                &attachment.instance,
-                &attachment.datum,
-                &attachment.target_datum,
-            ] {
-                identifier("attachment reference", name)?;
-            }
-            let target = if attachment.target_path.is_empty() {
-                Some(*index.get(attachment.instance.as_str()).ok_or_else(|| {
-                    AssemblyError::Attachment(format!(
-                        "'{}' must reference a sibling part occurrence '{}'",
-                        leaf.id, attachment.instance
-                    ))
-                })?)
-            } else {
-                None
-            };
-            let target_part = if let Some(target) = target {
-                &definition.instances[target].part
-            } else {
-                external.get(&leaf.id).ok_or_else(|| {
-                    AssemblyError::Attachment(
-                        "descendant target requires a validated assembly hierarchy".into(),
-                    )
-                })?
-            };
-            let target_datums = datums(target_part).ok_or_else(|| AssemblyError::MissingPart {
-                instance: attachment.instance.clone(),
-                part: target_part.clone(),
+    let mut current = definition;
+    let mut frames = vec![];
+    for (i, id) in path.iter().enumerate() {
+        identifier("attachment path component", id)?;
+        let occurrence = index
+            .get(&current.id)
+            .and_then(|x| x.get(*id))
+            .ok_or_else(|| {
+                AssemblyError::Attachment(format!(
+                    "missing target occurrence '{}' in definition '{}'",
+                    id, current.id
+                ))
             })?;
-            if !source_datums.contains_key(attachment.datum.as_str())
-                || !target_datums.contains_key(attachment.target_datum.as_str())
-            {
-                return Err(AssemblyError::Attachment(format!(
-                    "missing source or target datum on occurrence '{}'",
-                    leaf.id
-                )));
+        match occurrence {
+            Occurrence::Leaf(k) => {
+                if i + 1 != path.len() {
+                    return Err(AssemblyError::Attachment(format!(
+                        "target path continues beyond leaf '{}'",
+                        id
+                    )));
+                }
+                let leaf = &current.instances[*k];
+                frames.push(&leaf.transform);
+                return Ok((frames, leaf));
             }
-            dependencies[i] = target;
+            Occurrence::Child(k) => {
+                if i + 1 == path.len() {
+                    return Err(AssemblyError::Attachment(format!(
+                        "target path ends at assembly occurrence '{}' instead of a part",
+                        id
+                    )));
+                }
+                let child = &current.assemblies[*k];
+                frames.push(&child.transform);
+                current = definitions.get(&child.assembly).ok_or_else(|| {
+                    AssemblyError::Hierarchy(format!("missing assembly '{}'", child.assembly))
+                })?;
+            }
         }
     }
+    Err(AssemblyError::Attachment("empty datum path".into()))
+}
+fn target_path<'a>(instance: &'a str, tail: &'a [String]) -> Result<Vec<&'a str>, AssemblyError> {
+    if tail.len() >= 64 {
+        return Err(AssemblyError::ResourceLimit);
+    }
+    Ok(std::iter::once(instance)
+        .chain(tail.iter().map(String::as_str))
+        .collect())
+}
+fn dependency_order(dependencies: &[Option<usize>]) -> Result<Vec<usize>, AssemblyError> {
     let mut state = vec![0u8; dependencies.len()];
     let mut depth = vec![0usize; dependencies.len()];
-    let mut order = Vec::with_capacity(dependencies.len());
+    let mut order = vec![];
     for start in 0..dependencies.len() {
         if state[start] == 2 {
             continue;
@@ -144,280 +178,215 @@ fn attachment_order<'a>(
     }
     Ok(order)
 }
-
-/// Source-only preflight for all declared part frames and assembly attachments.
-/// Targets are sibling leaves or explicit descendant occurrence paths ending
-/// at a part. Target paths and sibling dependency chains are bounded at 64.
+fn preflight<'a>(
+    definitions: &BTreeMap<String, AssemblyDefinition>,
+    index: &OccurrenceIndex,
+    datums: impl Fn(&str) -> Option<&'a BTreeMap<String, RigidTransform>>,
+) -> Result<BTreeMap<String, Vec<usize>>, AssemblyError> {
+    let mut orders = BTreeMap::new();
+    let mut work = 0usize;
+    for (id, d) in definitions {
+        let mut dependencies = vec![None; d.instances.len() + d.assemblies.len()];
+        let mut check = |i: usize,
+                         source_part: &str,
+                         datum: &str,
+                         root: &str,
+                         tail: &[String],
+                         target_datum: &str|
+         -> Result<(), AssemblyError> {
+            identifier("attachment datum", datum)?;
+            identifier("attachment target datum", target_datum)?;
+            let path = target_path(root, tail)?;
+            work = work
+                .checked_add(path.len())
+                .ok_or(AssemblyError::ResourceLimit)?;
+            if work > MAX_INSTANCES * 128 {
+                return Err(AssemblyError::ResourceLimit);
+            }
+            let (_, target) = walk(d, &path, definitions, index)?;
+            if !datums(source_part).is_some_and(|m| m.contains_key(datum))
+                || !datums(&target.part).is_some_and(|m| m.contains_key(target_datum))
+            {
+                return Err(AssemblyError::Attachment(
+                    "missing source or target datum".into(),
+                ));
+            }
+            let target_index = match index[id][root] {
+                Occurrence::Leaf(k) => k,
+                Occurrence::Child(k) => d.instances.len() + k,
+            };
+            dependencies[i] = Some(target_index);
+            Ok(())
+        };
+        for (i, leaf) in d.instances.iter().enumerate() {
+            if let Some(a) = &leaf.attachment {
+                check(
+                    i,
+                    &leaf.part,
+                    &a.datum,
+                    &a.instance,
+                    &a.target_path,
+                    &a.target_datum,
+                )?;
+            }
+        }
+        for (i, child) in d.assemblies.iter().enumerate() {
+            if let Some(a) = &child.attachment {
+                if a.source_path.len() > 64 {
+                    return Err(AssemblyError::ResourceLimit);
+                }
+                let path: Vec<_> = a.source_path.iter().map(String::as_str).collect();
+                let (_, source) = walk(&definitions[&child.assembly], &path, definitions, index)?;
+                check(
+                    d.instances.len() + i,
+                    &source.part,
+                    &a.datum,
+                    &a.instance,
+                    &a.target_path,
+                    &a.target_datum,
+                )?;
+            }
+        }
+        orders.insert(id.clone(), dependency_order(&dependencies)?);
+    }
+    Ok(orders)
+}
+/// Validate all source paths and mixed leaf/child sibling DAGs, including unused
+/// definitions, before geometry evaluation. Each path and dependency chain is
+/// bounded at 64; path components are literal occurrence IDs.
 pub fn validate_attachment_definitions(
     parts: &BTreeMap<String, PartDefinition>,
     definitions: &BTreeMap<String, AssemblyDefinition>,
 ) -> Result<(), AssemblyError> {
-    if parts.len() > 10_000 || definitions.len() > 10_000 {
-        return Err(AssemblyError::ResourceLimit);
-    }
     validate_definitions(&parts.keys().cloned().collect(), definitions)?;
-    for part in parts.values() {
-        validate_datums(&part.datums)?;
+    for p in parts.values() {
+        validate_datums(&p.datums)?;
     }
-    let targets = descendant_targets(definitions)?;
-    let mut count = 0usize;
-    for definition in definitions.values() {
-        count = count
-            .checked_add(definition.instances.len())
-            .ok_or(AssemblyError::ResourceLimit)?;
-        if count > MAX_INSTANCES {
-            return Err(AssemblyError::ResourceLimit);
-        }
-        attachment_order(
-            definition,
-            |part| parts.get(part).map(|p| &p.datums),
-            &targets[&definition.id],
-        )?;
-    }
+    preflight(definitions, &occurrence_index(definitions), |id| {
+        parts.get(id).map(|p| &p.datums)
+    })?;
     Ok(())
 }
-
-/// Resolve one definition's local leaf placements in deterministic dependency
-/// order, retaining IDs but clearing attachments in the returned derived leaves.
-/// Descendant targets explicitly require `resolve_hierarchy_instances`; this
-/// legacy entry point has no hierarchy with which to resolve them.
-pub fn resolve_definition_instances(
-    definition: &AssemblyDefinition,
-    parts: &BTreeMap<String, BuiltPart>,
-    tolerance: Tolerance,
-) -> Result<Vec<Instance>, AssemblyError> {
-    if !tolerance.is_valid() {
-        return Err(AssemblyError::Tolerance);
-    }
-    for part in definition
-        .instances
-        .iter()
-        .map(|leaf| &leaf.part)
-        .collect::<BTreeSet<_>>()
-    {
-        let definition = parts.get(part).ok_or_else(|| AssemblyError::MissingPart {
-            instance: "attachment".into(),
-            part: part.clone(),
-        })?;
-        validate_datums(&definition.datums)?;
-    }
-    let order = attachment_order(
-        definition,
-        |part| parts.get(part).map(|p| &p.datums),
-        &BTreeMap::new(),
-    )?;
-    let mut resolved = BTreeMap::<String, Instance>::new();
-    for i in order {
-        let source = &definition.instances[i];
-        let mut instance = source.clone();
-        if let Some(attachment) = &source.attachment {
-            let target = &resolved[&attachment.instance];
-            let target_datum = &parts[&target.part].datums[&attachment.target_datum];
-            let own_datum = &parts[&source.part].datums[&attachment.datum];
-            instance.transform = target
-                .transform
-                .compose(target_datum, tolerance)?
-                .compose(&source.transform, tolerance)?
-                .compose(&own_datum.inverse(tolerance)?, tolerance)?;
-        }
-        instance.attachment = None;
-        resolved.insert(instance.id.clone(), instance);
-    }
-    Ok(resolved.into_values().collect())
-}
-
 pub(super) fn validate_built_attachments(
     parts: &BTreeMap<String, BuiltPart>,
     definitions: &BTreeMap<String, AssemblyDefinition>,
 ) -> Result<(), AssemblyError> {
-    for part in parts.values() {
-        validate_datums(&part.datums)?;
+    for p in parts.values() {
+        validate_datums(&p.datums)?;
     }
-    let targets = descendant_targets(definitions)?;
-    for definition in definitions.values() {
-        attachment_order(
-            definition,
-            |part| parts.get(part).map(|p| &p.datums),
-            &targets[&definition.id],
-        )?;
-    }
+    preflight(definitions, &occurrence_index(definitions), |id| {
+        parts.get(id).map(|p| &p.datums)
+    })?;
     Ok(())
 }
-
-#[derive(Clone, Copy)]
-enum Occurrence {
-    Leaf(usize),
-    Child(usize),
-}
-type OccurrenceIndex = BTreeMap<String, BTreeMap<String, Occurrence>>;
-fn occurrence_index(definitions: &BTreeMap<String, AssemblyDefinition>) -> OccurrenceIndex {
-    definitions
-        .iter()
-        .map(|(id, d)| {
-            let mut map = BTreeMap::new();
-            for (i, x) in d.instances.iter().enumerate() {
-                map.insert(x.id.clone(), Occurrence::Leaf(i));
-            }
-            for (i, x) in d.assemblies.iter().enumerate() {
-                map.insert(x.id.clone(), Occurrence::Child(i));
-            }
-            (id.clone(), map)
-        })
-        .collect()
-}
-fn target_walk<'a>(
-    definition: &'a AssemblyDefinition,
-    attachment: &DatumAttachment,
-    definitions: &'a BTreeMap<String, AssemblyDefinition>,
-    index: &OccurrenceIndex,
-) -> Result<(Vec<&'a RigidTransform>, &'a str, &'a Instance), AssemblyError> {
-    if attachment.target_path.len() >= 64 {
-        return Err(AssemblyError::ResourceLimit);
-    }
-    let components: Vec<_> = std::iter::once(&attachment.instance)
-        .chain(&attachment.target_path)
-        .collect();
-    let mut current = definition;
-    let mut frames = vec![];
-    for (i, id) in components.iter().enumerate() {
-        identifier("attachment path component", id)?;
-        let occurrence = index
-            .get(&current.id)
-            .and_then(|x| x.get(*id))
-            .ok_or_else(|| {
-                AssemblyError::Attachment(format!(
-                    "missing target occurrence '{}' in definition '{}'",
-                    id, current.id
-                ))
-            })?;
-        match occurrence {
-            Occurrence::Leaf(k) => {
-                if i + 1 != components.len() {
-                    return Err(AssemblyError::Attachment(format!(
-                        "target path continues beyond leaf '{}'",
-                        id
-                    )));
-                }
-                return Ok((frames, current.id.as_str(), &current.instances[*k]));
-            }
-            Occurrence::Child(k) => {
-                if i + 1 == components.len() {
-                    return Err(AssemblyError::Attachment(format!(
-                        "target path ends at assembly occurrence '{}' instead of a part",
-                        id
-                    )));
-                }
-                let child = &current.assemblies[*k];
-                frames.push(&child.transform);
-                current = definitions.get(&child.assembly).ok_or_else(|| {
-                    AssemblyError::Hierarchy(format!("missing assembly '{}'", child.assembly))
-                })?;
-            }
-        }
-    }
-    Err(AssemblyError::Attachment("empty target path".into()))
-}
-fn descendant_targets(
+fn datum_frame(
+    definition: &AssemblyDefinition,
+    path: &[&str],
+    datum: &str,
     definitions: &BTreeMap<String, AssemblyDefinition>,
-) -> Result<BTreeMap<String, BTreeMap<String, String>>, AssemblyError> {
-    let index = occurrence_index(definitions);
-    let mut result = BTreeMap::new();
-    let mut work = 0usize;
-    for (id, definition) in definitions {
-        let mut targets = BTreeMap::new();
-        for leaf in &definition.instances {
-            if let Some(a) = &leaf.attachment {
-                if !a.target_path.is_empty() {
-                    work = work
-                        .checked_add(a.target_path.len() + 1)
-                        .ok_or(AssemblyError::ResourceLimit)?;
-                    if work > MAX_INSTANCES * 64 {
-                        return Err(AssemblyError::ResourceLimit);
-                    }
-                    let (_, _, target) = target_walk(definition, a, definitions, &index)?;
-                    targets.insert(leaf.id.clone(), target.part.clone());
-                }
-            }
-        }
-        result.insert(id.clone(), targets);
+    index: &OccurrenceIndex,
+    parts: &BTreeMap<String, BuiltPart>,
+    tolerance: Tolerance,
+) -> Result<RigidTransform, AssemblyError> {
+    let (frames, leaf) = walk(definition, path, definitions, index)?;
+    let mut frame = RigidTransform::default();
+    for f in frames {
+        frame = frame.compose(f, tolerance)?;
     }
-    Ok(result)
+    frame.compose(&parts[&leaf.part].datums[datum], tolerance)
 }
-/// Resolve each definition once, bottom-up, without expanding repeated child
-/// occurrences. A target path traverses occurrence IDs and ends at a part; all
-/// transforms on that path precede the resolved target leaf and its named datum.
-pub fn resolve_hierarchy_instances(
+/// Resolve every reusable definition once, bottom-up; returned definitions
+/// contain derived placements and no attachments. Input source intent is retained.
+pub fn resolve_hierarchy_placements(
     parts: &BTreeMap<String, BuiltPart>,
     definitions: &BTreeMap<String, AssemblyDefinition>,
     tolerance: Tolerance,
-) -> Result<BTreeMap<String, Vec<Instance>>, AssemblyError> {
+) -> Result<BTreeMap<String, AssemblyDefinition>, AssemblyError> {
     if !tolerance.is_valid() {
         return Err(AssemblyError::Tolerance);
     }
     validate_definitions(&parts.keys().cloned().collect(), definitions)?;
-    validate_built_attachments(parts, definitions)?;
-    let targets = descendant_targets(definitions)?;
+    for p in parts.values() {
+        validate_datums(&p.datums)?;
+    }
     let index = occurrence_index(definitions);
+    let orders = preflight(definitions, &index, |id| parts.get(id).map(|p| &p.datums))?;
     fn visit(
         id: &str,
         parts: &BTreeMap<String, BuiltPart>,
         definitions: &BTreeMap<String, AssemblyDefinition>,
-        targets: &BTreeMap<String, BTreeMap<String, String>>,
         index: &OccurrenceIndex,
+        orders: &BTreeMap<String, Vec<usize>>,
         tolerance: Tolerance,
-        memo: &mut BTreeMap<String, BTreeMap<String, Instance>>,
+        memo: &mut BTreeMap<String, AssemblyDefinition>,
     ) -> Result<(), AssemblyError> {
         if memo.contains_key(id) {
             return Ok(());
         }
-        let definition = &definitions[id];
-        for child in &definition.assemblies {
+        let source = &definitions[id];
+        for child in &source.assemblies {
             visit(
                 &child.assembly,
                 parts,
                 definitions,
-                targets,
                 index,
+                orders,
                 tolerance,
                 memo,
             )?;
         }
-        let order = attachment_order(
-            definition,
-            |part| parts.get(part).map(|p| &p.datums),
-            &targets[id],
-        )?;
-        let mut resolved: BTreeMap<String, Instance> = BTreeMap::new();
-        for i in order {
-            let source = &definition.instances[i];
-            let mut instance = source.clone();
-            if let Some(a) = &source.attachment {
-                let (target_frame, target_part) = if a.target_path.is_empty() {
-                    let target = &resolved[&a.instance];
-                    (target.transform, target.part.as_str())
-                } else {
-                    let (frames, target_definition, target) =
-                        target_walk(definition, a, definitions, index)?;
-                    let mut frame = RigidTransform::default();
-                    for child_frame in frames {
-                        frame = frame.compose(child_frame, tolerance)?;
-                    }
-                    let target = &memo[target_definition][&target.id];
-                    (
-                        frame.compose(&target.transform, tolerance)?,
-                        target.part.as_str(),
-                    )
-                };
-                instance.transform = target_frame
-                    .compose(&parts[target_part].datums[&a.target_datum], tolerance)?
-                    .compose(&source.transform, tolerance)?
-                    .compose(
-                        &parts[&source.part].datums[&a.datum].inverse(tolerance)?,
+        let mut resolved = source.clone();
+        for &i in &orders[id] {
+            if i < source.instances.len() {
+                let leaf = &source.instances[i];
+                if let Some(a) = &leaf.attachment {
+                    let path = target_path(&a.instance, &a.target_path)?;
+                    let destination = datum_frame(
+                        &resolved,
+                        &path,
+                        &a.target_datum,
+                        memo,
+                        index,
+                        parts,
                         tolerance,
                     )?;
+                    resolved.instances[i].transform =
+                        destination.compose(&leaf.transform, tolerance)?.compose(
+                            &parts[&leaf.part].datums[&a.datum].inverse(tolerance)?,
+                            tolerance,
+                        )?;
+                }
+                resolved.instances[i].attachment = None;
+            } else {
+                let j = i - source.instances.len();
+                let child = &source.assemblies[j];
+                if let Some(a) = &child.attachment {
+                    let path = target_path(&a.instance, &a.target_path)?;
+                    let destination = datum_frame(
+                        &resolved,
+                        &path,
+                        &a.target_datum,
+                        memo,
+                        index,
+                        parts,
+                        tolerance,
+                    )?;
+                    let source_path: Vec<_> = a.source_path.iter().map(String::as_str).collect();
+                    let source_frame = datum_frame(
+                        &memo[&child.assembly],
+                        &source_path,
+                        &a.datum,
+                        memo,
+                        index,
+                        parts,
+                        tolerance,
+                    )?;
+                    resolved.assemblies[j].transform = destination
+                        .compose(&child.transform, tolerance)?
+                        .compose(&source_frame.inverse(tolerance)?, tolerance)?;
+                }
+                resolved.assemblies[j].attachment = None;
             }
-            instance.attachment = None;
-            resolved.insert(instance.id.clone(), instance);
         }
         memo.insert(id.to_owned(), resolved);
         Ok(())
@@ -428,14 +397,53 @@ pub fn resolve_hierarchy_instances(
             id,
             parts,
             definitions,
-            &targets,
             &index,
+            &orders,
             tolerance,
             &mut memo,
         )?;
     }
-    Ok(memo
+    Ok(memo)
+}
+/// Compatibility view of derived local leaves. Consumers needing child placements
+/// must use `resolve_hierarchy_placements` instead.
+pub fn resolve_hierarchy_instances(
+    parts: &BTreeMap<String, BuiltPart>,
+    definitions: &BTreeMap<String, AssemblyDefinition>,
+    tolerance: Tolerance,
+) -> Result<BTreeMap<String, Vec<Instance>>, AssemblyError> {
+    Ok(resolve_hierarchy_placements(parts, definitions, tolerance)?
         .into_iter()
-        .map(|(id, instances)| (id, instances.into_values().collect()))
+        .map(|(id, d)| {
+            let mut leaves = d.instances;
+            leaves.sort_by(|a, b| a.id.cmp(&b.id));
+            (id, leaves)
+        })
         .collect())
+}
+/// Legacy sibling-only local leaf resolver; descendant and child attachments
+/// require the complete hierarchy and are rejected here explicitly.
+pub fn resolve_definition_instances(
+    definition: &AssemblyDefinition,
+    parts: &BTreeMap<String, BuiltPart>,
+    tolerance: Tolerance,
+) -> Result<Vec<Instance>, AssemblyError> {
+    if definition.instances.iter().any(|x| {
+        x.attachment
+            .as_ref()
+            .is_some_and(|a| !a.target_path.is_empty())
+    }) || definition.assemblies.iter().any(|x| x.attachment.is_some())
+    {
+        return Err(AssemblyError::Attachment(
+            "attachment requires a complete assembly hierarchy".into(),
+        ));
+    }
+    let mut local = definition.clone();
+    local.assemblies.clear();
+    let result = resolve_hierarchy_instances(
+        parts,
+        &BTreeMap::from([(local.id.clone(), local)]),
+        tolerance,
+    )?;
+    Ok(result[&definition.id].clone())
 }

@@ -11,9 +11,14 @@ let temporary,server,browser;
 (async()=>{
   const root=path.resolve(__dirname,'../..');
   temporary=await fs.mkdtemp(path.join(os.tmpdir(),'cad-attachment-check-'));
-  const recipe=path.join(root,'examples/instrumented_cartridge.star'),source=await fs.readFile(recipe,'utf8');
-  assert.match(source,/target_path\s*=\s*\["cartridge","housing"\]/);
-  for(const spacing of [80,120])execFileSync(process.env.CAD_BIN||path.join(root,'target/debug/cad'),['build',recipe,'--param',`module_spacing=${spacing}`,'--out-dir',path.join(temporary,String(spacing))],{stdio:'pipe'});
+  const recipes=[];
+  for(const name of ['instrumented_cartridge','mounted_drive_module']){
+    const recipe=path.join(root,`examples/${name}.star`),source=await fs.readFile(recipe,'utf8');
+    assert.match(source,/target_path\s*=\s*\["cartridge","housing"\]/);
+    if(name==='mounted_drive_module')assert.match(source,/source_path\s*=\s*\["cartridge","housing"\]/);
+    recipes.push({name,source});
+    for(const spacing of [80,120])execFileSync(process.env.CAD_BIN||path.join(root,'target/debug/cad'),['build',recipe,'--param',`module_spacing=${spacing}`,'--out-dir',path.join(temporary,name,String(spacing))],{stdio:'pipe'});
+  }
   const errors=[],exact=[],results=[];
   server=http.createServer(async(req,res)=>{
     try{
@@ -28,8 +33,8 @@ let temporary,server,browser;
   const page=await browser.newPage({viewport:{width:1440,height:1000}});
   page.on('pageerror',error=>errors.push(error.message));
   page.on('request',request=>{if(/\.(brep\.json|step|stl)(\?|$)/.test(request.url()))exact.push(request.url());});
-  for(const spacing of [80,120])for(const mode of ['preview','gpu','stream']){
-    await page.goto(`http://127.0.0.1:${server.address().port}/${spacing}/instrumented_cartridge.${mode}.html`);
+  for(const {name,source} of recipes)for(const spacing of [80,120])for(const mode of ['preview','gpu','stream']){
+    await page.goto(`http://127.0.0.1:${server.address().port}/${name}/${spacing}/${name}.${mode}.html`);
     if(mode==='preview')await page.locator('[data-view="top"]').click();
     else{
       await page.waitForFunction(()=>window.cadGpuTest);
@@ -74,13 +79,17 @@ let temporary,server,browser;
       }
       return{mode,spacing,instances:c.instances.length,definitions:Object.keys(c.definitions).length,picks,parameter:recipeContext.parameters.module_spacing};
     },{mode,spacing});
-    assert.equal(result.parameter,spacing);results.push(result);
+    assert.equal(result.parameter,spacing);results.push({recipe:name,...result});
     await page.locator('#recipe-toggle').click();
     assert.equal(await page.locator('#recipe-source').textContent(),source);
     assert.match(await page.locator('#selection').textContent(),/sensor/);
     if(mode==='stream'&&spacing===120){
       await page.evaluate(async()=>{cadGpuTest.setView('iso');cadGpuTest.fit();cadGpuTest.render();await cadGpuTest.whenIdle();cadGpuTest.draw();cadGpuTest.finish();});
-      await page.screenshot({path:'/tmp/cad-instrumented-attachments.png'});
+      if(name==='mounted_drive_module'){
+        await page.locator('#recipe-panel').scrollIntoViewIfNeeded();
+        await page.locator('#recipe-source').evaluate(element=>{element.scrollTop=element.scrollHeight;});
+      }
+      await page.screenshot({path:name==='mounted_drive_module'?'/tmp/cad-mounted-drive-module.png':'/tmp/cad-instrumented-attachments.png'});
     }
   }
   assert.deepEqual(errors,[]);assert.deepEqual(exact,[]);

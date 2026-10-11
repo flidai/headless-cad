@@ -384,6 +384,7 @@ mod tests {
             id: "root".into(),
             instances: vec![],
             assemblies: vec![AssemblyInstance {
+                attachment: None,
                 id: "occurrence".into(),
                 assembly: "module".into(),
                 transform: RigidTransform {

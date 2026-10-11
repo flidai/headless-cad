@@ -1440,6 +1440,113 @@ assembly_output(name='nested',assembly=a)
 }
 
 #[test]
+fn whole_module_attachment_roundtrips_and_invalid_sources_preserve_generation() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("mounted.star");
+    let out = dir.path().join("out");
+    let recipe = r#"
+q=0.7071067811865476
+b=extrude(id='b',profile=rectangle(id='p',width=2,depth=3),height=4)
+p=part(id='part',body=b,datums={'foot':datum(offset=[1,0,0]),'seat':datum(offset=[0,2,0])})
+core=assembly(id='core',instances=[instance(id='leaf',part=p,offset=[3,4,5],rotation=[0,q,0,q])])
+module=assembly(id='module',instances=[assembly_instance(id='nested',assembly=core)])
+root=assembly(id='root',instances=[
+    instance(id='base',part=p,offset=[10,20,30],rotation=[0,0,q,q]),
+    assembly_instance(id='mounted',assembly=module,attach_to='base',source_path=['nested','leaf'],datum='foot',target_datum='seat',offset=[0,0,7]),
+    assembly_instance(id='spare',assembly=module,attach_to='base',source_path=['nested','leaf'],datum='foot',target_datum='seat',offset=[30,0,7]),
+    instance(id='sensor',part=p,attach_to='mounted',target_path=['nested','leaf'],datum='foot',target_datum='seat'),
+])
+assembly_output(name='mounted',assembly=root)
+"#;
+    fs::write(&source, recipe).unwrap();
+    let build = || {
+        cli(&[
+            "build",
+            source.to_str().unwrap(),
+            "--out-dir",
+            out.to_str().unwrap(),
+        ])
+    };
+    let result = build();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let native_path = out.join("mounted.assembly.json");
+    let bytes = fs::read(&native_path).unwrap();
+    let native: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(native["instances"].as_array().unwrap().len(), 4);
+    assert_eq!(native["definitions"].as_object().unwrap().len(), 1);
+    for (path, expected) in [
+        (
+            serde_json::json!(["mounted", "nested", "leaf"]),
+            [8., 19., 37.],
+        ),
+        (
+            serde_json::json!(["spare", "nested", "leaf"]),
+            [8., 49., 37.],
+        ),
+        (serde_json::json!(["sensor"]), [6., 18., 37.]),
+    ] {
+        let id = serde_json::to_string(&path).unwrap();
+        let actual = native["instances"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == id)
+            .unwrap();
+        for (a, b) in actual["transform"]["translation"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(expected)
+        {
+            assert!((a.as_f64().unwrap() - b).abs() < 1e-10);
+        }
+    }
+    let intent = &native["hierarchy"]["root"]["assemblies"][0];
+    assert_eq!(
+        intent["attachment"]["source_path"],
+        serde_json::json!(["nested", "leaf"])
+    );
+    assert_eq!(
+        intent["transform"]["translation"],
+        serde_json::json!([0., 0., 7.])
+    );
+    assert!(cli(&["validate", native_path.to_str().unwrap()])
+        .status
+        .success());
+    // Source intent is required to reproduce the derived positions; removing
+    // an attachment from an otherwise unchanged manifest must fail validation.
+    let mut damaged = native.clone();
+    damaged["hierarchy"]["root"]["assemblies"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("attachment");
+    fs::write(&native_path, serde_json::to_vec(&damaged).unwrap()).unwrap();
+    assert!(!cli(&["validate", native_path.to_str().unwrap()])
+        .status
+        .success());
+    fs::write(&native_path, &bytes).unwrap();
+    let generation = fs::read(out.join("manifest.json")).unwrap();
+    for replacement in [
+        "[]",
+        "['missing']",
+        "['nested']",
+        "['nested','leaf','extra']",
+    ] {
+        fs::write(&source, recipe.replace("['nested','leaf']", replacement)).unwrap();
+        assert!(
+            !build().status.success(),
+            "accepted invalid source path {replacement}"
+        );
+        assert_eq!(fs::read(&native_path).unwrap(), bytes);
+        assert_eq!(fs::read(out.join("manifest.json")).unwrap(), generation);
+    }
+}
+
+#[test]
 fn gantry_height_edit_moves_attachment_chain_and_rebuilds_one_definition() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("cache");

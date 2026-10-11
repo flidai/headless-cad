@@ -738,6 +738,7 @@ fn nested_invalid_references_cycles_and_expansion_are_rejected_before_geometry()
         id: "orphan".into(),
         instances: vec![],
         assemblies: vec![AssemblyInstance {
+            attachment: None,
             id: "self".into(),
             assembly: "orphan".into(),
             transform: Default::default(),
@@ -748,6 +749,7 @@ fn nested_invalid_references_cycles_and_expansion_are_rejected_before_geometry()
     assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
     let mut recipe = nested_recipe();
     recipe.assemblies[0].assemblies.push(AssemblyInstance {
+        attachment: None,
         id: "bolt".into(),
         assembly: "mid".into(),
         transform: Default::default(),
@@ -766,11 +768,13 @@ fn nested_invalid_references_cycles_and_expansion_are_rejected_before_geometry()
             instances: vec![],
             assemblies: vec![
                 AssemblyInstance {
+                    attachment: None,
                     id: "a".into(),
                     assembly: previous.clone(),
                     transform: Default::default(),
                 },
                 AssemblyInstance {
+                    attachment: None,
                     id: "b".into(),
                     assembly: previous,
                     transform: Default::default(),
@@ -796,6 +800,7 @@ fn nested_depth_and_aggregate_export_expansion_have_preflight_limits() {
             id: format!("level{level}"),
             instances: vec![],
             assemblies: vec![AssemblyInstance {
+                attachment: None,
                 id: "child".into(),
                 assembly: previous,
                 transform: Default::default(),
@@ -1116,6 +1121,7 @@ fn descendant_attachment_preflight_checks_unused_paths_before_geometry() {
         assemblies: vec![],
     });
     recipe.assemblies[0].assemblies.push(AssemblyInstance {
+        attachment: None,
         id: "child".into(),
         assembly: "module".into(),
         transform: Default::default(),
@@ -1150,6 +1156,56 @@ fn descendant_attachment_preflight_checks_unused_paths_before_geometry() {
         .unwrap()
         .target_datum = "missing".into();
     assert!(matches!(build(&invalid), Err(BuildError::AssemblyGraph(_))));
+}
+
+#[test]
+fn subassembly_attachment_preflight_rejects_bad_sources_and_mixed_cycles_before_geometry() {
+    let recipe:Recipe=serde_json::from_value(serde_json::json!({
+        "schema_version":2,"units":"mm",
+        "features":[{"op":"rectangle","id":"p","width":1e308,"depth":3},{"op":"extrude","id":"body","profile":"p","height":4}],
+        "parts":[{"id":"part","feature":"body","datums":{"origin":{}}}],
+        "assemblies":[
+            {"id":"module","instances":[{"id":"leaf","part":"part"}]},
+            {"id":"root","instances":[{"id":"base","part":"part"}],"assemblies":[
+                {"id":"mounted","assembly":"module","attachment":{"instance":"base","source_path":["leaf"],"datum":"origin","target_datum":"origin"}}
+            ]}
+        ]
+    })).unwrap();
+    // Every definition is preflighted although no output requests any of them.
+    assert!(matches!(build(&recipe), Err(BuildError::Kernel { .. })));
+    for path in [
+        vec![],
+        vec!["missing".to_owned()],
+        vec!["leaf".into(), "extra".into()],
+        vec!["leaf".into(); 65],
+    ] {
+        let mut invalid = recipe.clone();
+        invalid.assemblies[1].assemblies[0]
+            .attachment
+            .as_mut()
+            .unwrap()
+            .source_path = path;
+        assert!(matches!(build(&invalid), Err(BuildError::AssemblyGraph(_))));
+    }
+    let mut cycle = recipe.clone();
+    cycle.assemblies[1].instances[0].attachment = Some(DatumAttachment {
+        instance: "mounted".into(),
+        target_path: vec!["leaf".into()],
+        datum: "origin".into(),
+        target_datum: "origin".into(),
+    });
+    assert!(matches!(build(&cycle), Err(BuildError::AssemblyGraph(_))));
+    let mut self_reference = recipe.clone();
+    let attachment = self_reference.assemblies[1].assemblies[0]
+        .attachment
+        .as_mut()
+        .unwrap();
+    attachment.instance = "mounted".into();
+    attachment.target_path = vec!["leaf".into()];
+    assert!(matches!(
+        build(&self_reference),
+        Err(BuildError::AssemblyGraph(_))
+    ));
 }
 
 #[test]

@@ -167,7 +167,7 @@ B-rep. Modeling across placed instances requires explicit kernel operations;
 `transform` and scoped convex `intersect` operate on exact part geometry.
 Parts must reference solid features. Assemblies support both part occurrences
 and nested subassembly occurrences, with named part datums and deterministic
-sibling and descendant attachments. Joints and nonlinear constraint solving remain planned.
+sibling, descendant and whole-module attachments. Joints and nonlinear constraint solving remain planned.
 
 These functions produce recipe schema 2. Existing single-part recipes retain
 schema 1; their JSON and Starlark workflows remain supported. A part's local
@@ -281,9 +281,36 @@ nonzero/rotated tool datums, and reuse of the completed gantry in two stations.
 These are deterministic placements; named frames can also be associated with
 supported planar faces using `face_datum`. `instrumented_cartridge.star` shows
 a sensor attached inside a reused, nested cartridge. Moving the cartridge
-repositions the sensor without rebuilding geometry. Attaching whole subassemblies,
-upward references, multiple simultaneous mates, joints, DOF/residual reporting
-and collision checking remain unsupported.
+repositions the sensor without rebuilding geometry. Upward references, multiple
+simultaneous mates, joints, DOF/residual reporting and collision checking remain
+unsupported.
+
+To attach a **whole rigid subassembly**, identify its mounting datum with a
+nonempty `source_path` relative to that subassembly:
+
+```python
+mounted = assembly_instance(id = "mounted", assembly = drive_module,
+    attach_to = "base", source_path = ["cartridge", "housing"],
+    datum = "mount", target_datum = "dock")
+```
+
+All four arguments (`attach_to`, `source_path`, `datum`, `target_datum`) are
+required together; optional `target_path` selects a descendant on the target
+side. Both paths end at part occurrences with named datums. The module moves
+as one rigid unit; its internal placements and shared geometry are unchanged.
+Its placement aligns the complete resolved source datum frame:
+
+```text
+module_placement = target_frame × instance_offset × inverse(internal_source_frame)
+```
+
+Parts and modules participate in one local attachment DAG. A target within the
+source module itself is a cycle, as is a module attached to a part that follows
+that module. Both are rejected before modeling. Paths and dependency chains
+remain limited to 64 components/occurrences. `mounted_drive_module.star` docks
+two copies of a nested drive module onto base datums, then attaches a sensor
+through one placed module. Editing a docking datum repositions the module and
+sensor with no solid geometry recomputation.
 
 Assembly builds produce `<name>.assembly.json`, a metadata manifest referencing
 shared `definition-<hash>.brep.json` assets, and `<name>.display.json`, with one
@@ -813,7 +840,7 @@ Analytic cylinders use `ADVANCED_BREP_SHAPE_REPRESENTATION` with circles, a cyli
 The orthogonal baseline and first convex planar extension are bounded increments
 toward the commercial CAD goal. Nested assemblies, scoped face references and
 shared display assets are implemented.
-Named part datums and sibling/descendant attachments are implemented. Next come
+Named part datums and part/rigid-module attachments are implemented. Next come
 reference-driven modeling, bounded-error display LOD,
 broader analytic geometry, general planar Booleans, and general trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence

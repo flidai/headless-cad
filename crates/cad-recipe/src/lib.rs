@@ -104,11 +104,25 @@ fn frame(
     Ok(transform)
 }
 
+fn occurrence_path(value: Value, name: &str) -> anyhow::Result<Vec<String>> {
+    anyhow::ensure!(
+        starlark::values::list::ListRef::from_value(value).is_some(),
+        "{name} must be a list of occurrence IDs"
+    );
+    let path: Vec<String> = serde_json::from_str(&value.to_json()?)
+        .map_err(|_| anyhow::anyhow!("{name} must be a list of occurrence IDs"))?;
+    anyhow::ensure!(
+        path.iter().all(|id| !id.is_empty() && id.trim() == id),
+        "{name} components must be nonempty occurrence IDs without surrounding whitespace"
+    );
+    Ok(path)
+}
+
 fn register_instance(
     id: &str,
     reference_key: &str,
     reference: &str,
-    attachment: Option<cad_build::DatumAttachment>,
+    attachment: Option<serde_json::Value>,
     offset: Option<Value>,
     rotation: Option<Value>,
     eval: &mut Evaluator,
@@ -123,7 +137,7 @@ fn register_instance(
     anyhow::ensure!(!instances.contains_key(id), "duplicate instance ID '{id}'");
     let mut record = serde_json::json!({"id":id,reference_key:reference,"transform":transform});
     if let Some(attachment) = attachment {
-        record["attachment"] = serde_json::to_value(attachment)?;
+        record["attachment"] = attachment;
     }
     instances.insert(id.to_owned(), record);
     Ok(id.to_owned())
@@ -523,19 +537,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 || (attach_to.is_some() && datum.is_some() && target_datum.is_some()),
             "instance '{id}' target_path requires attach_to, datum and target_datum"
         );
-        let target_path: Vec<String> = match target_path {
-            None => vec![],
-            Some(value) => {
-                anyhow::ensure!(
-                    starlark::values::list::ListRef::from_value(value).is_some(),
-                    "target_path must be a list of occurrence IDs"
-                );
-                let path: Vec<String> = serde_json::from_str(&value.to_json()?)
-                    .map_err(|_| anyhow::anyhow!("target_path must be a list of occurrence IDs"))?;
-                anyhow::ensure!(path.iter().all(|id| !id.is_empty() && id.trim() == id), "target_path components must be nonempty occurrence IDs without surrounding whitespace");
-                path
-            }
-        };
+        let target_path = target_path
+            .map(|value| occurrence_path(value, "target_path"))
+            .transpose()?
+            .unwrap_or_default();
         let attachment = match (attach_to, datum, target_datum) {
             (None, None, None) => None,
             (Some(instance), Some(datum), Some(target_datum)) => Some(cad_build::DatumAttachment {
@@ -548,18 +553,48 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 anyhow::bail!("instance '{id}' requires attach_to, datum and target_datum together")
             }
         };
-        register_instance(id, "part", part, attachment, offset, rotation, eval)
+        register_instance(
+            id,
+            "part",
+            part,
+            attachment.map(serde_json::to_value).transpose()?,
+            offset,
+            rotation,
+            eval,
+        )
     }
 
-    /// Place an assembly definition without duplicating its parts or geometry.
+    /// Place a rigid assembly, optionally mating a descendant part datum.
+    #[allow(clippy::too_many_arguments)]
     fn assembly_instance(
         id: &str,
         assembly: &str,
         offset: Option<Value>,
         rotation: Option<Value>,
+        attach_to: Option<&str>,
+        source_path: Option<Value>,
+        datum: Option<&str>,
+        target_datum: Option<&str>,
+        target_path: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        register_instance(id, "assembly", assembly, None, offset, rotation, eval)
+        let attachment = match (attach_to, source_path, datum, target_datum) {
+            (None, None, None, None) => {
+                anyhow::ensure!(target_path.is_none(), "assembly_instance '{id}' target_path requires attachment arguments");
+                None
+            }
+            (Some(instance), Some(source), Some(datum), Some(target_datum)) => {
+                let source_path = occurrence_path(source, "source_path")?;
+                anyhow::ensure!(!source_path.is_empty(), "source_path must contain a descendant part occurrence");
+                let target_path = target_path.map(|value| occurrence_path(value, "target_path")).transpose()?.unwrap_or_default();
+                Some(serde_json::to_value(cad_build::AssemblyAttachment {
+                    instance: instance.into(), source_path, target_path,
+                    datum: datum.into(), target_datum: target_datum.into(),
+                })?)
+            }
+            _ => anyhow::bail!("assembly_instance '{id}' requires attach_to, source_path, datum and target_datum together"),
+        };
+        register_instance(id, "assembly", assembly, attachment, offset, rotation, eval)
     }
 
     /// Collect part and nested assembly instances into a reusable definition.
@@ -1781,5 +1816,59 @@ mod target_path_tests {
         )
         .unwrap();
         assert!(cad_build::build(&recipe).is_err());
+    }
+}
+
+#[cfg(test)]
+mod rigid_module_attachment_tests {
+    use super::*;
+
+    #[test]
+    fn whole_module_attachment_roundtrips_source_and_target_paths() {
+        let source = include_str!("../../../examples/mounted_drive_module.star");
+        let recipe = from_starlark("mounted_drive_module.star", source).unwrap();
+        let encoded = serde_json::to_string(&recipe).unwrap();
+        assert!(encoded.contains("\"source_path\":[\"cartridge\",\"housing\"]"));
+        let decoded: Recipe = serde_json::from_str(&encoded).unwrap();
+        let a = cad_build::build(&recipe).unwrap();
+        let b = cad_build::build(&decoded).unwrap();
+        assert_eq!(a.feature_hashes, b.feature_hashes);
+        assert_eq!(
+            a.assemblies["mounted_drive_module"].content_hash,
+            b.assemblies["mounted_drive_module"].content_hash
+        );
+    }
+
+    #[test]
+    fn whole_module_attachment_requires_strict_nonempty_source_path() {
+        for args in [
+            "attach_to='base',datum='mount',target_datum='dock'",
+            "source_path=['housing']",
+            "target_path=[]",
+            "attach_to='base',source_path=[],datum='mount',target_datum='dock'",
+            "attach_to='base',source_path='housing',datum='mount',target_datum='dock'",
+            "attach_to='base',source_path=('housing',),datum='mount',target_datum='dock'",
+            "attach_to='base',source_path=[42],datum='mount',target_datum='dock'",
+            "attach_to='base',source_path=[''],datum='mount',target_datum='dock'",
+            "attach_to='base',source_path=[' housing'],datum='mount',target_datum='dock'",
+            "attach_to='base',source_path=['housing'],datum='mount',target_datum='dock',target_path='base'",
+        ] {
+            let source=format!("assembly_instance(id='module',assembly='definition',{args})");
+            assert!(from_starlark("invalid-module.star",&source).is_err(),"accepted {args}");
+        }
+        let source = include_str!("../../../examples/mounted_drive_module.star");
+        for path in [
+            "[\"missing\"]",
+            "[\"cartridge\"]",
+            "[\"cartridge\",\"housing\",\"child\"]",
+            "[\"..\",\"housing\"]",
+        ] {
+            let edited = source.replace(
+                "source_path = [\"cartridge\",\"housing\"]",
+                &format!("source_path = {path}"),
+            );
+            let recipe = from_starlark("invalid-source.star", &edited).unwrap();
+            assert!(cad_build::build(&recipe).is_err(), "resolved {path}");
+        }
     }
 }

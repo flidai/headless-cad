@@ -25,8 +25,8 @@ pub use face_datums::{
 mod selection;
 pub use assembly::{MAX_ASSEMBLIES, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS, MAX_PARTS};
 pub use cad_assembly::{
-    validate_datums, AssemblyDefinition, AssemblyInstance, AssemblyOutput, DatumAttachment,
-    Instance, Material, PartDefinition, PartMetadata, RigidTransform,
+    validate_datums, AssemblyAttachment, AssemblyDefinition, AssemblyInstance, AssemblyOutput,
+    DatumAttachment, Instance, Material, PartDefinition, PartMetadata, RigidTransform,
 };
 pub use selection::{
     FaceCardinality, FaceLineageStep, FaceResolution, FaceResolutionStatus, FaceSelector,

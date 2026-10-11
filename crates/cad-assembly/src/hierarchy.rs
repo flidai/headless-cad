@@ -239,12 +239,12 @@ pub(super) fn expand(
         Ok(total)
     }
     placement_work(root, parts, definitions, &mut BTreeMap::new())?;
-    let resolved = resolve_hierarchy_instances(parts, &hierarchy, tolerance)?;
+    let resolved = resolve_hierarchy_placements(parts, &hierarchy, tolerance)?;
     let mut leaves = BTreeMap::new();
     let mut paths = BTreeMap::new();
     let mut pending = vec![(root, Vec::<String>::new(), RigidTransform::default())];
     while let Some((id, prefix, transform)) = pending.pop() {
-        for leaf in &resolved[id] {
+        for leaf in &resolved[id].instances {
             let mut path = prefix.clone();
             path.push(leaf.id.clone());
             let leaf_id = if nested {
@@ -263,7 +263,7 @@ pub(super) fn expand(
             );
             paths.insert(leaf_id, path);
         }
-        for child in &definitions[id].assemblies {
+        for child in &resolved[id].assemblies {
             let mut path = prefix.clone();
             path.push(child.id.clone());
             pending.push((

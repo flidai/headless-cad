@@ -10,8 +10,8 @@ mod mass_properties;
 pub use mass_properties::AssemblyMassProperties;
 mod datum;
 pub use datum::{
-    resolve_definition_instances, resolve_hierarchy_instances, validate_attachment_definitions,
-    validate_datums, DatumAttachment,
+    resolve_definition_instances, resolve_hierarchy_instances, resolve_hierarchy_placements,
+    validate_attachment_definitions, validate_datums, AssemblyAttachment, DatumAttachment,
 };
 mod hierarchy;
 pub use bom::{BomItem, BomReport, Material, PartMetadata};
@@ -79,6 +79,8 @@ pub struct AssemblyDefinition {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyInstance {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment: Option<AssemblyAttachment>,
     pub id: String,
     pub assembly: String,
     #[serde(default)]

@@ -363,6 +363,7 @@ fn definition(
 }
 fn child(id: &str, assembly: &str, transform: RigidTransform) -> AssemblyInstance {
     AssemblyInstance {
+        attachment: None,
         id: id.into(),
         assembly: assembly.into(),
         transform,
@@ -1108,6 +1109,7 @@ fn descendant_attachment_uses_resolved_leaf_and_noncommuting_occurrence_frames()
         instances: vec![sensor.clone(), other],
         assemblies: vec![
             AssemblyInstance {
+                attachment: None,
                 id: "module/one".into(),
                 assembly: "child".into(),
                 transform: RigidTransform {
@@ -1116,6 +1118,7 @@ fn descendant_attachment_uses_resolved_leaf_and_noncommuting_occurrence_frames()
                 },
             },
             AssemblyInstance {
+                attachment: None,
                 id: "module/two".into(),
                 assembly: "child".into(),
                 transform: RigidTransform {
@@ -1174,6 +1177,7 @@ fn descendant_attachment_rejects_invalid_paths_even_in_unused_definitions() {
             id: "unused".into(),
             instances: vec![leaf],
             assemblies: vec![AssemblyInstance {
+                attachment: None,
                 id: "module".into(),
                 assembly: "child".into(),
                 transform: RigidTransform::default(),
@@ -1197,4 +1201,106 @@ fn descendant_attachment_rejects_invalid_paths_even_in_unused_definitions() {
         )
         .is_err());
     }
+}
+
+#[test]
+fn rigid_subassembly_attachments_resolve_internal_attached_children_and_reuse_definitions() {
+    let t = Tolerance::default();
+    let q = std::f64::consts::FRAC_1_SQRT_2;
+    let mut parts = parts();
+    let dock = RigidTransform {
+        translation: [1., 0., 2.],
+        rotation: [0., 0., q, q],
+    };
+    parts.get_mut("plate").unwrap().datums = BTreeMap::from([("dock".into(), dock)]);
+    let definitions:BTreeMap<String,AssemblyDefinition>=serde_json::from_value(serde_json::json!({
+        "unit":{"id":"unit","instances":[{"id":"tip","part":"plate","transform":{"translation":[2,3,4],"rotation":[0,q,0,q]}}]},
+        "module":{"id":"module","instances":[{"id":"base","part":"plate","transform":{"translation":[10,20,30],"rotation":[0,0,q,q]}}],
+          "assemblies":[{"id":"inner","assembly":"unit","transform":{"translation":[1,2,3],"rotation":[q,0,0,q]},
+            "attachment":{"instance":"base","source_path":["tip"],"datum":"dock","target_datum":"dock"}}]},
+        "root":{"id":"root","assemblies":[
+          {"id":"attached","assembly":"module","transform":{"translation":[3,4,5],"rotation":[0,0,q,q]},
+            "attachment":{"instance":"target","target_path":["inner","tip"],"source_path":["inner","tip"],"datum":"dock","target_datum":"dock"}},
+          {"id":"other","assembly":"module","transform":{"translation":[13,4,5],"rotation":[0,0,q,q]},
+            "attachment":{"instance":"target","target_path":["inner","tip"],"source_path":["inner","tip"],"datum":"dock","target_datum":"dock"}},
+          {"id":"target","assembly":"module","transform":{"translation":[100,200,300],"rotation":[0,q,0,q]}}
+        ]}
+    })).unwrap();
+    let source = definitions.clone();
+    let resolved = resolve_hierarchy_placements(&parts, &definitions, t).unwrap();
+    assert!(resolved
+        .values()
+        .all(|d| d.instances.iter().all(|x| x.attachment.is_none())
+            && d.assemblies.iter().all(|x| x.attachment.is_none())));
+    assert_eq!(source, definitions);
+    let built = BuiltAssembly::from_definitions("root".into(), parts, definitions, t).unwrap();
+    built.validate(t).unwrap();
+    assert_eq!(built.instances.len(), 6);
+    assert_eq!(built.parts.len(), 1);
+    assert_eq!(built.hierarchy.len(), 3);
+    // Independent integer coordinate permutations give internal source frame
+    // S(x,y,z)=(9-x,19+z,35+y), then target Ry90, then local root offset Rz90.
+    for (occurrence, last) in [("attached", 294.), ("other", 304.)] {
+        let tip = built
+            .instances
+            .iter()
+            .find(|i| built.instance_paths[&i.id] == [occurrence, "inner", "tip"])
+            .unwrap();
+        for p in [
+            [0., 0., 0.],
+            [1., 0., 0.],
+            [0., 1., 0.],
+            [0., 0., 1.],
+            [2., 3., 4.],
+        ] {
+            let actual = tip.transform.point(dock.point(p));
+            for (actual, expected) in
+                actual
+                    .into_iter()
+                    .zip([139. + p[0], 224. + p[2], last - p[1]])
+            {
+                assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
+            }
+        }
+    }
+}
+
+#[test]
+fn rigid_attachment_rejects_mixed_cycles_self_descendants_and_invalid_source_paths() {
+    let t = Tolerance::default();
+    let mut parts = parts();
+    parts.get_mut("plate").unwrap().datums =
+        BTreeMap::from([("dock".into(), RigidTransform::default())]);
+    let base = serde_json::json!({
+      "unit":{"id":"unit","instances":[{"id":"tip","part":"plate"}]},
+      "root":{"id":"root","instances":[{"id":"base","part":"plate"}],"assemblies":[
+        {"id":"module","assembly":"unit","attachment":{"instance":"base","source_path":["tip"],"datum":"dock","target_datum":"dock"}}
+      ]}
+    });
+    for mutation in 0..7 {
+        let mut raw = base.clone();
+        let a = &mut raw["root"]["assemblies"][0]["attachment"];
+        match mutation {
+            0 => a["source_path"] = serde_json::json!([]),
+            1 => a["source_path"] = serde_json::json!(["missing"]),
+            2 => a["source_path"] = serde_json::json!(["tip", "beyond"]),
+            3 => a["source_path"] = serde_json::json!(vec!["tip"; 65]),
+            4 => {
+                a["instance"] = serde_json::json!("module");
+                a["target_path"] = serde_json::json!(["tip"]);
+            }
+            5 => {
+                raw["root"]["instances"][0]["attachment"] = serde_json::json!({"instance":"module","target_path":["tip"],"datum":"dock","target_datum":"dock"});
+            }
+            _ => a["datum"] = serde_json::json!("missing"),
+        }
+        let defs = serde_json::from_value(raw).unwrap();
+        assert!(
+            resolve_hierarchy_placements(&parts, &defs, t).is_err(),
+            "mutation {mutation}"
+        );
+        assert!(BuiltAssembly::from_definitions("root".into(), parts.clone(), defs, t).is_err());
+    }
+    let missing = serde_json::json!({"instance":"base","datum":"dock","target_datum":"dock"});
+    assert!(serde_json::from_value::<AssemblyAttachment>(missing).is_err());
 }

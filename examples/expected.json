@@ -1020,5 +1020,57 @@
         ]
       ]
     }
+  },
+  "mounted_drive_module.star": {
+    "housing": {
+      "volume_mm3": 23499.113048851654,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -22,
+          -22,
+          0
+        ],
+        [
+          22,
+          22,
+          30
+        ]
+      ]
+    },
+    "sensor_mount": {
+      "volume_mm3": 480,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          12,
+          10,
+          4
+        ]
+      ]
+    },
+    "mounted_drive_module": {
+      "volume_mm3": 167750.0283519208,
+      "solids": 11,
+      "instances": 11,
+      "definitions": 7,
+      "bounds_mm": [
+        [
+          -35,
+          -40,
+          -10
+        ],
+        [
+          155,
+          40,
+          45
+        ]
+      ]
+    }
   }
 }
