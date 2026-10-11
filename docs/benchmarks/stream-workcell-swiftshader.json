@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "revision": "80be037708b0f2cfcd97b19967aecdb342ce90b5",
+  "date_utc": "2026-10-11T21:33:08.292Z",
+  "url": "http://localhost:8080/workcell_line/workcell_line.stream.html#camera=%7B%22yaw%22%3A-1.5707963267948966%2C%22pitch%22%3A1.5707963267948966%2C%22target%22%3A%5B50%2C30%2C21%5D%2C%22halfHeight%22%3A50%7D",
+  "browser": "154.0.8037.92",
+  "software_renderer_requested": true,
+  "environment": {
+    "os": "Linux",
+    "release": "6.18.54",
+    "arch": "x64",
+    "cpu": "QEMU Virtual CPU version 2.5+",
+    "logical_cpus": 16
+  },
+  "viewport": [
+    1440,
+    1000
+  ],
+  "device_scale_factor": 1,
+  "proxy_ready_ms": 716.603205,
+  "first_detail_ready_ms": 736.547201,
+  "pan_detail_ready_ms": 117.08556599999997,
+  "first_requests": [
+    "http://localhost:8080/workcell_line/workcell_line.stream.html",
+    "http://localhost:8080/workcell_line/mesh-9ef01b0d6bdbeb8c86977ad20473c13eadd73e0e73b3dc81a62b743751aec41d.display.json",
+    "http://localhost:8080/workcell_line/mesh-e5b2d71e99ab93a2757d3427e505f21803a7e539ee3fa7adfed106e7a5114938.display.json",
+    "http://localhost:8080/workcell_line/mesh-dbaeab4d071ab795c3d4583ac92d59cd076bb05b77611b7452c61b15ed91f358.display.json",
+    "http://localhost:8080/workcell_line/mesh-9b47005dfa4d0a20f81f58654c7c7b6af796bee350766122e5a3acb7a24e1e26.display.json"
+  ],
+  "all_requests": [
+    "http://localhost:8080/workcell_line/workcell_line.stream.html",
+    "http://localhost:8080/workcell_line/mesh-9ef01b0d6bdbeb8c86977ad20473c13eadd73e0e73b3dc81a62b743751aec41d.display.json",
+    "http://localhost:8080/workcell_line/mesh-e5b2d71e99ab93a2757d3427e505f21803a7e539ee3fa7adfed106e7a5114938.display.json",
+    "http://localhost:8080/workcell_line/mesh-dbaeab4d071ab795c3d4583ac92d59cd076bb05b77611b7452c61b15ed91f358.display.json",
+    "http://localhost:8080/workcell_line/mesh-9b47005dfa4d0a20f81f58654c7c7b6af796bee350766122e5a3acb7a24e1e26.display.json",
+    "http://localhost:8080/workcell_line/mesh-e75b42679cef6402e8dde8680c838488c177569d316a2441b905042db5eee643.display.json"
+  ],
+  "exact_geometry_requests": 0,
+  "first": {
+    "stats": {
+      "ready": true,
+      "errors": [],
+      "assetErrors": {},
+      "instanceCount": 60,
+      "meshCount": 15,
+      "geometryCopies": 4,
+      "geometryVertices": 132,
+      "geometryUploads": 4,
+      "instanceBufferBytes": 4796,
+      "drawCalls": 4,
+      "lastPickDrawCalls": 0,
+      "renderCount": 4,
+      "selectedInstance": -1,
+      "selectedFace": -1,
+      "backend": "webgl2",
+      "cpuExpandedFaces": 0,
+      "residentMeshCount": 4,
+      "residentBytes": 7075,
+      "requested": 4,
+      "loadingCount": 0,
+      "visibleCount": 5,
+      "culledCount": 55,
+      "proxyCount": 0,
+      "abortedRequests": 0,
+      "instances": 60,
+      "uniqueMeshes": 15,
+      "renderer": "WebKit WebGL",
+      "bufferBytes": 9500,
+      "streamed": true,
+      "dpr": 1,
+      "reservedBytes": 0,
+      "budgetBytes": 67108864,
+      "geometryBudgetBytes": 67108864,
+      "gpuBytes": 12536300,
+      "gpuBytesKind": "estimated buffers and picking targets; residentBytes separately budgets encoded mesh bytes plus geometry VBOs",
+      "residentKeys": [
+        "03d6bd7ac4baed013c581a66bc53506232634f09e5150c7b29b301c4bd7f0fe7",
+        "58b7a06e36c05faaf009fbd8b955749adc83da16d8adbb0c931eeae9f7022c5d",
+        "9262df8c9f90653e21b69f2795727ff15cd733ecab967078ff39aaee229603fc",
+        "daa0fdd725af25f3f0496d6b3af8cc866fb929d5bb3f4c0250b135294d93aa0c"
+      ]
+    },
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "camera": {
+      "target": [
+        50,
+        30,
+        21
+      ],
+      "right": [
+        1,
+        6.123233995736766e-17,
+        0
+      ],
+      "up": [
+        -6.123233995736766e-17,
+        1,
+        6.123233995736766e-17
+      ],
+      "eye": [
+        3.749399456654644e-33,
+        -6.123233995736766e-17,
+        1
+      ],
+      "halfHeight": 50,
+      "halfWidth": 57.95574288724974,
+      "depthRange": 21.211503498940324,
+      "width": 1100,
+      "height": 949,
+      "pixelWidth": 1100,
+      "pixelHeight": 949,
+      "visibleIndices": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "residentKeys": [
+        "03d6bd7ac4baed013c581a66bc53506232634f09e5150c7b29b301c4bd7f0fe7",
+        "58b7a06e36c05faaf009fbd8b955749adc83da16d8adbb0c931eeae9f7022c5d",
+        "9262df8c9f90653e21b69f2795727ff15cd733ecab967078ff39aaee229603fc",
+        "daa0fdd725af25f3f0496d6b3af8cc866fb929d5bb3f4c0250b135294d93aa0c"
+      ]
+    },
+    "meshAssets": 15,
+    "assembly_hash": "a0b8910ab86927624b32073458dd6219abf462b2ff37eea9d14dcf927e845359",
+    "recipe_context_hash": "818df9c7f1f7aef0698626757aa7d4eeecc9e208450e1a3a1aa762e5d63a349f"
+  },
+  "second": {
+    "stats": {
+      "ready": true,
+      "errors": [],
+      "assetErrors": {},
+      "instanceCount": 60,
+      "meshCount": 15,
+      "geometryCopies": 5,
+      "geometryVertices": 156,
+      "geometryUploads": 5,
+      "instanceBufferBytes": 4840,
+      "drawCalls": 4,
+      "lastPickDrawCalls": 0,
+      "renderCount": 7,
+      "selectedInstance": -1,
+      "selectedFace": -1,
+      "backend": "webgl2",
+      "cpuExpandedFaces": 0,
+      "residentMeshCount": 5,
+      "residentBytes": 8482,
+      "requested": 5,
+      "loadingCount": 0,
+      "visibleCount": 5,
+      "culledCount": 55,
+      "proxyCount": 0,
+      "abortedRequests": 0,
+      "instances": 60,
+      "uniqueMeshes": 15,
+      "renderer": "WebKit WebGL",
+      "bufferBytes": 10216,
+      "streamed": true,
+      "dpr": 1,
+      "reservedBytes": 0,
+      "budgetBytes": 67108864,
+      "geometryBudgetBytes": 67108864,
+      "gpuBytes": 12537016,
+      "gpuBytesKind": "estimated buffers and picking targets; residentBytes separately budgets encoded mesh bytes plus geometry VBOs",
+      "residentKeys": [
+        "03d6bd7ac4baed013c581a66bc53506232634f09e5150c7b29b301c4bd7f0fe7",
+        "58b7a06e36c05faaf009fbd8b955749adc83da16d8adbb0c931eeae9f7022c5d",
+        "9262df8c9f90653e21b69f2795727ff15cd733ecab967078ff39aaee229603fc",
+        "c5fc4befdd61bc5d23b638c352548d18f3111c871eb6e85d29596669d23de2b7",
+        "daa0fdd725af25f3f0496d6b3af8cc866fb929d5bb3f4c0250b135294d93aa0c"
+      ]
+    },
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "camera": {
+      "target": [
+        650,
+        330,
+        21
+      ],
+      "right": [
+        1,
+        6.123233995736766e-17,
+        0
+      ],
+      "up": [
+        -6.123233995736766e-17,
+        1,
+        6.123233995736766e-17
+      ],
+      "eye": [
+        3.749399456654644e-33,
+        -6.123233995736766e-17,
+        1
+      ],
+      "halfHeight": 50,
+      "halfWidth": 57.95574288724974,
+      "depthRange": 21.211503498940324,
+      "width": 1100,
+      "height": 949,
+      "pixelWidth": 1100,
+      "pixelHeight": 949,
+      "visibleIndices": [
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "residentKeys": [
+        "03d6bd7ac4baed013c581a66bc53506232634f09e5150c7b29b301c4bd7f0fe7",
+        "58b7a06e36c05faaf009fbd8b955749adc83da16d8adbb0c931eeae9f7022c5d",
+        "9262df8c9f90653e21b69f2795727ff15cd733ecab967078ff39aaee229603fc",
+        "c5fc4befdd61bc5d23b638c352548d18f3111c871eb6e85d29596669d23de2b7",
+        "daa0fdd725af25f3f0496d6b3af8cc866fb929d5bb3f4c0250b135294d93aa0c"
+      ]
+    },
+    "meshAssets": 15,
+    "assembly_hash": "a0b8910ab86927624b32073458dd6219abf462b2ff37eea9d14dcf927e845359",
+    "recipe_context_hash": "818df9c7f1f7aef0698626757aa7d4eeecc9e208450e1a3a1aa762e5d63a349f"
+  },
+  "errors": []
+}

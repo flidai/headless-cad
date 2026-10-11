@@ -498,6 +498,30 @@ in [repeated-part results](benchmarks/gpu-10000-repeated-swiftshader.json) and
 these runs; `CAD_GPU_HARDWARE=1` requests the available hardware path and the
 report still records the renderer actually obtained.
 
+### Recorded selective-loading sample
+
+At revision `80be037`, the 12-station workcell (60 occurrences, 15 unique meshes)
+was inspected in Chromium 154.0.8037.92 with SwiftShader at 1440 × 1000, DPR 1.
+The initial camera shows five occurrences and requests four meshes; moving to a
+second station reuses three frame meshes and fetches only its new tool. Neither
+view requests exact geometry. This is a single local software-rendered run,
+not the 25,000-instance or hardware performance gate.
+
+| Observation | Recorded value |
+| --- | --- |
+| Initial proxy-ready signal | 717 ms from navigation |
+| First detailed view, including GPU completion | 737 ms from navigation |
+| Second station detailed view, including GPU completion | 117 ms after camera move |
+| Resident geometry accounting after first / second view | 7,075 / 8,482 bytes |
+| Visible / culled occurrences in each view | 5 / 55 |
+
+The proxy-ready signal is not a measured presentation timestamp. Detailed-view
+timings explicitly draw and call `gl.finish()`. Bounds proxies are not simplified
+surface LOD. [Raw sample](benchmarks/stream-workcell-swiftshader.json) records
+camera, environment, requests, identities and accounting scope. Reproduce with
+`node tools/preview-check/stream-benchmark.cjs` after serving the workcell; set
+`CAD_BROWSER` to the browser executable and optionally `CAD_STREAM_URL`.
+
 ## Implemented baseline and remaining work
 
 | Area | Implemented now | Target work |
