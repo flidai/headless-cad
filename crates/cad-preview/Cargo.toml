@@ -11,6 +11,7 @@ cad-kernel = { path = "../cad-kernel" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+sha2 = "0.11"
 
 [dev-dependencies]
 cad-build = { path = "../cad-build" }

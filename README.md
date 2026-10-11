@@ -561,13 +561,28 @@ not evidence of more advanced geometric modeling.
 
 `--display-only` also works with `watch`. It preserves source snapshots,
 parameters, geometry validation and atomic publication. Assembly outputs contain
-GPU HTML and compact display JSON; ordinary solid outputs retain portable HTML.
+embedded GPU HTML, streaming HTML, compact metadata and shared mesh assets;
+ordinary solid outputs retain portable HTML.
 No exact B-rep, STEP, STL, SVG, or separate BOM files are published in that mode.
 Switching publication modes removes obsolete artifacts after a successful build.
 
-The GPU viewer requires WebGL2 and a manual reload after a rebuild. All display
-assets remain embedded; streaming, culling, LOD and residency eviction are future
-work. It uses local and camera-relative float32 coordinates and reports explicit
+Assembly builds also produce `*.stream.html` and `*.stream.json`. The streaming
+viewer loads visible shared meshes separately, verifies their byte length and
+SHA-256, and uses four concurrent requests plus a 64 MiB geometry accounting
+budget. Bounds proxies keep unloaded or failed parts visible; selecting a proxy
+prioritizes its mesh. The budget covers encoded payload plus geometry buffers,
+including pending reservations, not total browser or driver memory. Frustum
+culling applies to both GPU modes; geometric LOD and occlusion culling remain
+future work. The streaming viewer needs HTTP(S) and Web Crypto; localhost works.
+
+`examples/workcell_line.star` demonstrates 12 stations, 60 occurrences and 15 part
+definitions with datum-mounted triangular tools. Its independently expected
+volume is 411147 mm³ and bounds are [0,0,0]–[700,360,42] mm. Build it normally and
+open `/workcell_line/workcell_line.stream.html` from the gallery. The selective
+loading harness is `tools/preview-check/stream-benchmark.cjs`.
+
+The GPU viewers require WebGL2 and a manual reload after a rebuild. They use local
+and camera-relative float32 coordinates and report explicit
 errors outside its display range. It is an approximate inspection client, never
 an engineering measurement or modeling backend. Normal builds include a portable
 preview fallback; display-only assemblies need a WebGL2-capable browser.
@@ -606,7 +621,7 @@ The orthogonal baseline and first convex planar extension are bounded increments
 toward the commercial CAD goal. Nested assemblies, scoped face references and
 shared display assets are implemented.
 Named part datums and sibling attachments are implemented. Next come
-reference-driven modeling, streamed display assets,
+reference-driven modeling, bounded-error display LOD,
 profiles with holes, curved analytic geometry, and trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence
 for curved modeling, constraints, large assemblies, and manufacturing workflows.
@@ -648,6 +663,7 @@ npm run test:nested
 npm run test:polygon
 npm run test:datums
 npm run test:gpu
+npm run test:stream
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.

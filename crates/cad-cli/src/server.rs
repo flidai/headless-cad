@@ -410,7 +410,15 @@ fn gallery(directory: &Dir) -> String {
         {
             output.push_str(&format!("<a href=\"{}\">GPU viewer ↗</a>", url(&gpu)));
         }
+        let stream = format!("{stem}.stream.html");
+        if directory
+            .metadata(&stream)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!("<a href=\"{}\">Stream viewer ↗</a>", url(&stream)));
+        }
         for (suffix, label) in [
+            ("stream.json", "Stream metadata"),
             ("step", "STEP"),
             ("stl", "STL"),
             ("brep.json", "B-rep JSON"),
@@ -552,9 +560,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("large.gpu.html"), "gpu").unwrap();
         std::fs::write(dir.path().join("large.display.json"), "{}").unwrap();
+        std::fs::write(dir.path().join("large.stream.html"), "stream").unwrap();
+        std::fs::write(dir.path().join("large.stream.json"), "{}").unwrap();
         let response = request(dir.path(), b"GET / HTTP/1.1\r\n\r\n");
         assert!(response.contains("/large.gpu.html"));
         assert!(response.contains("/large.display.json"));
+        assert!(response.contains("/large.stream.html"));
+        assert!(response.contains("/large.stream.json"));
         assert!(!response.contains("large.step"));
         assert!(!response.contains("large.preview.svg"));
         std::fs::write(dir.path().join("large.preview.html"), "cpu").unwrap();

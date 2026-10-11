@@ -1426,10 +1426,19 @@ fn display_only_publication_keeps_shared_meshes_and_removes_stale_exports() {
     let summary: serde_json::Value = serde_json::from_slice(&shown.stdout).unwrap();
     assert_eq!(summary["generation_mode"], "display_only");
     assert_eq!(summary["outputs"]["many"]["instances"], 10001);
-    assert_eq!(
-        summary["outputs"]["many"]["available_files"],
-        serde_json::json!(["many.display.json", "many.gpu.html"])
-    );
+    let available = summary["outputs"]["many"]["available_files"]
+        .as_array()
+        .unwrap();
+    for name in [
+        "many.display.json",
+        "many.gpu.html",
+        "many.stream.json",
+        "many.stream.html",
+    ] {
+        assert!(available.contains(&serde_json::json!(name)));
+    }
+    assert_eq!(available.len(), 5); // four entrypoints plus one immutable shared mesh
+
     let actual: std::collections::BTreeSet<_> = fs::read_dir(&out)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
@@ -1482,5 +1491,63 @@ fn display_only_plain_body_publishes_cpu_html_without_engineering_exports() {
             serde_json::json!([format!("{name}.preview.html")])
         );
         assert!(!out.join(format!("{name}.step")).exists());
+    }
+}
+
+#[test]
+fn streamed_outputs_deduplicate_payloads_but_each_lists_shared_dependencies() {
+    let directory = tempfile::tempdir().unwrap();
+    let recipe = directory.path().join("shared.star");
+    let output = directory.path().join("out");
+    fs::write(&recipe, "p=rectangle(id='p',width=2,depth=3)\nb=extrude(id='b',profile=p,height=4)\nd=part(id='part',body=b)\ni=instance(id='leaf',part=d)\na=assembly(id='a',instances=[i])\nassembly_output(name='first',assembly=a)\nassembly_output(name='second',assembly=a)\n").unwrap();
+    let built = cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--display-only",
+        "--out-dir",
+        output.to_str().unwrap(),
+    ]);
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let manifest: serde_json::Value = serde_json::from_slice(&built.stdout).unwrap();
+    let meshes: Vec<_> = fs::read_dir(&output)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.starts_with("mesh-"))
+        .collect();
+    assert_eq!(meshes.len(), 1);
+    for name in ["first", "second"] {
+        let metadata: serde_json::Value =
+            serde_json::from_slice(&fs::read(output.join(format!("{name}.stream.json"))).unwrap())
+                .unwrap();
+        assert_eq!(metadata["schema_version"], 2);
+        assert_eq!(metadata["meshes"], serde_json::json!({}));
+        let descriptors = metadata["mesh_assets"].as_object().unwrap();
+        assert_eq!(descriptors.len(), 1);
+        let descriptor = descriptors.values().next().unwrap();
+        assert_eq!(descriptor["url"], meshes[0]);
+        assert_eq!(
+            descriptor["byte_length"],
+            fs::metadata(output.join(&meshes[0])).unwrap().len()
+        );
+        assert!(manifest["outputs"][name]["available_files"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!(meshes[0])));
+        let html = fs::read_to_string(output.join(format!("{name}.stream.html"))).unwrap();
+        let scene = html
+            .split("<script id=\"cad-scene-data\" type=\"application/json\">")
+            .nth(1)
+            .unwrap()
+            .split("</script>")
+            .next()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(scene).unwrap(),
+            metadata
+        );
     }
 }

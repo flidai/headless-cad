@@ -811,6 +811,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 .collect::<Vec<_>>());
         }
         let mut definition_assets = BTreeSet::new();
+        let mut shared_display_assets = BTreeMap::<String, usize>::new();
         for (name, assembly) in &build.assemblies {
             filename(name)?;
             if !names.insert(name.to_ascii_lowercase()) {
@@ -820,11 +821,13 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 .into());
             }
             let artifact_start = artifacts.len();
+            let mut dependencies = BTreeSet::new();
             if !display_only {
                 let mut definitions = serde_json::Map::new();
                 for (part_id, part) in &assembly.parts {
                     let asset = format!("definition-{}.brep.json", part.content_hash);
                     filename(&asset)?;
+                    dependencies.insert(asset.clone());
                     if definition_assets.insert(asset.clone()) {
                         artifacts
                             .push((asset.clone(), serde_json::to_string_pretty(&*part.result)?));
@@ -904,10 +907,27 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 format!("{name}.gpu.html"),
                 cad_preview::to_assembly_gpu_html_with_fallback(assembly, &context, !display_only)?,
             ));
-            summary["outputs"][name]["available_files"] = json!(artifacts[artifact_start..]
-                .iter()
-                .map(|(name, _)| name)
-                .collect::<Vec<_>>());
+            let bundle = cad_preview::to_assembly_stream_bundle(assembly, &context, !display_only)?;
+            artifacts.push((format!("{name}.stream.html"), bundle.html));
+            artifacts.push((format!("{name}.stream.json"), bundle.scene_json));
+            for asset in bundle.assets {
+                filename(&asset.name)?;
+                dependencies.insert(asset.name.clone());
+                if let Some(&index) = shared_display_assets.get(&asset.name) {
+                    if artifacts[index].1 != asset.content {
+                        return Err("shared display mesh digest collision".into());
+                    }
+                } else {
+                    shared_display_assets.insert(asset.name.clone(), artifacts.len());
+                    artifacts.push((asset.name, asset.content));
+                }
+            }
+            dependencies.extend(
+                artifacts[artifact_start..]
+                    .iter()
+                    .map(|(name, _)| name.clone()),
+            );
+            summary["outputs"][name]["available_files"] = json!(dependencies);
         }
         let mut artifact_names = BTreeSet::new();
         for (name, _) in &artifacts {

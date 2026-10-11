@@ -346,10 +346,31 @@ no change to authoritative kernel coordinates or engineering measurements.
 Normal assembly builds include both `.preview.html` (Canvas) and `.gpu.html`.
 `build/watch --display-only` can publish GPU assembly inspection without exact
 body files, STEP/STL, or SVG generation. Opening that artifact loads zero exact
-B-reps. The headless build still evaluates and validates geometry. Shared display
-assets and instance metadata are currently embedded together, so there is no
-selective asset loading, eviction, frustum culling, or LOD yet. The GPU client
-requires a reload after rebuilding; Canvas retains automatic generation refresh.
+B-reps. The headless build still evaluates and validates geometry. Assembly builds also publish `.stream.html` and schema-2 `.stream.json`, with
+separate `mesh-<sha256>.display.json` assets. The streaming page embeds metadata,
+bounds, occurrence paths and captured recipe context, then fetches visible meshes.
+Descriptors record exact byte length, SHA-256, bounds and geometry counts. The
+client bounds response reads, verifies the digest before parsing/upload, and
+rejects stale request completions. Four concurrent requests, conservative
+orthographic frustum culling and LRU eviction bound the working set. Selected
+proxy instances take priority for refinement. Loading, failed or over-budget
+parts remain visible bounds proxies; proxy picking never claims an exact face.
+
+The default 64 MiB geometry accounting budget charges encoded payload bytes plus
+geometry VBO bytes, including reservations for in-flight requests. It is not a
+hard JavaScript heap or total GPU-memory limit: parse transients, instance buffers,
+picking targets and driver allocations are separate. Repeated occurrences share
+one resident mesh per geometry hash. Distinct hashes with identical payloads can
+still have separate resident VBOs. Visibility currently scans occurrences on the
+CPU; spatial BVHs, occlusion culling, geometric LOD and meshlets remain target work.
+The embedded `.gpu.html` remains available and also uses frustum culling.
+
+Streaming requires HTTP(S), WebGL2 and Web Crypto (localhost is supported).
+Content-addressed assets are verified individually; unavailable assets remain
+explicit proxies. The GPU clients require a reload after rebuilding; Canvas
+retains automatic generation refresh. Old open pages whose assets were removed
+must reload the published generation; the current local publisher is not a
+multi-generation retention service.
 
 GPU publication permits up to 100,000 occurrences, with at most 50,000 unique
 faces and 200,000 unique face points. These are resource ceilings, not measured
@@ -486,7 +507,7 @@ report still records the renderer actually obtained.
 | References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Topology-associated datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
-| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication | Lazy assets, frustum culling, bounded LOD streaming, residency eviction, GPU generation refresh, sections/overlays |
+| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, frustum culling, bounded geometry cache and proxy fallback | Spatial BVHs, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
 | Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations and mass moments |
 

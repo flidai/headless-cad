@@ -10,7 +10,8 @@ use thiserror::Error;
 mod assembly;
 pub use assembly::{
     to_assembly_gpu_html, to_assembly_gpu_html_with_fallback, to_assembly_gpu_scene_json,
-    to_assembly_html, to_assembly_scene_json, to_assembly_svg,
+    to_assembly_html, to_assembly_scene_json, to_assembly_stream_bundle, to_assembly_svg,
+    DisplayMeshAsset, StreamBundle,
 };
 
 #[derive(Debug, Error)]

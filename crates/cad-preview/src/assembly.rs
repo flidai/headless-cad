@@ -8,6 +8,7 @@ use super::{
 use cad_assembly::{BuiltAssembly, Instance};
 use cad_kernel::Tolerance;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
 const MAX_INSTANCES: usize = 10_000;
@@ -29,6 +30,8 @@ struct AssemblyScene {
     assembly_id: String,
     content_hash: String,
     meshes: BTreeMap<String, Scene>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    mesh_assets: BTreeMap<String, MeshAssetDescriptor>,
     definitions: BTreeMap<String, Definition>,
     instances: Vec<Instance>,
     instance_paths: BTreeMap<String, Vec<String>>,
@@ -42,6 +45,34 @@ struct AssemblyScene {
     display_points: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     portable_preview_available: Option<bool>,
+}
+
+/// Immutable UTF-8 display payload. The SHA-256 in its filename addresses
+/// exactly `content.as_bytes()`; this is display geometry, never an exact B-rep.
+#[derive(Debug, Clone)]
+pub struct DisplayMeshAsset {
+    pub name: String,
+    pub content: String,
+}
+
+/// Metadata-only streamed scene, viewer HTML, and shared immutable mesh assets.
+#[derive(Debug, Clone)]
+pub struct StreamBundle {
+    pub scene_json: String,
+    pub html: String,
+    pub assets: Vec<DisplayMeshAsset>,
+}
+
+#[derive(Serialize)]
+struct MeshAssetDescriptor {
+    url: String,
+    sha256: String,
+    byte_length: usize,
+    bounds: Option<[[f64; 3]; 2]>,
+    faces: usize,
+    points: usize,
+    vertices: usize,
+    gpu_bytes: usize,
 }
 
 fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, PreviewError> {
@@ -130,6 +161,7 @@ fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, 
         assembly_id: assembly.assembly_id.clone(),
         content_hash: assembly.content_hash.clone(),
         meshes,
+        mesh_assets: BTreeMap::new(),
         definitions,
         instances: assembly.instances.clone(),
         instance_paths: assembly.instance_paths.clone(),
@@ -197,6 +229,63 @@ pub fn to_assembly_gpu_html_with_fallback(
     let mut scene = assembly_scene(assembly, true)?;
     scene.portable_preview_available = Some(portable_preview_available);
     render_html_template(&scene, Some(recipe), include_str!("gpu-viewer.html"))
+}
+
+/// Produce schema-2 metadata and immutable shared mesh payloads. Unique mesh
+/// budgets remain the same as embedded GPU previews; no face arrays appear in
+/// the HTML or scene metadata. Assets are fetched only by the streamed viewer.
+pub fn to_assembly_stream_bundle(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    portable_preview_available: bool,
+) -> Result<StreamBundle, PreviewError> {
+    if recipe.content_hash != assembly.content_hash {
+        return Err(PreviewError::Recipe(
+            "recipe output identity does not match assembly",
+        ));
+    }
+    let mut scene = assembly_scene(assembly, true)?;
+    scene.schema_version = 2;
+    scene.portable_preview_available = Some(portable_preview_available);
+    let mut assets = BTreeMap::<String, String>::new();
+    for (hash, mesh) in std::mem::take(&mut scene.meshes) {
+        let content = serde_json::to_string(&mesh)?;
+        let sha256: String = Sha256::digest(content.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let name = format!("mesh-{sha256}.display.json");
+        let descriptor = MeshAssetDescriptor {
+            url: name.clone(),
+            sha256,
+            byte_length: content.len(),
+            bounds: mesh.bounds,
+            faces: mesh.faces.len(),
+            points: mesh.faces.iter().map(|face| face.points.len()).sum(),
+            vertices: mesh.vertices,
+            gpu_bytes: mesh
+                .faces
+                .iter()
+                .map(|face| (face.points.len().saturating_sub(2)) * 3 * 7 * 4)
+                .sum(),
+        };
+        if let Some(previous) = assets.insert(name, content.clone()) {
+            if previous != content {
+                return Err(PreviewError::Assembly(
+                    "display payload SHA-256 collision".into(),
+                ));
+            }
+        }
+        scene.mesh_assets.insert(hash, descriptor);
+    }
+    Ok(StreamBundle {
+        scene_json: serde_json::to_string_pretty(&scene)?,
+        html: render_html_template(&scene, Some(recipe), include_str!("gpu-viewer.html"))?,
+        assets: assets
+            .into_iter()
+            .map(|(name, content)| DisplayMeshAsset { name, content })
+            .collect(),
+    })
 }
 
 fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
@@ -320,6 +409,74 @@ mod tests {
         {
             assert!((actual - expected).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn stream_bundle_has_only_metadata_and_sha_addressed_shared_payloads() {
+        let assembly = fixture();
+        let recipe = RecipeContext {
+            language: "starlark".into(),
+            source: "# </script><img src=x>".into(),
+            source_name: "parts.star".into(),
+            output_name: "parts".into(),
+            feature_id: "pair".into(),
+            parameters: BTreeMap::new(),
+            content_hash: assembly.content_hash.clone(),
+            recipe_context_hash: "source".into(),
+        };
+        let bundle = to_assembly_stream_bundle(&assembly, &recipe, true).unwrap();
+        assert_eq!(bundle.assets.len(), 1);
+        let metadata: serde_json::Value = serde_json::from_str(&bundle.scene_json).unwrap();
+        assert_eq!(metadata["schema_version"], 2);
+        assert_eq!(metadata["meshes"], serde_json::json!({}));
+        assert_eq!(metadata["instances"].as_array().unwrap().len(), 2);
+        let descriptor = &metadata["mesh_assets"]["shared-geometry"];
+        let asset = &bundle.assets[0];
+        assert_eq!(descriptor["byte_length"], asset.content.len());
+        assert_eq!(descriptor["faces"], 6);
+        assert_eq!(descriptor["points"], 24);
+        assert_eq!(descriptor["vertices"], 8);
+        assert_eq!(descriptor["gpu_bytes"], 1008);
+        assert_eq!(
+            descriptor["bounds"],
+            serde_json::json!([[0., 0., 0.], [2., 3., 4.]])
+        );
+        assert_eq!(
+            asset.name,
+            format!(
+                "mesh-{}.display.json",
+                descriptor["sha256"].as_str().unwrap()
+            )
+        );
+        assert!(descriptor["sha256"]
+            .as_str()
+            .unwrap()
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)));
+        let expected: String = Sha256::digest(asset.content.as_bytes())
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(descriptor["sha256"], expected);
+        let local: serde_json::Value = serde_json::from_str(&asset.content).unwrap();
+        assert_eq!(local["faces"].as_array().unwrap().len(), 6);
+        assert!(!bundle.html.contains("</script><img"));
+        let embedded = bundle
+            .html
+            .split("<script id=\"cad-scene-data\" type=\"application/json\">")
+            .nth(1)
+            .unwrap()
+            .split("</script>")
+            .next()
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(embedded).unwrap(),
+            metadata
+        );
+        let repeated = to_assembly_stream_bundle(&assembly, &recipe, true).unwrap();
+        assert_eq!(bundle.scene_json, repeated.scene_json);
+        assert_eq!(bundle.html, repeated.html);
+        assert_eq!(bundle.assets[0].content, repeated.assets[0].content);
     }
 
     #[test]

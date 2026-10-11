@@ -342,5 +342,23 @@
         ]
       ]
     }
+  },
+  "workcell_line.star": {
+    "workcell_line": {
+      "volume_mm3": 411147,
+      "solids": 60,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          700,
+          360,
+          42
+        ]
+      ]
+    }
   }
 }

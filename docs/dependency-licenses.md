@@ -22,6 +22,7 @@ crates are omitted from the table.
 | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli, Linux target |
 | serde | 1.0.229 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-kernel, cad-preview |
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-cli, cad-kernel, cad-preview, cad-recipe |
+| sha2 | 0.11.0 | MIT OR Apache-2.0 | cad-preview; SHA-256 identity for fetched display assets |
 | starlark | 0.14.2 | Apache-2.0 | cad-recipe |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | cad-build, cad-cli |
 | thiserror | 2.0.21 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-export, cad-kernel, cad-preview, cad-recipe |
@@ -51,7 +52,7 @@ Before distributing a binary or dependency source bundle:
 4. Refresh this table whenever direct dependencies or their resolved versions
    change.
 
-The resolved metadata contains 215 packages including seven workspace crates. That
+The resolved metadata contains 222 packages including seven workspace crates. That
 count is an inventory starting point, not a claim that every package is shipped
 or audited. For example, transitive `r-efi` 6.0.0 declares
 `MIT OR Apache-2.0 OR LGPL-2.1-or-later`; its Apache-2.0 alternative is available,
@@ -61,3 +62,10 @@ LGPL. The release inventory must record the actual selection.
 Optional Python/OCP interoperability checks and browser test tools are outside
 this Rust dependency review. They are not CAD-kernel runtime dependencies; include
 them in a separate inventory if their packages are redistributed.
+
+The streamed-display increment adds `sha2` 0.11.0 and six resolved supporting
+packages. Their local manifests offer MIT and Apache-2.0 alternatives; the upstream
+[sha2 documentation](https://docs.rs/sha2/0.11.0/sha2/) confirms the dual license.
+Browser verification uses the platform Web Crypto API rather than redistributed
+JavaScript cryptography. This scoped check does not close the release inventory
+requirements above.
