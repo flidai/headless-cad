@@ -1,0 +1,821 @@
+use std::fs;
+use std::path::Path;
+use std::process::{Command, Output};
+
+fn cli(args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_cad"))
+        .args(args)
+        .output()
+        .unwrap()
+}
+
+fn example(name: &str) -> String {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../examples")
+        .join(name)
+        .to_string_lossy()
+        .into_owned()
+}
+
+#[test]
+fn starlark_build_writes_expected_geometry_and_manifest() {
+    let dir = tempfile::tempdir().unwrap();
+    let result = cli(&[
+        "build",
+        &example("plate.star"),
+        "--out-dir",
+        dir.path().to_str().unwrap(),
+    ]);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    let plate = &report["outputs"]["plate"];
+    assert_eq!(plate["volume_mm3"], 19_200.0);
+    assert_eq!(
+        plate["bounds_mm"]["max"],
+        serde_json::json!([80.0, 40.0, 6.0])
+    );
+    assert_eq!(plate["topology"]["vertices"], 8);
+    assert_eq!(plate["topology"]["edges"], 12);
+    assert_eq!(plate["topology"]["faces"], 6);
+    assert_eq!(plate["validation"]["valid"], true);
+    let stl = fs::read_to_string(dir.path().join("plate.stl")).unwrap();
+    assert_eq!(stl.matches("facet normal").count(), 12);
+    let step = fs::read_to_string(dir.path().join("plate.step")).unwrap();
+    assert!(step.starts_with("ISO-10303-21;"));
+    assert!(step.contains("FACETED_BREP"));
+    assert!(dir.path().join("plate.brep.json").is_file());
+    assert!(dir.path().join("manifest.json").is_file());
+    let compiled = dir.path().join("recipe.json");
+    assert!(compiled.is_file());
+    assert!(cli(&["check", compiled.to_str().unwrap()]).status.success());
+    assert_eq!(report["kernel_build_id"].as_str().unwrap().len(), 64);
+    assert_eq!(report["executor_build_id"].as_str().unwrap().len(), 64);
+}
+
+#[test]
+fn starlark_and_json_examples_have_the_same_content_hashes() {
+    let a = cli(&["inspect", &example("plate.star")]);
+    let b = cli(&["inspect", &example("plate.json")]);
+    assert!(a.status.success() && b.status.success());
+    let a: serde_json::Value = serde_json::from_slice(&a.stdout).unwrap();
+    let b: serde_json::Value = serde_json::from_slice(&b.stdout).unwrap();
+    assert_eq!(a, b);
+}
+
+#[test]
+fn invalid_geometry_fails_without_writing_artifacts() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("invalid.star");
+    fs::write(&recipe, "p = rectangle(id = 'p', width = -1, depth = 40)\ns = extrude(id = 's', profile = p, height = 6)\noutput(name = 'plate', feature = s)\n").unwrap();
+    let output_dir = dir.path().join("artifacts");
+    let result = cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        output_dir.to_str().unwrap(),
+    ]);
+    assert!(!result.status.success());
+    assert!(!output_dir.exists());
+    let error: serde_json::Value = serde_json::from_slice(&result.stderr).unwrap();
+    assert!(error["error"].as_str().unwrap().contains("width"));
+}
+
+#[test]
+fn output_names_cannot_escape_artifact_directory() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("escape.star");
+    fs::write(&recipe, "p = rectangle(id = 'p', width = 1, depth = 2)\ns = extrude(id = 's', profile = p, height = 3)\noutput(name = '../escape', feature = s)\n").unwrap();
+    let output_dir = dir.path().join("artifacts");
+    let result = cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        output_dir.to_str().unwrap(),
+    ]);
+    assert!(!result.status.success());
+    assert!(!output_dir.exists());
+    assert!(!dir.path().join("escape.step").exists());
+}
+
+#[test]
+fn compilation_produces_rebuildable_graph() {
+    let dir = tempfile::tempdir().unwrap();
+    let result = cli(&["compile", &example("plate.star")]);
+    assert!(result.status.success());
+    let recipe = dir.path().join("compiled.json");
+    fs::write(&recipe, result.stdout).unwrap();
+    let checked = cli(&["check", recipe.to_str().unwrap()]);
+    assert!(
+        checked.status.success(),
+        "{}",
+        String::from_utf8_lossy(&checked.stderr)
+    );
+}
+
+#[test]
+fn filesystem_name_collisions_and_reserved_names_fail_before_writing() {
+    let dir = tempfile::tempdir().unwrap();
+    for (index, declarations) in [
+        "output(name = 'CON', feature = s)",
+        "output(name = 'part.', feature = s)",
+        "output(name = 'Part', feature = s)\noutput(name = 'part', feature = s)",
+    ]
+    .iter()
+    .enumerate()
+    {
+        let recipe = dir.path().join(format!("names{index}.star"));
+        let source = format!("p = rectangle(id = 'p', width = 1, depth = 2)\ns = extrude(id = 's', profile = p, height = 3)\n{declarations}\n");
+        fs::write(&recipe, source).unwrap();
+        let output_dir = dir.path().join(format!("artifacts{index}"));
+        let result = cli(&[
+            "build",
+            recipe.to_str().unwrap(),
+            "--out-dir",
+            output_dir.to_str().unwrap(),
+        ]);
+        assert!(!result.status.success());
+        assert!(!output_dir.exists());
+    }
+}
+
+#[test]
+fn repeated_builds_have_byte_identical_exports() {
+    let a = tempfile::tempdir().unwrap();
+    let b = tempfile::tempdir().unwrap();
+    for dir in [&a, &b] {
+        let result = cli(&[
+            "build",
+            &example("plate.star"),
+            "--out-dir",
+            dir.path().to_str().unwrap(),
+        ]);
+        assert!(result.status.success());
+    }
+    for file in [
+        "plate.step",
+        "plate.stl",
+        "plate.brep.json",
+        "manifest.json",
+    ] {
+        assert_eq!(
+            fs::read(a.path().join(file)).unwrap(),
+            fs::read(b.path().join(file)).unwrap()
+        );
+    }
+}
+
+const BRACKET: &str = r#"
+width = param(name = 'width', default = 80)
+p = rectangle(id = 'base_profile', width = width, depth = 40)
+base = extrude(id = 'base', profile = p, height = 6)
+q = rectangle(id = 'wall_profile', width = 6, depth = 40)
+wall = extrude(id = 'wall_raw', profile = q, height = 34)
+wall = translate(id = 'wall', body = wall, offset = [0, 0, 6])
+joined = union(id = 'joined', left = base, right = wall)
+s = rectangle(id = 'slot_profile', width = 10, depth = 10)
+slot = extrude(id = 'slot_raw', profile = s, height = 8)
+slot = translate(id = 'slot', body = slot, offset = [20, 15, -1])
+bracket = cut(id = 'bracket', left = joined, right = slot)
+output(name = 'bracket', feature = bracket)
+"#;
+
+fn successful_json(result: Output) -> serde_json::Value {
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    serde_json::from_slice(&result.stdout).unwrap()
+}
+
+const SELECT_RECIPE: &str = r#"
+p = rectangle(id = 'profile', width = param(name = 'width', default = 10), depth = 8)
+base = extrude(id = 'base', profile = p, height = 3)
+moved = translate(id = 'moved', body = base, offset = [20,0,0])
+q = rectangle(id = 'cutter_profile', width = 2, depth = 10)
+cutter = extrude(id = 'cutter', profile = q, height = 5)
+cutter = translate(id = 'positioned_cutter', body = cutter, offset = [4,-1,-1])
+split = cut(id = 'split', left = base, right = cutter)
+empty = cut(id = 'empty', left = base, right = base)
+output(name = 'part', feature = moved)
+"#;
+
+fn selection_fixture() -> tempfile::TempDir {
+    let directory = tempfile::tempdir().unwrap();
+    fs::write(directory.path().join("part.star"), SELECT_RECIPE).unwrap();
+    directory
+}
+
+fn select_in(directory: &Path, target: &str, extra: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_cad"))
+        .current_dir(directory)
+        .args([
+            "select",
+            "part.star",
+            "--from",
+            "base",
+            "--role",
+            "end_cap",
+            "--in",
+            target,
+        ])
+        .args(extra)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn semantic_selection_resolves_translation_without_mutating_source_or_publishing() {
+    let directory = selection_fixture();
+    let report = successful_json(select_in(directory.path(), "moved", &[]));
+    assert_eq!(report["status"], "resolved");
+    assert_eq!(report["witnesses"].as_array().unwrap().len(), 1);
+    assert_eq!(report["witnesses"][0]["target_feature"], "moved");
+    assert_eq!(
+        report["snapshot"]["recipe_source_hash"],
+        blake3::hash(SELECT_RECIPE.as_bytes()).to_hex().to_string()
+    );
+    assert!(report["snapshot"]["target_content_hash"].is_string());
+    assert!(report["snapshot"]["anchor_content_hash"].is_string());
+    assert_eq!(
+        report["snapshot"]["kernel_build_id"],
+        cad_kernel::KERNEL_BUILD_ID
+    );
+    assert!(!report["lineage"].as_array().unwrap().is_empty());
+    assert_eq!(
+        fs::read_to_string(directory.path().join("part.star")).unwrap(),
+        SELECT_RECIPE
+    );
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    assert!(!directory.path().join("out").exists());
+}
+
+#[test]
+fn semantic_selection_requires_explicit_split_cardinality() {
+    let directory = selection_fixture();
+    let ambiguous = select_in(directory.path(), "split", &[]);
+    assert!(!ambiguous.status.success());
+    assert!(ambiguous.stdout.is_empty());
+    let error: serde_json::Value = serde_json::from_slice(&ambiguous.stderr).unwrap();
+    assert_eq!(error["code"], "selection_ambiguous");
+    assert_eq!(error["selection"]["status"], "ambiguous");
+    assert!(error["selection"]["snapshot"]["target_content_hash"].is_string());
+    assert_eq!(error["selection"]["witnesses"].as_array().unwrap().len(), 2);
+    let all = successful_json(select_in(directory.path(), "split", &["--all"]));
+    assert_eq!(all["status"], "resolved");
+    assert_eq!(all["witnesses"].as_array().unwrap().len(), 2);
+    let exact = successful_json(select_in(directory.path(), "split", &["--count", "2"]));
+    assert_eq!(exact["witnesses"], all["witnesses"]);
+    assert!(!select_in(directory.path(), "split", &["--count", "0"])
+        .status
+        .success());
+    assert!(
+        !select_in(directory.path(), "split", &["--count", "2", "--all"])
+            .status
+            .success()
+    );
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn semantic_selection_reports_deleted_and_unsupported_with_cache_and_params() {
+    let directory = selection_fixture();
+    let deleted = select_in(directory.path(), "empty", &["--all"]);
+    assert!(!deleted.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&deleted.stderr).unwrap();
+    assert_eq!(error["code"], "selection_deleted");
+    assert_eq!(error["selection"]["status"], "deleted");
+    assert!(error["selection"]["witnesses"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let missing = select_in(directory.path(), "missing_feature", &[]);
+    assert!(!missing.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&missing.stderr).unwrap();
+    assert_eq!(error["code"], "selection_unsupported");
+    assert!(error["selection"]["snapshot"]["target_content_hash"].is_null());
+    let args = ["--param", "width=12", "--cache-dir", "cache"];
+    successful_json(select_in(directory.path(), "moved", &args));
+    let cached = successful_json(select_in(directory.path(), "moved", &args));
+    assert_eq!(cached["status"], "resolved");
+    assert!(cached["stats"]["disk_cache_hits"].as_u64().unwrap() > 0);
+    let changed = successful_json(select_in(
+        directory.path(),
+        "moved",
+        &["--param", "width=14"],
+    ));
+    assert_ne!(
+        cached["snapshot"]["target_content_hash"],
+        changed["snapshot"]["target_content_hash"]
+    );
+    assert_ne!(
+        cached["snapshot"]["anchor_content_hash"],
+        changed["snapshot"]["anchor_content_hash"]
+    );
+    assert_eq!(
+        cached["snapshot"]["recipe_source_hash"],
+        changed["snapshot"]["recipe_source_hash"]
+    );
+    assert_eq!(
+        fs::read_to_string(directory.path().join("part.star")).unwrap(),
+        SELECT_RECIPE
+    );
+    assert!(!directory.path().join("out").exists());
+}
+
+#[test]
+fn parameterized_bracket_builds_valid_export_and_previews() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("bracket.star");
+    fs::write(&recipe, BRACKET).unwrap();
+    let out = dir.path().join("out");
+    let report = successful_json(cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--param",
+        "width=100",
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]));
+    assert_eq!(report["outputs"]["bracket"]["volume_mm3"], 31560.0);
+    assert_eq!(
+        report["outputs"]["bracket"]["bounds_mm"]["max"],
+        serde_json::json!([100.0, 40.0, 40.0])
+    );
+    assert!(fs::read_to_string(out.join("bracket.preview.svg"))
+        .unwrap()
+        .contains("<svg"));
+    assert!(fs::read_to_string(out.join("bracket.preview.html"))
+        .unwrap()
+        .contains("<html"));
+    let validated = successful_json(cli(&[
+        "validate",
+        out.join("bracket.brep.json").to_str().unwrap(),
+    ]));
+    assert_eq!(validated["validation"]["valid"], true);
+    assert_eq!(validated["volume_mm3"], 31560.0);
+}
+
+#[test]
+fn init_preserves_existing_recipe_and_parameter_errors_are_json() {
+    let dir = tempfile::tempdir().unwrap();
+    successful_json(cli(&["init", dir.path().to_str().unwrap()]));
+    let recipe = dir.path().join("main.star");
+    let original = fs::read(&recipe).unwrap();
+    assert!(!cli(&["init", dir.path().to_str().unwrap()])
+        .status
+        .success());
+    assert_eq!(fs::read(&recipe).unwrap(), original);
+    let report = successful_json(cli(&[
+        "inspect",
+        recipe.to_str().unwrap(),
+        "--param",
+        "width=100",
+    ]));
+    assert_eq!(report["outputs"]["plate"]["volume_mm3"], 24000.0);
+    let bad = cli(&["check", recipe.to_str().unwrap(), "--param", "typo=1"]);
+    assert!(!bad.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&bad.stderr).unwrap();
+    assert!(error["error"].as_str().unwrap().contains("typo"));
+}
+
+#[test]
+fn diff_reports_changed_and_removed_outputs() {
+    let dir = tempfile::tempdir().unwrap();
+    let before = dir.path().join("before.star");
+    let after = dir.path().join("after.star");
+    let prefix = "p = rectangle(id = 'p', width = 2, depth = 3)\ns = extrude(id = 's', profile = p, height = 4)\n";
+    fs::write(
+        &before,
+        format!(
+            "{prefix}output(name = 'part', feature = s)\noutput(name = 'removed', feature = s)\n"
+        ),
+    )
+    .unwrap();
+    fs::write(
+        &after,
+        format!(
+            "{}output(name = 'part', feature = s)\n",
+            prefix.replace("width = 2", "width = 4")
+        ),
+    )
+    .unwrap();
+    let report = successful_json(cli(&[
+        "diff",
+        before.to_str().unwrap(),
+        after.to_str().unwrap(),
+    ]));
+    assert_eq!(report["outputs"]["part"]["status"], "changed");
+    assert_eq!(report["outputs"]["part"]["volume_delta_mm3"], 24.0);
+    assert_eq!(report["outputs"]["removed"]["status"], "removed");
+}
+
+#[test]
+fn artifact_replacement_removes_stale_outputs_and_failure_preserves_generation() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("part.star");
+    let out = dir.path().join("out");
+    let prefix = "p = rectangle(id = 'p', width = 2, depth = 3)\ns = extrude(id = 's', profile = p, height = 4)\n";
+    fs::write(
+        &recipe,
+        format!("{prefix}output(name = 'old', feature = s)\n"),
+    )
+    .unwrap();
+    successful_json(cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]));
+    fs::write(
+        &recipe,
+        format!("{prefix}output(name = 'new', feature = s)\n"),
+    )
+    .unwrap();
+    successful_json(cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]));
+    assert!(!out.join("old.step").exists());
+    let original = fs::read(out.join("manifest.json")).unwrap();
+    fs::write(&recipe, format!("{prefix}empty = cut(id = 'empty', left = s, right = s)\noutput(name = 'empty', feature = empty)\n")).unwrap();
+    let empty = successful_json(cli(&["inspect", recipe.to_str().unwrap()]));
+    assert_eq!(empty["outputs"]["empty"]["volume_mm3"], 0.0);
+    assert!(empty["outputs"]["empty"]["bounds_mm"].is_null());
+    let failed = cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]);
+    assert!(!failed.status.success());
+    assert_eq!(fs::read(out.join("manifest.json")).unwrap(), original);
+    assert!(out.join("new.step").exists());
+    assert!(!out.join("empty.step").exists());
+}
+
+#[test]
+fn nonempty_unmanaged_output_directory_is_preserved() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("notes.txt"), "keep me").unwrap();
+    let result = cli(&[
+        "build",
+        &example("plate.star"),
+        "--out-dir",
+        dir.path().to_str().unwrap(),
+    ]);
+    assert!(!result.status.success());
+    assert_eq!(
+        fs::read_to_string(dir.path().join("notes.txt")).unwrap(),
+        "keep me"
+    );
+    assert!(!dir.path().join("plate.step").exists());
+}
+
+#[test]
+fn corrupted_brep_validation_returns_structured_issues() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut result =
+        cad_kernel::extrude_rectangle(2.0, 3.0, 4.0, cad_kernel::Tolerance::default()).unwrap();
+    result.model.edges[0].vertices[0].0 = usize::MAX;
+    let path = dir.path().join("corrupt.brep.json");
+    fs::write(&path, serde_json::to_vec(&result).unwrap()).unwrap();
+    let response = cli(&["validate", path.to_str().unwrap()]);
+    assert!(!response.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&response.stderr).unwrap();
+    assert_eq!(error["code"], "invalid_brep");
+    assert_eq!(error["validation"]["valid"], false);
+    assert!(!error["validation"]["issues"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn comment_only_edit_updates_exact_recipe_and_preview_without_geometry_change() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("source.star");
+    let out = dir.path().join("out");
+    let source = "# unique_comment_before\r\np = rectangle(id = 'p', width = param(name = 'width', default = 2), depth = 3)\r\ns = extrude(id = 's', profile = p, height = 4)\r\noutput(name = 'part', feature = s)\r\n";
+    fs::write(&recipe, source).unwrap();
+    let args = [
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--param",
+        "width=5",
+    ];
+    let before = successful_json(cli(&args));
+    assert_eq!(
+        fs::read(out.join("recipe.star")).unwrap(),
+        source.as_bytes()
+    );
+    assert_eq!(before["recipe_source"]["parameter_overrides"]["width"], 5.0);
+    assert_eq!(before["recipe_source"]["name"], "source.star");
+    let first_html = fs::read_to_string(out.join("part.preview.html")).unwrap();
+    assert!(first_html.contains("unique_comment_before"));
+    let embedded_context = |html: &str| -> serde_json::Value {
+        let json = html
+            .lines()
+            .find_map(|line| line.strip_prefix("let recipeContext = "))
+            .unwrap()
+            .trim_end_matches(';');
+        serde_json::from_str(json).unwrap()
+    };
+    let first_context = embedded_context(&first_html);
+    assert_eq!(
+        first_context["content_hash"],
+        before["outputs"]["part"]["content_hash"]
+    );
+    assert_eq!(
+        first_context["recipe_context_hash"],
+        before["recipe_context_hash"]
+    );
+    let after_source = source.replace("unique_comment_before", "unique_comment_after");
+    fs::write(&recipe, &after_source).unwrap();
+    let after = successful_json(cli(&args));
+    assert_eq!(
+        after["outputs"]["part"]["content_hash"],
+        before["outputs"]["part"]["content_hash"]
+    );
+    assert_ne!(after["recipe_source_hash"], before["recipe_source_hash"]);
+    assert_eq!(
+        after["recipe_source_hash"],
+        blake3::hash(after_source.as_bytes()).to_hex().to_string()
+    );
+    assert_eq!(
+        fs::read(out.join("recipe.star")).unwrap(),
+        after_source.as_bytes()
+    );
+    let second_html = fs::read_to_string(out.join("part.preview.html")).unwrap();
+    assert!(second_html.contains("unique_comment_after"));
+    assert!(!second_html.contains("unique_comment_before"));
+    assert_ne!(first_html, second_html);
+    let second_context = embedded_context(&second_html);
+    assert_eq!(
+        second_context["content_hash"],
+        first_context["content_hash"]
+    );
+    assert_eq!(
+        second_context["recipe_context_hash"],
+        after["recipe_context_hash"]
+    );
+    assert_ne!(
+        second_context["recipe_context_hash"],
+        first_context["recipe_context_hash"]
+    );
+    let rebuilt = successful_json(cli(&["check", out.join("recipe.json").to_str().unwrap()]));
+    assert_eq!(rebuilt["outputs"]["part"]["volume_mm3"], 60.0);
+    let default_args = [
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+    ];
+    let default = successful_json(cli(&default_args));
+    let mut explicit_args = default_args.to_vec();
+    explicit_args.extend(["--param", "width=2"]);
+    let explicit = successful_json(cli(&explicit_args));
+    assert_eq!(
+        default["outputs"]["part"]["content_hash"],
+        explicit["outputs"]["part"]["content_hash"]
+    );
+    assert_eq!(
+        default["recipe_source_hash"],
+        explicit["recipe_source_hash"]
+    );
+    assert_ne!(
+        default["recipe_context_hash"],
+        explicit["recipe_context_hash"]
+    );
+}
+
+#[test]
+fn json_source_is_retained_separately_from_resolved_graph() {
+    let dir = tempfile::tempdir().unwrap();
+    let original = fs::read_to_string(example("plate.json")).unwrap();
+    let source = format!("\n\n{original}\n\n");
+    let path = dir.path().join("input.json");
+    let out = dir.path().join("out");
+    fs::write(&path, &source).unwrap();
+    let report = successful_json(cli(&[
+        "build",
+        path.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]));
+    assert_eq!(report["recipe_source"]["language"], "json");
+    assert_eq!(
+        fs::read_to_string(out.join("recipe.source.json")).unwrap(),
+        source
+    );
+    assert_ne!(
+        fs::read(out.join("recipe.json")).unwrap(),
+        source.as_bytes()
+    );
+    assert!(fs::read_to_string(out.join("plate.preview.html"))
+        .unwrap()
+        .contains("input.json"));
+}
+
+#[test]
+fn disjoint_union_exports_two_step_solids_and_persistent_cache_hits() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("pair.star");
+    fs::write(&recipe, "p = rectangle(id = 'p', width = 2, depth = 3)\na = extrude(id = 'a', profile = p, height = 4)\nb = translate(id = 'b', body = a, offset = [5,0,0])\npair = union(id = 'pair', left = a, right = b)\noutput(name = 'pair', feature = pair)\n").unwrap();
+    let cache = dir.path().join("cache");
+    let out = dir.path().join("out");
+    let report = successful_json(cli(&[
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    assert_eq!(report["outputs"]["pair"]["topology"]["solids"], 2);
+    assert_eq!(report["outputs"]["pair"]["volume_mm3"], 48.0);
+    let step = fs::read_to_string(out.join("pair.step")).unwrap();
+    assert_eq!(step.matches("=FACETED_BREP(").count(), 2);
+    let cached = successful_json(cli(&[
+        "check",
+        recipe.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    assert!(cached["stats"]["disk_cache_hits"].as_u64().unwrap() > 0);
+}
+
+#[test]
+fn assemblies_publish_shared_assets_and_placement_edits_reuse_geometry() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("assembly.star");
+    let out = dir.path().join("out");
+    let cache = dir.path().join("cache");
+    fs::write(&source,r#"gap = param(name = "gap", default = 20)
+p = rectangle(id = "p", width = 2, depth = 3)
+b = extrude(id = "b", profile = p, height = 4)
+d = part(id = "block", body = b)
+a = instance(id = "first", part = d)
+c = instance(id = "second", part = d, offset = [gap, 0, 0], rotation = [0, 0, 0.3826834323650898, 0.9238795325112867])
+s = assembly(id = "pair", instances = [a, c])
+assembly_output(name = "pair", assembly = s)
+"#).unwrap();
+    let built = cli(&[
+        "build",
+        source.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]);
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let first: serde_json::Value = serde_json::from_slice(&built.stdout).unwrap();
+    assert_eq!(first["schema_version"], 2);
+    assert_eq!(first["stats"]["computed_solids"], 1);
+    assert_eq!(first["outputs"]["pair"]["instances"], 2);
+    assert_eq!(first["outputs"]["pair"]["definitions"], 1);
+    assert_eq!(first["outputs"]["pair"]["material_volume_mm3"], 48.0);
+    let assembly: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(out.join("pair.assembly.json")).unwrap()).unwrap();
+    assert!(assembly["definitions"]["block"].get("model").is_none());
+    let asset = assembly["definitions"]["block"]["geometry_asset"]
+        .as_str()
+        .unwrap();
+    assert!(out.join(asset).is_file());
+    let validated = cli(&["validate", out.join("pair.assembly.json").to_str().unwrap()]);
+    assert!(
+        validated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&validated.stderr)
+    );
+    assert_eq!(
+        fs::read_dir(&out)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().starts_with("definition-"))
+            .count(),
+        1
+    );
+    let display: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(out.join("pair.display.json")).unwrap()).unwrap();
+    assert_eq!(display["meshes"].as_object().unwrap().len(), 1);
+    assert_eq!(display["instances"].as_array().unwrap().len(), 2);
+    let step = fs::read_to_string(out.join("pair.step")).unwrap();
+    assert_eq!(step.matches("FACETED_BREP('").count(), 1);
+    assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 2);
+    let check = cli(&[
+        "check",
+        out.join("recipe.json").to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]);
+    assert!(check.status.success());
+    let compiled: serde_json::Value = serde_json::from_slice(&check.stdout).unwrap();
+    assert_eq!(
+        compiled["outputs"]["pair"]["content_hash"],
+        first["outputs"]["pair"]["content_hash"]
+    );
+    let moved = cli(&[
+        "inspect",
+        source.to_str().unwrap(),
+        "--param",
+        "gap=30",
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]);
+    assert!(moved.status.success());
+    let moved: serde_json::Value = serde_json::from_slice(&moved.stdout).unwrap();
+    assert_eq!(moved["stats"]["computed_solids"], 0);
+    assert_eq!(moved["stats"]["disk_cache_hits"], 1);
+    assert_ne!(
+        moved["outputs"]["pair"]["content_hash"],
+        first["outputs"]["pair"]["content_hash"]
+    );
+    assert_eq!(moved["outputs"]["pair"]["material_volume_mm3"], 48.0);
+    let bad = cli(&[
+        "build",
+        source.to_str().unwrap(),
+        "--param",
+        "gap=1e300",
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]);
+    assert!(!bad.status.success());
+    assert_eq!(fs::read_to_string(out.join("pair.step")).unwrap(), step);
+}
+
+#[test]
+fn assembly_validation_rejects_metadata_tampering_and_preflights_resources() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("parts.star");
+    let out = dir.path().join("out");
+    fs::write(&source, "p=rectangle(id='p',width=2,depth=3)\nb=extrude(id='b',profile=p,height=4)\nd=part(id='block',body=b)\ne=part(id='alias',body=b)\ni=instance(id='first',part=d)\nj=instance(id='second',part=e,offset=[10,0,0])\na=assembly(id='pair',instances=[i,j])\nassembly_output(name='pair',assembly=a)\n").unwrap();
+    let built = cli(&[
+        "build",
+        source.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]);
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let path = out.join("pair.assembly.json");
+    let original: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(
+        original["definitions"]["block"]["geometry_asset"],
+        original["definitions"]["alias"]["geometry_asset"]
+    );
+    // Display data is optional and not certified by exact validation.
+    fs::remove_file(out.join("pair.display.json")).unwrap();
+    assert!(cli(&["validate", path.to_str().unwrap()]).status.success());
+    for (pointer, replacement) in [
+        ("/material_volume_mm3", serde_json::json!(-99)),
+        ("/bounds_mm/max/0", serde_json::json!(999)),
+        (
+            "/definitions/block/material_volume_mm3",
+            serde_json::json!(-99),
+        ),
+        (
+            "/definitions/alias/local_bounds_mm/min/1",
+            serde_json::json!(1),
+        ),
+        ("/bounds_kind", serde_json::json!("tight")),
+        ("/volume_kind", serde_json::json!("union")),
+        ("/display_asset", serde_json::json!("../outside.json")),
+        ("/instances/0/part", serde_json::json!("missing")),
+    ] {
+        let mut changed = original.clone();
+        *changed.pointer_mut(pointer).unwrap() = replacement;
+        fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
+        let validation = cli(&["validate", path.to_str().unwrap()]);
+        assert!(!validation.status.success(), "accepted changed {pointer}");
+        let error: serde_json::Value = serde_json::from_slice(&validation.stderr).unwrap();
+        assert!(error["error"].is_string());
+    }
+    // Numeric formatting is not semantic: an integer volume equals its float.
+    let mut numeric = original.clone();
+    numeric["material_volume_mm3"] = serde_json::json!(48);
+    numeric["definitions"]["block"]["material_volume_mm3"] = serde_json::json!(24);
+    fs::write(&path, serde_json::to_vec(&numeric).unwrap()).unwrap();
+    assert!(cli(&["validate", path.to_str().unwrap()]).status.success());
+    // Count failures happen before the deliberately missing referenced file is opened.
+    let mut oversized = original.clone();
+    oversized["definitions"]["block"]["geometry_asset"] = serde_json::json!("missing.brep.json");
+    oversized["instances"] =
+        serde_json::Value::Array(vec![original["instances"][0].clone(); 100_001]);
+    fs::write(&path, serde_json::to_vec(&oversized).unwrap()).unwrap();
+    let result = cli(&["validate", path.to_str().unwrap()]);
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("count limit"));
+}

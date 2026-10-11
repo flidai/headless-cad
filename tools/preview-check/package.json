@@ -1,0 +1,14 @@
+{
+  "name": "headless-cad-preview-check",
+  "private": true,
+  "scripts": {
+    "test": "node check.cjs",
+    "test:hosted": "node hosted-check.cjs",
+    "test:depth": "node ../../crates/cad-preview/tests/depth-check.cjs",
+    "test:refresh": "node refresh-check.cjs",
+    "test:assembly": "node ../../crates/cad-preview/tests/assembly-check.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}

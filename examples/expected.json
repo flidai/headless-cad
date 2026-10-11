@@ -1,0 +1,224 @@
+{
+  "bracket.star": {
+    "bracket": {
+      "volume_mm3": 24624,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          40,
+          40
+        ]
+      ]
+    }
+  },
+  "tray.star": {
+    "tray": {
+      "volume_mm3": 53616,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          70,
+          25
+        ]
+      ]
+    },
+    "lid": {
+      "volume_mm3": 21000,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          30
+        ],
+        [
+          100,
+          70,
+          33
+        ]
+      ]
+    },
+    "assembly": {
+      "volume_mm3": 74616,
+      "solids": 2,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          70,
+          33
+        ]
+      ]
+    }
+  },
+  "intersection.star": {
+    "intersection": {
+      "volume_mm3": 2250,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          10,
+          5,
+          5
+        ],
+        [
+          20,
+          20,
+          20
+        ]
+      ]
+    }
+  },
+  "fixture.star": {
+    "fixture": {
+      "volume_mm3": 89856,
+      "solids": 3,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          120,
+          80,
+          26
+        ]
+      ]
+    },
+    "fixture_plate": {
+      "volume_mm3": 82944,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          120,
+          80,
+          24
+        ]
+      ]
+    },
+    "fixture_jaws": {
+      "volume_mm3": 6912,
+      "solids": 2,
+      "bounds_mm": [
+        [
+          10,
+          60,
+          10
+        ],
+        [
+          110,
+          72,
+          26
+        ]
+      ]
+    }
+  },
+  "enclosure.star": {
+    "enclosure": {
+      "volume_mm3": 88240,
+      "solids": 2,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          68,
+          47
+        ]
+      ]
+    },
+    "enclosure_body": {
+      "volume_mm3": 67840,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          68,
+          36
+        ]
+      ]
+    },
+    "enclosure_lid": {
+      "volume_mm3": 20400,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          44
+        ],
+        [
+          100,
+          68,
+          47
+        ]
+      ]
+    }
+  },
+  "mounting_array.star": {
+    "mounting_array": {
+      "volume_mm3": 4992,
+      "solids": 24,
+      "bounds_mm": [
+        [
+          -6,
+          0,
+          0
+        ],
+        [
+          110,
+          52,
+          4
+        ]
+      ]
+    }
+  },
+  "reference_fixture.star": {
+    "reference_fixture": {
+      "volume_mm3": 23296,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          40,
+          20
+        ]
+      ]
+    }
+  }
+}

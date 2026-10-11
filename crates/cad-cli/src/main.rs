@@ -1,0 +1,841 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::error::Error;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
+use cad_build::{BuildEngine, BuildResult, Recipe};
+use clap::{Parser, Subcommand};
+use serde_json::{json, Value};
+
+mod server;
+mod watch;
+
+#[derive(Debug)]
+struct InvalidBrep(cad_kernel::ValidationReport);
+
+impl std::fmt::Display for InvalidBrep {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "B-rep validation failed with {} issue(s)",
+            self.0.issues.len()
+        )
+    }
+}
+
+impl Error for InvalidBrep {}
+
+#[derive(Debug)]
+struct UnresolvedSelection(Value);
+
+impl std::fmt::Display for UnresolvedSelection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(
+            self.0["diagnostic"]
+                .as_str()
+                .unwrap_or("semantic face reference did not resolve"),
+        )
+    }
+}
+
+impl Error for UnresolvedSelection {}
+
+#[derive(Parser)]
+#[command(
+    name = "cad",
+    version,
+    about = "Build reproducible solid models with a Rust kernel"
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command,
+    /// Override a declared Starlark parameter, repeatable.
+    #[arg(long = "param", global = true, value_name = "NAME=VALUE")]
+    params: Vec<String>,
+    /// Persistent geometry cache directory.
+    #[arg(long, global = true)]
+    cache_dir: Option<PathBuf>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Resolve a semantic face role through the feature graph without publishing artifacts.
+    Select {
+        recipe: PathBuf,
+        #[arg(long = "from")]
+        anchor: String,
+        #[arg(long)]
+        role: String,
+        #[arg(long = "in")]
+        target: String,
+        /// Require exactly this positive number of faces (default: 1).
+        #[arg(long, conflicts_with = "all")]
+        count: Option<std::num::NonZeroUsize>,
+        /// Accept every surviving face, including splits.
+        #[arg(long, conflicts_with = "count")]
+        all: bool,
+    },
+    /// Rebuild changed recipes while preserving the last successful artifacts.
+    Watch {
+        recipe: PathBuf,
+        #[arg(long, default_value = "out")]
+        out_dir: PathBuf,
+        #[arg(long, default_value_t = 500, value_parser = clap::value_parser!(u64).range(1..))]
+        interval_ms: u64,
+    },
+    /// Serve generated previews and exports through a read-only local viewer.
+    Serve {
+        #[arg(default_value = "out")]
+        directory: PathBuf,
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(long, default_value_t = 8080)]
+        port: u16,
+    },
+    /// Create a starter recipe without overwriting existing files.
+    Init { directory: PathBuf },
+    /// Validate a B-rep snapshot or assembly manifest and its referenced definitions.
+    Validate { model: PathBuf },
+    /// Compare output hashes, volumes, and bounds for two recipes.
+    Diff { before: PathBuf, after: PathBuf },
+    /// Compile a .star or .json recipe into the versioned JSON feature graph.
+    Compile { recipe: PathBuf },
+    /// Evaluate a recipe and report geometry, provenance, and validation as JSON.
+    Inspect { recipe: PathBuf },
+    /// Build and validate every output; exits nonzero on any invalid result.
+    Check { recipe: PathBuf },
+    /// Write each output as B-rep JSON, STEP, and STL, plus a build manifest.
+    Build {
+        recipe: PathBuf,
+        #[arg(long, default_value = "out")]
+        out_dir: PathBuf,
+    },
+}
+
+fn load(path: &Path, parameters: &BTreeMap<String, f64>) -> Result<Recipe, Box<dyn Error>> {
+    load_source(path, &fs::read_to_string(path)?, parameters)
+}
+
+fn load_source(
+    path: &Path,
+    source: &str,
+    parameters: &BTreeMap<String, f64>,
+) -> Result<Recipe, Box<dyn Error>> {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("star") => Ok(cad_recipe::from_starlark_with_params(&path.to_string_lossy(), source, parameters)?),
+        Some("json") if parameters.is_empty() => Ok(serde_json::from_str(source)?),
+        Some("json") => Err("parameter overrides require a .star recipe; compiled JSON already contains resolved values".into()),
+        _ => Err("recipe extension must be .star or .json".into()),
+    }
+}
+
+fn report(recipe: &Recipe, build: &BuildResult) -> Value {
+    let mut outputs: serde_json::Map<String, Value> = build
+        .outputs
+        .iter()
+        .map(|(name, output)| {
+            let model = &output.result.model;
+            (
+                name.clone(),
+                json!({
+                    "feature_id": output.feature_id,
+                    "content_hash": output.content_hash,
+                    "provenance": output.provenance,
+                    "bounds_mm": if model.solids.is_empty() { Value::Null } else { json!(model.bounds()) },
+                    "volume_mm3": model.volume(),
+                    "topology": {
+                        "vertices": model.vertices.len(), "edges": model.edges.len(),
+                        "faces": model.faces.len(), "shells": model.shells.len(),
+                        "solids": model.solids.len(),
+                    },
+                    "validation": model.validate(recipe.tolerance.unwrap_or_default()),
+                    "history": output.result.history,
+                }),
+            )
+        })
+        .collect();
+    for (name, assembly) in &build.assemblies {
+        outputs.insert(name.clone(), json!({
+            "kind": "assembly",
+            "feature_id": assembly.assembly_id,
+            "content_hash": assembly.content_hash,
+            "bounds_mm": assembly.bounds(),
+            "bounds_kind": "conservative_axis_aligned",
+            "volume_mm3": assembly.material_volume(),
+            "material_volume_mm3": assembly.material_volume(),
+            "volume_kind": "summed_instance_material_not_union",
+            "definitions": assembly.parts.len(),
+            "instances": assembly.instance_count(),
+            "topology": { "solids": assembly.solid_count() },
+            "validation": { "valid": true, "scope": "individual definitions and rigid placements; interference not checked" },
+        }));
+    }
+    json!({
+        "kernel_version": cad_kernel::KERNEL_VERSION,
+        "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
+        "executor_build_id": cad_build::executor_build_id(),
+        "schema_version": recipe.schema_version,
+        "units": recipe.units,
+        "tolerance": recipe.tolerance.unwrap_or_default(),
+        "stats": build.stats,
+        "feature_hashes": build.feature_hashes,
+        "outputs": outputs,
+    })
+}
+
+// Recipe output names are logical IDs. Only portable filename components may
+// become paths; this check occurs before creating any artifact files.
+fn filename(name: &str) -> Result<(), Box<dyn Error>> {
+    let stem = name.split('.').next().unwrap_or("").to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (stem.len() == 4
+            && (stem.starts_with("COM") || stem.starts_with("LPT"))
+            && matches!(stem.as_bytes()[3], b'1'..=b'9'));
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || !name
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+        || name.eq_ignore_ascii_case("manifest")
+        || name.ends_with('.')
+        || reserved
+    {
+        return Err(format!("output name '{name}' must be a portable filename (letters, digits, '-', '_', '.'); 'manifest' is reserved").into());
+    }
+    Ok(())
+}
+
+fn parameters(values: &[String]) -> Result<BTreeMap<String, f64>, Box<dyn Error>> {
+    let mut result = BTreeMap::new();
+    for entry in values {
+        let (name, value) = entry
+            .split_once('=')
+            .ok_or("parameter must be NAME=VALUE")?;
+        let number: f64 = value.parse()?;
+        if name.is_empty() || !number.is_finite() {
+            return Err("parameter name must be nonempty and value must be finite".into());
+        }
+        if result.insert(name.to_owned(), number).is_some() {
+            return Err(format!("duplicate parameter override '{name}'").into());
+        }
+    }
+    Ok(result)
+}
+
+fn engine(cache: &Option<PathBuf>) -> BuildEngine {
+    match cache {
+        Some(path) => BuildEngine::with_cache_dir(path.clone()),
+        None => BuildEngine::default(),
+    }
+}
+
+const STARTER: &str = "# Dimensions are millimetres. Override with --param width=100.\nwidth = param(name = 'width', default = 80)\ndepth = param(name = 'depth', default = 40)\nheight = param(name = 'height', default = 6)\nprofile = rectangle(id = 'outline', width = width, depth = depth)\npart = extrude(id = 'blank', profile = profile, height = height)\noutput(name = 'plate', feature = part)\n";
+
+fn initialize(directory: &Path) -> Result<Value, Box<dyn Error>> {
+    fs::create_dir_all(directory)?;
+    let path = directory.join("main.star");
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)?;
+    file.write_all(STARTER.as_bytes())?;
+    file.sync_all()?;
+    Ok(json!({ "created": path }))
+}
+
+// Publish a complete generation in a single directory rename/exchange. Existing
+// nonempty directories must carry our manifest, and may contain only its files.
+// A failed build leaves the previous generation available and unchanged.
+fn publish(out_dir: &Path, artifacts: &[(String, String)]) -> Result<(), Box<dyn Error>> {
+    let absolute = std::path::absolute(out_dir)?;
+    let parent = absolute
+        .parent()
+        .ok_or("output must have a parent directory")?;
+    if absolute.file_name().is_none() {
+        return Err("output cannot be a filesystem root".into());
+    }
+    fs::create_dir_all(parent)?;
+    let existing = match fs::symlink_metadata(&absolute) {
+        Ok(metadata) => {
+            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                return Err("output path must be a real directory, not a symlink or file".into());
+            }
+            let entries = fs::read_dir(&absolute)?.collect::<Result<Vec<_>, _>>()?;
+            if !entries.is_empty() {
+                let manifest_path = absolute.join("manifest.json");
+                let old: Value =
+                    serde_json::from_str(&fs::read_to_string(manifest_path).map_err(|_| {
+                        "refusing to replace a nonempty directory without a CAD build manifest"
+                    })?)?;
+                let files = old["artifact_files"].as_array().ok_or("existing directory has no owned-artifact manifest; use a dedicated empty output directory")?;
+                let owned: BTreeSet<&str> = files.iter().filter_map(Value::as_str).collect();
+                for entry in entries {
+                    if !entry.file_type()?.is_file()
+                        || !owned.contains(entry.file_name().to_string_lossy().as_ref())
+                    {
+                        return Err(format!(
+                            "output directory contains unmanaged file '{}'",
+                            entry.file_name().to_string_lossy()
+                        )
+                        .into());
+                    }
+                }
+            }
+            true
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+        Err(error) => return Err(error.into()),
+    };
+    let staging = tempfile::Builder::new()
+        .prefix(".cad-stage-")
+        .tempdir_in(parent)?;
+    for (name, content) in artifacts {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(staging.path().join(name))?;
+        file.write_all(content.as_bytes())?;
+        file.sync_all()?;
+    }
+    if existing {
+        #[cfg(target_os = "linux")]
+        rustix::fs::renameat_with(
+            rustix::fs::CWD,
+            staging.path(),
+            rustix::fs::CWD,
+            &absolute,
+            rustix::fs::RenameFlags::EXCHANGE,
+        )?;
+        #[cfg(not(target_os = "linux"))]
+        {
+            // Portable fallback: complete generations only, but readers can see
+            // a short missing-directory interval. Restore the old one on error.
+            let backup = tempfile::Builder::new()
+                .prefix(".cad-previous-")
+                .tempdir_in(parent)?;
+            fs::remove_dir(backup.path())?;
+            fs::rename(&absolute, backup.path())?;
+            if let Err(error) = fs::rename(staging.path(), &absolute) {
+                if let Err(rollback) = fs::rename(backup.path(), &absolute) {
+                    let preserved = backup.keep();
+                    return Err(format!("publication failed: {error}; rollback failed: {rollback}; previous generation preserved at {}", preserved.display()).into());
+                }
+                return Err(error.into());
+            }
+        }
+    } else {
+        fs::rename(staging.path(), &absolute)?;
+    }
+    // After exchange the temporary directory contains the previous generation.
+    // Its drop removes old artifacts, including outputs removed from the recipe.
+    Ok(())
+}
+
+fn difference(before: &Value, after: &Value) -> Value {
+    let before_outputs = before["outputs"].as_object().expect("build outputs");
+    let after_outputs = after["outputs"].as_object().expect("build outputs");
+    let names: BTreeSet<_> = before_outputs.keys().chain(after_outputs.keys()).collect();
+    let changes: serde_json::Map<String, Value> = names.into_iter().map(|name| {
+        let a = before_outputs.get(name);
+        let b = after_outputs.get(name);
+        let status = match (a,b) {
+            (None, Some(_)) => "added",
+            (Some(_), None) => "removed",
+            (Some(a), Some(b)) if a["content_hash"] == b["content_hash"] => "unchanged",
+            _ => "changed",
+        };
+        let details = |v: Option<&Value>| v.map(|v| json!({"content_hash":v["content_hash"],"volume_mm3":v["volume_mm3"],"bounds_mm":v["bounds_mm"],"topology":v["topology"]}));
+        let delta = match (a,b) {
+            (Some(a),Some(b)) => Some(b["volume_mm3"].as_f64().unwrap() - a["volume_mm3"].as_f64().unwrap()),
+            _ => None,
+        };
+        (name.clone(), json!({"status":status,"before":details(a),"after":details(b),"volume_delta_mm3":delta}))
+    }).collect();
+    json!({"outputs":changes,"comparison":"build hashes and measured properties; not a proof of geometric equivalence"})
+}
+
+fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
+    if raw["schema_version"] != 1 || raw["units"] != "mm" || raw["kind"] != "assembly" {
+        return Err("unsupported assembly artifact schema, kind or units".into());
+    }
+    if raw["bounds_kind"] != "conservative_axis_aligned"
+        || raw["volume_kind"] != "summed_instance_material_not_union"
+    {
+        return Err("assembly measurement kind metadata is inconsistent".into());
+    }
+    if raw["assembly_build_id"].as_str() != Some(cad_assembly::assembly_build_id()) {
+        return Err("assembly artifact requires its producing implementation; rebuild the recipe with this executable before validating".into());
+    }
+    let text = |value: &Value| -> Result<String, Box<dyn Error>> {
+        value
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| "missing assembly artifact string".into())
+    };
+    // Display is a derived proxy, outside exact validation. Validate its reference
+    // syntax without requiring the optional display file or trusting its content.
+    filename(&text(&raw["display_asset"])?)?;
+    let definitions = raw["definitions"]
+        .as_object()
+        .ok_or("missing assembly definitions")?;
+    let instances = raw["instances"]
+        .as_array()
+        .ok_or("missing assembly instances")?;
+    if definitions.len() > cad_build::MAX_PARTS || instances.len() > cad_build::MAX_INSTANCES {
+        return Err("assembly artifact exceeds definition or instance count limit".into());
+    }
+    // Typed placement parsing and count checks precede any referenced asset I/O.
+    let instances = serde_json::from_value(raw["instances"].clone())?;
+    let tolerance = serde_json::from_value(raw["tolerance"].clone())?;
+    let root = path.parent().unwrap_or(Path::new(".")).canonicalize()?;
+    let mut assets: BTreeMap<PathBuf, std::sync::Arc<cad_kernel::OperationResult>> =
+        BTreeMap::new();
+    let mut parts = BTreeMap::new();
+    for (name, definition) in definitions {
+        let asset = text(&definition["geometry_asset"])?;
+        filename(&asset)?;
+        let asset_path = root.join(&asset).canonicalize()?;
+        if !asset_path.starts_with(&root) {
+            return Err("assembly geometry asset escapes artifact directory".into());
+        }
+        let result = match assets.get(&asset_path) {
+            Some(result) => std::sync::Arc::clone(result),
+            None => {
+                let result = std::sync::Arc::new(serde_json::from_slice(&fs::read(&asset_path)?)?);
+                assets.insert(asset_path, std::sync::Arc::clone(&result));
+                result
+            }
+        };
+        parts.insert(
+            name.clone(),
+            cad_assembly::BuiltPart {
+                feature_id: text(&definition["feature_id"])?,
+                content_hash: text(&definition["content_hash"])?,
+                result,
+            },
+        );
+    }
+    let assembly = cad_assembly::BuiltAssembly {
+        assembly_id: text(&raw["assembly_id"])?,
+        content_hash: text(&raw["content_hash"])?,
+        parts,
+        instances,
+    };
+    assembly.validate(tolerance)?;
+    fn measured(value: &Value, expected: f64, field: &str) -> Result<(), Box<dyn Error>> {
+        if value.as_f64() != Some(expected) {
+            return Err(
+                format!("assembly metadata '{field}' does not match measured geometry").into(),
+            );
+        }
+        Ok(())
+    }
+    fn bounds(
+        value: &Value,
+        expected: Option<cad_kernel::Bounds>,
+        field: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        let actual: Option<cad_kernel::Bounds> = serde_json::from_value(value.clone())?;
+        if actual != expected {
+            return Err(
+                format!("assembly metadata '{field}' does not match measured geometry").into(),
+            );
+        }
+        Ok(())
+    }
+    measured(
+        &raw["material_volume_mm3"],
+        assembly.material_volume(),
+        "material_volume_mm3",
+    )?;
+    bounds(&raw["bounds_mm"], assembly.bounds(), "bounds_mm")?;
+    for (id, part) in &assembly.parts {
+        let definition = &definitions[id];
+        measured(
+            &definition["material_volume_mm3"],
+            part.result.model.volume(),
+            &format!("definitions.{id}.material_volume_mm3"),
+        )?;
+        let expected = (!part.result.model.solids.is_empty()).then(|| part.result.model.bounds());
+        bounds(
+            &definition["local_bounds_mm"],
+            expected,
+            &format!("definitions.{id}.local_bounds_mm"),
+        )?;
+    }
+    Ok(json!({
+        "validation": {"valid": true, "scope": "individual definitions, rigid placements and measured metadata; interference and display proxy content not checked"},
+        "instances": assembly.instance_count(), "definitions": assembly.parts.len(),
+        "material_volume_mm3": assembly.material_volume(), "bounds_mm": assembly.bounds(),
+        "bounds_kind": "conservative_axis_aligned", "volume_kind": "summed_instance_material_not_union",
+    }))
+}
+
+fn run(cli: Cli) -> Result<Value, Box<dyn Error>> {
+    run_with_source(cli, None)
+}
+
+fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Error>> {
+    let parameters = parameters(&cli.params)?;
+    if !parameters.is_empty()
+        && matches!(
+            cli.command,
+            Command::Init { .. } | Command::Validate { .. } | Command::Serve { .. }
+        )
+    {
+        return Err("parameter overrides apply only to recipe commands".into());
+    }
+    match &cli.command {
+        Command::Select {
+            recipe,
+            anchor,
+            role,
+            target,
+            count,
+            all,
+        } => {
+            let source_bytes = fs::read(recipe)?;
+            let recipe = load_source(recipe, std::str::from_utf8(&source_bytes)?, &parameters)?;
+            let build = engine(&cli.cache_dir).build(&recipe)?;
+            let selector = cad_build::FaceSelector {
+                anchor_feature: anchor.clone(),
+                role: role.clone(),
+                target_feature: target.clone(),
+                cardinality: if *all {
+                    cad_build::FaceCardinality::All
+                } else {
+                    cad_build::FaceCardinality::Exactly {
+                        count: count.map(std::num::NonZeroUsize::get).unwrap_or(1),
+                    }
+                },
+            };
+            let resolution = build.resolve_faces(&selector);
+            let resolved = matches!(resolution.status, cad_build::FaceResolutionStatus::Resolved);
+            let mut report = serde_json::to_value(&resolution)?;
+            report["stats"] = json!(build.stats);
+            report["snapshot"] = json!({
+                "recipe_source_hash": blake3::hash(&source_bytes).to_hex().to_string(),
+                "parameter_overrides": parameters,
+                "tolerance": recipe.tolerance.unwrap_or_default(),
+                "kernel_version": cad_kernel::KERNEL_VERSION,
+                "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
+                "anchor_content_hash": build.feature_hashes.get(anchor),
+                "target_content_hash": build.feature_hashes.get(target),
+            });
+            if !resolved {
+                return Err(Box::new(UnresolvedSelection(report)));
+            }
+            return Ok(report);
+        }
+        Command::Watch {
+            recipe,
+            out_dir,
+            interval_ms,
+        } => {
+            return watch::run(
+                recipe,
+                std::time::Duration::from_millis(*interval_ms),
+                |bytes| {
+                    run_with_source(
+                        Cli {
+                            command: Command::Build {
+                                recipe: recipe.clone(),
+                                out_dir: out_dir.clone(),
+                            },
+                            params: cli.params.clone(),
+                            cache_dir: cli.cache_dir.clone(),
+                        },
+                        Some(bytes),
+                    )
+                },
+            );
+        }
+        Command::Serve {
+            directory,
+            host,
+            port,
+        } => {
+            server::serve(directory, host, *port)?;
+            return Ok(json!({"status":"stopped"}));
+        }
+        Command::Init { directory } => return initialize(directory),
+        Command::Validate { model } => {
+            let raw: Value = serde_json::from_str(&fs::read_to_string(model)?)?;
+            if raw.get("kind").and_then(Value::as_str) == Some("assembly") {
+                return validate_assembly_manifest(model, &raw);
+            }
+            let snapshot: cad_kernel::ModelSnapshot =
+                serde_json::from_value(raw.get("model").cloned().unwrap_or(raw))?;
+            let validation = snapshot.validate(cad_kernel::Tolerance::default());
+            if !validation.valid {
+                return Err(Box::new(InvalidBrep(validation)));
+            }
+            return Ok(
+                json!({"validation":validation,"volume_mm3":snapshot.volume(),"bounds_mm":if snapshot.solids.is_empty() { Value::Null } else { json!(snapshot.bounds()) }}),
+            );
+        }
+        Command::Diff { before, after } => {
+            let a = load(before, &parameters)?;
+            let b = load(after, &parameters)?;
+            let mut engine = engine(&cli.cache_dir);
+            return Ok(difference(
+                &report(&a, &engine.build(&a)?),
+                &report(&b, &engine.build(&b)?),
+            ));
+        }
+        _ => {}
+    }
+    let path = match &cli.command {
+        Command::Compile { recipe }
+        | Command::Inspect { recipe }
+        | Command::Check { recipe }
+        | Command::Build { recipe, .. } => recipe,
+        _ => unreachable!(),
+    };
+    // One immutable byte snapshot feeds graph evaluation, provenance, and the
+    // viewer. In watch mode these are the bytes that triggered this rebuild.
+    let source_bytes = match source {
+        Some(bytes) => bytes.to_vec(),
+        None => fs::read(path)?,
+    };
+    let source_text = std::str::from_utf8(&source_bytes)?;
+    let recipe = load_source(path, source_text, &parameters)?;
+    if matches!(cli.command, Command::Compile { .. }) {
+        return Ok(serde_json::to_value(recipe)?);
+    }
+    let build = engine(&cli.cache_dir).build(&recipe)?;
+    let mut summary = report(&recipe, &build);
+    if let Command::Build { out_dir, .. } = &cli.command {
+        // Do not replace directories containing the source recipe or cache.
+        if out_dir.exists() {
+            let destination = out_dir.canonicalize()?;
+            if path.canonicalize()?.starts_with(&destination)
+                || cli
+                    .cache_dir
+                    .as_ref()
+                    .and_then(|p| p.canonicalize().ok())
+                    .is_some_and(|p| p.starts_with(&destination))
+            {
+                return Err("output directory cannot contain the source recipe or cache".into());
+            }
+        }
+        let mut artifacts = vec![(
+            "recipe.json".to_owned(),
+            serde_json::to_string_pretty(&recipe)?,
+        )];
+        let language = if path
+            .extension()
+            .is_some_and(|extension| extension == "star")
+        {
+            "starlark"
+        } else {
+            "json"
+        };
+        let source_artifact = if language == "starlark" {
+            "recipe.star"
+        } else {
+            "recipe.source.json"
+        };
+        let source_name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        artifacts.push((source_artifact.to_owned(), source_text.to_owned()));
+        summary["recipe_source_hash"] = json!(blake3::hash(&source_bytes).to_hex().to_string());
+        summary["recipe_source"] = json!({
+            "name": source_name,
+            "language": language,
+            "artifact": source_artifact,
+            "parameter_overrides": parameters,
+        });
+        summary["recipe_context_hash"] = json!(blake3::hash(&serde_json::to_vec(&json!({
+            "source_hash": summary["recipe_source_hash"],
+            "source": summary["recipe_source"],
+        }))?)
+        .to_hex()
+        .to_string());
+        let mut names = BTreeSet::new();
+        for (name, output) in &build.outputs {
+            filename(name)?;
+            if !names.insert(name.to_ascii_lowercase()) {
+                return Err(format!(
+                    "output name '{name}' collides on a case-insensitive filesystem"
+                )
+                .into());
+            }
+            let tolerance = recipe.tolerance.unwrap_or_default();
+            let model = &output.result.model;
+            artifacts.push((
+                format!("{name}.brep.json"),
+                serde_json::to_string_pretty(&*output.result)?,
+            ));
+            artifacts.push((
+                format!("{name}.step"),
+                cad_export::to_step(model, tolerance)?,
+            ));
+            artifacts.push((format!("{name}.stl"), cad_export::to_stl(model, tolerance)?));
+            artifacts.push((format!("{name}.preview.svg"), cad_preview::to_svg(model)?));
+            let context = cad_preview::RecipeContext {
+                language: language.to_owned(),
+                source: source_text.to_owned(),
+                source_name: source_name.clone(),
+                output_name: name.clone(),
+                feature_id: output.feature_id.clone(),
+                parameters: parameters.clone(),
+                content_hash: output.content_hash.clone(),
+                recipe_context_hash: summary["recipe_context_hash"]
+                    .as_str()
+                    .expect("computed recipe context hash")
+                    .to_owned(),
+            };
+            artifacts.push((
+                format!("{name}.preview.html"),
+                cad_preview::to_html_with_recipe(model, &context)?,
+            ));
+        }
+        let mut definition_assets = BTreeSet::new();
+        for (name, assembly) in &build.assemblies {
+            filename(name)?;
+            if !names.insert(name.to_ascii_lowercase()) {
+                return Err(format!(
+                    "output name '{name}' collides on a case-insensitive filesystem"
+                )
+                .into());
+            }
+            let mut definitions = serde_json::Map::new();
+            for (part_id, part) in &assembly.parts {
+                let asset = format!("definition-{}.brep.json", part.content_hash);
+                filename(&asset)?;
+                if definition_assets.insert(asset.clone()) {
+                    artifacts.push((asset.clone(), serde_json::to_string_pretty(&*part.result)?));
+                }
+                definitions.insert(part_id.clone(), json!({
+                    "feature_id": part.feature_id,
+                    "content_hash": part.content_hash,
+                    "geometry_asset": asset,
+                    "local_bounds_mm": if part.result.model.solids.is_empty() { Value::Null } else { json!(part.result.model.bounds()) },
+                    "material_volume_mm3": part.result.model.volume(),
+                }));
+            }
+            let manifest = json!({
+                "schema_version": 1, "kind": "assembly", "units": "mm",
+                "assembly_build_id": cad_assembly::assembly_build_id(),
+                "assembly_id": assembly.assembly_id, "content_hash": assembly.content_hash,
+                "tolerance": recipe.tolerance.unwrap_or_default(),
+                "definitions": definitions, "instances": assembly.instances,
+                "bounds_mm": assembly.bounds(), "bounds_kind": "conservative_axis_aligned",
+                "material_volume_mm3": assembly.material_volume(),
+                "volume_kind": "summed_instance_material_not_union",
+                "display_asset": format!("{name}.display.json"),
+            });
+            artifacts.push((
+                format!("{name}.assembly.json"),
+                serde_json::to_string_pretty(&manifest)?,
+            ));
+            artifacts.push((
+                format!("{name}.display.json"),
+                cad_preview::to_assembly_scene_json(assembly)?,
+            ));
+            artifacts.push((
+                format!("{name}.step"),
+                cad_export::assembly_to_step(assembly, recipe.tolerance.unwrap_or_default())?,
+            ));
+            artifacts.push((
+                format!("{name}.stl"),
+                cad_export::assembly_to_stl(assembly, recipe.tolerance.unwrap_or_default())?,
+            ));
+            artifacts.push((
+                format!("{name}.preview.svg"),
+                cad_preview::to_assembly_svg(assembly)?,
+            ));
+            let context = cad_preview::RecipeContext {
+                language: language.to_owned(),
+                source: source_text.to_owned(),
+                source_name: source_name.clone(),
+                output_name: name.clone(),
+                feature_id: assembly.assembly_id.clone(),
+                parameters: parameters.clone(),
+                content_hash: assembly.content_hash.clone(),
+                recipe_context_hash: summary["recipe_context_hash"].as_str().unwrap().to_owned(),
+            };
+            artifacts.push((
+                format!("{name}.preview.html"),
+                cad_preview::to_assembly_html(assembly, &context)?,
+            ));
+        }
+        let mut artifact_names = BTreeSet::new();
+        for (name, _) in &artifacts {
+            if !artifact_names.insert(name.to_ascii_lowercase()) {
+                return Err(format!("generated artifact filename collision: '{name}'").into());
+            }
+        }
+        let mut files: Vec<_> = artifacts.iter().map(|(name, _)| name.clone()).collect();
+        files.push("manifest.json".into());
+        summary["artifact_files"] = json!(files);
+        artifacts.push((
+            "manifest.json".into(),
+            serde_json::to_string_pretty(&summary)?,
+        ));
+        publish(out_dir, &artifacts)?;
+        summary["artifacts"] = json!(artifacts
+            .iter()
+            .map(|(name, _)| out_dir.join(name))
+            .collect::<Vec<_>>());
+    }
+    Ok(summary)
+}
+
+fn main() {
+    match run(Cli::parse()) {
+        Ok(value) => println!(
+            "{}",
+            serde_json::to_string_pretty(&value).expect("JSON value serializes")
+        ),
+        Err(error) => {
+            let mut causes = Vec::new();
+            let mut source = error.source();
+            while let Some(cause) = source {
+                causes.push(cause.to_string());
+                source = cause.source();
+            }
+            let mut report =
+                json!({ "error": error.to_string(), "code": "invalid_request", "causes": causes });
+            if let Some(selection) = error.downcast_ref::<UnresolvedSelection>() {
+                report["code"] = json!(format!(
+                    "selection_{}",
+                    selection.0["status"].as_str().unwrap_or("unresolved")
+                ));
+                report["selection"] = selection.0.clone();
+            } else if let Some(validation) = error.downcast_ref::<InvalidBrep>() {
+                report["code"] = json!("invalid_brep");
+                report["validation"] = json!(validation.0);
+            } else if let Some(build) = error.downcast_ref::<cad_build::BuildError>() {
+                report["code"] = json!("invalid_graph");
+                match build {
+                    cad_build::BuildError::Kernel { feature, .. } => {
+                        report["code"] = json!("kernel_operation_failed");
+                        report["feature"] = json!(feature);
+                    }
+                    cad_build::BuildError::Dimension { feature, parameter } => {
+                        report["feature"] = json!(feature);
+                        report["parameter"] = json!(parameter);
+                    }
+                    _ => {}
+                }
+            } else if error.is::<cad_export::ExportError>() {
+                report["code"] = json!("export_failed");
+            } else if error.is::<cad_recipe::RecipeError>() {
+                report["code"] = json!("recipe_failed");
+            } else if error.is::<std::io::Error>() {
+                report["code"] = json!("io_failed");
+            } else if error.is::<serde_json::Error>() {
+                report["code"] = json!("invalid_json");
+            }
+            eprintln!("{report}");
+            std::process::exit(1);
+        }
+    }
+}

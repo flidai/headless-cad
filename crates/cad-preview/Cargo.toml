@@ -1,0 +1,17 @@
+[package]
+license.workspace = true
+name = "cad-preview"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-assembly = { path = "../cad-assembly" }
+cad-kernel = { path = "../cad-kernel" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+cad-build = { path = "../cad-build" }
+cad-recipe = { path = "../cad-recipe" }

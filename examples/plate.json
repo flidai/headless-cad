@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "units": "mm",
+  "features": [
+    { "op": "rectangle", "id": "plate/outline", "width": 80, "depth": 40 },
+    { "op": "extrude", "id": "plate/blank", "profile": "plate/outline", "height": 6 }
+  ],
+  "outputs": [
+    { "name": "plate", "feature": "plate/blank" }
+  ]
+}

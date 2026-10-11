@@ -1,0 +1,10 @@
+[package]
+license.workspace = true
+name = "cad-export"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cad-assembly = { path = "../cad-assembly" }
+cad-kernel = { path = "../cad-kernel" }
+thiserror.workspace = true

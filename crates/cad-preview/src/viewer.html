@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Headless CAD — Model inspector</title>
+<style>
+:root{color-scheme:light;font-family:system-ui,sans-serif;color:#243a34;background:#f5f6f4}*{box-sizing:border-box}body{margin:0}header{height:72px;border-bottom:1px solid #dbe1dc;display:flex;align-items:center;padding:0 28px;gap:16px;background:#fff}header b{font-size:15px;letter-spacing:.08em}header span{color:#7d8b83;font-size:13px}.badge{margin-left:auto;border:1px solid #d4ded7;padding:6px 10px;border-radius:16px;font-size:11px;letter-spacing:.07em}main{display:grid;grid-template-columns:minmax(0,1fr) 290px;height:calc(100dvh - 72px)}.viewport{position:relative;min-height:350px;overflow:hidden}canvas{width:100%;height:100%;display:block;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}.toolbar{position:absolute;top:20px;left:24px;display:flex;gap:5px;flex-wrap:wrap;right:20px}button{border:1px solid #d7dfd8;background:#fff;color:#35554a;padding:8px 12px;border-radius:6px;font:inherit;font-size:12px;cursor:pointer;box-shadow:0 2px 4px #1231}button:hover,button[aria-pressed=true]{background:#e0ebe4;border-color:#8cac97}button:focus-visible{outline:3px solid #328469;outline-offset:2px}.hint{position:absolute;bottom:20px;left:24px;font-size:12px;color:#73847a;pointer-events:none}aside{min-width:0;padding:28px 24px;background:#fff;border-left:1px solid #dbe1dc;overflow:auto}h1{font-size:22px;letter-spacing:-.04em;font-weight:550;margin:0 0 6px}.muted{font-size:12px;color:#79867d;line-height:1.6}.section{margin-top:30px}h2{text-transform:uppercase;font-size:10px;letter-spacing:.12em;color:#7d8b83;margin:0 0 12px}dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:12px;font-size:12px}dt{color:#708076}dd{margin:0;font-family:ui-monospace,monospace;font-size:12px}#selection{border:1px dashed #d5e0d7;border-radius:8px;padding:16px;font-size:12px;line-height:1.8;color:#607469}footer{margin-top:28px;font-size:11px;color:#8b958f;line-height:1.6}@media(max-width:700px){main{grid-template-columns:1fr;height:auto}.viewport{height:65dvh}aside{border-left:0;border-top:1px solid #dbe1dc}.badge{display:none}header{padding:0 18px}.toolbar{left:12px}}
+main.recipe-open{grid-template-columns:minmax(0,1fr) minmax(340px,440px)}#recipe-panel[hidden]{display:none}#recipe-source{max-width:100%;margin:14px 0 0;padding:14px;background:#f5f7f4;border:1px solid #dce4dc;border-radius:6px;overflow:auto;max-height:45dvh;white-space:pre;font:12px/1.65 ui-monospace,monospace;tab-size:4}#recipe-summary{overflow-wrap:anywhere}#recipe-parameters{margin-top:14px}#recipe-parameters dd{overflow-wrap:anywhere}#recipe-heading{margin-bottom:8px}@media(max-width:700px){main.recipe-open{grid-template-columns:1fr}#recipe-source{max-height:55dvh}}
+</style>
+<header><b>HEADLESS CAD</b><span>/ model inspector</span><span class="badge">LOCAL ARTIFACT</span></header>
+<main><div class="viewport"><canvas id="view" tabindex="0" aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, click a face to inspect. Use view buttons for keyboard access."></canvas><div class="toolbar"><button data-view="iso">Isometric</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Right</button><button id="fit">Fit</button><button id="edges" aria-pressed="true">Edges</button><button id="recipe-toggle" aria-expanded="false" aria-controls="recipe-panel">Recipe</button></div><div class="hint">Drag to orbit · Scroll to zoom · Click to inspect a face</div></div><aside><h1>Model overview</h1><div class="muted">Boundary representation<br>All dimensions in millimetres</div><section id="recipe-panel" class="section" aria-labelledby="recipe-heading" hidden><h2 id="recipe-heading">Recipe source</h2><div id="recipe-summary" class="muted"></div><dl id="recipe-parameters"></dl><pre id="recipe-source" tabindex="0" aria-label="Read-only recipe source"></pre></section><div id="occurrences-section" class="section" hidden><h2>Assembly occurrences</h2><select id="occurrence-select" aria-label="Select assembly occurrence" style="width:100%;padding:8px;border:1px solid #d7dfd8;border-radius:6px;background:white"></select><p class="muted">Material volume sums occurrences, including overlaps. Bounds conservatively enclose transformed local bounds. Software display expands shared meshes only while drawing.</p></div><div class="section"><h2>Geometry</h2><dl id="geometry"></dl></div><div class="section"><h2>Dimensions</h2><dl id="dimensions"></dl></div><div class="section"><h2>Face inspector</h2><div id="selection" aria-live="polite">Select a face in the viewport.</div></div><footer>This preview is generated from the model's face boundaries. Use the build manifest for validation results and STEP for CAD interchange.</footer></aside></main>
+<script>
+'use strict';
+let scene = /*SCENE_DATA*/null;
+let recipeContext = /*RECIPE_DATA*/null;
+function validBody(body){
+ const vector=value=>Array.isArray(value)&&value.length===3&&value.every(Number.isFinite);
+ return body&&Array.isArray(body.faces)&&body.faces.length<=50000&&Array.isArray(body.crease_edges)&&body.crease_edges.every(Number.isInteger)
+ &&['vertices','edges','solids'].every(key=>Number.isInteger(body[key])&&body[key]>=0)
+ &&(body.volume===null||Number.isFinite(body.volume))
+ &&(body.bounds===null||(Array.isArray(body.bounds)&&body.bounds.length===2&&body.bounds.every(vector)))
+ &&body.faces.every(face=>Number.isInteger(face.id)&&vector(face.normal)&&Array.isArray(face.points)&&face.points.length>=3&&face.points.every(vector)&&Array.isArray(face.edges)&&face.edges.length===face.points.length&&face.edges.every(Number.isInteger));
+}
+function normalizeScene(raw){
+ if(raw?.kind!=='assembly'){if(!validBody(raw))throw Error('Incomplete scene');return raw}
+ if(raw.schema_version!==1||!raw.meshes||!raw.definitions||!Array.isArray(raw.instances)||raw.instances.length>10000||!Number.isFinite(raw.material_volume))throw Error('Incomplete assembly scene');
+ for(const mesh of Object.values(raw.meshes))if(!validBody(mesh))throw Error('Incomplete local mesh');
+ const faces=[],crease_edges=[];let vertices=0,edges=0,solids=0,points=0;
+ const rotate=(p,q)=>{const [x,y,z,w]=q,[a,b,c]=p,tx=2*(y*c-z*b),ty=2*(z*a-x*c),tz=2*(x*b-y*a);return[a+w*tx+y*tz-z*ty,b+w*ty+z*tx-x*tz,c+w*tz+x*ty-y*tx]};
+ const ids=new Set();
+ for(const instance of raw.instances){
+  if(typeof instance.id!=='string'||typeof instance.part!=='string'||ids.has(instance.id)||!Object.hasOwn(raw.definitions,instance.part))throw Error('Invalid occurrence');ids.add(instance.id);
+  const definition=raw.definitions[instance.part],mesh=raw.meshes[definition.mesh],transform=instance.transform,q=transform?.rotation,t=transform?.translation;
+  if(!mesh||typeof definition.feature_id!=='string'||!Array.isArray(q)||q.length!==4||!q.every(Number.isFinite)||Math.abs(Math.hypot(...q)-1)>1e-8||!Array.isArray(t)||t.length!==3||!t.every(Number.isFinite))throw Error('Invalid occurrence transform');
+  for(const face of mesh.faces){
+   points+=face.points.length;if(faces.length>=50000||points>200000)throw Error('Software display limit exceeded');
+   const transformed=face.points.map(p=>rotate(p,q).map((v,i)=>v+t[i])),normal=rotate(face.normal,q);
+   if(!transformed.every(p=>p.every(Number.isFinite))||!normal.every(Number.isFinite))throw Error('Display coordinate overflow');
+   faces.push({id:faces.length,local_face_id:face.id,instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id,points:transformed,normal,edges:face.edges.map(id=>id+edges)});
+  }
+  crease_edges.push(...mesh.crease_edges.map(id=>id+edges));vertices+=mesh.vertices;edges+=mesh.edges;solids+=mesh.solids;
+ }
+ const result={faces,crease_edges,vertices,edges,solids,bounds:raw.bounds,volume:raw.material_volume,is_assembly:true,instances:raw.instances,definitions:raw.definitions,unique_meshes:Object.keys(raw.meshes).length};
+ if(!validBody(result))throw Error('Invalid expanded assembly');return result;
+}
+let compactScene=scene;
+scene=normalizeScene(compactScene);
+let selectedInstance=null,selectionContext=null;
+let creaseEdges = new Set(scene.crease_edges);
+const canvas=document.getElementById('view'),ctx=canvas.getContext('2d');
+const fmt=n=>Number.isFinite(n)?n.toLocaleString(undefined,{maximumFractionDigits:5}):'—';
+const rows=(id,items)=>{const dl=document.getElementById(id);for(const [name,value] of items){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;dl.append(dt,dd)}};
+let bounds,size,center;
+function overview(){
+ document.getElementById('geometry').replaceChildren();document.getElementById('dimensions').replaceChildren();
+ rows('geometry',[...(scene.is_assembly?[['Occurrences',scene.instances.length],['Definitions',Object.keys(scene.definitions).length],['Unique meshes',scene.unique_meshes]]:[]),['Solids',scene.solids],['Faces',scene.faces.length],['Edges',scene.edges],['Vertices',scene.vertices],[scene.is_assembly?'Material volume (sum)':'Volume',fmt(scene.volume)+' mm³']]);
+ const section=document.getElementById('occurrences-section'),select=document.getElementById('occurrence-select');section.hidden=!scene.is_assembly;select.replaceChildren();
+ if(scene.is_assembly){const all=document.createElement('option');all.value='';all.textContent='All occurrences';select.append(all);for(const instance of scene.instances){const option=document.createElement('option');option.value=instance.id;option.textContent=instance.id+' · '+instance.part;select.append(option)}select.value=selectedInstance||'';}
+ bounds=scene.bounds||[[0,0,0],[0,0,0]];size=bounds[1].map((n,i)=>n-bounds[0][i]);center=bounds[0].map((n,i)=>n/2+bounds[1][i]/2);
+ rows('dimensions',[['Width / X',fmt(size[0])],['Depth / Y',fmt(size[1])],['Height / Z',fmt(size[2])]]);
+}
+function recipeOverview(){
+ const context=recipeContext,summary=document.getElementById('recipe-summary'),source=document.getElementById('recipe-source'),parameters=document.getElementById('recipe-parameters');
+ parameters.replaceChildren();
+ document.querySelector('h1').textContent=context?context.output_name:'Model overview';
+ if(!context){summary.textContent='Recipe source was not included in this artifact.';source.textContent='';return}
+ summary.textContent=`${context.source_name} · ${context.language === 'starlark' ? 'Starlark' : 'JSON'}\nOutput: ${context.output_name} · Feature: ${selectionContext?.feature_id||context.feature_id}${selectionContext?`\nOccurrence: ${selectionContext.instance_id} · Definition: ${selectionContext.part_id}`:''}\nFull shared recipe for this build. Parameter overrides are shown below; the source is unchanged.`;
+ summary.style.whiteSpace='pre-line';source.textContent=context.source;
+ const entries=Object.entries(context.parameters);
+ rows('recipe-parameters',entries.length?entries.map(([name,value])=>[name,String(value)]):[['Parameter overrides','None']]);
+}
+document.getElementById('recipe-toggle').addEventListener('click',event=>{
+ const panel=document.getElementById('recipe-panel'),open=panel.hidden;panel.hidden=!open;event.currentTarget.setAttribute('aria-expanded',String(open));document.querySelector('main').classList.toggle('recipe-open',open);
+});
+overview();recipeOverview();
+let yaw=-.75,pitch=.6,zoom=1,drawEdges=true,selected=-1,width=0,height=0;
+let faceBuffer=new Int32Array(0),bufferWidth=0,bufferHeight=0,renderRatio=1;
+const surface=document.createElement('canvas'),surfaceContext=surface.getContext('2d');
+const dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),sub=(a,b)=>a.map((v,i)=>v-b[i]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+function draw(){
+ const dpr=window.devicePixelRatio||1,r=canvas.getBoundingClientRect();width=r.width;height=r.height;canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
+ const right=[-Math.sin(yaw),Math.cos(yaw),0],up=[-Math.cos(yaw)*Math.sin(pitch),-Math.sin(yaw)*Math.sin(pitch),Math.cos(pitch)],eye=[Math.cos(yaw)*Math.cos(pitch),Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch)];
+ const project=p=>{p=sub(p,center);return [dot(p,right),-dot(p,up),dot(p,eye)]};
+ let extent=[0,0];for(const face of scene.faces)for(const p of face.points){const q=project(p);extent[0]=Math.max(extent[0],Math.abs(q[0]));extent[1]=Math.max(extent[1],Math.abs(q[1]))}
+ const scale=zoom*Math.min(Math.max(1,width-80)/(2*extent[0]||1),Math.max(1,height-150)/(2*extent[1]||1));
+ const screen=q=>[width/2+q[0]*scale,height/2+20+q[1]*scale];
+ ctx.strokeStyle='#e4e9e3';ctx.lineWidth=1;for(let x=20;x<width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke()}for(let y=20;y<height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke()}
+ // A pixel depth buffer handles crossing projected depth ranges and disconnected
+ // components; sorting whole faces by their centroids cannot guarantee occlusion.
+ renderRatio=Math.min(dpr,Math.sqrt(1500000/Math.max(1,width*height)));
+ bufferWidth=Math.max(1,Math.round(width*renderRatio));bufferHeight=Math.max(1,Math.round(height*renderRatio));
+ surface.width=bufferWidth;surface.height=bufferHeight;
+ const image=surfaceContext.createImageData(bufferWidth,bufferHeight),pixels=image.data;
+ const depth=new Float64Array(bufferWidth*bufferHeight);depth.fill(-Infinity);
+ faceBuffer=new Int32Array(depth.length);faceBuffer.fill(-1);
+ const visible=scene.faces.filter(f=>dot(f.normal,eye)>1e-10).map(f=>({f,points:f.points.map(p=>{const q=project(p),s=screen(q);return [s[0]*renderRatio,s[1]*renderRatio,q[2]]})}));
+ const orient=(a,b,x,y)=>(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]);
+ function triangle(a,b,c,id,color){
+  let area=orient(a,b,c[0],c[1]);if(!Number.isFinite(area)||Math.abs(area)<1e-12)return;
+  if(area<0){[b,c]=[c,b];area=-area}
+  const x0=Math.max(0,Math.floor(Math.min(a[0],b[0],c[0]))),x1=Math.min(bufferWidth-1,Math.ceil(Math.max(a[0],b[0],c[0])));
+  const y0=Math.max(0,Math.floor(Math.min(a[1],b[1],c[1]))),y1=Math.min(bufferHeight-1,Math.ceil(Math.max(a[1],b[1],c[1])));
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+   const u=orient(b,c,x+.5,y+.5)/area,v=orient(c,a,x+.5,y+.5)/area,w=1-u-v;
+   if(u < -1e-10||v < -1e-10||w < -1e-10)continue;
+   const z=u*a[2]+v*b[2]+w*c[2],at=y*bufferWidth+x;if(z<=depth[at])continue;
+   depth[at]=z;faceBuffer[at]=id;const pixel=at*4;pixels[pixel]=color[0];pixels[pixel+1]=color[1];pixels[pixel+2]=color[2];pixels[pixel+3]=255;
+  }
+ }
+ for(const {f,points} of visible){
+  const shade=Math.round(175+55*Math.max(-1,Math.min(1,dot(f.normal,[.3,-.5,.8]))));
+  const color=f.id===selected||f.instance_id===selectedInstance?[143,206,184]:[shade-18,shade,shade-5];
+  for(let i=1;i+1<points.length;i++)triangle(points[0],points[i],points[i+1],f.id,color);
+ }
+ function edge(a,b,faceId,highlight){
+  const span=Math.max(Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1])),steps=Math.max(1,Math.ceil(span));
+  // Limit sampling to the viewport, even when the user zooms far into a model.
+  let start=0,end=1;
+  for(let axis=0;axis<2;axis++){
+   const delta=b[axis]-a[axis],limit=axis===0?bufferWidth:bufferHeight;
+   if(delta===0){if(a[axis]<-2||a[axis]>limit+2)return}else{
+    const lo=(-2-a[axis])/delta,hi=(limit+2-a[axis])/delta;start=Math.max(start,Math.min(lo,hi));end=Math.min(end,Math.max(lo,hi));
+   }
+  }
+  if(start>end)return;
+  const radius=highlight?Math.max(1,Math.round(renderRatio*.6)):0,color=highlight?[8,104,70]:[80,109,97];
+  for(let step=Math.max(0,Math.floor(start*steps));step<=Math.min(steps,Math.ceil(end*steps));step++){
+   const t=step/steps,x=Math.floor(a[0]+(b[0]-a[0])*t),y=Math.floor(a[1]+(b[1]-a[1])*t);
+   for(let dy=-radius;dy<=radius;dy++)for(let dx=-radius;dx<=radius;dx++){
+    const px=x+dx,py=y+dy;if(px<0||py<0||px>=bufferWidth||py>=bufferHeight)continue;
+    const at=py*bufferWidth+px;
+    // Stroke only pixels actually owned by this visible face. This cannot leak
+    // an occluded back edge through a nearer face or change selection ownership.
+    if(faceBuffer[at]!==faceId)continue;
+    const pixel=at*4;pixels[pixel]=color[0];pixels[pixel+1]=color[1];pixels[pixel+2]=color[2];
+   }
+  }
+ }
+ for(const {f,points} of visible)for(let i=0;i<points.length;i++)if(f.id===selected||(drawEdges&&creaseEdges.has(f.edges[i])))edge(points[i],points[(i+1)%points.length],f.id,f.id===selected);
+ surfaceContext.putImageData(image,0,0);ctx.drawImage(surface,0,0,width,height);
+ if(!scene.faces.length){ctx.fillStyle='#728379';ctx.textAlign='center';ctx.font='16px system-ui';ctx.fillText('Empty result',width/2,height/2)}
+ const origin=[width-65,height-65];for(const [axis,color,label] of [[[1,0,0],'#bc625a','X'],[[0,1,0],'#548e6b','Y'],[[0,0,1],'#587eaa','Z']]){const p=[dot(axis,right)*30,-dot(axis,up)*30];ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(...origin);ctx.lineTo(origin[0]+p[0],origin[1]+p[1]);ctx.stroke();ctx.font='11px ui-monospace';ctx.textAlign='center';ctx.fillText(label,origin[0]+p[0]*1.3,origin[1]+p[1]*1.3+4)}
+}
+function select(x,y){
+ const px=Math.floor(x*renderRatio),py=Math.floor(y*renderRatio);
+ selected=px>=0&&py>=0&&px<bufferWidth&&py<bufferHeight?faceBuffer[py*bufferWidth+px]:-1;
+ const element=document.getElementById('selection'),face=scene.faces.find(f=>f.id===selected);
+ if(face){selectedInstance=face.instance_id||null;selectionContext=face.instance_id?face:null;let area=0;for(let i=1;i+1<face.points.length;i++){const c=cross(sub(face.points[i],face.points[0]),sub(face.points[i+1],face.points[0]));area+=Math.hypot(...c)/2}element.textContent=`Face ${face.local_face_id??face.id} · ${face.points.length} edges${face.instance_id?`\nOccurrence: ${face.instance_id}\nDefinition: ${face.part_id}\nFeature: ${face.feature_id}`:''}\nArea: ${fmt(area)} mm²\nNormal: [${face.normal.map(fmt).join(', ')}]`;element.style.whiteSpace='pre-line'}else{selectedInstance=null;selectionContext=null;element.textContent='Select a face in the viewport.'}document.getElementById('occurrence-select').value=selectedInstance||'';recipeOverview();draw();
+}
+document.getElementById('occurrence-select').addEventListener('change',event=>{selected=-1;selectedInstance=event.target.value||null;const instance=scene.instances?.find(item=>item.id===selectedInstance);selectionContext=instance?{instance_id:instance.id,part_id:instance.part,feature_id:scene.definitions[instance.part].feature_id}:null;document.getElementById('selection').textContent=instance?`Occurrence: ${instance.id}\nDefinition: ${instance.part}\nSelect a face for local topology details.`:'Select a face in the viewport.';recipeOverview();draw()});
+let drag=null;canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY};canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-drag.lastX)*.008;pitch=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch+(e.clientY-drag.lastY)*.008));drag.lastX=e.clientX;drag.lastY=e.clientY;draw()});canvas.addEventListener('pointerup',e=>{if(drag&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<4){const r=canvas.getBoundingClientRect();select(e.clientX-r.left,e.clientY-r.top)}drag=null});canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.1,Math.min(15,zoom*Math.exp(-e.deltaY*.001)));draw()},{passive:false});
+document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{[yaw,pitch]=({iso:[-.75,.6],top:[-Math.PI/2,Math.PI/2],front:[-Math.PI/2,0],right:[0,0]})[button.dataset.view];zoom=1;draw()}));document.getElementById('fit').onclick=()=>{zoom=1;draw()};document.getElementById('edges').onclick=e=>{drawEdges=!drawEdges;e.currentTarget.setAttribute('aria-pressed',String(drawEdges));draw()};canvas.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='f'){zoom=1;draw()}if(e.key.toLowerCase()==='e')document.getElementById('edges').click()});new ResizeObserver(draw).observe(canvas);draw();
+// Only HTTP(S) artifacts participate in live refresh; local files make no requests.
+// Fetch and validate replacements before switching scenes, preserving the camera
+// and last good geometry throughout failed or interrupted builds.
+if(location.protocol==='http:'||location.protocol==='https:'){
+ const manifestURL=new URL('manifest.json',location.href),previewURL=new URL(location.href);
+ const outputName=decodeURIComponent(previewURL.pathname.split('/').pop()).replace(/\.preview\.html$/, '');
+ const badge=document.querySelector('.badge');let baseline=null,stopped=false;
+ async function fetchText(url){
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),4000);
+  try{const response=await fetch(url,{cache:'no-store',credentials:'same-origin',signal:controller.signal});if(!response.ok)throw Error('Artifact unavailable');return await response.text()}finally{clearTimeout(timeout)}
+ }
+ function token(manifest){
+  if(!manifest||typeof manifest.outputs!=='object'||manifest.outputs===null||Array.isArray(manifest.outputs))throw Error('Incomplete manifest');
+  const entries=Object.entries(manifest.outputs);if(entries.some(([,output])=>typeof output?.content_hash!=='string'||!output.content_hash))throw Error('Incomplete output');
+  if(previewURL.pathname.endsWith('.preview.html')){const output=manifest.outputs[outputName];if(!output)throw Error('Output unavailable');return JSON.stringify([output.content_hash,manifest.recipe_context_hash??manifest.recipe_source_hash??null,manifest.recipe_source?.parameter_overrides??null])}
+  return JSON.stringify([entries.map(([name,output])=>[name,output.content_hash]).sort(([a],[b])=>a.localeCompare(b)),manifest.recipe_context_hash??manifest.recipe_source_hash??null,manifest.recipe_source?.parameter_overrides??null]);
+ }
+ function replacement(html){
+  const embedded=html.match(/\b(?:const|let) scene = (\{[^\r\n]*\});/);if(!embedded)throw Error('Incomplete preview');
+  const raw=JSON.parse(embedded[1]),next=normalizeScene(raw);
+  const contextData=html.match(/\b(?:const|let) recipeContext = (\{[^\r\n]*\}|null);/);if(!contextData)throw Error('Incomplete recipe context');
+  const context=JSON.parse(contextData[1]);
+  if(context!==null&&(!context||!['language','source','source_name','output_name','feature_id','content_hash','recipe_context_hash'].every(key=>typeof context[key]==='string')
+   ||!['starlark','json'].includes(context.language)||!context.parameters||typeof context.parameters!=='object'||Array.isArray(context.parameters)||!Object.values(context.parameters).every(Number.isFinite)))throw Error('Incomplete recipe context');
+  return {scene:next,compact:raw,context};
+ }
+ async function poll(){
+  if(stopped)return;
+  try{
+   const manifest=JSON.parse(await fetchText(manifestURL)),current=token(manifest);
+   if(current!==baseline){
+    const next=replacement(await fetchText(previewURL));
+    // Two equal manifest reads alone cannot detect A→B→A rebuild sequences.
+    // Bind the fetched HTML to its own immutable output/source generation.
+    if(recipeContext!==null||manifest.recipe_context_hash!=null){
+     const context=next.context,expected=manifest.outputs[outputName];
+     if(!context||!expected||context.output_name!==outputName||context.content_hash!==expected.content_hash||context.recipe_context_hash!==manifest.recipe_context_hash)throw Error('Preview generation does not match manifest');
+    }
+    const confirmed=token(JSON.parse(await fetchText(manifestURL)));
+    if(current===confirmed){const sameGeometry=JSON.stringify(compactScene)===JSON.stringify(next.compact);compactScene=next.compact;scene=next.scene;recipeContext=next.context;creaseEdges=new Set(scene.crease_edges);if(!sameGeometry){selected=-1;selectedInstance=null;selectionContext=null;document.getElementById('selection').textContent='Select a face in the viewport.'}recipeOverview();overview();draw();baseline=current}
+   }
+   badge.textContent='LIVE PREVIEW';
+  }catch{badge.textContent='RECONNECTING'}
+  finally{if(!stopped)setTimeout(poll,1000)}
+ }
+ window.addEventListener('pagehide',()=>{stopped=true});poll();
+}
+
+</script>
+</html>

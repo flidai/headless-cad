@@ -1,0 +1,13 @@
+[package]
+license.workspace = true
+name = "cad-recipe"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+cad-build = { path = "../cad-build" }
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow = "1"
+starlark = "0.14.2"
