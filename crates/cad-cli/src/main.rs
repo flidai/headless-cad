@@ -60,6 +60,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Integrate volume, centroid and central inertia from exact output geometry.
+    Properties {
+        recipe: PathBuf,
+        #[arg(long)]
+        output: String,
+        /// Optional uniform body density; assemblies use each part's material.
+        #[arg(long)]
+        density_kg_per_m3: Option<f64>,
+    },
     /// Report component quantities, materials, and mass for an assembly output.
     Bom {
         recipe: PathBuf,
@@ -552,6 +561,113 @@ fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn
     }))
 }
 
+// Convert an integrated mm³/mm⁵ quantity to kg/kg·mm². Reorder factors
+// to avoid avoidable intermediate overflow; reject nonzero values rounded away.
+fn density_scaled(value: f64, density: f64) -> Result<f64, Box<dyn Error>> {
+    if value == 0.0 {
+        return Ok(0.0);
+    }
+    for result in [
+        (value * density) * 1e-9,
+        (value * 1e-9) * density,
+        value * (density * 1e-9),
+    ] {
+        if result.is_normal() {
+            return Ok(result);
+        }
+    }
+    Err("mass properties exceed normal floating-point range".into())
+}
+
+fn properties_report(
+    recipe: &Recipe,
+    build: &BuildResult,
+    output: &str,
+    density: Option<f64>,
+    source: &[u8],
+    parameters: &BTreeMap<String, f64>,
+) -> Result<Value, Box<dyn Error>> {
+    let tolerance = recipe.tolerance.unwrap_or_default();
+    let (mut report, kind, feature_id, content_hash) = if let Some(body) = build.outputs.get(output)
+    {
+        let properties = body.result.model.mass_properties(tolerance)?;
+        let mass = density
+            .map(|density| density_scaled(properties.volume, density))
+            .transpose()?;
+        let mass_inertia = match (density, properties.central_inertia) {
+            (Some(density), Some(tensor)) => {
+                let mut result = [[0.; 3]; 3];
+                for i in 0..3 {
+                    for j in 0..3 {
+                        result[i][j] = density_scaled(tensor[i][j], density)?;
+                    }
+                }
+                Some(result)
+            }
+            _ => None,
+        };
+        (
+            json!({
+                "volume": properties.volume,
+                "volume_centroid": properties.centroid,
+                "central_volume_inertia": properties.central_inertia,
+                "density_kg_per_m3": density,
+                "mass_kg": mass,
+                "center_of_mass": if density.is_some() { properties.centroid } else { None },
+                "central_mass_inertia": mass_inertia,
+                "mass_status": if density.is_some() { "complete" } else { "density_unspecified" },
+                "volume_kind": "integrated_solid_material",
+            }),
+            "body",
+            body.feature_id.as_str(),
+            body.content_hash.as_str(),
+        )
+    } else if let Some(assembly) = build.assemblies.get(output) {
+        if density.is_some() {
+            return Err(
+                "assembly density override is unsupported; set material density on each part"
+                    .into(),
+            );
+        }
+        let properties = assembly.mass_properties(tolerance)?;
+        let mut report = serde_json::to_value(&properties)?;
+        report["mass_status"] = json!(if properties.missing_density_occurrences == 0 {
+            "complete"
+        } else {
+            "missing_part_density"
+        });
+        report["volume_kind"] = json!("summed_occurrence_material_not_union");
+        (
+            report,
+            "assembly",
+            assembly.assembly_id.as_str(),
+            assembly.content_hash.as_str(),
+        )
+    } else {
+        return Err(format!("unknown recipe output '{output}'").into());
+    };
+    report["schema_version"] = json!(1);
+    report["kind"] = json!(kind);
+    report["output_name"] = json!(output);
+    report["coordinate_frame"] = json!(if kind == "assembly" {
+        "root_assembly_frame"
+    } else {
+        "output_model_frame"
+    });
+    report["units"] = json!({"volume":"mm3", "volume_centroid":"mm", "central_volume_inertia":"mm5", "mass_kg":"kg", "center_of_mass":"mm", "central_mass_inertia":"kg*mm2", "density_kg_per_m3":"kg/m3"});
+    report["inertia_convention"] = json!("central symmetric tensor: integral ((r dot r) identity - r outer r); off-diagonals are negative product moments; r measured from the corresponding centroid");
+    report["snapshot"] = json!({
+        "recipe_source_hash": blake3::hash(source).to_hex().to_string(),
+        "parameter_overrides": parameters, "tolerance": tolerance,
+        "feature_id": feature_id, "content_hash": content_hash,
+        "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
+        "executor_build_id": cad_build::executor_build_id(),
+        "assembly_build_id": if kind == "assembly" { Some(cad_assembly::assembly_build_id()) } else { None },
+    });
+    report["stats"] = json!(build.stats);
+    Ok(report)
+}
+
 fn run(cli: Cli) -> Result<Value, Box<dyn Error>> {
     run_with_source(cli, None)
 }
@@ -687,7 +803,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         Command::Compile { recipe }
         | Command::Inspect { recipe }
         | Command::Check { recipe }
-        | Command::Build { recipe, .. } => recipe,
+        | Command::Build { recipe, .. }
+        | Command::Properties { recipe, .. } => recipe,
         _ => unreachable!(),
     };
     // One immutable byte snapshot feeds graph evaluation, provenance, and the
@@ -701,7 +818,31 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
     if matches!(cli.command, Command::Compile { .. }) {
         return Ok(serde_json::to_value(recipe)?);
     }
+    if let Command::Properties {
+        density_kg_per_m3: Some(density),
+        ..
+    } = &cli.command
+    {
+        if !density.is_finite() || *density <= 0.0 {
+            return Err("density must be finite and positive in kg/m³".into());
+        }
+    }
     let build = engine(&cli.cache_dir).build(&recipe)?;
+    if let Command::Properties {
+        output,
+        density_kg_per_m3,
+        ..
+    } = &cli.command
+    {
+        return properties_report(
+            &recipe,
+            &build,
+            output,
+            *density_kg_per_m3,
+            &source_bytes,
+            &parameters,
+        );
+    }
     let mut summary = report(&recipe, &build)?;
     if let Command::Build {
         out_dir,

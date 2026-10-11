@@ -6,6 +6,8 @@
 //! modeling domain. Nested reusable definitions retain local placements and explicit
 //! occurrence paths. Assembly constraints are not implemented.
 mod bom;
+mod mass_properties;
+pub use mass_properties::AssemblyMassProperties;
 mod datum;
 pub use datum::{
     resolve_definition_instances, validate_attachment_definitions, validate_datums, DatumAttachment,
@@ -32,6 +34,7 @@ pub fn assembly_build_id() -> &'static str {
         hash.update(include_bytes!("lib.rs"));
         hash.update(include_bytes!("hierarchy.rs"));
         hash.update(include_bytes!("bom.rs"));
+        hash.update(include_bytes!("mass_properties.rs"));
         hash.update(include_bytes!("datum.rs"));
         hash.update(include_bytes!("../Cargo.toml"));
         hash.update(include_bytes!("../../../Cargo.lock"));

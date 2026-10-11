@@ -1551,3 +1551,173 @@ fn streamed_outputs_deduplicate_payloads_but_each_lists_shared_dependencies() {
         );
     }
 }
+
+fn near(value: &serde_json::Value, expected: f64) {
+    let actual = value.as_f64().unwrap();
+    assert!(
+        (actual - expected).abs() <= 1e-11 * expected.abs().max(1.),
+        "{actual} != {expected}"
+    );
+}
+
+#[test]
+fn body_properties_are_analytic_parameterized_and_read_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("box.star");
+    let source="w=param(name='width',default=2)\np=rectangle(id='p',width=w,depth=3)\nb=extrude(id='b',profile=p,height=4)\noutput(name='box',feature=b)\n";
+    fs::write(&recipe, source).unwrap();
+    let result = cli(&[
+        "properties",
+        recipe.to_str().unwrap(),
+        "--output",
+        "box",
+        "--density-kg-per-m3",
+        "8000",
+    ]);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    assert_eq!(report["kind"], "body");
+    assert_eq!(report["coordinate_frame"], "output_model_frame");
+    assert_eq!(report["units"]["central_volume_inertia"], "mm5");
+    assert_eq!(report["units"]["central_mass_inertia"], "kg*mm2");
+    near(&report["volume"], 24.);
+    assert_eq!(report["volume_centroid"], serde_json::json!([1., 1.5, 2.]));
+    for (axis, expected) in [50., 40., 26.].into_iter().enumerate() {
+        near(&report["central_volume_inertia"][axis][axis], expected);
+        near(&report["central_mass_inertia"][axis][axis], expected * 8e-6);
+    }
+    near(&report["mass_kg"], 0.000192);
+    let changed = cli(&[
+        "properties",
+        recipe.to_str().unwrap(),
+        "--output",
+        "box",
+        "--param",
+        "width=4",
+    ]);
+    assert!(changed.status.success());
+    let changed: serde_json::Value = serde_json::from_slice(&changed.stdout).unwrap();
+    near(&changed["volume"], 48.);
+    assert_eq!(changed["volume_centroid"], serde_json::json!([2., 1.5, 2.]));
+    assert!(
+        changed["mass_kg"].is_null()
+            && changed["center_of_mass"].is_null()
+            && changed["central_mass_inertia"].is_null()
+    );
+    assert_ne!(
+        changed["snapshot"]["content_hash"],
+        report["snapshot"]["content_hash"]
+    );
+    assert_eq!(
+        changed["snapshot"]["recipe_source_hash"],
+        report["snapshot"]["recipe_source_hash"]
+    );
+    assert_eq!(changed["snapshot"]["parameter_overrides"]["width"], 4.);
+    assert_eq!(fs::read_to_string(&recipe).unwrap(), source);
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+    for density in ["0", "-1", "NaN", "inf", "1e-320"] {
+        let failed = cli(&[
+            "properties",
+            recipe.to_str().unwrap(),
+            "--output",
+            "box",
+            &format!("--density-kg-per-m3={density}"),
+        ]);
+        assert!(
+            !failed.status.success(),
+            "density {density} unexpectedly accepted"
+        );
+        let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+        assert_eq!(error["code"], "invalid_request");
+    }
+    assert!(
+        !cli(&["properties", recipe.to_str().unwrap(), "--output", "absent"])
+            .status
+            .success()
+    );
+}
+
+#[test]
+fn assembly_properties_distinguish_volume_and_density_weighted_centers() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("mixed.star");
+    let source="p=rectangle(id='p',width=2,depth=2)\nb=extrude(id='b',profile=p,height=2)\na=part(id='a',body=b,material='A',density_kg_per_m3=1000)\nc=part(id='c',body=b,material='C',density_kg_per_m3=2000)\ni=instance(id='i',part=a)\nj=instance(id='j',part=c,offset=[10,0,0])\nr=assembly(id='r',instances=[i,j])\nassembly_output(name='mixed',assembly=r)\n";
+    fs::write(&recipe, source).unwrap();
+    let query = || cli(&["properties", recipe.to_str().unwrap(), "--output", "mixed"]);
+    let result = query();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    near(&report["volume"], 16.);
+    assert_eq!(report["volume_centroid"], serde_json::json!([6., 1., 1.]));
+    near(&report["mass_kg"], 24e-6);
+    near(&report["center_of_mass"][0], 23. / 3.);
+    near(&report["central_mass_inertia"][0][0], 16e-6);
+    near(&report["central_mass_inertia"][1][1], 16e-6 + 4800e-6 / 9.);
+    assert_eq!(report["missing_density_occurrences"], 0);
+    let rejected = cli(&[
+        "properties",
+        recipe.to_str().unwrap(),
+        "--output",
+        "mixed",
+        "--density-kg-per-m3",
+        "1000",
+    ]);
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("assembly density override"));
+    fs::write(
+        &recipe,
+        source.replace(",material='C',density_kg_per_m3=2000", ""),
+    )
+    .unwrap();
+    let missing = query();
+    assert!(missing.status.success());
+    let missing: serde_json::Value = serde_json::from_slice(&missing.stdout).unwrap();
+    assert_eq!(missing["missing_density_occurrences"], 1);
+    assert!(
+        missing["mass_kg"].is_null()
+            && missing["center_of_mass"].is_null()
+            && missing["central_mass_inertia"].is_null()
+    );
+    near(&missing["volume"], 16.);
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn empty_body_properties_have_zero_mass_and_no_fabricated_centroid() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("empty.star");
+    fs::write(&recipe,"p=rectangle(id='p',width=2,depth=3)\nb=extrude(id='b',profile=p,height=4)\ne=cut(id='e',left=b,right=b)\noutput(name='empty',feature=e)\n").unwrap();
+    let result = cli(&[
+        "properties",
+        recipe.to_str().unwrap(),
+        "--output",
+        "empty",
+        "--density-kg-per-m3",
+        "8000",
+    ]);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
+    near(&report["volume"], 0.);
+    near(&report["mass_kg"], 0.);
+    for field in [
+        "volume_centroid",
+        "central_volume_inertia",
+        "center_of_mass",
+        "central_mass_inertia",
+    ] {
+        assert!(report[field].is_null(), "{field}");
+    }
+    assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+}

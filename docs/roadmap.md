@@ -17,7 +17,7 @@ regression performance. A green test count alone does not close a milestone.
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, frustum culling and bounded cache implemented; LOD, spatial hierarchy and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
-| M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM and summed density-based mass implemented; drawings, PMI, inertia and configuration policies remain |
+| M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries implemented; drawings, PMI, principal axes and configuration policies remain |
 | M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | Planned |
 
 Completing M1 and extending the display-asset interface are the immediate
@@ -75,6 +75,13 @@ contain their transformed native coordinates.
    general polygon union/cut remain unsupported. Retain triangle/trapezoid/pentagon analytic and STEP oracles,
    plus `angled_fixture.star` and the browser `test:polygon` silhouette/picking
    regression as curved primitives and trim handling are introduced.
+
+The M6 mass-properties increment uses `balance_arm.star`: a rotated beam,
+mixed-density payload/counterweight, and rigid attachment chain. Position edits
+change the material center and inertia while reusing part geometry. Independent
+box-moment expectations distinguish volume centroid from center of mass and
+check the full tensor at three counterweight positions. Missing densities and
+numerical limitations remain explicit; this is not a dynamics or joint solver.
 
 ## Example policy
 

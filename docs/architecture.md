@@ -431,6 +431,24 @@ collision candidates; overlapping boxes cannot prove collision. Approximate
 LOD meshes cannot certify clearance or machining dimensions. Exact query workers
 load only candidate bodies and attach evidence to the result.
 
+The native mass-property query now integrates volume, volume centroid and central
+volume inertia directly from validated planar B-rep boundaries. Assembly queries
+reuse definition properties, rotate tensors into the root frame and apply the
+parallel-axis theorem over occurrences. Mass weighting uses explicit part density;
+missing material makes mass, center of mass and mass inertia unknown, without
+hiding the available geometric properties. As in the BOM, overlapping occurrences
+are summed and empty occurrences still require material for complete mass status.
+
+`cad properties` is read-only with respect to source and published outputs. Its
+versioned JSON records units, coordinate frame, tensor sign convention, source,
+parameters and implementation identities. Body density is an explicit query
+input; assembly density comes from part metadata. Local-reference integration,
+compensated accumulation and a centered second pass have numerical range and
+cancellation guards. These are checked floating-point engineering results, not
+claims of symbolic precision. Independent box/prism formulas, mixed-material
+balance-arm fixtures and optional OCCT centroid/tensor comparisons verify them.
+Principal axes, uncertainty propagation and dynamics remain future work.
+
 Treat manufacturing output as a first-class domain: associated orthographic and
 section views, hidden-line removal, dimensions and datums, GD&T/PMI intent,
 materials/density, mass properties and inertia, BOM, part/revision numbers, and
@@ -561,7 +579,7 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, frustum culling, bounded geometry cache and proxy fallback | Spatial BVHs, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
-| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations and mass moments |
+| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
 The current working commands are in [README.md](../README.md).

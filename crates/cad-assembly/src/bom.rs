@@ -94,7 +94,7 @@ fn normal_nonnegative(value: f64) -> Result<f64, AssemblyError> {
     }
 }
 
-fn mass(volume: f64, density: f64) -> Result<f64, AssemblyError> {
+pub(super) fn mass(volume: f64, density: f64) -> Result<f64, AssemblyError> {
     if volume == 0.0 {
         return Ok(0.0);
     }

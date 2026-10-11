@@ -310,6 +310,44 @@ geometry and structure, but does not carry these material or revision fields;
 use the accompanying BOM. Materials do not yet include certified property
 libraries, occurrence overrides, configurations, or mass moments/inertia.
 
+## Mass properties
+
+Query the authoritative solids without opening a viewer or publishing artifacts:
+
+```sh
+cad properties examples/balance_arm.star --output balance_arm
+cad properties examples/balance_arm.star --output balance_arm --param counterweight_distance=45
+cad properties examples/balance_arm.star --output beam --density-kg-per-m3 2700
+```
+
+Reports contain volume, volume centroid and central volume inertia, plus mass,
+center of mass and central mass inertia when density is known. Volume units are
+mm³; geometric inertia is mm⁵; mass is kg; mass inertia is kg·mm². Tensors use
+`∫ (|r|² I − r rᵀ)` about their corresponding centroid, so off-diagonal entries
+are **negative** product moments. Directions use the output model frame or root
+assembly frame, as labeled in the report. Source/parameter and build fingerprints
+identify the queried snapshot.
+
+For a body output, the optional density flag supplies a uniform material density.
+Assemblies use each part's material metadata and reject a uniform override. If
+any occurrence lacks density, total mass, center of mass and mass inertia are
+`null`; geometric properties remain available. This includes empty occurrences,
+matching the BOM completeness policy. Empty geometry has no centroid or tensor.
+Overlapping assembly occurrences count separately as material, not as a union.
+
+The balance arm uses five boxes, rigid datum attachments and mixed densities.
+Its default mass is **0.115776 kg**. Its volume centroid is approximately
+`[7.707626, 4.45, 31.45] mm`, while its center of mass is
+`[1.357204, 0.783582, 33.365672] mm`. Moving the counterweight changes placement
+and the inertia tensor without changing the part shapes. Independent box-moment
+expectations cover three positions in `balance_arm.properties.expected.json`.
+
+The kernel integrates signed tetrahedral domains from planar boundary faces;
+these are not viewer triangles. Local references, compensated sums and a centered
+second pass reduce cancellation. Unrepresentable centroids, overflow, underflow
+and excessive cancellation return explicit numerical errors. The command does
+not infer density, solve dynamics, or calculate principal axes yet.
+
 ## Recipes and parameters
 
 ```python
@@ -418,6 +456,7 @@ hashes identify build inputs, not geometric equivalence.
 cad init <directory>
 cad compile <recipe.star|recipe.json>
 cad inspect <recipe.star|recipe.json>
+cad properties <recipe.star|recipe.json> --output <name> [--density-kg-per-m3 <value>]
 cad check <recipe.star|recipe.json>
 cad build <recipe.star|recipe.json> --out-dir <directory>
 cad validate <model.brep.json|assembly.assembly.json>

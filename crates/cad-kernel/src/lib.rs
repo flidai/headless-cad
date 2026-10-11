@@ -10,15 +10,19 @@
 //! represented axis permutations also retain the orthogonal solid domain.
 //! All coordinates, dimensions, and linear tolerances are millimetres; volume is
 //! mm³. Results contain analytic lines and planes and explicit oriented topology.
+//! Validated mass properties integrate volume, centroid, and central volume
+//! inertia (mm⁵) from this boundary; material density is an application concern.
 //! There is no external CAD kernel, mesh approximation, or stored volume shortcut.
 
 mod convex_intersection;
+mod mass_properties;
 mod math;
 mod orthogonal;
 mod polygon;
 mod transform;
 mod validation;
 
+pub use mass_properties::MassProperties;
 pub use math::Tolerance;
 use math::{cross, dot, sub};
 pub use orthogonal::{boolean, translate, BooleanOp};
