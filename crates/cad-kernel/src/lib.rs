@@ -36,7 +36,9 @@ mod transform;
 mod triangulation;
 mod validation;
 
-pub use analytic::{extrude_circle, validate_circle, CylinderGeometry};
+pub use analytic::{
+    extrude_annulus, extrude_circle, validate_annulus, validate_circle, CylinderGeometry,
+};
 pub use face_frame::FaceFrame;
 pub use mass_properties::MassProperties;
 pub use math::Tolerance;
@@ -100,7 +102,10 @@ pub enum Curve {
     Line(Line),
     Circle(Circle),
 }
-/// An outward-oriented analytic cylinder. Axial bounds belong to topology,
+fn is_false(value: &bool) -> bool {
+    !value
+}
+/// An oriented analytic cylinder. Axial bounds belong to topology,
 /// not to the supporting infinite surface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -109,6 +114,9 @@ pub struct Cylinder {
     pub axis: [f64; 3],
     pub x_direction: [f64; 3],
     pub radius: f64,
+    /// Reverse the support normal for an interior cylindrical wall.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub inward: bool,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(

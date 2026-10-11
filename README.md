@@ -782,7 +782,7 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 - Explicit rejection of enclosed cavities, nonmanifold contacts, unsupported
   geometry, and computations outside the numerical/resource envelope.
 
-Round-hole cutting, tubes, general rotated nonconvex modeling, sketch constraints, general
+Round-hole cutting in arbitrary solids, general rotated nonconvex modeling, sketch constraints, general
 polygon union/cut and nonconvex polygon Booleans, nonconvex hole rings, general trimmed curved surfaces,
 fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
@@ -805,13 +805,28 @@ creates an authoritative cylinder with three faces, three edges and two seam
 vertices. Native transforms, mass properties, cap datums, STEP and inspection
 preserve its circular geometry. See [shaft_stack.star](examples/shaft_stack.star)
 for a shaft, flange and end cap attached through face datums, plus a separately
-rotated shaft. These are separate solid parts; curved Booleans and hollow tubes
-are not yet supported.
+rotated shaft. These are separate solid parts; curved Booleans are not yet supported.
 
 ```sh
 cad build examples/shaft_stack.star --out-dir out/shaft_stack
 cad properties examples/shaft_stack.star --output shaft
 ```
+
+Set `inner_radius` to create a true annular profile, for example
+`circle(id = "bushing_profile", radius = 10, inner_radius = 6)`. Zero (the default)
+creates a disk; a positive bore and the remaining wall must exceed the recipe's
+linear tolerance. Extrusion retains annular caps and an inward cylindrical face
+with its own periodic seam. `inner_wall` identifies that face in recipe selectors;
+`wall` remains the outer wall. Both cap datums use the material area centroid,
+which lies in the bore for a concentric annulus.
+
+[bearing_cartridge.star](examples/bearing_cartridge.star) combines a bronze sleeve,
+two shared steel retainer rings and a separate shaft with prescribed radial
+clearance. Its bore and length parameters drive geometry, cap attachments, BOM,
+and mass properties. `npm run test:tube --prefix tools/preview-check` verifies
+through-bore visibility and native face picking against independent ray/cylinder
+intersections. `cad-export`'s `export_tubes` example produces straight and oblique
+STEP fixtures for the independent OCCT tools.
 
 Display/STL tessellation uses a default 0.01 mm radial chord-error ceiling and
 at most 4,096 circumference segments; an unmet error budget fails explicitly.

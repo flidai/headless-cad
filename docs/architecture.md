@@ -300,8 +300,8 @@ triangulation and pick through the notch and holes.
 The first analytic increment is now a true circular extrusion: tagged line/circle
 curves and plane/cylinder surfaces, two circular boundary edges, and one periodic
 seam used in both directions. The validator certifies this canonical solid-cylinder
-family and rigid placements; it does not yet certify arbitrary reordered curved
-B-reps, tubes, curved intersections or general trimming. Volume, centroid, inertia,
+and concentric annular families and rigid placements; it does not yet certify
+arbitrary reordered curved B-reps, curved intersections or general trimming. Volume, centroid, inertia,
 bounds and cap datum frames come from the analytic boundary. Wall datum frames
 and curved Booleans are explicit unsupported outcomes.
 
@@ -313,6 +313,17 @@ placements. Derived STL/display patches have a declared radial chord-error polic
 Display envelope 3 preserves native face IDs across wall patches, rejects older
 clients, and records the achieved bound. Native JSON uses tagged geometry in
 kernel 0.3; previous generated snapshots must be rebuilt from source.
+
+The annular increment adds `circle(..., inner_radius=...)` without changing disk
+recipes. Tubes retain four faces, six edges and four seam vertices: two annular
+caps, outer and inward cylindrical walls, each with its own periodic seam.
+Validation checks the full oriented topology and concentric support frames;
+volume uses `(R-r)(R+r)` to avoid subtracting nearly equal squared radii.
+Derived cap patches preserve the bore, and all bore-wall patches map to one
+native `inner_wall` face. STEP retains inner bounds and inward surface sense.
+`bearing_cartridge.star` exercises repeated retainer definitions, cap attachments,
+mixed-material mass/inertia and bore/length edits. This is analytic annular
+extrusion, not yet a generalized curved cut operation.
 
 Progress through general nonconvex solid operations, curved extrusion,
 revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,

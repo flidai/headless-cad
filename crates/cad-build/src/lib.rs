@@ -167,6 +167,8 @@ pub enum Feature {
     Circle {
         id: String,
         radius: f64,
+        #[serde(skip_serializing_if = "is_zero")]
+        inner_radius: f64,
         op_version: u32,
     },
     Rectangle {
@@ -240,6 +242,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut id = None;
                 let mut op_version = None;
                 let mut radius = None;
+                let mut inner_radius = None;
                 let mut width = None;
                 let mut depth = None;
                 let mut profile = None;
@@ -266,6 +269,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "id" => read_field!(id, String),
                         "op_version" => read_field!(op_version, u32),
                         "radius" => read_field!(radius, f64),
+                        "inner_radius" => read_field!(inner_radius, f64),
                         "width" => read_field!(width, f64),
                         "depth" => read_field!(depth, f64),
                         "profile" => read_field!(profile, String),
@@ -285,6 +289,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "id",
                                     "op_version",
                                     "radius",
+                                    "inner_radius",
                                     "width",
                                     "depth",
                                     "profile",
@@ -306,7 +311,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let id = id.ok_or_else(|| M::Error::missing_field("id"))?;
                 let op_version = op_version.unwrap_or_else(operation_version);
                 let allowed: &[&str] = match op.as_str() {
-                    "circle" => &["op", "id", "op_version", "radius"],
+                    "circle" => &["op", "id", "op_version", "radius", "inner_radius"],
                     "rectangle" => &["op", "id", "op_version", "width", "depth"],
                     "polygon" => &["op", "id", "op_version", "points", "holes"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
@@ -342,6 +347,7 @@ impl<'de> Deserialize<'de> for Feature {
                         id,
                         op_version,
                         radius: radius.ok_or_else(|| M::Error::missing_field("radius"))?,
+                        inner_radius: inner_radius.unwrap_or(0.),
                     },
                     "rectangle" => Feature::Rectangle {
                         id,
@@ -398,6 +404,10 @@ impl<'de> Deserialize<'de> for Feature {
         }
         deserializer.deserialize_map(FeatureVisitor)
     }
+}
+
+fn is_zero(value: &f64) -> bool {
+    *value == 0.
 }
 
 impl Feature {
@@ -701,8 +711,16 @@ fn hash_feature(
         hash.update(hashes[dependency].as_bytes());
     }
     match feature {
-        Feature::Circle { radius, .. } => {
+        Feature::Circle {
+            radius,
+            inner_radius,
+            ..
+        } => {
             hash.update(&radius.to_le_bytes());
+            if *inner_radius != 0. {
+                hash.update(b"inner_radius");
+                hash.update(&inner_radius.to_le_bytes());
+            }
         }
         Feature::Rectangle { width, depth, .. } => {
             hash.update(&width.to_le_bytes());
@@ -948,14 +966,17 @@ impl BuildEngine {
         let order = ordered_features(recipe, &indices)?;
         for feature in &recipe.features {
             match feature {
-                Feature::Circle { id, radius, .. } => {
-                    cad_kernel::validate_circle(*radius, tolerance).map_err(|error| {
-                        BuildError::Kernel {
-                            feature: id.clone(),
-                            message: error.to_string(),
-                        }
-                    })?
-                }
+                Feature::Circle {
+                    id,
+                    radius,
+                    inner_radius,
+                    ..
+                } => cad_kernel::validate_annulus(*radius, *inner_radius, tolerance).map_err(
+                    |error| BuildError::Kernel {
+                        feature: id.clone(),
+                        message: error.to_string(),
+                    },
+                )?,
                 Feature::Rectangle {
                     id, width, depth, ..
                 } => {
@@ -1051,9 +1072,16 @@ impl BuildEngine {
                         Feature::Extrude {
                             profile, height, ..
                         } => match &recipe.features[indices[profile.as_str()]] {
-                            Feature::Circle { radius, .. } => {
-                                cad_kernel::extrude_circle(*radius, *height, tolerance)
-                            }
+                            Feature::Circle {
+                                radius,
+                                inner_radius,
+                                ..
+                            } => cad_kernel::extrude_annulus(
+                                *radius,
+                                *inner_radius,
+                                *height,
+                                tolerance,
+                            ),
                             Feature::Rectangle { width, depth, .. } => {
                                 extrude_rectangle(*width, *depth, *height, tolerance)
                             }

@@ -712,5 +712,73 @@
         ]
       ]
     }
+  },
+  "bearing_cartridge.star": {
+    "sleeve": {
+      "volume_mm3": 8042.47719318987,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -10,
+          -10,
+          0
+        ],
+        [
+          10,
+          10,
+          40
+        ]
+      ]
+    },
+    "retainer": {
+      "volume_mm3": 2940.5307237600464,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -16,
+          -16,
+          0
+        ],
+        [
+          16,
+          16,
+          6
+        ]
+      ]
+    },
+    "shaft": {
+      "volume_mm3": 5497.787143782139,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -5,
+          -5,
+          0
+        ],
+        [
+          5,
+          5,
+          70
+        ]
+      ]
+    },
+    "bearing_cartridge": {
+      "volume_mm3": 19421.325784492103,
+      "solids": 4,
+      "instances": 4,
+      "definitions": 3,
+      "bounds_mm": [
+        [
+          -16,
+          -16,
+          -15
+        ],
+        [
+          16,
+          16,
+          55
+        ]
+      ]
+    }
   }
 }

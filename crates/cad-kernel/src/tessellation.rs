@@ -88,30 +88,64 @@ pub fn tessellate_cylinder(
         bottom.push(p);
         top.push(std::array::from_fn(|a| p[a] + c.height * c.axis[a]));
     }
-    let edge = |face: FaceId| model.loops[model.faces[face.0].loops[0].0].edges[0].edge;
-    let lower = edge(c.start_cap);
-    let upper = edge(c.end_cap);
-    let mut patches = Vec::with_capacity(3 * n);
+    let edge = |face: FaceId, loop_index: usize| {
+        model.loops[model.faces[face.0].loops[loop_index].0].edges[0].edge
+    };
+    let lower = edge(c.start_cap, 0);
+    let upper = edge(c.end_cap, 0);
+    let mut patches = Vec::with_capacity(4 * n);
     let top_center = std::array::from_fn(|a| c.origin[a] + c.height * c.axis[a]);
-    for i in 0..n {
-        let j = (i + 1) % n;
-        patches.push(MeshPatch {
-            face: c.start_cap,
-            points: vec![c.origin, bottom[j], bottom[i]],
-            normal: c.axis.map(|v| -v),
-            boundary_edges: vec![None, Some(lower), None],
-        });
-        patches.push(MeshPatch {
-            face: c.end_cap,
-            points: vec![top_center, top[i], top[j]],
-            normal: c.axis,
-            boundary_edges: vec![None, Some(upper), None],
-        });
+    let mut inner_bottom = Vec::new();
+    let mut inner_top = Vec::new();
+    if c.inner_wall.is_some() {
+        for i in 0..n {
+            let (s, co) = (std::f64::consts::TAU * i as f64 / n as f64).sin_cos();
+            let p = std::array::from_fn(|a| {
+                c.origin[a] + c.inner_radius * (co * c.x_direction[a] + s * y[a])
+            });
+            inner_bottom.push(p);
+            inner_top.push(std::array::from_fn(|a| p[a] + c.height * c.axis[a]));
+        }
     }
     for i in 0..n {
         let j = (i + 1) % n;
-        let angle = std::f64::consts::TAU * (i as f64 + 0.5) / n as f64;
-        let (s, co) = angle.sin_cos();
+        if let Some(inner_wall) = c.inner_wall {
+            let inner_lower = edge(c.start_cap, 1);
+            let inner_upper = edge(c.end_cap, 1);
+            patches.push(MeshPatch {
+                face: c.start_cap,
+                points: vec![bottom[i], inner_bottom[i], inner_bottom[j], bottom[j]],
+                normal: c.axis.map(|v| -v),
+                boundary_edges: vec![None, Some(inner_lower), None, Some(lower)],
+            });
+            patches.push(MeshPatch {
+                face: c.end_cap,
+                points: vec![top[i], top[j], inner_top[j], inner_top[i]],
+                normal: c.axis,
+                boundary_edges: vec![Some(upper), None, Some(inner_upper), None],
+            });
+            let (s, co) = (std::f64::consts::TAU * (i as f64 + 0.5) / n as f64).sin_cos();
+            patches.push(MeshPatch {
+                face: inner_wall,
+                points: vec![inner_bottom[j], inner_bottom[i], inner_top[i], inner_top[j]],
+                normal: std::array::from_fn(|a| -(co * c.x_direction[a] + s * y[a])),
+                boundary_edges: vec![Some(inner_lower), None, Some(inner_upper), None],
+            });
+        } else {
+            patches.push(MeshPatch {
+                face: c.start_cap,
+                points: vec![c.origin, bottom[j], bottom[i]],
+                normal: c.axis.map(|v| -v),
+                boundary_edges: vec![None, Some(lower), None],
+            });
+            patches.push(MeshPatch {
+                face: c.end_cap,
+                points: vec![top_center, top[i], top[j]],
+                normal: c.axis,
+                boundary_edges: vec![None, Some(upper), None],
+            });
+        }
+        let (s, co) = (std::f64::consts::TAU * (i as f64 + 0.5) / n as f64).sin_cos();
         patches.push(MeshPatch {
             face: c.wall,
             points: vec![bottom[i], bottom[j], top[j], top[i]],

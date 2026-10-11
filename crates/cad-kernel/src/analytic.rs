@@ -11,19 +11,24 @@ pub struct CylinderGeometry {
     pub x_direction: [f64; 3],
     pub radius: f64,
     pub height: f64,
+    pub inner_radius: f64,
+    pub inner_wall: Option<FaceId>,
     pub start_cap: FaceId,
     pub end_cap: FaceId,
     pub wall: FaceId,
 }
 impl CylinderGeometry {
     pub(crate) fn volume(&self) -> f64 {
-        std::f64::consts::PI * self.radius * self.radius * self.height
+        std::f64::consts::PI
+            * (self.radius - self.inner_radius)
+            * (self.radius + self.inner_radius)
+            * self.height
     }
     pub(crate) fn properties(&self) -> Result<MassProperties, KernelError> {
         let volume = self.volume();
-        let axial = volume * (self.radius * self.radius / 2.);
-        let transverse =
-            volume * (self.radius * self.radius / 4. + self.height * self.height / 12.);
+        let squared_radii = self.radius * self.radius + self.inner_radius * self.inner_radius;
+        let axial = volume * (squared_radii / 2.);
+        let transverse = volume * (squared_radii / 4. + self.height * self.height / 12.);
         if [volume, axial, transverse]
             .iter()
             .any(|v| !v.is_normal() || *v <= 0.)
@@ -156,6 +161,7 @@ pub fn extrude_circle(
                     axis,
                     x_direction,
                     radius,
+                    inward: false,
                 }),
                 loops: vec![LoopId(2)],
             },
@@ -184,17 +190,189 @@ pub fn extrude_circle(
     })
 }
 
+/// Validate a concentric circular profile. Zero inner radius denotes a disk;
+/// a positive inner radius and the remaining wall must exceed tolerance.
+pub fn validate_annulus(
+    radius: f64,
+    inner_radius: f64,
+    tolerance: Tolerance,
+) -> Result<(), KernelError> {
+    validate_circle(radius, tolerance)?;
+    if !inner_radius.is_finite() || inner_radius < 0. {
+        return Err(KernelError::InvalidDimension {
+            dimension: "inner_radius",
+        });
+    }
+    if inner_radius != 0. {
+        validate_circle(inner_radius, tolerance)?;
+        if radius - inner_radius <= tolerance.linear {
+            return Err(KernelError::InvalidDimension {
+                dimension: "wall_thickness",
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Exact extrusion of a disk or annulus, with explicit inward bore surface.
+pub fn extrude_annulus(
+    radius: f64,
+    inner_radius: f64,
+    height: f64,
+    tolerance: Tolerance,
+) -> Result<OperationResult, KernelError> {
+    validate_annulus(radius, inner_radius, tolerance)?;
+    let mut result = extrude_circle(radius, height, tolerance)?;
+    if inner_radius == 0. {
+        return Ok(result);
+    }
+    let inner = extrude_circle(inner_radius, height, tolerance)?.model;
+    let m = &mut result.model;
+    m.vertices.extend(inner.vertices);
+    m.edges.extend(inner.edges.into_iter().map(|mut e| {
+        e.vertices = e.vertices.map(|v| VertexId(v.0 + 2));
+        e
+    }));
+    let eu = |edge, reversed| EdgeUse {
+        edge: EdgeId(edge),
+        reversed,
+    };
+    m.loops.extend([
+        Loop {
+            edges: vec![eu(3, false)],
+        },
+        Loop {
+            edges: vec![eu(4, true)],
+        },
+        Loop {
+            edges: vec![eu(3, true), eu(5, false), eu(4, false), eu(5, true)],
+        },
+    ]);
+    m.faces[0].loops.push(LoopId(3));
+    m.faces[1].loops.push(LoopId(4));
+    let mut wall = inner.faces[2].clone();
+    if let Surface::Cylinder(c) = &mut wall.surface {
+        c.inward = true;
+    }
+    wall.loops = vec![LoopId(5)];
+    m.faces.push(wall);
+    m.shells[0].faces.push(FaceId(3));
+    let report = m.validate(tolerance);
+    if !report.valid {
+        return Err(KernelError::InvalidResult(report));
+    }
+    result
+        .history
+        .generated_faces
+        .insert("inner_wall".into(), vec![FaceId(3)]);
+    Ok(result)
+}
+
+// Certify both support cylinders independently, then require a common exact
+// parameter frame. Reducing each boundary to the certified disk family is a
+// validation technique only; the authoritative annular topology is retained.
+fn recognize_annulus(
+    model: &ModelSnapshot,
+    tolerance: Option<Tolerance>,
+) -> Result<CylinderGeometry, KernelError> {
+    if model.vertices.len() != 4
+        || model.edges.len() != 6
+        || model.loops.len() != 6
+        || model.faces.len() != 4
+        || model.shells.len() != 1
+        || model.solids.len() != 1
+    {
+        return Err(unsupported(
+            "annular extrusion requires complete periodic tube topology",
+        ));
+    }
+    let eu = |edge, reversed| EdgeUse {
+        edge: EdgeId(edge),
+        reversed,
+    };
+    if model.faces[0].loops != [LoopId(0), LoopId(3)]
+        || model.faces[1].loops != [LoopId(1), LoopId(4)]
+        || model.faces[2].loops != [LoopId(2)]
+        || model.faces[3].loops != [LoopId(5)]
+        || model.loops[3].edges != [eu(3, false)]
+        || model.loops[4].edges != [eu(4, true)]
+        || model.loops[5].edges != [eu(3, true), eu(5, false), eu(4, false), eu(5, true)]
+        || model.edges[3].vertices != [VertexId(2), VertexId(2)]
+        || model.edges[4].vertices != [VertexId(3), VertexId(3)]
+        || model.edges[5].vertices != [VertexId(2), VertexId(3)]
+        || model.shells[0].faces != [FaceId(0), FaceId(1), FaceId(2), FaceId(3)]
+        || model.solids[0].shells != [ShellId(0)]
+    {
+        return Err(unsupported(
+            "invalid annular extrusion topology or orientation",
+        ));
+    }
+    let Surface::Cylinder(inner_surface) = &model.faces[3].surface else {
+        return Err(unsupported(
+            "annular extrusion requires an inner cylindrical surface",
+        ));
+    };
+    if !inner_surface.inward {
+        return Err(unsupported("inner cylindrical wall must face inward"));
+    }
+    let mut outer = model.clone();
+    outer.vertices.truncate(2);
+    outer.edges.truncate(3);
+    outer.loops.truncate(3);
+    outer.faces.truncate(3);
+    outer.faces[0].loops = vec![LoopId(0)];
+    outer.faces[1].loops = vec![LoopId(1)];
+    outer.shells[0].faces.truncate(3);
+    let mut geometry = recognize(&outer, tolerance)?;
+    let mut inner = outer.clone();
+    inner.vertices = model.vertices[2..].to_vec();
+    inner.edges = model.edges[3..]
+        .iter()
+        .cloned()
+        .map(|mut e| {
+            e.vertices = e.vertices.map(|v| VertexId(v.0 - 2));
+            e
+        })
+        .collect();
+    let mut support = inner_surface.clone();
+    support.inward = false;
+    inner.faces[2].surface = Surface::Cylinder(support);
+    let bore = recognize(&inner, tolerance)?;
+    if geometry.origin != bore.origin
+        || geometry.axis != bore.axis
+        || geometry.x_direction != bore.x_direction
+        || geometry.height != bore.height
+    {
+        return Err(unsupported(
+            "annular extrusion requires concentric circles in the same parameter frame",
+        ));
+    }
+    let thickness = geometry.radius - bore.radius;
+    if !thickness.is_normal() || thickness <= tolerance.map_or(0., |t| t.linear) {
+        return Err(unsupported(
+            "annular extrusion wall thickness must exceed tolerance",
+        ));
+    }
+    geometry.inner_radius = bore.radius;
+    geometry.inner_wall = Some(FaceId(3));
+    geometry.properties()?;
+    Ok(geometry)
+}
+
 fn unsupported(message: &str) -> KernelError {
     KernelError::Unsupported(message.into())
 }
 
-/// This first analytic domain accepts only the complete canonical circular
+/// This analytic domain accepts complete canonical disk and annular
 /// extrusion topology (including rigid placements). Other curve/surface B-reps
 /// fail explicitly; merely containing a Cylinder surface is never sufficient.
 pub(crate) fn recognize(
     model: &ModelSnapshot,
     tolerance: Option<Tolerance>,
 ) -> Result<CylinderGeometry, KernelError> {
+    if model.faces.len() == 4 {
+        return recognize_annulus(model, tolerance);
+    }
     if model.vertices.len() != 2
         || model.edges.len() != 3
         || model.loops.len() != 3
@@ -272,6 +450,7 @@ pub(crate) fn recognize(
         || bottom.radius <= 0.
         || top.radius != bottom.radius
         || wall.radius != bottom.radius
+        || wall.inward
     {
         return Err(unsupported(
             "invalid analytic radius or orthonormal parameter frame",
@@ -347,6 +526,8 @@ pub(crate) fn recognize(
         x_direction: bottom.x_direction,
         radius: bottom.radius,
         height,
+        inner_radius: 0.,
+        inner_wall: None,
         start_cap: FaceId(0),
         end_cap: FaceId(1),
         wall: FaceId(2),
@@ -360,7 +541,7 @@ pub(crate) fn recognize(
 }
 
 impl ModelSnapshot {
-    /// Returns validated analytic cylinder geometry, or None for a validated
+    /// Returns validated analytic disk/tube extrusion geometry, or None for a validated
     /// planar model. No curve is replaced by a polygon for this query.
     pub fn cylinder_geometry(
         &self,
@@ -390,6 +571,151 @@ mod tests {
             (actual - expected).abs() <= 1e-10 * expected.abs().max(1.),
             "{actual} != {expected}"
         );
+    }
+    #[test]
+    fn annular_extrusion_matches_independent_disk_difference_and_rotated_tensor() {
+        let tol = Tolerance::default();
+        for (r, bore, h) in [(10., 7., 25.), (3., 1., 0.5), (100., 99.99, 12.)] {
+            let result = extrude_annulus(r, bore, h, tol).unwrap();
+            let m = result.model;
+            assert!(m.validate(tol).valid);
+            assert_eq!(
+                (
+                    m.vertices.len(),
+                    m.edges.len(),
+                    m.loops.len(),
+                    m.faces.len()
+                ),
+                (4, 6, 6, 4)
+            );
+            assert_eq!(result.history.generated_faces["inner_wall"], [FaceId(3)]);
+            assert_eq!(m.faces[0].loops.len(), 2);
+            assert_eq!(m.faces[1].loops.len(), 2);
+            let expected_volume = std::f64::consts::PI * (r * r - bore * bore) * h;
+            close(m.volume(), expected_volume);
+            let p = m.mass_properties(tol).unwrap();
+            let outer = extrude_circle(r, h, tol)
+                .unwrap()
+                .model
+                .mass_properties(tol)
+                .unwrap();
+            let inner = extrude_circle(bore, h, tol)
+                .unwrap()
+                .model
+                .mass_properties(tol)
+                .unwrap();
+            for i in 0..3 {
+                for j in 0..3 {
+                    close(
+                        p.central_inertia.unwrap()[i][j],
+                        outer.central_inertia.unwrap()[i][j] - inner.central_inertia.unwrap()[i][j],
+                    );
+                }
+            }
+            assert_eq!(p.centroid, Some([0., 0., h / 2.]));
+            assert_eq!(
+                m.bounds(),
+                Bounds {
+                    min: [-r, -r, 0.],
+                    max: [r, r, h]
+                }
+            );
+            let moved = transform(&m, [12., -7., 4.], [0.5, 0.5, 0., 0.5_f64.sqrt()], tol)
+                .unwrap()
+                .model;
+            let axis = [0.5_f64.sqrt(), -0.5_f64.sqrt(), 0.];
+            let tensor = moved.mass_properties(tol).unwrap().central_inertia.unwrap();
+            let axial = expected_volume * (r * r + bore * bore) / 2.;
+            let transverse = expected_volume * (3. * (r * r + bore * bore) + h * h) / 12.;
+            for i in 0..3 {
+                for j in 0..3 {
+                    close(
+                        tensor[i][j],
+                        if i == j { transverse } else { 0. }
+                            + (axial - transverse) * axis[i] * axis[j],
+                    );
+                }
+            }
+            let frame = m.face_frame(FaceId(1), [1., 0., 0.], [0.; 3], tol).unwrap();
+            assert_eq!(frame.origin, [0., 0., h]); // The annular centroid lies inside the empty bore.
+            assert!(m.face_frame(FaceId(3), [1., 0., 0.], [0.; 3], tol).is_err());
+            let decoded: ModelSnapshot =
+                serde_json::from_slice(&serde_json::to_vec(&m).unwrap()).unwrap();
+            assert_eq!(decoded, m);
+            assert!(decoded.validate(tol).valid);
+        }
+        assert_eq!(
+            extrude_annulus(4., 0., 12., tol).unwrap(),
+            extrude_circle(4., 12., tol).unwrap()
+        );
+    }
+    #[test]
+    fn annular_dimensions_and_corrupted_bore_boundaries_fail_closed() {
+        let tol = Tolerance::default();
+        for bore in [
+            -1.,
+            f64::NAN,
+            f64::INFINITY,
+            tol.linear,
+            10.,
+            11.,
+            10. - tol.linear / 2.,
+        ] {
+            assert!(extrude_annulus(10., bore, 20., tol).is_err());
+        }
+        let model = extrude_annulus(10., 7., 20., tol).unwrap().model;
+        let changes: Vec<fn(&mut ModelSnapshot)> = vec![
+            |m| m.vertices[2].position[0] += 1e-9,
+            |m| m.edges[3].vertices[0] = VertexId(0),
+            |m| m.loops[3].edges[0].reversed = true,
+            |m| m.loops[4].edges[0].reversed = false,
+            |m| m.loops[5].edges[0].reversed = false,
+            |m| m.faces[0].loops.pop().map(drop).unwrap(),
+            |m| m.faces[3].loops = vec![LoopId(2)],
+            |m| m.edges[5].try_line_mut().unwrap().origin[1] += 1e-9,
+            |m| {
+                if let Curve::Circle(c) = &mut m.edges[3].curve {
+                    c.radius = 11.;
+                }
+            },
+            |m| {
+                if let Curve::Circle(c) = &mut m.edges[4].curve {
+                    c.origin[2] += 1e-9;
+                }
+            },
+            |m| {
+                if let Surface::Cylinder(c) = &mut m.faces[3].surface {
+                    c.inward = false;
+                }
+            },
+            |m| {
+                if let Surface::Cylinder(c) = &mut m.faces[2].surface {
+                    c.inward = true;
+                }
+            },
+            |m| {
+                if let Surface::Cylinder(c) = &mut m.faces[3].surface {
+                    c.axis[2] = -1.;
+                }
+            },
+            |m| m.shells[0].faces.pop().map(drop).unwrap(),
+            |m| m.solids[0].shells.clear(),
+            |m| {
+                m.vertices.clear();
+            },
+        ];
+        for (i, change) in changes.into_iter().enumerate() {
+            let mut invalid = model.clone();
+            change(&mut invalid);
+            assert!(!invalid.validate(tol).valid, "mutation {i}");
+            assert!(invalid.mass_properties(tol).is_err(), "mutation {i}");
+            assert!(invalid.cylinder_geometry(tol).is_err(), "mutation {i}");
+            assert!(
+                transform(&invalid, [0.; 3], [0., 0., 0., 1.], tol).is_err(),
+                "mutation {i}"
+            );
+            assert!(invalid.volume().is_nan(), "mutation {i}");
+        }
     }
     #[test]
     fn circle_extrusion_has_true_periodic_boundary_and_exact_properties() {
