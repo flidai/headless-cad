@@ -88,11 +88,27 @@ function recipe(width) {
   const sourceResponse = await fetch(`${base}/recipe.star`);
   assert.equal(sourceResponse.status, 200);
   assert.equal(await sourceResponse.text(), annotated);
+  // Valid geometry with invalid design intent must also retain the complete
+  // previous generation. Restore an assertion that resolves without changing
+  // geometry and verify the captured source refreshes independently.
+  const previousManifest = await fs.readFile(path.join(output, 'manifest.json'), 'utf8');
+  const previousScene = await page.evaluate(() => JSON.stringify(scene));
+  const logStart = watcher.log.length;
+  const assertion = count => `assert_faces(id="live_top_intent", from_feature="part", role="end_cap", in_feature="part", count=${count})\n`;
+  await fs.writeFile(source, annotated + assertion(2));
+  await until(() => /live_top_intent/.test(watcher.log.slice(logStart)), 'failed face assertion');
+  assert.equal(await fs.readFile(path.join(output, 'manifest.json'), 'utf8'), previousManifest);
+  assert.equal(await page.evaluate(() => JSON.stringify(scene)), previousScene);
+  const assertedSource = annotated + assertion(1);
+  await fs.writeFile(source, assertedSource);
+  await until(async () => (await manifest()).face_assertions?.live_top_intent?.status === 'resolved', 'assertion recovery');
+  await until(async () => (await page.locator('#recipe-source').textContent()) === assertedSource, 'assertion source refresh');
+  assert.equal(await page.evaluate(() => JSON.stringify(scene)), previousScene);
   const response = await fetch(`${base}/plate.step`);
   assert.equal(response.status, 200);
   assert.match(await response.text(), /ISO-10303-21/);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ hosted_viewer: true, live_recipe_rebuild: true, automatic_refresh: true, camera_preserved: true, failed_build_retained: true, recovery: true, step_download: true, exact_recipe_source: true, source_only_refresh: true, source_html_escaped: true, errors }));
+  console.log(JSON.stringify({ hosted_viewer: true, live_recipe_rebuild: true, automatic_refresh: true, camera_preserved: true, failed_build_retained: true, failed_assertion_retained: true, assertion_recovery: true, recovery: true, step_download: true, exact_recipe_source: true, source_only_refresh: true, source_html_escaped: true, errors }));
 })().catch(error => {
   console.error(error);
   for (const child of children) console.error(child.log);

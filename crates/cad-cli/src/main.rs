@@ -180,6 +180,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Value {
         "tolerance": recipe.tolerance.unwrap_or_default(),
         "stats": build.stats,
         "feature_hashes": build.feature_hashes,
+        "face_assertions": build.face_assertions,
         "outputs": outputs,
     })
 }
@@ -353,7 +354,31 @@ fn difference(before: &Value, after: &Value) -> Value {
         };
         (name.clone(), json!({"status":status,"before":details(a),"after":details(b),"volume_delta_mm3":delta}))
     }).collect();
-    json!({"outputs":changes,"comparison":"build hashes and measured properties; not a proof of geometric equivalence"})
+    let before_assertions = before["face_assertions"]
+        .as_object()
+        .expect("build assertions");
+    let after_assertions = after["face_assertions"]
+        .as_object()
+        .expect("build assertions");
+    let assertion_names: BTreeSet<_> = before_assertions
+        .keys()
+        .chain(after_assertions.keys())
+        .collect();
+    let assertions: serde_json::Map<String, Value> = assertion_names
+        .into_iter()
+        .map(|name| {
+            let a = before_assertions.get(name);
+            let b = after_assertions.get(name);
+            let status = match (a, b) {
+                (None, Some(_)) => "added",
+                (Some(_), None) => "removed",
+                (Some(a), Some(b)) if a == b => "unchanged",
+                _ => "changed",
+            };
+            (name.clone(), json!({"status":status,"before":a,"after":b}))
+        })
+        .collect();
+    json!({"outputs":changes,"face_assertions":assertions,"comparison":"build hashes, measured properties and assertion witnesses; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -815,6 +840,22 @@ fn main() {
             } else if let Some(build) = error.downcast_ref::<cad_build::BuildError>() {
                 report["code"] = json!("invalid_graph");
                 match build {
+                    cad_build::BuildError::FaceAssertionFailed {
+                        assertion_id,
+                        resolution,
+                        anchor_content_hash,
+                        target_content_hash,
+                    } => {
+                        report["code"] = json!("face_assertion_failed");
+                        report["assertion_id"] = json!(assertion_id);
+                        report["selection"] = json!(resolution);
+                        report["snapshot"] = json!({
+                            "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
+                            "executor_build_id": cad_build::executor_build_id(),
+                            "anchor_content_hash": anchor_content_hash,
+                            "target_content_hash": target_content_hash,
+                        });
+                    }
                     cad_build::BuildError::Kernel { feature, .. } => {
                         report["code"] = json!("kernel_operation_failed");
                         report["feature"] = json!(feature);

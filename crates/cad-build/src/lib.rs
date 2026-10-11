@@ -49,6 +49,19 @@ pub fn executor_build_id() -> &'static str {
         hash.finalize().to_hex().to_string()
     })
 }
+/// Maximum number of persisted semantic face assertions in one recipe.
+pub const MAX_FACE_ASSERTIONS: usize = 1_000;
+/// Shared traversal, copied-handle and identifier-byte budget for all assertions
+/// in one build, preventing successful reports from multiplying memory use.
+pub const MAX_FACE_ASSERTION_WORK: usize = MAX_FACE_SELECTION_WORK;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FaceAssertion {
+    pub id: String,
+    pub selector: FaceSelector,
+}
+
 fn operation_version() -> u32 {
     1
 }
@@ -67,6 +80,8 @@ pub struct Recipe {
     pub assemblies: Vec<AssemblyDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub assembly_outputs: Vec<AssemblyOutput>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub face_assertions: Vec<FaceAssertion>,
 }
 
 impl<'de> Deserialize<'de> for Recipe {
@@ -94,6 +109,8 @@ impl<'de> Deserialize<'de> for Recipe {
             assemblies: Option<Vec<AssemblyDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             assembly_outputs: Option<Vec<AssemblyOutput>>,
+            #[serde(default, deserialize_with = "present_vec")]
+            face_assertions: Option<Vec<FaceAssertion>>,
         }
         let raw = RawRecipe::deserialize(deserializer)?;
         if raw.schema_version == 1
@@ -101,6 +118,11 @@ impl<'de> Deserialize<'de> for Recipe {
         {
             return Err(serde::de::Error::custom(
                 "assembly fields require recipe schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.face_assertions.is_some() {
+            return Err(serde::de::Error::custom(
+                "face assertions require recipe schema version 2",
             ));
         }
         Ok(Self {
@@ -112,6 +134,7 @@ impl<'de> Deserialize<'de> for Recipe {
             parts: raw.parts.unwrap_or_default(),
             assemblies: raw.assemblies.unwrap_or_default(),
             assembly_outputs: raw.assembly_outputs.unwrap_or_default(),
+            face_assertions: raw.face_assertions.unwrap_or_default(),
         })
     }
 }
@@ -381,11 +404,23 @@ pub struct BuildResult {
     pub assemblies: BTreeMap<String, cad_assembly::BuiltAssembly>,
     pub feature_hashes: BTreeMap<String, String>,
     pub stats: BuildStats,
+    pub face_assertions: BTreeMap<String, FaceResolution>,
     selection_graph: selection::SelectionGraph,
 }
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("face assertions require recipe schema version 2")]
+    FaceAssertionSchema,
+    #[error("invalid face assertion '{id}': {message}")]
+    InvalidFaceAssertion { id: String, message: String },
+    #[error("face assertion '{assertion_id}' failed: {diagnostic}", diagnostic = resolution.diagnostic)]
+    FaceAssertionFailed {
+        assertion_id: String,
+        resolution: Box<FaceResolution>,
+        anchor_content_hash: Option<String>,
+        target_content_hash: Option<String>,
+    },
     #[error("unsupported recipe schema version {0}; expected 1 or 2")]
     SchemaVersion(u32),
     #[error("assembly fields require recipe schema version 2")]
@@ -690,6 +725,34 @@ impl BuildEngine {
             return Err(BuildError::SchemaVersion(recipe.schema_version));
         }
         assembly::resource_limits(recipe)?;
+        if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
+            return Err(BuildError::FaceAssertionSchema);
+        }
+        if recipe.face_assertions.len() > MAX_FACE_ASSERTIONS {
+            return Err(BuildError::ResourceLimit {
+                resource: "face assertions",
+                limit: MAX_FACE_ASSERTIONS,
+            });
+        }
+        let mut assertion_ids = std::collections::BTreeSet::new();
+        for assertion in &recipe.face_assertions {
+            identifier("face assertion", &assertion.id)?;
+            if !assertion_ids.insert(&assertion.id) {
+                return Err(BuildError::InvalidFaceAssertion {
+                    id: assertion.id.clone(),
+                    message: "duplicate assertion ID".into(),
+                });
+            }
+            if matches!(
+                assertion.selector.cardinality,
+                FaceCardinality::Exactly { count: 0 }
+            ) {
+                return Err(BuildError::InvalidFaceAssertion {
+                    id: assertion.id.clone(),
+                    message: "exact cardinality must be positive".into(),
+                });
+            }
+        }
         if recipe.schema_version == 1
             && (!recipe.parts.is_empty()
                 || !recipe.assemblies.is_empty()
@@ -863,12 +926,36 @@ impl BuildEngine {
             .collect();
         let assemblies = assembly::evaluate(recipe, &hashes, &evaluated, tolerance)?;
         let selection_graph = selection::SelectionGraph::new(recipe, order, evaluated);
-        Ok(BuildResult {
+        let mut result = BuildResult {
             outputs,
             assemblies,
             feature_hashes: hashes,
             stats,
+            face_assertions: BTreeMap::new(),
             selection_graph,
-        })
+        };
+        let mut assertion_work_remaining = MAX_FACE_ASSERTION_WORK;
+        for assertion in &recipe.face_assertions {
+            let resolution = result
+                .resolve_faces_with_remaining(&assertion.selector, &mut assertion_work_remaining);
+            if resolution.status != FaceResolutionStatus::Resolved {
+                return Err(BuildError::FaceAssertionFailed {
+                    assertion_id: assertion.id.clone(),
+                    anchor_content_hash: result
+                        .feature_hashes
+                        .get(&assertion.selector.anchor_feature)
+                        .cloned(),
+                    target_content_hash: result
+                        .feature_hashes
+                        .get(&assertion.selector.target_feature)
+                        .cloned(),
+                    resolution: Box::new(resolution),
+                });
+            }
+            result
+                .face_assertions
+                .insert(assertion.id.clone(), resolution);
+        }
+        Ok(result)
     }
 }

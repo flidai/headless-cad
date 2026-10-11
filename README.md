@@ -284,6 +284,32 @@ intent in source; numeric face IDs in witnesses belong only to the reported
 build snapshot. B-rep patch counts can change after edits, even when a visible
 surface remains connected.
 
+### Design assertions in recipes
+
+Persist required face selections in Starlark so every build checks design intent:
+
+```python
+assert_faces(id = "two_stop_tops", from_feature = stop, role = "end_cap",
+             in_feature = finished, count = 2)
+assert_faces(id = "plate_top_survives", from_feature = blank, role = "end_cap",
+             in_feature = finished, all = True)
+```
+
+`count` defaults to one; `all=True` requires a nonempty selection and cannot be
+combined with an explicit count. Each assertion needs a unique ID. Assertions
+use recipe schema 2 and are included in compiled JSON. Builds evaluate them
+after geometry, including on cache hits, and publish only when every assertion
+resolves. Failure returns `face_assertion_failed`, the assertion ID, status,
+candidate witnesses, and geometry fingerprints. The previous published
+generation remains intact, including in watch mode.
+
+Successful `check` and `build` reports contain `face_assertions`; exported build
+manifests retain those witnesses with source and build identity. `cad diff`
+reports assertion changes even when geometric outputs are unchanged. These are
+topological-intent checks, not dimension, clearance, or stress assertions.
+There is a limit of 1,000 assertions per recipe, sharing one million work/copy
+units across the complete assertion set. Exhaustion fails the build explicitly.
+
 `cad init` never overwrites an existing recipe. Builds stage all artifacts before
 publication. Linux replacement uses atomic directory exchange. Other platforms
 use a rename/rollback fallback with a brief publication gap. Only empty

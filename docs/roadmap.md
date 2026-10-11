@@ -39,7 +39,9 @@ operations are already supported.
    supported; keep migration and repeated-definition reuse tests.
 2. Extend implemented face-role selector results (`resolved`, `deleted`,
    `ambiguous`, `unsupported`) and orthogonal face lineage to richer predicates,
-   datums and downstream modeling consumers. Expand the generated edit corpus
+   datums and downstream modeling consumers. Recipe `assert_faces` now enforces
+   these references before publication and preserves reports for review.
+   Expand the generated edit corpus
    beyond orthogonal cuts and translations before claiming general persistent
    naming reliability.
 3. Extend the implemented metadata-only assembly manifest and shared local-mesh

@@ -209,6 +209,12 @@ source intent on each build; it is not persistent numbering. General geometric
 predicates, edge/vertex selectors, datums, instance paths, and consumption by
 downstream modeling operations remain work to implement.
 
+Starlark `assert_faces` persists this selector intent in schema-2 recipes. The
+build resolves each assertion before artifact publication, including on cached
+geometry; manifests retain successful witnesses and semantic diffs expose
+assertion changes. This is the first build-time consumer of semantic references.
+It does not yet attach a sketch or drive a geometric operation from a reference.
+
 ## Constraints and assemblies
 
 Build a constraint service separately from geometric construction. The 2D sketch
@@ -374,7 +380,7 @@ reviewed decision based on evidence, not by relabeling missed targets.
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
 | Kernel | Validated orthogonal B-rep; rectangular extrusion; translation; Booleans | General geometry, robust intersections, cavity/trim handling, richer operations |
-| References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics and snapshot witnesses | Datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
+| References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, flat rigid instances, shared assets and occurrence-aware STEP | Nested instances, datums, constraints, configurations, BOM |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, depth-buffer Canvas inspection, compact instanced display assets, occurrence picking, recipe panel, live refresh | GPU instancing, lazy assets, bounded LOD streaming, sections/overlays |

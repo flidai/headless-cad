@@ -101,8 +101,21 @@ impl BuildResult {
         self.resolve_faces_with_budget(selector, MAX_FACE_SELECTION_WORK)
     }
 
-    fn resolve_faces_with_budget(&self, selector: &FaceSelector, budget: usize) -> FaceResolution {
+    fn resolve_faces_with_budget(
+        &self,
+        selector: &FaceSelector,
+        mut budget: usize,
+    ) -> FaceResolution {
+        self.resolve_faces_with_remaining(selector, &mut budget)
+    }
+
+    pub(super) fn resolve_faces_with_remaining(
+        &self,
+        selector: &FaceSelector,
+        remaining: &mut usize,
+    ) -> FaceResolution {
         use FaceResolutionStatus::*;
+        let budget = *remaining;
         let mut resolution = FaceResolution {
             status: Unsupported,
             selector: selector.clone(),
@@ -110,19 +123,25 @@ impl BuildResult {
             lineage: Vec::new(),
             diagnostic: String::new(),
         };
-        let mut work = 0usize;
         macro_rules! charge {
             ($cost:expr) => {
-                work = work.saturating_add($cost);
-                if work > budget {
+                let cost = $cost;
+                if cost > *remaining {
                     resolution.lineage.clear();
                     resolution.witnesses.clear();
                     resolution.status = Unsupported;
                     resolution.diagnostic = format!("face selection resource budget exceeded ({budget} work/lineage handles); no witnesses certified");
+                    *remaining = 0;
                     return resolution;
                 }
+                *remaining -= cost;
             };
         }
+        charge!(selector
+            .anchor_feature
+            .len()
+            .saturating_add(selector.role.len())
+            .saturating_add(selector.target_feature.len()));
         let graph = &self.selection_graph;
         let Some(anchor) = graph.results.get(&selector.anchor_feature) else {
             resolution.diagnostic = "anchor must identify an existing solid feature".into();
@@ -523,6 +542,144 @@ mod tests {
         assert_eq!(result.status, FaceResolutionStatus::Unsupported);
         assert!(result.diagnostic.contains("resource budget"));
         assert!(result.lineage.is_empty());
+    }
+
+    #[test]
+    fn persisted_assertions_gate_builds_and_reuse_geometry_on_contract_edits() {
+        let mut recipe = recipe(12.0, 8.0, 3.0, 4.0, 3.0);
+        recipe.schema_version = 2;
+        recipe.face_assertions.push(FaceAssertion {
+            id: "top_faces".into(),
+            selector: selector("cut", FaceCardinality::All),
+        });
+        let mut engine = BuildEngine::default();
+        let first = engine.build(&recipe).unwrap();
+        assert_eq!(first.face_assertions["top_faces"].witnesses.len(), 2);
+        recipe.face_assertions[0].selector.cardinality = FaceCardinality::Exactly { count: 2 };
+        let changed = engine.build(&recipe).unwrap();
+        assert_eq!(changed.stats.computed_solids, 0);
+        assert_eq!(first.feature_hashes, changed.feature_hashes);
+        recipe.face_assertions[0].selector.cardinality = FaceCardinality::Exactly { count: 1 };
+        let BuildError::FaceAssertionFailed {
+            assertion_id,
+            resolution,
+            anchor_content_hash,
+            target_content_hash,
+        } = engine.build(&recipe).unwrap_err()
+        else {
+            panic!("expected structured assertion failure")
+        };
+        assert_eq!(assertion_id, "top_faces");
+        assert_eq!(resolution.status, FaceResolutionStatus::Ambiguous);
+        assert_eq!(resolution.witnesses.len(), 2);
+        assert_eq!(
+            anchor_content_hash.as_ref(),
+            first.feature_hashes.get("body")
+        );
+        assert_eq!(
+            target_content_hash.as_ref(),
+            first.feature_hashes.get("cut")
+        );
+        recipe.face_assertions[0].selector.role = "unknown".into();
+        let BuildError::FaceAssertionFailed { resolution, .. } = engine.build(&recipe).unwrap_err()
+        else {
+            panic!("expected unsupported selector")
+        };
+        assert_eq!(resolution.status, FaceResolutionStatus::Unsupported);
+        recipe.face_assertions[0].selector.role = "end_cap".into();
+        if let Feature::Cut { right, .. } = &mut recipe.features[5] {
+            *right = "body".into();
+        }
+        let BuildError::FaceAssertionFailed { resolution, .. } = engine.build(&recipe).unwrap_err()
+        else {
+            panic!("expected deleted selector")
+        };
+        assert_eq!(resolution.status, FaceResolutionStatus::Deleted);
+    }
+
+    #[test]
+    fn many_successful_assertions_share_one_aggregate_work_budget() {
+        let mut recipe = recipe(12.0, 8.0, 3.0, 4.0, 3.0);
+        recipe.schema_version = 2;
+        let long_id = "m".repeat(5000);
+        if let Feature::Translate { id, .. } = &mut recipe.features[6] {
+            *id = long_id.clone();
+        }
+        recipe.outputs[1].feature = long_id.clone();
+        recipe.face_assertions = (0..200)
+            .map(|i| FaceAssertion {
+                id: format!("assertion_{i}"),
+                selector: selector(&long_id, FaceCardinality::All),
+            })
+            .collect();
+        let error = build(&recipe).unwrap_err();
+        let BuildError::FaceAssertionFailed { resolution, .. } = error else {
+            panic!("expected aggregate budget failure")
+        };
+        assert_eq!(resolution.status, FaceResolutionStatus::Unsupported);
+        assert!(resolution.diagnostic.contains("resource budget"));
+        assert!(resolution.witnesses.is_empty());
+    }
+
+    #[test]
+    fn assertion_schema_and_preflight_errors_do_not_evaluate_geometry() {
+        let base = recipe(12.0, 8.0, 3.0, 4.0, 3.0);
+        for value in [serde_json::json!([]), serde_json::Value::Null] {
+            let mut raw = serde_json::to_value(&base).unwrap();
+            raw["face_assertions"] = value;
+            assert!(serde_json::from_value::<Recipe>(raw).is_err());
+        }
+        let mut recipe = base;
+        recipe.schema_version = 2;
+        recipe.face_assertions.push(FaceAssertion {
+            id: "top".into(),
+            selector: selector("cut", FaceCardinality::Exactly { count: 1 }),
+        });
+        let serialized = serde_json::to_string(&recipe).unwrap();
+        assert_eq!(
+            serde_json::from_str::<Recipe>(&serialized)
+                .unwrap()
+                .face_assertions[0]
+                .id,
+            "top"
+        );
+        let mut unknown = serde_json::to_value(&recipe).unwrap();
+        unknown["face_assertions"][0]["typo"] = true.into();
+        assert!(serde_json::from_value::<Recipe>(unknown).is_err());
+        // Invalid geometry would fail later; assertion preflight must win first.
+        if let Feature::Rectangle { width, .. } = &mut recipe.features[0] {
+            *width = -1.0;
+        }
+        recipe.face_assertions[0].selector.cardinality = FaceCardinality::Exactly { count: 0 };
+        assert!(matches!(
+            build(&recipe),
+            Err(BuildError::InvalidFaceAssertion { .. })
+        ));
+        recipe.face_assertions[0].selector.cardinality = FaceCardinality::All;
+        recipe
+            .face_assertions
+            .push(recipe.face_assertions[0].clone());
+        assert!(matches!(
+            build(&recipe),
+            Err(BuildError::InvalidFaceAssertion { .. })
+        ));
+        recipe.face_assertions.pop();
+        recipe.face_assertions[0].id = " ".into();
+        assert!(matches!(
+            build(&recipe),
+            Err(BuildError::Identifier {
+                kind: "face assertion",
+                ..
+            })
+        ));
+        recipe.face_assertions = vec![recipe.face_assertions[0].clone(); MAX_FACE_ASSERTIONS + 1];
+        assert!(matches!(
+            build(&recipe),
+            Err(BuildError::ResourceLimit {
+                resource: "face assertions",
+                ..
+            })
+        ));
     }
 
     #[test]

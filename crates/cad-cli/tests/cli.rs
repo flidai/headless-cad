@@ -819,3 +819,219 @@ fn assembly_validation_rejects_metadata_tampering_and_preflights_resources() {
     assert!(!result.status.success());
     assert!(String::from_utf8_lossy(&result.stderr).contains("count limit"));
 }
+
+const FACE_ASSERTION_RECIPE: &str = r#"
+x = param(name = 'cut_x', default = 8)
+w = param(name = 'cut_width', default = 2)
+p = rectangle(id = 'profile', width = 10, depth = 8)
+base = extrude(id = 'base', profile = p, height = 3)
+q = rectangle(id = 'tool_profile', width = w, depth = 10)
+tool = extrude(id = 'tool', profile = q, height = 5)
+tool = translate(id = 'placed_tool', body = tool, offset = [x,-1,-1])
+result = cut(id = 'cut', left = base, right = tool)
+assert_faces(id = 'top_survives', from_feature = base, role = 'end_cap', in_feature = result)
+output(name = 'part', feature = result)
+"#;
+
+fn artifact_bytes(root: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    fn visit(
+        root: &Path,
+        directory: &Path,
+        files: &mut std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>,
+    ) {
+        for entry in fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                visit(root, &path, files);
+            } else {
+                files.insert(
+                    path.strip_prefix(root).unwrap().to_owned(),
+                    fs::read(path).unwrap(),
+                );
+            }
+        }
+    }
+    let mut files = std::collections::BTreeMap::new();
+    visit(root, root, &mut files);
+    files
+}
+
+#[test]
+fn face_assertions_publish_evidence_and_failed_parameter_edits_preserve_all_artifacts() {
+    let directory = tempfile::tempdir().unwrap();
+    let recipe = directory.path().join("assertions.star");
+    let out = directory.path().join("out");
+    let cache = directory.path().join("cache");
+    fs::write(&recipe, FACE_ASSERTION_RECIPE).unwrap();
+    let args = [
+        "build",
+        recipe.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ];
+    let first = successful_json(cli(&args));
+    let resolution = &first["face_assertions"]["top_survives"];
+    assert_eq!(resolution["status"], "resolved");
+    assert_eq!(
+        resolution["selector"],
+        serde_json::json!({
+            "anchor_feature":"base", "role":"end_cap", "target_feature":"cut",
+            "cardinality":{"kind":"exactly", "count":1}
+        })
+    );
+    assert_eq!(resolution["witnesses"].as_array().unwrap().len(), 1);
+    assert_eq!(resolution["witnesses"][0]["target_feature"], "cut");
+    assert_eq!(
+        resolution["witnesses"][0]["anchor_faces"],
+        serde_json::json!([1])
+    );
+    assert!(resolution["witnesses"][0]["target_face"].is_u64());
+    assert!(!resolution["lineage"].as_array().unwrap().is_empty());
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["face_assertions"], first["face_assertions"]);
+    let compiled_check = successful_json(cli(&[
+        "check",
+        out.join("recipe.json").to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    assert_eq!(compiled_check["face_assertions"], first["face_assertions"]);
+    assert!(compiled_check["stats"]["disk_cache_hits"].as_u64().unwrap() > 0);
+    let original = artifact_bytes(&out);
+    assert!(original.contains_key(Path::new("manifest.json")));
+    assert!(original.contains_key(Path::new("part.step")));
+    assert!(original.contains_key(Path::new("part.preview.html")));
+    for (parameters, status, witnesses) in [
+        (vec!["--param", "cut_x=4"], "ambiguous", 2),
+        (
+            vec!["--param", "cut_x=-1", "--param", "cut_width=12"],
+            "deleted",
+            0,
+        ),
+    ] {
+        // Repeating also checks that a cached failed geometry result never
+        // bypasses re-evaluation of the declarative face assertion.
+        for _ in 0..2 {
+            let mut changed_args = args.to_vec();
+            changed_args.extend(&parameters);
+            let changed = cli(&changed_args);
+            assert!(!changed.status.success());
+            assert!(changed.stdout.is_empty());
+            let error: serde_json::Value = serde_json::from_slice(&changed.stderr).unwrap();
+            assert_eq!(error["code"], "face_assertion_failed", "{error}");
+            assert_eq!(error["assertion_id"], "top_survives");
+            assert_eq!(
+                error["snapshot"]["kernel_build_id"],
+                first["kernel_build_id"]
+            );
+            assert_eq!(
+                error["snapshot"]["executor_build_id"],
+                first["executor_build_id"]
+            );
+            assert_eq!(
+                error["snapshot"]["anchor_content_hash"]
+                    .as_str()
+                    .unwrap()
+                    .len(),
+                64
+            );
+            assert_eq!(
+                error["snapshot"]["target_content_hash"]
+                    .as_str()
+                    .unwrap()
+                    .len(),
+                64
+            );
+            assert_eq!(error["selection"]["status"], status);
+            assert_eq!(error["selection"]["selector"], resolution["selector"]);
+            assert_eq!(
+                error["selection"]["witnesses"].as_array().unwrap().len(),
+                witnesses
+            );
+            assert_eq!(
+                artifact_bytes(&out),
+                original,
+                "failed {status} assertion modified artifacts"
+            );
+        }
+    }
+    assert_eq!(fs::read_to_string(recipe).unwrap(), FACE_ASSERTION_RECIPE);
+}
+
+#[test]
+fn face_assertions_accept_explicit_split_counts_and_all_survivors() {
+    let directory = tempfile::tempdir().unwrap();
+    for (index, cardinality) in ["count = 2", "all = True"].into_iter().enumerate() {
+        let recipe = directory.path().join(format!("split{index}.star"));
+        let out = directory.path().join(format!("out{index}"));
+        let source = FACE_ASSERTION_RECIPE.replace(
+            "in_feature = result)",
+            &format!("in_feature = result, {cardinality})"),
+        );
+        fs::write(&recipe, source).unwrap();
+        let built = successful_json(cli(&[
+            "build",
+            recipe.to_str().unwrap(),
+            "--param",
+            "cut_x=4",
+            "--out-dir",
+            out.to_str().unwrap(),
+        ]));
+        let resolution = &built["face_assertions"]["top_survives"];
+        assert_eq!(resolution["status"], "resolved");
+        assert_eq!(resolution["witnesses"].as_array().unwrap().len(), 2);
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+        assert_eq!(manifest["face_assertions"], built["face_assertions"]);
+    }
+}
+
+#[test]
+fn face_assertion_only_edits_are_visible_in_diff_without_geometry_changes() {
+    let directory = tempfile::tempdir().unwrap();
+    let before = directory.path().join("before.star");
+    let after = directory.path().join("after.star");
+    fs::write(&before, FACE_ASSERTION_RECIPE).unwrap();
+    for (source, expected) in [
+        (
+            FACE_ASSERTION_RECIPE
+                .replace("in_feature = result)", "in_feature = result, all = True)"),
+            "changed",
+        ),
+        (
+            FACE_ASSERTION_RECIPE.replace("top_survives", "top_surface"),
+            "removed",
+        ),
+    ] {
+        fs::write(&after, source).unwrap();
+        let report = successful_json(cli(&[
+            "diff",
+            before.to_str().unwrap(),
+            after.to_str().unwrap(),
+        ]));
+        assert_eq!(report["outputs"]["part"]["status"], "unchanged");
+        let assertion = &report["face_assertions"]["top_survives"];
+        assert_eq!(assertion["status"], expected, "{report}");
+        assert_eq!(assertion["before"]["status"], "resolved");
+        if expected == "changed" {
+            assert_eq!(
+                assertion["before"]["selector"]["cardinality"]["kind"],
+                "exactly"
+            );
+            assert_eq!(assertion["after"]["selector"]["cardinality"]["kind"], "all");
+            assert_eq!(
+                assertion["before"]["witnesses"],
+                assertion["after"]["witnesses"]
+            );
+        } else {
+            assert!(assertion["after"].is_null());
+            let renamed = &report["face_assertions"]["top_surface"];
+            assert_eq!(renamed["status"], "added");
+            assert!(renamed["before"].is_null());
+            assert_eq!(renamed["after"], assertion["before"]);
+        }
+    }
+}

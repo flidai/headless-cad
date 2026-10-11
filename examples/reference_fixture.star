@@ -43,4 +43,9 @@ right_stop = translate(id = "stop_right", body = stop,
                        offset = [width - 8, 0, thickness])
 with_left = union(id = "with_left", left = current, right = left_stop)
 finished = union(id = "finished", left = with_left, right = right_stop)
+# Design intent is checked before any generation is published.
+assert_faces(id = "plate_top_survives", from_feature = blank, role = "end_cap",
+             in_feature = finished, all = True)
+assert_faces(id = "two_stop_tops", from_feature = stop, role = "end_cap",
+             in_feature = finished, count = 2)
 output(name = "reference_fixture", feature = finished)

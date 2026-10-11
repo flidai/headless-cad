@@ -5,7 +5,10 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
-use cad_build::{Recipe, MAX_ASSEMBLIES, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS, MAX_PARTS};
+use cad_build::{
+    Recipe, MAX_ASSEMBLIES, MAX_FACE_ASSERTIONS, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS,
+    MAX_PARTS,
+};
 use starlark::any::ProvidesStaticType;
 use starlark::environment::{GlobalsBuilder, Module};
 use starlark::eval::Evaluator;
@@ -31,6 +34,7 @@ struct GraphStore {
     used_instances: RefCell<BTreeSet<String>>,
     assemblies: RefCell<Vec<serde_json::Value>>,
     assembly_outputs: RefCell<Vec<serde_json::Value>>,
+    face_assertions: RefCell<Vec<serde_json::Value>>,
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
     parameters: RefCell<BTreeMap<String, f64>>,
@@ -194,6 +198,43 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         store(eval)?.output(serde_json::json!({
             "name": name, "feature": feature,
         }))?;
+        Ok(NoneType)
+    }
+
+    /// Require a semantic face reference to resolve when the graph is built.
+    /// Omitted count requires one face; all=True explicitly accepts splits.
+    fn assert_faces(
+        id: &str,
+        from_feature: &str,
+        role: &str,
+        in_feature: &str,
+        count: Option<i32>,
+        #[starlark(default = false)] all: bool,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        anyhow::ensure!(
+            !(all && count.is_some()),
+            "assert_faces accepts count or all=True, not both"
+        );
+        let cardinality = if all {
+            serde_json::json!({"kind":"all"})
+        } else {
+            let count = count.unwrap_or(1);
+            anyhow::ensure!(
+                (1..=100_000).contains(&count),
+                "assert_faces count must be an integer from 1 to 100000"
+            );
+            serde_json::json!({"kind":"exactly","count":count})
+        };
+        let graph = store(eval)?;
+        let mut assertions = graph.face_assertions.borrow_mut();
+        anyhow::ensure!(
+            assertions.len() < MAX_FACE_ASSERTIONS,
+            "recipe exceeds {MAX_FACE_ASSERTIONS} face assertions"
+        );
+        assertions.push(serde_json::json!({"id":id,"selector":{
+            "anchor_feature":from_feature,"role":role,"target_feature":in_feature,"cardinality":cardinality,
+        }}));
         Ok(NoneType)
     }
 
@@ -377,10 +418,11 @@ pub fn from_starlark_with_params(
     let parts = graph.parts.into_inner();
     let assemblies = graph.assemblies.into_inner();
     let assembly_outputs = graph.assembly_outputs.into_inner();
+    let face_assertions = graph.face_assertions.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if assembly_schema { 2 } else { 1 },
+        "schema_version": if assembly_schema || !face_assertions.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -389,6 +431,9 @@ pub fn from_starlark_with_params(
         value["parts"] = serde_json::json!(parts);
         value["assemblies"] = serde_json::json!(assemblies);
         value["assembly_outputs"] = serde_json::json!(assembly_outputs);
+    }
+    if !face_assertions.is_empty() {
+        value["face_assertions"] = serde_json::json!(face_assertions);
     }
     Ok(serde_json::from_value(value)?)
 }
@@ -626,5 +671,108 @@ assembly_output(name="pair", assembly=assembly(id="pair", instances=[a,b]))
             "def many():\n    for i in range(10001):\n        part(id=str(i),body='body')\nmany()";
         let error = from_starlark("limit.star", source).unwrap_err().to_string();
         assert!(error.contains("10000 parts"), "{error}");
+    }
+}
+
+#[cfg(test)]
+mod assertion_tests {
+    use super::*;
+
+    const MODEL: &str = r#"
+p = rectangle(id='p',width=10,depth=8)
+base = extrude(id='base',profile=p,height=3)
+moved = translate(id='moved',body=base,offset=[20,0,0])
+q = rectangle(id='q',width=2,depth=10)
+c = extrude(id='c',profile=q,height=5)
+c = translate(id='positioned',body=c,offset=[4,-1,-1])
+split = cut(id='split',left=base,right=c)
+output(name='part',feature=moved)
+"#;
+
+    #[test]
+    fn semantic_assertions_emit_schema_two_and_build_roundtrip() {
+        let source=format!("{MODEL}\nassert_faces(id='cap',from_feature=base,role='end_cap',in_feature=moved)\nassert_faces(id='split_cap',from_feature=base,role='end_cap',in_feature=split,count=2)\nassert_faces(id='all_walls',from_feature=base,role='walls',in_feature=moved,all=True)\n");
+        let recipe = from_starlark("assertions.star", &source).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        let raw = serde_json::to_value(&recipe).unwrap();
+        assert_eq!(
+            raw["face_assertions"][0]["selector"]["cardinality"],
+            serde_json::json!({"kind":"exactly","count":1})
+        );
+        assert_eq!(
+            raw["face_assertions"][2]["selector"]["cardinality"],
+            serde_json::json!({"kind":"all"})
+        );
+        let decoded: Recipe =
+            serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+        let built = cad_build::build(&recipe).unwrap();
+        let roundtrip = cad_build::build(&decoded).unwrap();
+        assert_eq!(built.face_assertions.len(), 3);
+        assert_eq!(built.face_assertions["cap"].witnesses.len(), 1);
+        assert_eq!(built.face_assertions["split_cap"].witnesses.len(), 2);
+        assert_eq!(built.face_assertions["all_walls"].witnesses.len(), 4);
+        assert_eq!(
+            serde_json::to_value(&built.face_assertions).unwrap(),
+            serde_json::to_value(&roundtrip.face_assertions).unwrap()
+        );
+    }
+
+    #[test]
+    fn unresolved_assertions_fail_geometry_build_instead_of_silently_selecting() {
+        let source=format!("{MODEL}\nassert_faces(id='must_be_one',from_feature=base,role='end_cap',in_feature=split)\n");
+        let recipe = from_starlark("ambiguous.star", &source).unwrap();
+        match cad_build::build(&recipe).unwrap_err() {
+            cad_build::BuildError::FaceAssertionFailed {
+                assertion_id,
+                resolution,
+                ..
+            } => {
+                assert_eq!(assertion_id, "must_be_one");
+                assert_eq!(
+                    resolution.status,
+                    cad_build::FaceResolutionStatus::Ambiguous
+                );
+                assert_eq!(resolution.witnesses.len(), 2);
+            }
+            error => panic!("unexpected failure: {error}"),
+        }
+        let duplicate=format!("{MODEL}\nassert_faces(id='duplicate',from_feature=base,role='end_cap',in_feature=moved)\nassert_faces(id='duplicate',from_feature=base,role='end_cap',in_feature=moved)\n");
+        let recipe = from_starlark("duplicate.star", &duplicate).unwrap();
+        assert!(matches!(
+            cad_build::build(&recipe),
+            Err(cad_build::BuildError::InvalidFaceAssertion { .. })
+        ));
+    }
+
+    #[test]
+    fn assertion_arguments_are_strict_and_host_allocations_bounded() {
+        for arguments in [
+            "count=0",
+            "count=-1",
+            "count=100001",
+            "count=1.5",
+            "count=1.0",
+            "count=True",
+            "count=None",
+            "count='1'",
+            "all=1",
+            "all='yes'",
+            "count=1,all=True",
+        ] {
+            let source=format!("assert_faces(id='a',from_feature='base',role='end_cap',in_feature='moved',{arguments})");
+            let error = from_starlark("invalid-assertion.star", &source)
+                .expect_err(arguments)
+                .to_string();
+            assert!(error.contains("invalid-assertion.star"), "{error}");
+        }
+        let source="def many():\n    for i in range(1001):\n        assert_faces(id=str(i),from_feature='base',role='end_cap',in_feature='base')\nmany()";
+        let error = from_starlark("bounded-assertions.star", source)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("1000 face assertions"), "{error}");
+        assert_eq!(
+            from_starlark("legacy.star", MODEL).unwrap().schema_version,
+            1
+        );
     }
 }
