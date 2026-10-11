@@ -16,7 +16,12 @@ use thiserror::Error;
 
 mod assembly;
 mod demand;
+mod property_assertions;
 pub use demand::{BuildMode, BuildScope};
+pub use property_assertions::{
+    EngineeringProperty, PropertyAssertion, PropertyAssertionReport, PropertyAssertionStatus,
+    MAX_PROPERTY_ASSERTIONS, MAX_PROPERTY_ASSERTION_WORK,
+};
 mod face_datums;
 pub use face_datums::{
     FaceDatumDefinition, FaceDatumResolution, ResolvedFaceDatums, MAX_FACE_DATUMS,
@@ -52,6 +57,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("demand.rs").as_slice(),
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
+            include_bytes!("property_assertions.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -94,6 +100,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_assertions: Vec<FaceAssertion>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub property_assertions: Vec<PropertyAssertion>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
 }
 
@@ -125,6 +133,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             face_assertions: Option<Vec<FaceAssertion>>,
             #[serde(default, deserialize_with = "present_vec")]
+            property_assertions: Option<Vec<PropertyAssertion>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
         }
         let raw = RawRecipe::deserialize(deserializer)?;
@@ -133,6 +143,11 @@ impl<'de> Deserialize<'de> for Recipe {
         {
             return Err(serde::de::Error::custom(
                 "assembly fields require recipe schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.property_assertions.is_some() {
+            return Err(serde::de::Error::custom(
+                "property assertions require recipe schema version 2",
             ));
         }
         if raw.schema_version == 1 && raw.face_assertions.is_some() {
@@ -155,6 +170,7 @@ impl<'de> Deserialize<'de> for Recipe {
             assemblies: raw.assemblies.unwrap_or_default(),
             assembly_outputs: raw.assembly_outputs.unwrap_or_default(),
             face_assertions: raw.face_assertions.unwrap_or_default(),
+            property_assertions: raw.property_assertions.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
         })
     }
@@ -534,12 +550,22 @@ pub struct BuildResult {
     pub feature_hashes: BTreeMap<String, String>,
     pub stats: BuildStats,
     pub face_assertions: BTreeMap<String, FaceResolution>,
+    pub property_assertions: BTreeMap<String, PropertyAssertionReport>,
     pub face_datums: ResolvedFaceDatums,
     selection_graph: selection::SelectionGraph,
 }
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("property assertions require recipe schema version 2")]
+    PropertyAssertionSchema,
+    #[error("invalid property assertion '{id}': {message}")]
+    InvalidPropertyAssertion { id: String, message: String },
+    #[error("property assertion '{assertion_id}' failed")]
+    PropertyAssertionFailed {
+        assertion_id: String,
+        report: Box<PropertyAssertionReport>,
+    },
     #[error("output selection must contain at least one output name")]
     EmptyOutputSelection,
     #[error("unknown selected output '{0}'")]
@@ -950,6 +976,7 @@ impl BuildEngine {
             return Err(BuildError::SchemaVersion(recipe.schema_version));
         }
         assembly::resource_limits(recipe)?;
+        property_assertions::preflight(recipe)?;
         face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
@@ -1263,6 +1290,7 @@ impl BuildEngine {
             feature_hashes: hashes,
             stats,
             face_assertions: BTreeMap::new(),
+            property_assertions: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             selection_graph,
         };
@@ -1295,14 +1323,34 @@ impl BuildEngine {
             tolerance,
             &mut assertion_work_remaining,
         )?;
-        result.assemblies = assembly::evaluate(
+        let assembly_requests: Vec<_> = result
+            .scope
+            .requested_outputs
+            .iter()
+            .cloned()
+            .chain(recipe.property_assertions.iter().map(|a| a.output.clone()))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let assertion_assemblies = assembly::evaluate(
             recipe,
             &result.feature_hashes,
             &evaluated,
             tolerance,
             &result.face_datums,
-            &result.scope.requested_outputs,
+            &assembly_requests,
         )?;
+        result.property_assertions = property_assertions::evaluate(
+            recipe,
+            &result.feature_hashes,
+            &evaluated,
+            &assertion_assemblies,
+            tolerance,
+        )?;
+        result.assemblies = assertion_assemblies
+            .into_iter()
+            .filter(|(name, _)| result.scope.requested_outputs.binary_search(name).is_ok())
+            .collect();
         Ok(result)
     }
 }

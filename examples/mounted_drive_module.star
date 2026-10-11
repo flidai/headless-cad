@@ -44,3 +44,10 @@ assembly_output(name = "mounted_drive_module", assembly = assembly(id = "mounted
 ]))
 output(name = "housing", feature = housing_body)
 output(name = "sensor_mount", feature = mount_body)
+
+# Engineering release gates: retain the intended material envelope, stay below
+# the 650 g mass budget, and keep the assembly balance inside the support span.
+# Native properties are checked even when only an individual output is built.
+assert_property(id = "material_envelope", output = "mounted_drive_module", property = "volume_mm3", min = 167000, max = 168000)
+assert_property(id = "mass_budget", output = "mounted_drive_module", property = "mass_kg", max = 0.65)
+assert_property(id = "balance_envelope", output = "mounted_drive_module", property = "mass_centroid_x_mm", min = 45, max = 61)

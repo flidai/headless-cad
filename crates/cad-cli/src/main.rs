@@ -217,6 +217,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "scope": build.scope,
         "feature_hashes": build.feature_hashes,
         "face_assertions": build.face_assertions,
+        "property_assertions": build.property_assertions,
         "face_datums": build.face_datums,
         "outputs": outputs,
     }))
@@ -425,6 +426,29 @@ fn difference(before: &Value, after: &Value) -> Value {
             (name.clone(), json!({"status":status,"before":a,"after":b}))
         })
         .collect();
+    let before_properties = before["property_assertions"]
+        .as_object()
+        .expect("build property assertions");
+    let after_properties = after["property_assertions"]
+        .as_object()
+        .expect("build property assertions");
+    let properties: serde_json::Map<String, Value> = before_properties
+        .keys()
+        .chain(after_properties.keys())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|name| {
+            let a = before_properties.get(name);
+            let b = after_properties.get(name);
+            let status = match (a, b) {
+                (None, Some(_)) => "added",
+                (Some(_), None) => "removed",
+                (Some(a), Some(b)) if a == b => "unchanged",
+                _ => "changed",
+            };
+            (name.clone(), json!({"status":status,"before":a,"after":b}))
+        })
+        .collect();
     let before_datums = before["face_datums"]
         .as_object()
         .expect("build face datums");
@@ -460,7 +484,7 @@ fn difference(before: &Value, after: &Value) -> Value {
             (part.clone(), json!(changes))
         })
         .collect();
-    json!({"outputs":changes,"face_assertions":assertions,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"face_assertions":assertions,"property_assertions":properties,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -754,6 +778,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             result["parameter_overrides"] = json!(parameters);
             result["stats"] = json!(built.stats);
             result["build_scope"] = json!(built.scope);
+            result["property_assertions"] = json!(built.property_assertions);
             return Ok(result);
         }
         Command::Select {
@@ -783,6 +808,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             let resolved = matches!(resolution.status, cad_build::FaceResolutionStatus::Resolved);
             let mut report = serde_json::to_value(&resolution)?;
             report["stats"] = json!(build.stats);
+            report["property_assertions"] = json!(build.property_assertions);
             report["snapshot"] = json!({
                 "recipe_source_hash": blake3::hash(&source_bytes).to_hex().to_string(),
                 "parameter_overrides": parameters,
@@ -906,14 +932,16 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         ..
     } = &cli.command
     {
-        return properties_report(
+        let mut result = properties_report(
             &recipe,
             &build,
             output,
             *density_kg_per_m3,
             &source_bytes,
             &parameters,
-        );
+        )?;
+        result["property_assertions"] = json!(build.property_assertions);
+        return Ok(result);
     }
     let mut summary = report(&recipe, &build)?;
     if let Command::Build {
@@ -1225,6 +1253,23 @@ fn main() {
             } else if let Some(build) = error.downcast_ref::<cad_build::BuildError>() {
                 report["code"] = json!("invalid_graph");
                 match build {
+                    cad_build::BuildError::InvalidPropertyAssertion { id, .. } => {
+                        report["code"] = json!("invalid_property_assertion");
+                        report["assertion_id"] = json!(id);
+                    }
+                    cad_build::BuildError::PropertyAssertionFailed {
+                        assertion_id,
+                        report: assertion,
+                    } => {
+                        report["code"] = json!("property_assertion_failed");
+                        report["assertion_id"] = json!(assertion_id);
+                        report["assertion"] = json!(assertion);
+                        report["snapshot"] = json!({
+                            "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
+                            "executor_build_id": cad_build::executor_build_id(),
+                            "target_content_hash": assertion.target_content_hash,
+                        });
+                    }
                     cad_build::BuildError::FaceAssertionFailed {
                         assertion_id,
                         resolution,

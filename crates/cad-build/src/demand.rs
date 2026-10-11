@@ -77,6 +77,29 @@ pub(super) fn scope(
         validation_roots.insert(datum.anchor_feature.clone());
         validation_roots.insert(parts[datum.part.as_str()].feature.clone());
     }
+    let asserted: BTreeSet<_> = recipe
+        .property_assertions
+        .iter()
+        .map(|a| a.output.as_str())
+        .collect();
+    for output in recipe
+        .outputs
+        .iter()
+        .filter(|o| asserted.contains(o.name.as_str()))
+    {
+        validation_roots.insert(output.feature.clone());
+    }
+    let (_, assertion_parts) = assembly_closure(
+        recipe,
+        recipe
+            .assembly_outputs
+            .iter()
+            .filter(|o| asserted.contains(o.name.as_str()))
+            .map(|o| o.assembly.as_str()),
+    );
+    for part in assertion_parts {
+        validation_roots.insert(parts[part].feature.clone());
+    }
     let mut needed = BTreeSet::new();
     if requested.is_none() {
         needed.extend(recipe.features.iter().map(|f| f.id().to_owned()));

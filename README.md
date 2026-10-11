@@ -637,6 +637,48 @@ topological-intent checks, not dimension, clearance, or stress assertions.
 There is a limit of 1,000 assertions per recipe, sharing one million work/copy
 units across the complete assertion set. Exhaustion fails the build explicitly.
 
+Recipes can also enforce engineering limits on named body or assembly outputs:
+
+```python
+assert_property(id = "mass_budget", output = "mounted_drive_module",
+                property = "mass_kg", max = 0.65)
+assert_property(id = "balance", output = "mounted_drive_module",
+                property = "mass_centroid_x_mm", min = 45, max = 61)
+```
+
+`assert_property` uses schema 2 and requires at least one finite, inclusive bound.
+When both are given, `min <= max`. There is no implicit percentage or comparison
+tolerance: express the acceptable interval explicitly in the property's units.
+Measurements come from native geometry and material metadata, never display LOD.
+
+| Property | Meaning |
+| --- | --- |
+| `volume_mm3` | Body volume or summed assembly occurrence material volume |
+| `volume_centroid_x_mm`, `_y_mm`, `_z_mm` | Volume-weighted centroid in the output frame |
+| `volume_inertia_xx_mm5`, `_yy_mm5`, `_zz_mm5`, `_xy_mm5`, `_xz_mm5`, `_yz_mm5` | Central volume inertia tensor components |
+| `mass_kg` | Assembly mass; every occurrence must have density |
+| `mass_centroid_x_mm`, `_y_mm`, `_z_mm` | Assembly centre of mass |
+| `mass_inertia_xx_kg_mm2`, `_yy_kg_mm2`, `_zz_kg_mm2`, `_xy_kg_mm2`, `_xz_kg_mm2`, `_yz_kg_mm2` | Central mass inertia tensor components |
+
+Tensor off-diagonals use negative product moments. Assembly sums count overlaps;
+they are not Boolean-union measurements or collision checks. Body outputs carry
+no density, so mass-weighted assertions require an assembly output. Undefined
+centroids/inertias and missing densities fail as `unavailable`, rather than zero.
+
+All property assertions run even for `build --output ...`, `--display-only`, and
+cached builds. An unrequested asserted output is evaluated for validation but
+is not published. Reports and the build manifest retain `property_assertions`
+with bounds, actual values and target content hashes. Failed checks return
+`property_assertion_failed` with `out_of_range` or `unavailable`; the previous
+generation stays intact. `cad diff` reports changed assertion limits even when
+the geometry stays identical. `mounted_drive_module.star` exercises fixed mass,
+balance and material-volume limits across docking edits.
+
+There are at most 1,000 property assertions. Each distinct target is measured
+once per build, with a ten-million-unit aggregate topology/occurrence budget
+reserved before property queries. Exhaustion fails explicitly. These checks do
+not certify fit, clearance, stress, manufacturing tolerances or solver convergence.
+
 `cad init` never overwrites an existing recipe. Builds stage all artifacts before
 publication. Linux replacement uses atomic directory exchange. Other platforms
 use a rename/rollback fallback with a brief publication gap. Only empty
@@ -661,7 +703,7 @@ cad watch examples/workcell_line.star --output service_station --out-dir out/ser
 `build`, `inspect`, and `watch` without this flag retain full evaluation.
 `properties --output` and `bom --assembly` evaluate their requested output.
 `check` always evaluates the full recipe. All modes validate the complete recipe's
-structure and enforce **every** global face assertion and face-derived datum;
+structure and enforce **every** global face/property assertion and face-derived datum;
 those obligations can require geometry outside the selected output. Unselected
 geometry operations without such obligations are not executed. A selected
 success therefore does not certify every other output's geometry.

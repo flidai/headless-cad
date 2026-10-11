@@ -207,6 +207,41 @@ validation, and publishes only a complete generation. Untrusted hosted recipes
 run in isolated processes with CPU, memory, filesystem, and network limits; the
 current Starlark interpreter limits alone are not this service boundary.
 
+### Engineering assertions as build obligations
+
+Schema-2 `assert_property` records a named output, a typed property with explicit
+units, and at least one finite inclusive bound. It currently covers native body
+and assembly volume, volume centroid and central volume inertia, plus assembly
+mass, centre of mass and central mass inertia. Off-diagonal tensor entries are
+negative product moments. Frames are the body output frame or root assembly
+frame. Assembly properties sum occurrences, including overlaps; they do not
+imply collision freedom. Body outputs have no material assignment, and every
+assembly occurrence needs density for mass-weighted metrics.
+
+All declared property assertions are global validation obligations, even on a
+selected-output, display-only or cached build. Structural errors fail before
+geometry. Demand planning includes the asserted output's dependency closure;
+assertion-only assemblies are computed without adding them to published outputs.
+Each distinct target is measured once. Before queries run, the builder reserves
+a bounded topology/occurrence workload across all targets (ten million units,
+at most 1,000 assertions), failing explicitly if the budget is exceeded.
+
+Compare against the source interval without adding an implicit tolerance or
+rounding a failing value. `out_of_range` and `unavailable` are distinct failures;
+missing density, undefined empty-body centroids and query failures are never
+interpreted as zero. A successful report pins the property, bounds, measured
+value and target content hash. Build manifests retain these reports alongside
+source and build identity; failure preserves the preceding artifact generation.
+Semantic diff includes changed assertion limits independently of geometry edits.
+
+The mounted drive module now has fixed material-volume, mass-budget and balance
+limits. Its tests use independent density-weighted formulas across docking edits
+and reject overweight/unbalanced variants during body-only builds. A separate
+mixed-density two-cube oracle checks every scalar property, including nonzero
+off-diagonals. This is numerical release evidence for supported native geometry,
+not a substitute for general geometry robustness, fit/clearance queries, stress
+analysis or manufacturing certification.
+
 ## Original Rust kernel
 
 ### Geometry and numerical policy
@@ -561,7 +596,9 @@ The local builder now supports explicit output selection while retaining eager
 then evaluates selected body/assembly dependencies plus every global assertion
 and face-datum dependency. Reports list requested outputs, evaluated/skipped
 features and validation roots. Unknown outputs fail before geometry evaluation;
-only selected assemblies are materialized. Published source stays complete,
+selected assemblies and globally asserted assemblies are materialized. An
+assertion-only assembly is retained only for validation and is not published.
+Published source stays complete,
 and selected publication replaces a complete selected generation rather than
 merging artifacts from different scopes.
 
@@ -996,7 +1033,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache and proxy fallback | Paged assembly/part spatial indexes, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
-| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
+| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; recipe property assertions with pinned evidence and global validation | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
 The current working commands are in [README.md](../README.md).

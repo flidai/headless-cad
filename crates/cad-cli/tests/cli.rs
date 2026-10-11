@@ -1031,6 +1031,144 @@ fn face_assertions_publish_evidence_and_failed_parameter_edits_preserve_all_arti
 }
 
 #[test]
+fn property_assertions_publish_pinned_evidence_and_fail_before_any_artifact_change() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("balanced.star");
+    let out = directory.path().join("out");
+    let cache = directory.path().join("cache");
+    let recipe = r#"
+gap=param(name='gap',default=20)
+density=param(name='density',default=3000)
+b=extrude(id='block_body',profile=rectangle(id='profile',width=10,depth=10),height=10)
+p=part(id='light',body=b,material='Light material',density_kg_per_m3=1000)
+def counterweight():
+    if density > 0:
+        return part(id='heavy',body=b,material='Counterweight material',density_kg_per_m3=density)
+    return part(id='heavy',body=b)
+q=counterweight()
+a=assembly(id='assembly',instances=[instance(id='left',part=p),instance(id='right',part=q,offset=[gap,0,0])])
+output(name='block',feature=b)
+assembly_output(name='balanced',assembly=a)
+assert_property(id='volume',output='block',property='volume_mm3',min=999.999,max=1000.001)
+assert_property(id='balance',output='balanced',property='mass_centroid_x_mm',min=0,max=21)
+assert_property(id='mass',output='balanced',property='mass_kg',min=0.003999,max=0.004001)
+assert_property(id='inertia',output='balanced',property='mass_inertia_zz_kg_mm2',min=0.36,max=1)
+"#;
+    fs::write(&source, recipe).unwrap();
+    let args = [
+        "build",
+        source.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+        "--output",
+        "block",
+    ];
+    let initial = successful_json(cli(&args));
+    assert_eq!(
+        initial["outputs"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .collect::<Vec<_>>(),
+        vec!["block"]
+    );
+    assert!(!out.join("balanced.step").exists());
+    let balance = &initial["property_assertions"]["balance"];
+    assert_eq!(balance["status"], "passed");
+    assert!((balance["actual"].as_f64().unwrap() - 20.).abs() < 1e-10);
+    assert_eq!(balance["property"], "mass_centroid_x_mm");
+    assert_eq!(balance["max"], 21.);
+    assert!(balance["target_content_hash"].as_str().unwrap().len() == 64);
+    assert!(
+        (initial["property_assertions"]["inertia"]["actual"]
+            .as_f64()
+            .unwrap()
+            - 11. / 30.)
+            .abs()
+            < 1e-12
+    );
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+    assert_eq!(
+        manifest["property_assertions"],
+        initial["property_assertions"]
+    );
+    let checked = successful_json(cli(&[
+        "check",
+        out.join("recipe.json").to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    assert_eq!(
+        checked["property_assertions"],
+        initial["property_assertions"]
+    );
+    assert_eq!(checked["stats"]["computed_solids"], 0);
+    let measured = successful_json(cli(&[
+        "properties",
+        source.to_str().unwrap(),
+        "--output",
+        "block",
+    ]));
+    assert_eq!(
+        measured["property_assertions"],
+        initial["property_assertions"]
+    );
+    let generation = artifact_bytes(&out);
+    for (parameter, status, expected) in [
+        ("gap=22", "out_of_range", Some(21.5)),
+        ("density=-1", "unavailable", None),
+    ] {
+        for _ in 0..2 {
+            let mut changed = args.to_vec();
+            changed.extend(["--param", parameter]);
+            let failed = cli(&changed);
+            assert!(!failed.status.success());
+            let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+            assert_eq!(error["code"], "property_assertion_failed", "{error}");
+            assert_eq!(error["assertion_id"], "balance");
+            assert_eq!(error["assertion"]["status"], status);
+            if let Some(value) = expected {
+                assert!((error["assertion"]["actual"].as_f64().unwrap() - value).abs() < 1e-10);
+            } else {
+                assert!(error["assertion"]["actual"].is_null());
+            }
+            assert_eq!(
+                error["snapshot"]["target_content_hash"],
+                error["assertion"]["target_content_hash"]
+            );
+            assert_eq!(
+                error["snapshot"]["executor_build_id"],
+                initial["executor_build_id"]
+            );
+            assert_ne!(
+                error["assertion"]["target_content_hash"],
+                balance["target_content_hash"]
+            );
+            assert_eq!(artifact_bytes(&out), generation);
+        }
+    }
+    let changed = directory.path().join("changed.star");
+    fs::write(&changed, recipe.replace("max=21)", "max=22)")).unwrap();
+    let difference = successful_json(cli(&[
+        "diff",
+        source.to_str().unwrap(),
+        changed.to_str().unwrap(),
+    ]));
+    assert_eq!(difference["outputs"]["balanced"]["status"], "unchanged");
+    assert_eq!(
+        difference["property_assertions"]["balance"]["status"],
+        "changed"
+    );
+    assert_eq!(
+        difference["property_assertions"]["balance"]["before"]["actual"],
+        difference["property_assertions"]["balance"]["after"]["actual"]
+    );
+}
+
+#[test]
 fn face_assertions_accept_explicit_split_counts_and_all_survivors() {
     let directory = tempfile::tempdir().unwrap();
     for (index, cardinality) in ["count = 2", "all = True"].into_iter().enumerate() {

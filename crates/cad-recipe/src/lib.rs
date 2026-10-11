@@ -35,6 +35,7 @@ struct GraphStore {
     assemblies: RefCell<Vec<serde_json::Value>>,
     assembly_outputs: RefCell<Vec<serde_json::Value>>,
     face_assertions: RefCell<Vec<serde_json::Value>>,
+    property_assertions: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
@@ -357,6 +358,59 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         store(eval)?.output(serde_json::json!({
             "name": name, "feature": feature,
         }))?;
+        Ok(NoneType)
+    }
+
+    /// Gate publication on native engineering properties of a named output.
+    fn assert_property(
+        id: &str,
+        output: &str,
+        property: &str,
+        min: Option<Value>,
+        max: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        anyhow::ensure!(!id.is_empty() && id.trim()==id && !output.is_empty() && output.trim()==output,
+            "assert_property id and output must be nonempty identifiers without surrounding whitespace");
+        let property: cad_build::EngineeringProperty =
+            serde_json::from_value(serde_json::json!(property))
+                .map_err(|_| anyhow::anyhow!("unknown engineering property '{property}'"))?;
+        let min = min
+            .filter(|value| !value.is_none())
+            .map(number)
+            .transpose()
+            .map_err(|_| anyhow::anyhow!("assert_property min must be a finite number"))?;
+        let max = max
+            .filter(|value| !value.is_none())
+            .map(number)
+            .transpose()
+            .map_err(|_| anyhow::anyhow!("assert_property max must be a finite number"))?;
+        anyhow::ensure!(
+            min.is_some() || max.is_some(),
+            "assert_property requires min or max"
+        );
+        anyhow::ensure!(
+            !matches!((min,max),(Some(a),Some(b)) if a>b),
+            "assert_property min must not exceed max"
+        );
+        let graph = store(eval)?;
+        let mut assertions = graph.property_assertions.borrow_mut();
+        anyhow::ensure!(
+            assertions.len() < cad_build::MAX_PROPERTY_ASSERTIONS,
+            "recipe exceeds {} property assertions",
+            cad_build::MAX_PROPERTY_ASSERTIONS
+        );
+        anyhow::ensure!(
+            !assertions.iter().any(|a| a["id"].as_str() == Some(id)),
+            "duplicate property assertion ID '{id}'"
+        );
+        assertions.push(serde_json::to_value(cad_build::PropertyAssertion {
+            id: id.into(),
+            output: output.into(),
+            property,
+            min,
+            max,
+        })?);
         Ok(NoneType)
     }
 
@@ -734,11 +788,12 @@ pub fn from_starlark_with_params(
     let assemblies = graph.assemblies.into_inner();
     let assembly_outputs = graph.assembly_outputs.into_inner();
     let face_assertions = graph.face_assertions.into_inner();
+    let property_assertions = graph.property_assertions.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() { 2 } else { 1 },
+        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -747,6 +802,9 @@ pub fn from_starlark_with_params(
         value["parts"] = serde_json::json!(parts);
         value["assemblies"] = serde_json::json!(assemblies);
         value["assembly_outputs"] = serde_json::json!(assembly_outputs);
+    }
+    if !property_assertions.is_empty() {
+        value["property_assertions"] = serde_json::json!(property_assertions);
     }
     if !face_assertions.is_empty() {
         value["face_assertions"] = serde_json::json!(face_assertions);
@@ -1870,5 +1928,71 @@ mod rigid_module_attachment_tests {
             let recipe = from_starlark("invalid-source.star", &edited).unwrap();
             assert!(cad_build::build(&recipe).is_err(), "resolved {path}");
         }
+    }
+}
+
+#[cfg(test)]
+mod property_assertion_tests {
+    use super::*;
+    const BODY: &str="b=extrude(id='b',profile=rectangle(id='p',width=2,depth=3),height=4)\noutput(name='body',feature=b)\n";
+
+    #[test]
+    fn property_dsl_promotes_schema_and_roundtrips_native_bounds() {
+        let source=format!("{BODY}assert_property(id='capacity',output='body',property='volume_mm3',min=24,max=24)\nassert_property(id='upper',output='body',property='volume_centroid_z_mm',max=2)\nassert_property(id='lower',output='body',property='volume_inertia_xx_mm5',min=50,max=None)");
+        let recipe = from_starlark("engineering.star", &source).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        assert_eq!(recipe.property_assertions.len(), 3);
+        let encoded = serde_json::to_string(&recipe).unwrap();
+        let decoded: Recipe = serde_json::from_str(&encoded).unwrap();
+        let a = cad_build::build(&recipe).unwrap();
+        let b = cad_build::build(&decoded).unwrap();
+        assert_eq!(a.feature_hashes, b.feature_hashes);
+        assert_eq!(
+            serde_json::to_value(a.property_assertions).unwrap(),
+            serde_json::to_value(b.property_assertions).unwrap()
+        );
+        let mut old = recipe;
+        old.schema_version = 1;
+        assert!(cad_build::build(&old).is_err());
+    }
+
+    #[test]
+    fn property_dsl_rejects_unknown_nonfinite_missing_reversed_and_duplicate_bounds() {
+        for args in [
+            "",
+            ",property='volume'",
+            ",min=1",
+            ",property='volume_mm3'",
+            ",property='volume_mm3',min=3,max=2",
+            ",property='volume_mm3',min=True",
+            ",property='volume_mm3',max='3'",
+            ",property='volume_mm3',max=float('nan')",
+            ",property='volume_mm3',min=float('inf')",
+        ] {
+            let source = format!("assert_property(id='a',output='body'{args})");
+            assert!(
+                from_starlark("invalid.star", &source).is_err(),
+                "accepted {args}"
+            );
+        }
+        for value in ["float('nan')", "float('inf')"] {
+            let source = format!(
+                "assert_property(id='finite',output='body',property='volume_mm3',max={value})"
+            );
+            assert!(from_starlark("finite.star", &source)
+                .unwrap_err()
+                .to_string()
+                .contains("finite number"));
+        }
+        let source="assert_property(id='same',output='body',property='volume_mm3',max=3)\nassert_property(id='same',output='body',property='volume_mm3',min=1)";
+        assert!(from_starlark("duplicate.star", source)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate"));
+        let source="def limits():\n    for i in range(1001):\n        assert_property(id=str(i),output='body',property='volume_mm3',max=3)\nlimits()";
+        assert!(from_starlark("bounded.star", source)
+            .unwrap_err()
+            .to_string()
+            .contains("1000"));
     }
 }

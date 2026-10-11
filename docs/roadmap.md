@@ -32,7 +32,7 @@ large workcell benchmark; neither substitutes for the other's release gates.
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache implemented; LOD, metadata paging, part spatial indexes and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
-| M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries implemented; drawings, PMI, principal axes and configuration policies remain |
+| M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries and global recipe property assertions implemented; drawings, PMI, principal axes and configuration policies remain |
 | M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | Planned |
 
 Completing M1 and extending the display-asset interface are the immediate
@@ -53,6 +53,13 @@ adds two transformed tools with cap/wall lineage assertions; manufacturing files
 contain their transformed native coordinates.
 
 ## Next concrete implementation increments
+
+Engineering property gates now enforce native volume, mass, centroid and central
+inertia bounds before publication, including selected-output builds.
+`mounted_drive_module.star` carries fixed mass and balance requirements; its
+independent tests reject overbudget edits while preserving geometry cache reuse.
+Extend these obligations toward dimensions, clearance and manufacturing intent
+as those query contracts become available.
 
 Apply the architecture's request/representation contracts to each increment:
 opening and picking are read-only display/source requests; modeling, solving,
