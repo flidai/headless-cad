@@ -16,6 +16,8 @@ const stats = window.cadGpuStats = {
   selectedInstance: -1, selectedFace: -1, backend: 'webgl2', cpuExpandedFaces: 0,
   residentMeshCount: 0, residentBytes: 0, requested: 0, loadingCount: 0,
   visibleCount: 0, culledCount: 0, proxyCount: 0, abortedRequests: 0,
+  bvhNodeCount: 0, bvhLeafCount: 0, bvhMaxDepth: 0,
+  cullNodeTests: 0, cullLeafTests: 0, cullOccurrenceTests: 0, cullPrunedNodes: 0,
 };
 const canvas = document.getElementById('view');
 const status = document.getElementById('statistics');
@@ -131,6 +133,39 @@ function start() {
     if (!finite3(record.center)) throw Error('Nonfinite placed display bounds.');
     records.push(record); byMesh.get(record.hash).push(index);
   });
+  // This display-only hierarchy preserves occurrence indices and never fetches geometry.
+  // Each leaf AABB encloses the placed OBB. Outward padding covers the binary64
+  // sums/products and center +/- half cancellation; traversal adds camera-scale
+  // padding too. Nonfinite intermediate bounds are deliberately unprunable.
+  const occurrenceBounds = records.map(record => {
+    const half = [0, 1, 2].map(i => record.axes.reduce((sum, axis, j) => sum + Math.abs(axis[i]) * record.half[j], 0));
+    return [record.center.map((value, i) => value - half[i] - (Math.abs(value) + half[i]) * 64 * Number.EPSILON),
+      record.center.map((value, i) => value + half[i] + (Math.abs(value) + half[i]) * 64 * Number.EPSILON)];
+  });
+  function buildBvh(indices, depth = 0) {
+    if (!indices.length) return null;
+    stats.bvhNodeCount++; stats.bvhMaxDepth = Math.max(stats.bvhMaxDepth, depth);
+    const lower = [Infinity, Infinity, Infinity], upper = [-Infinity, -Infinity, -Infinity];
+    for (const index of indices) for (let axis = 0; axis < 3; axis++) {
+      lower[axis] = Math.min(lower[axis], occurrenceBounds[index][0][axis]);
+      upper[axis] = Math.max(upper[axis], occurrenceBounds[index][1][axis]);
+    }
+    const half = lower.map((value, i) => (upper[i] - value) / 2);
+    const center = lower.map((value, i) => value + half[i]);
+    const node = { center, half, bounded: finite3(center) && finite3(half) };
+    if (indices.length <= 8) {
+      stats.bvhLeafCount++; node.indices = indices; return node;
+    }
+    let axis = 0;
+    for (let i = 1; i < 3; i++) if (half[i] > half[axis]) axis = i;
+    // Original index breaks all equal-coordinate ties, including coincident parts.
+    indices.sort((a, b) => records[a].center[axis] - records[b].center[axis] || a - b);
+    const split = Math.floor(indices.length / 2);
+    node.left = buildBvh(indices.slice(0, split), depth + 1);
+    node.right = buildBvh(indices.slice(split), depth + 1);
+    return node;
+  }
+  const occurrenceBvh = buildBvh(records.filter(record => !record.empty).map(record => record.index));
   const vertex = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;layout(location=1) in vec3 aNormal;layout(location=2) in float aFace;
@@ -237,17 +272,42 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
   }
   function cull() {
     visible = new Map(); visibleIndices = [];
+    stats.cullNodeTests = stats.cullLeafTests = stats.cullOccurrenceTests = stats.cullPrunedNodes = 0;
     const planes = [[basis.right, camera.halfHeight * aspect], [basis.up, camera.halfHeight], [basis.eye, depthRange]];
-    for (const record of records) {
-      if (record.empty) continue;
-      const center = sub(record.center, camera.target);
-      const intersects = planes.every(([axis, extent]) => {
-        const support = record.axes.reduce((sum, localAxis, i) => sum + Math.abs(dot(axis, localAxis)) * record.half[i], 0);
-        return Math.abs(dot(center, axis)) <= extent + support + radius * 1e-12;
+    const stack = occurrenceBvh ? [occurrenceBvh] : [];
+    while (stack.length) {
+      const node = stack.pop(); stats.cullNodeTests++;
+      const relative = sub(node.center, camera.target);
+      const intersectsNode = !node.bounded || planes.every(([axis, extent]) => {
+        const support = node.half.reduce((sum, value, i) => sum + Math.abs(axis[i]) * value, 0);
+        const distance = Math.abs(dot(relative, axis));
+        // Absolute source magnitudes cover subtraction/dot rounding even when a
+        // large translated scene is viewed near its origin or a tangent plane.
+        const magnitude = node.center.reduce((sum, value, i) => sum + Math.abs(axis[i]) * (Math.abs(value) + Math.abs(camera.target[i]) + node.half[i]), 0);
+        const padding = (magnitude + Math.abs(extent)) * 64 * Number.EPSILON + radius * 1e-12;
+        return !Number.isFinite(distance + support + padding) || distance <= extent + support + padding;
       });
-      if (!intersects) continue;
+      if (!intersectsNode) { stats.cullPrunedNodes++; continue; }
+      if (!node.indices) { stack.push(node.right, node.left); continue; }
+      stats.cullLeafTests++;
+      for (const index of node.indices) {
+        const record = records[index]; stats.cullOccurrenceTests++;
+        const center = sub(record.center, camera.target);
+        // Preserve the original leaf predicate exactly: hierarchy candidates do
+        // not change visibility, streaming priorities, or GPU picking semantics.
+        const intersects = planes.every(([axis, extent]) => {
+          const support = record.axes.reduce((sum, localAxis, i) => sum + Math.abs(dot(axis, localAxis)) * record.half[i], 0);
+          return Math.abs(dot(center, axis)) <= extent + support + radius * 1e-12;
+        });
+        if (intersects) visibleIndices.push(index);
+      }
+    }
+    // Spatial traversal order must not change equal-depth drawing/picking ties.
+    visibleIndices.sort((a, b) => a - b);
+    for (const index of visibleIndices) {
+      const record = records[index];
       if (!visible.has(record.hash)) visible.set(record.hash, []);
-      visible.get(record.hash).push(record.index); visibleIndices.push(record.index);
+      visible.get(record.hash).push(index);
     }
     stats.visibleCount = visibleIndices.length; stats.culledCount = instances.length - visibleIndices.length;
   }
@@ -430,7 +490,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
   function setView(name){const views={iso:[-Math.PI/3,Math.PI/5],top:[-Math.PI/2,Math.PI/2],front:[-Math.PI/2,0],right:[0,0]};if(!views[name])throw Error('Unknown view');[camera.yaw,camera.pitch]=views[name];render();}
   function project(point){resize();updateCamera();const relative=sub(point,camera.target),rect=canvas.getBoundingClientRect();return[(dot(relative,basis.right)/(camera.halfHeight*aspect)+1)*rect.width/2,(1-dot(relative,basis.up)/camera.halfHeight)*rect.height/2,-dot(relative,basis.eye)/depthRange];}
   function setCamera(values){for(const name of ['yaw','pitch','halfHeight'])if(Number.isFinite(values[name]))camera[name]=values[name];if(Number.isFinite(values.zoom)&&values.zoom>0)camera.halfHeight=radius*1.15/values.zoom;if(Array.isArray(values.target)&&values.target.length===3&&values.target.every(Number.isFinite))camera.target=values.target.slice();camera.halfHeight=Math.max(radius*1e-7,Math.min(radius*1e7,camera.halfHeight));}
-  function snapshot(){resize();updateCamera();const rect=canvas.getBoundingClientRect();return{target:camera.target.slice(),right:basis.right.slice(),up:basis.up.slice(),eye:basis.eye.slice(),halfHeight:camera.halfHeight,halfWidth:camera.halfHeight*aspect,depthRange,width:rect.width,height:rect.height,pixelWidth,pixelHeight,visibleIndices:visibleIndices.slice(),residentKeys:[...resident.keys()].sort()};}
+  function snapshot(){resize();updateCamera();const rect=canvas.getBoundingClientRect();return{target:camera.target.slice(),right:basis.right.slice(),up:basis.up.slice(),eye:basis.eye.slice(),halfHeight:camera.halfHeight,halfWidth:camera.halfHeight*aspect,depthRange,width:rect.width,height:rect.height,pixelWidth,pixelHeight,visibleIndices:visibleIndices.slice(),culling:{cullNodeTests:stats.cullNodeTests,cullLeafTests:stats.cullLeafTests,cullOccurrenceTests:stats.cullOccurrenceTests,cullPrunedNodes:stats.cullPrunedNodes},residentKeys:[...resident.keys()].sort()};}
   function setBudget(bytes){if(!Number.isFinite(bytes))throw Error('Invalid geometry budget');budget=Math.max(1024,Math.min(MAX_BUDGET,Math.floor(bytes)));render();return budget;}
   window.cadGpuTest={render,draw:render,finish:()=>gl.finish(),setCamera,snapshot,pick,setView,fit,project,camera,select,whenIdle,setBudget};
   document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>setView(button.dataset.view));document.getElementById('fit').onclick=fit;

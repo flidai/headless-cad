@@ -629,8 +629,18 @@ geometry VBO bytes, including reservations for in-flight requests. It is not a
 hard JavaScript heap or total GPU-memory limit: parse transients, instance buffers,
 picking targets and driver allocations are separate. Repeated occurrences share
 one resident mesh per geometry hash. Distinct hashes with identical payloads can
-still have separate resident VBOs. Visibility currently scans occurrences on the
-CPU; spatial BVHs, occlusion culling, geometric LOD and meshlets remain target work.
+still have separate resident VBOs. Visibility uses a deterministic CPU occurrence BVH over conservative world
+bounds. Internal nodes reject off-screen groups; leaves retain the individual
+oriented-bound visibility test. Accepted occurrence indices are sorted into
+source order, preserving picking IDs and draw order. The hierarchy is built once
+from display metadata and shared by embedded and streamed GPU views. Per-camera
+node and occurrence test counts expose pruning separately from frame timing.
+
+This first hierarchy still loads and indexes all occurrence metadata at startup.
+It does not page metadata, index triangles inside a part, perform occlusion
+culling, or generate geometric LOD/meshlets. Those remain target work; overview
+views may still visit every occurrence. A hierarchy over display bounds is not
+an authoritative interference or clearance query index.
 The embedded `.gpu.html` remains available and also uses frustum culling.
 
 Streaming requires HTTP(S), WebGL2 and Web Crypto (localhost is supported).
@@ -857,6 +867,25 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 `node tools/preview-check/stream-benchmark.cjs` after serving the workcell; set
 `CAD_BROWSER` to the browser executable and optionally `CAD_STREAM_URL`.
 
+### Recorded occurrence-BVH acceptance
+
+The occurrence-BVH acceptance fixture contains 25,600 occurrences and eight
+shared mesh definitions with multiple rigid rotations. In both embedded and
+streamed GPU modes, its focused camera visits 25 hierarchy nodes and tests six
+individual occurrences. Visibility is compared against independently transformed
+box corners across 76 camera comparisons and clip-boundary contacts; overview and
+off-screen queries retain complete candidate sets and original picking IDs.
+No exact-body downloads are needed. Run
+`npm run test:bvh --prefix tools/preview-check` with `CAD_BROWSER` set to the
+supported Chromium binary.
+
+The fast `test:bvh:numeric` regression extracts the production traversal and
+compares it with the former linear predicate for 3,000 deterministic camera
+cases, including empty/coincident scenes, thin rotated bounds and large coordinate
+ranges. These checks establish conservative traversal and pruning for the corpus;
+they do not establish browser heap limits, metadata paging or a hardware frame
+rate. They exercise the display index, not exact engineering-query completeness.
+
 ### Recorded selective-regeneration sample
 
 A local Linux run inspected `workcell_line.star` with 1,000 stations, 25 columns
@@ -888,7 +917,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
-| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, frustum culling, bounded geometry cache and proxy fallback | Spatial BVHs, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
+| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache and proxy fallback | Paged assembly/part spatial indexes, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
 | Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 

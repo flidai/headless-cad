@@ -741,8 +741,10 @@ SHA-256, and uses four concurrent requests plus a 64 MiB geometry accounting
 budget. Bounds proxies keep unloaded or failed parts visible; selecting a proxy
 prioritizes its mesh. The budget covers encoded payload plus geometry buffers,
 including pending reservations, not total browser or driver memory. Frustum
-culling applies to both GPU modes; geometric LOD and occlusion culling remain
-future work. The streaming viewer needs HTTP(S) and Web Crypto; localhost works.
+culling uses an occurrence bounding-volume hierarchy in both GPU modes, skipping
+off-screen groups before checking individual parts. Original occurrence and face
+IDs remain stable. All occurrence metadata is still loaded at startup; metadata
+paging, geometric LOD and occlusion culling remain future work. The streaming viewer needs HTTP(S) and Web Crypto; localhost works.
 
 `examples/workcell_line.star` demonstrates 12 stations, 60 occurrences and 15 part
 definitions with datum-mounted triangular tools. Its independently expected
@@ -917,6 +919,8 @@ npm run test:clipped
 npm run test:datums
 npm run test:gpu
 npm run test:stream
+npm run test:bvh:numeric
+npm run test:bvh
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.

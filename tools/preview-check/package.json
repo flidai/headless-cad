@@ -18,7 +18,9 @@
     "test:concave": "node concave-check.cjs",
     "test:cylinder": "node cylinder-check.cjs",
     "test:tube": "node tube-check.cjs",
-    "test:drilled": "node drilled-check.cjs"
+    "test:drilled": "node drilled-check.cjs",
+    "test:bvh": "node bvh-check.cjs",
+    "test:bvh:numeric": "node bvh-numeric-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"
