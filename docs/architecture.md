@@ -446,6 +446,37 @@ driver/OS, storage/network conditions, and timing instrumentation. Display loadi
 and exact geometry evaluation get separate timings. Adjust budgets through a
 reviewed decision based on evidence, not by relabeling missed targets.
 
+### Recorded first GPU workload sample
+
+At implementation revision `27d7b70`, Chromium 154 with ANGLE SwiftShader on a
+16-vCPU QEMU Linux host produced the following single-run observations. Both
+workloads use `display_rack.star`, 100 rows × 100 columns, a fresh browser page,
+1920 × 1080 viewport at DPR 1, and the same 30-frame camera trace. The actual
+canvas is 1580 × 1029 pixels. These are software-rendered observations on a shared
+virtual host, not evidence of discrete-GPU frame rate or passed M3 release gates.
+
+| Workload | First view including GPU completion | Frame wall median / p95 | Draw calls / shared meshes | Estimated buffers + picking targets |
+| --- | --- | --- | --- | --- |
+| 10,000 occurrences, one unique part | 646 ms | 251 / 285 ms | 1 / 1 | 19,830,848 bytes |
+| 10,000 occurrences, 100 unique parts | 576 ms | 299 / 583 ms | 100 / 100 | 19,930,640 bytes |
+
+Each run requested only its embedded GPU HTML and zero exact B-rep files. Shared
+mesh storage and draw calls scale with unique geometry; the instance buffer is
+320,000 bytes in both runs. Allocation estimates exclude driver overhead, CPU
+JSON/object memory and the browser's default framebuffer; they are not measured
+VRAM residency. Frame samples include `gl.finish()` and therefore GPU completion,
+but not presentation latency. First-view timing excludes building the artifacts.
+No cold/warm headless-build or repeated-run timing distribution is claimed here.
+
+Raw samples, renderer, environment, parameters and artifact identities are saved
+in [repeated-part results](benchmarks/gpu-10000-repeated-swiftshader.json) and
+[varied-part results](benchmarks/gpu-10000-varied-swiftshader.json). Reproduce with
+`build --display-only --param rows=100 --param columns=100 --param variants=1`
+(or `variants=100`), then run `tools/preview-check/gpu-benchmark.cjs` with
+`CAD_GPU_URL` set to that served artifact. Its default SwiftShader flags match
+these runs; `CAD_GPU_HARDWARE=1` requests the available hardware path and the
+report still records the renderer actually obtained.
+
 ## Implemented baseline and remaining work
 
 | Area | Implemented now | Target work |
