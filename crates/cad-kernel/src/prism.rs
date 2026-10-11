@@ -1,10 +1,10 @@
-//! Convex-ring right prisms with disjoint convex through holes.
+//! Simple-profile right prisms with disjoint convex through holes.
 use crate::math::{cross, dot, norm, sub};
 use crate::*;
 use std::collections::BTreeSet;
 pub const MAX_POLYGON_HOLES: usize = 32;
 
-/// Convex CCW outer ring, convex CW disjoint strictly interior holes, in mm.
+/// Simple CCW outer ring, convex CW disjoint strictly interior holes, in mm.
 /// No ring reordering, repair, tangent contacts, nested holes, or touching edges.
 pub fn validate_polygon_with_holes(
     outer: &[[f64; 2]],
@@ -21,25 +21,41 @@ pub fn validate_polygon_with_holes(
             "polygon supports 256 total vertices and 32 holes".into(),
         ));
     }
-    validate_polygon(outer, tol)?;
+    if validate_polygon(outer, tol).is_err() {
+        crate::simple_polygon::validate_ring(outer, tol)?;
+    }
     for hole in holes {
         let reverse: Vec<_> = hole.iter().rev().copied().collect();
         validate_polygon(&reverse, tol)?;
+        let scale = outer
+            .iter()
+            .chain(hole)
+            .flatten()
+            .map(|v| v.abs())
+            .fold(0., f64::max);
+        let margin = tol.linear + scale * 256. * f64::EPSILON;
         for i in 0..outer.len() {
-            let a = outer[i];
-            let b = outer[(i + 1) % outer.len()];
-            let e = [b[0] - a[0], b[1] - a[1]];
-            let length = e[0].hypot(e[1]);
-            for p in hole {
-                let x = e[0] * (p[1] - a[1]);
-                let y = e[1] * (p[0] - a[0]);
-                let error = (x.abs() + y.abs()) * 32. * f64::EPSILON;
-                if !error.is_finite() || x - y <= tol.linear * length + error {
-                    return Err(KernelError::Unsupported("holes must be strictly interior and separated from outer edges by tolerance".into()));
+            for j in 0..hole.len() {
+                if !crate::simple_polygon::separated(
+                    outer[i],
+                    outer[(i + 1) % outer.len()],
+                    hole[j],
+                    hole[(j + 1) % hole.len()],
+                    margin,
+                ) {
+                    return Err(KernelError::Unsupported(
+                        "hole boundary crosses or touches outer boundary".into(),
+                    ));
                 }
             }
         }
+        if !crate::simple_polygon::inside(hole[0], outer) {
+            return Err(KernelError::Unsupported(
+                "holes must lie strictly inside outer boundary".into(),
+            ));
+        }
     }
+
     for i in 0..holes.len() {
         for j in i + 1..holes.len() {
             let mut separated = false;
@@ -92,7 +108,7 @@ pub fn extrude_polygon_with_holes(
     tol: Tolerance,
 ) -> Result<OperationResult, KernelError> {
     validate_polygon_with_holes(outer, holes, tol)?;
-    if holes.is_empty() {
+    if holes.is_empty() && validate_polygon(outer, tol).is_ok() {
         return extrude_polygon(outer, height, tol);
     }
     if !height.is_finite() || height <= tol.linear {
@@ -216,7 +232,7 @@ pub fn extrude_polygon_with_holes(
 /// Called only after all native references/local face geometry/topology validate.
 pub(crate) fn validate_prism(model: &ModelSnapshot, tol: Tolerance) -> Result<(), KernelError> {
     let bad = || {
-        KernelError::Unsupported("multi-loop geometry must be one right prism with matching convex-ring caps and complete straight wall strips".into())
+        KernelError::Unsupported("multi-loop geometry must be one right prism with matching simple-ring caps and complete straight wall strips".into())
     };
     if model.solids.len() != 1 || model.shells.len() != 1 {
         return Err(bad());
@@ -225,7 +241,7 @@ pub(crate) fn validate_prism(model: &ModelSnapshot, tol: Tolerance) -> Result<()
         .faces
         .iter()
         .enumerate()
-        .filter(|(_, f)| f.loops.len() > 1)
+        .filter(|(i, f)| f.loops.len() > 1 || !crate::face_is_convex(model, FaceId(*i)))
         .collect();
     if caps.len() != 2 {
         return Err(bad());
@@ -562,5 +578,182 @@ mod rotation_tests {
                 triangulate_face(&rotated, f, t).unwrap();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod concave_tests {
+    use super::*;
+    fn u() -> Vec<[f64; 2]> {
+        vec![
+            [0., 0.],
+            [10., 0.],
+            [10., 10.],
+            [8., 10.],
+            [8., 2.],
+            [2., 2.],
+            [2., 10.],
+            [0., 10.],
+        ]
+    }
+    #[test]
+    fn convex_large_offset_preserves_previous_domain_and_l_tensor_matches_boxes() {
+        let t = Tolerance::default();
+        let ring = [
+            [1e12, 1e12],
+            [1e12 + 10., 1e12],
+            [1e12 + 10., 1e12 + 8.],
+            [1e12, 1e12 + 8.],
+        ];
+        let old = extrude_polygon(&ring, 3., t).unwrap();
+        let new = extrude_polygon_with_holes(&ring, &[], 3., t).unwrap();
+        assert_eq!(old.model, new.model);
+        assert_eq!(old.history, new.history);
+        let ring = [[0., 0.], [6., 0.], [6., 2.], [2., 2.], [2., 6.], [0., 6.]];
+        let p = extrude_polygon_with_holes(&ring, &[], 3., t)
+            .unwrap()
+            .model
+            .mass_properties(t)
+            .unwrap();
+        let center = [2.2, 2.2, 1.5];
+        let mut expected = [[0.; 3]; 3];
+        for (volume, c, dimensions) in [
+            (36., [3., 1., 1.5], [6., 2., 3.]),
+            (24., [1., 4., 1.5], [2., 4., 3.]),
+        ] {
+            let delta = sub(c, center);
+            let squared = dot(delta, delta);
+            for i in 0..3 {
+                for j in 0..3 {
+                    expected[i][j] += if i == j {
+                        volume
+                            * ((dimensions[(i + 1) % 3] * dimensions[(i + 1) % 3]
+                                + dimensions[(i + 2) % 3] * dimensions[(i + 2) % 3])
+                                / 12.
+                                + squared
+                                - delta[i] * delta[i])
+                    } else {
+                        -volume * delta[i] * delta[j]
+                    };
+                }
+            }
+        }
+        let actual = p.central_inertia.unwrap();
+        for i in 0..3 {
+            for j in 0..3 {
+                assert!((actual[i][j] - expected[i][j]).abs() < 1e-9);
+            }
+        }
+    }
+    #[test]
+    fn concave_caps_have_signed_centroids_and_certified_triangles() {
+        let t = Tolerance::default();
+        let profiles = vec![
+            (
+                vec![[0., 0.], [6., 0.], [6., 2.], [2., 2.], [2., 6.], [0., 6.]],
+                20.,
+                [2.2, 2.2],
+            ),
+            (u(), 52., [5., 212. / 52.]),
+            (
+                vec![
+                    [0., 0.],
+                    [4., 1.],
+                    [8., 0.],
+                    [7., 4.],
+                    [8., 8.],
+                    [4., 7.],
+                    [0., 8.],
+                    [1., 4.],
+                ],
+                48.,
+                [4., 4.],
+            ),
+        ];
+        for (ring, area, center) in profiles {
+            let model = extrude_polygon_with_holes(&ring, &[], 3., t).unwrap().model;
+            assert!((model.volume() - area * 3.).abs() < 1e-9);
+            let p = model.mass_properties(t).unwrap();
+            let centroid = p.centroid.unwrap();
+            assert!((centroid[0] - center[0]).abs() < 1e-10);
+            assert!((centroid[1] - center[1]).abs() < 1e-10);
+            for f in [FaceId(0), FaceId(1)] {
+                assert!(!face_is_convex(&model, f));
+                assert_eq!(
+                    triangulate_face(&model, f, t).unwrap().len(),
+                    ring.len() - 2
+                );
+                let frame = model.face_frame(f, [1., 0., 0.], [0.; 3], t).unwrap();
+                assert!((frame.origin[0] - center[0]).abs() < 1e-10);
+                assert!((frame.origin[1] - center[1]).abs() < 1e-10);
+            }
+            assert!(!crate::validation::geometry::validate_convex(&model, t).is_empty());
+        }
+    }
+    #[test]
+    fn concave_hole_rotations_and_bay_crossings() {
+        let t = Tolerance::default();
+        let outer = u();
+        let hole = vec![[0.5, 3.], [0.5, 5.], [1.5, 5.], [1.5, 3.]];
+        let m = extrude_polygon_with_holes(&outer, &[hole], 3., t)
+            .unwrap()
+            .model;
+        assert!((m.volume() - 150.).abs() < 1e-9);
+        let properties = m.mass_properties(t).unwrap();
+        for i in 1..8 {
+            let a = i as f64 * 0.1;
+            let s = a.sin() / 14f64.sqrt();
+            let q = [s, 2. * s, 3. * s, a.cos()];
+            let rotated = transform(&m, [4., 5., 6.], q, t).unwrap().model;
+            assert!(rotated.validate(t).valid);
+            assert!((rotated.mass_properties(t).unwrap().volume - properties.volume).abs() < 1e-9);
+            for f in [FaceId(0), FaceId(1)] {
+                assert_eq!(triangulate_face(&rotated, f, t).unwrap().len(), 12);
+                rotated.face_frame(f, [1., 0., 0.], [0.; 3], t).unwrap();
+            }
+        }
+        // All vertices are in material, but two edges cross the open bay.
+        let bridge = vec![[1., 4.], [1., 5.], [9., 5.], [9., 4.]];
+        assert!(validate_polygon_with_holes(&outer, &[bridge], t).is_err());
+        let notch = vec![[4., 4.], [4., 5.], [5., 5.], [5., 4.]];
+        assert!(validate_polygon_with_holes(&outer, &[notch], t).is_err());
+    }
+    #[test]
+    fn invalid_simple_profiles_and_nonprismatic_mutation() {
+        let t = Tolerance::default();
+        for ring in [
+            vec![[0., 0.], [4., 4.], [0., 4.], [4., 0.]],
+            vec![[0., 0.], [4., 0.], [4., 4.], [0., 0.], [0., 4.]],
+            vec![[0., 0.], [2., 0.], [4., 0.], [4., 4.], [0., 4.]],
+            vec![[0., 0.], [4., 0.], [4., 4.], [2., 1e-9], [0., 4.]],
+        ] {
+            assert!(validate_polygon_with_holes(&ring, &[], t).is_err());
+        }
+        let mut m = extrude_polygon_with_holes(&u(), &[], 3., t).unwrap().model;
+        // Rebuild exact planes/lines after a shear. Local topology/planarity is
+        // valid, but the global right-prism certificate must reject it.
+        for v in &mut m.vertices {
+            if v.position[2] == 3. {
+                v.position[0] += 0.25;
+            }
+        }
+        for edge in &mut m.edges {
+            let a = m.vertices[edge.vertices[0].0].position;
+            let b = m.vertices[edge.vertices[1].0].position;
+            let d = sub(b, a);
+            edge.line = Line {
+                origin: a,
+                direction: d.map(|v| v / norm(d)),
+            };
+        }
+        for i in 0..m.faces.len() {
+            let p = m.loop_points(m.faces[i].loops[0]).unwrap();
+            let n = cross(sub(p[1], p[0]), sub(p[2], p[0]));
+            m.faces[i].plane = Plane {
+                origin: p[0],
+                normal: n.map(|v| v / norm(n)),
+            };
+        }
+        assert!(!m.validate(t).valid);
     }
 }

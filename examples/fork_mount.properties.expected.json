@@ -1,0 +1,89 @@
+{
+  "oracle": "Exact rational rectangular-prism moments: outer box minus central notch box and two arm hole boxes, shifted by parallel-axis theorem. Independent of kernel signed face tetrahedra and polygon triangulation.",
+  "cases": [
+    {
+      "notch_width": 20,
+      "notch_depth": 25,
+      "thickness": 3,
+      "volume": 12198,
+      "centroid": [
+        40.0,
+        27.186178061977373,
+        1.5
+      ],
+      "central_inertia": [
+        [
+          3592343.689621249,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          7103522.5,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          10677569.18962125
+        ]
+      ]
+    },
+    {
+      "notch_width": 30,
+      "notch_depth": 35,
+      "thickness": 6,
+      "volume": 21096,
+      "centroid": [
+        40.0,
+        25.501706484641637,
+        3.0
+      ],
+      "central_inertia": [
+        [
+          6443465.9385665525,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          13879536.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          20196425.938566554
+        ]
+      ]
+    },
+    {
+      "notch_width": 40,
+      "notch_depth": 40,
+      "thickness": 10,
+      "volume": 29660,
+      "centroid": [
+        40.0,
+        23.69824679703304,
+        5.0
+      ],
+      "central_inertia": [
+        [
+          9393552.642166778,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          21928413.333333332,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          30827632.64216678
+        ]
+      ]
+    }
+  ]
+}

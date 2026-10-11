@@ -1,7 +1,7 @@
 //! Validation for closed orientable planar B-reps. In the orthogonal domain,
 //! nonconvex solids, handles, and disconnected solids are supported. General
 //! planar geometry is restricted to a single strictly convex solid or a validated
-//! right prism with a convex outer profile and disjoint convex through holes.
+//! right prism with a simple outer profile and disjoint convex through holes.
 //! Each solid currently requires one connected shell; enclosed cavities are
 //! unsupported.
 //! Geometric intersection and containment checks follow the topology checks.
@@ -210,7 +210,9 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
         if face.loops.is_empty() || face.loops.len() > crate::MAX_POLYGON_HOLES + 1 {
             issue(
                 "unsupported_face",
-                format!("Face {index}: one convex outer loop and at most 32 convex inner loops are supported"),
+                format!(
+                    "Face {index}: one simple outer loop and at most 32 convex inner loops are supported"
+                ),
             );
         }
         let normal_norm = norm(face.plane.normal);
@@ -252,29 +254,31 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             if points.len() > crate::MAX_POLYGON_POINTS {
                 issue(
                     "resource_limit",
-                    format!("Face {index} exceeds the convex polygon vertex limit"),
+                    format!("Face {index} exceeds the polygon vertex limit"),
                 );
                 continue;
             }
-            // For a convex face, every other boundary vertex must lie on the
-            // interior side of every oriented edge. This also rejects star rings.
-            for i in 0..points.len() {
-                let a = points[i];
-                let direction = sub(points[(i + 1) % points.len()], a);
-                let length = norm(direction);
-                let inward = cross(face.plane.normal, direction.map(|v| v / length));
-                for (j, &point) in points.iter().enumerate() {
-                    if j == i || j == (i + 1) % points.len() {
-                        continue;
-                    }
-                    let side = dot(sub(point, a), inward);
-                    if !side.is_finite() || side * orientation <= 0.0 {
-                        issue(
-                            "face_orientation_or_degeneracy",
-                            format!("Face {index} is not strictly convex and outward-oriented"),
-                        );
-                        break;
-                    }
+            let convex =
+                crate::simple_polygon::convex_ring(&points, face.plane.normal, orientation);
+            if !convex {
+                let direction = sub(points[1], points[0]);
+                let x = direction.map(|v| v / norm(direction));
+                let y = cross(face.plane.normal, x);
+                let mut projected: Vec<_> = points
+                    .iter()
+                    .map(|p| {
+                        let d = sub(*p, points[0]);
+                        [dot(d, x), dot(d, y)]
+                    })
+                    .collect();
+                if boundary_index > 0 {
+                    projected.reverse();
+                }
+                if let Err(error) = crate::simple_polygon::validate_ring(&projected, tolerance) {
+                    issue(
+                        "face_orientation_or_degeneracy",
+                        format!("Face {index}: {error}"),
+                    );
                 }
             }
             let mut area_twice = 0.0;
@@ -283,7 +287,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                     cross(sub(triangle[0], points[0]), sub(triangle[1], points[0])),
                     face.plane.normal,
                 );
-                if !(triangle_area_twice / 2.0).is_normal() {
+                if triangle_area_twice != 0.0 && !(triangle_area_twice / 2.0).is_normal() {
                     issue(
                         "numeric_range",
                         format!("Face {index} triangle area is outside the normal f64 range"),

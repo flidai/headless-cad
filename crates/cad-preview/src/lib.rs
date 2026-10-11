@@ -151,7 +151,7 @@ fn scene_with_tolerance(
         if face_points > 200_000 {
             return Err(invalid("software preview exceeds 200,000 face points"));
         }
-        let triangles = if starts.len() > 1 {
+        let triangles = if !cad_kernel::face_is_convex(model, cad_kernel::FaceId(id)) {
             Some(
                 cad_kernel::triangulate_face(model, cad_kernel::FaceId(id), tolerance)
                     .map_err(|_| invalid("face triangulation failed"))?

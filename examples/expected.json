@@ -578,5 +578,55 @@
         ]
       ]
     }
+  },
+  "fork_mount.star": {
+    "blank": {
+      "volume_mm3": 22500,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          60,
+          6
+        ]
+      ]
+    },
+    "fork": {
+      "volume_mm3": 21096,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          60,
+          6
+        ]
+      ]
+    },
+    "fork_mount": {
+      "volume_mm3": 41324,
+      "solids": 7,
+      "bounds_mm": [
+        [
+          -5,
+          -5,
+          0
+        ],
+        [
+          85,
+          65,
+          29
+        ]
+      ]
+    }
   }
 }

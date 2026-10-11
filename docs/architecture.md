@@ -198,7 +198,7 @@ This is an M2 increment, not completion of general planar or analytic modeling.
 
 Native rigid transforms now rotate line/plane geometry and vertices, then apply
 translation. They preserve topology and explicit input-face lineage. General
-rotations are validated for one strictly convex solid or one supported holed
+rotations are validated for one strictly convex solid or one supported simple-profile
 right prism; exactly represented signed
 axis permutations additionally support existing orthogonal nonconvex and
 multiple-solid inputs. No near-axis snapping or implicit quaternion normalization
@@ -224,8 +224,9 @@ oracle additionally asks OCCT to compute Common from the original operand STEP
 files, comparing area, volume, bounds and both directed difference volumes with
 the native result. Browser depth/picking checks use independent analytic faces.
 
-The next planar increment adds convex-ring right prisms with polygonal
-through-holes. A convex CCW outer ring encloses disjoint convex CW holes, with at
+The right-prism increment supports simple nonconvex outer profiles as well as
+convex ones, with optional polygonal through-holes. A simple CCW outer ring
+encloses disjoint convex CW holes, with at
 most 256 total vertices and 32 holes. Multi-loop cap faces remain authoritative;
 wall faces preserve source-ring roles. Validation recognizes a matched-cap,
 straight-wall prism and rejects unsupported general nonconvex geometry.
@@ -247,7 +248,22 @@ clients reject the unsupported replacement and require a reload. Older streamed
 clients reject the changed triangle-byte descriptor rather than rendering a fan
 across an opening.
 
-Progress through general nonconvex transforms and boundary profiles, curved extrusion,
+`fork_mount.star` extends the corpus to a U-shaped cap with two arm openings.
+Simple-ring validation checks nonadjacent segment crossings and numerical
+separation; hole containment checks full boundary edges, not only hole vertices.
+Nonconvex cap faces are recognized only as part of a complete matched-cap right
+prism, including under rigid transforms. General nonconvex polyhedra and Booleans
+remain unsupported. Signed cap fans are valid integration domains even when
+individual terms are negative or zero; display/export use checked triangulation.
+Independent signed-box moments and rotated inertia checks cover parameter edits.
+
+Stream assets requiring explicit triangles now use a versioned mesh envelope.
+An old fan-only client rejects this payload even when triangle counts equal a
+fan; byte-count checks alone cannot detect a concave single-loop face. Bare
+convex payloads remain compatible. New renderers preserve cap identity across
+triangulation and pick through the notch and holes.
+
+Progress through general nonconvex solid operations, curved extrusion,
 revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,
 and controlled import repair. Include open shells and cavity orientation in the
 data model before promising shelling. Each operation declares supported input
@@ -714,7 +730,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion and convex-ring through-hole prisms; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap holed-prism validation | Nonconvex boundary profiles, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation | Curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

@@ -21,7 +21,7 @@ pub fn validate_transform(offset: [f64; 3], rotation: [f64; 4]) -> Result<(), Ke
 
 /// Apply `R(rotation) * point + offset` to native line/plane geometry.
 /// General rotations require one strictly convex solid, a validated right prism
-/// with convex through-hole rings, or an empty model.
+/// with a simple outer ring and convex through-hole rings, or an empty model.
 /// Exactly represented signed-permutation rotations additionally support the
 /// existing orthogonal nonconvex/multiple-solid domain. Near-axis rotations are
 /// never snapped. Topology IDs and outward winding remain unchanged; provenance
@@ -66,7 +66,12 @@ pub fn transform(
             && row.iter().all(|&v| matches!(v, -1.0 | 0.0 | 1.0))
     });
     if !permutation && !model.solids.is_empty() {
-        let issues = if model.faces.iter().any(|face| face.loops.len() > 1) {
+        let issues = if model
+            .faces
+            .iter()
+            .enumerate()
+            .any(|(i, face)| face.loops.len() > 1 || !crate::face_is_convex(model, FaceId(i)))
+        {
             match crate::prism::validate_prism(model, tolerance) {
                 Ok(()) => vec![],
                 Err(error) => vec![ValidationIssue {
@@ -81,7 +86,7 @@ pub fn transform(
             return Err(if issue.code == "resource_limit" {
                 KernelError::ResourceLimit(issue.message.clone())
             } else {
-                KernelError::Unsupported("general rigid rotation requires a single strictly convex solid or a validated right prism with convex through holes; other nonconvex and multiple solids need an exact axis permutation".into())
+                KernelError::Unsupported("general rigid rotation requires a single strictly convex solid or a validated right prism with a simple outer ring and convex through holes; other nonconvex and multiple solids need an exact axis permutation".into())
             });
         }
     }

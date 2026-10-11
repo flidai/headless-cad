@@ -22,7 +22,12 @@ fn issue(code: &str, message: impl Into<String>) -> Vec<ValidationIssue> {
 }
 
 pub(super) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
-    if model.faces.iter().any(|f| f.loops.len() > 1) {
+    if model
+        .faces
+        .iter()
+        .enumerate()
+        .any(|(i, f)| f.loops.len() > 1 || !crate::face_is_convex(model, FaceId(i)))
+    {
         return match crate::prism::validate_prism(model, tolerance) {
             Ok(()) => vec![],
             Err(error) => issue("unsupported_geometry", error.to_string()),
@@ -52,14 +57,22 @@ pub(super) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<Valid
 // This excludes crossing/folded shells, coincident subdivisions, duplicate
 // geometric vertices, and inward surfaces; no generic intersection claim is made.
 pub(crate) fn validate_convex(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
-    if model.faces.iter().any(|face| face.loops.len() != 1) {
+    if model
+        .faces
+        .iter()
+        .enumerate()
+        .any(|(i, face)| face.loops.len() != 1 || !crate::face_is_convex(model, FaceId(i)))
+    {
         return issue(
             "unsupported_geometry",
-            "convex geometry cannot contain inner face boundaries",
+            "convex geometry requires convex faces without inner boundaries",
         );
     }
     if model.solids.len() != 1 || model.shells.len() != 1 {
-        return issue("unsupported_geometry", "general planar geometry currently requires one convex solid; multiple general solids are unsupported");
+        return issue(
+            "unsupported_geometry",
+            "general planar geometry currently requires one convex solid; multiple general solids are unsupported",
+        );
     }
     if model
         .faces
@@ -164,7 +177,13 @@ fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
                     .filter(|&i| i != direction_axis)
                     .any(|i| edge.line.direction[i] != 0.0 || edge.line.origin[i] != a[i])
             {
-                return issue("unsupported_geometry", format!("Edge {}: supporting line must coincide exactly with its axis-aligned endpoints", edge_use.edge.0));
+                return issue(
+                    "unsupported_geometry",
+                    format!(
+                        "Edge {}: supporting line must coincide exactly with its axis-aligned endpoints",
+                        edge_use.edge.0
+                    ),
+                );
             }
         }
         rectangles.push(Rectangle {
@@ -217,7 +236,12 @@ fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
                 _ => false,
             };
             if !legitimate {
-                return issue("geometric_intersection", format!("Faces {i} and {j} overlap, cross, or touch without a matching full topological edge/vertex"));
+                return issue(
+                    "geometric_intersection",
+                    format!(
+                        "Faces {i} and {j} overlap, cross, or touch without a matching full topological edge/vertex"
+                    ),
+                );
             }
         }
     }
@@ -249,7 +273,12 @@ fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
                 .map(|face| face.sign)
                 .sum();
             if winding != 0 {
-                return issue("overlapping_solids", format!("Solid {i} lies inside solid {j}; separate solids must have disjoint interiors"));
+                return issue(
+                    "overlapping_solids",
+                    format!(
+                        "Solid {i} lies inside solid {j}; separate solids must have disjoint interiors"
+                    ),
+                );
             }
         }
     }

@@ -1004,7 +1004,7 @@ fn invalid_unused_polygons_and_unsupported_booleans_fail_explicitly() {
         vec![],
         vec![[0.0, 0.0]; 3],
         vec![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]],
-        vec![[0.0, 0.0], [2.0, 0.0], [1.0, 0.5], [2.0, 2.0], [0.0, 2.0]],
+        vec![[0.0, 0.0], [2.0, 2.0], [0.0, 2.0], [2.0, 0.0]],
         vec![[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]],
         vec![[0.0, 0.0], [f64::NAN, 0.0], [0.0, 1.0]],
         vec![[0.0, 0.0]; MAX_POLYGON_POINTS + 1],
@@ -1887,4 +1887,111 @@ fn polygon_holes_json_is_strict_and_invalid_unused_holes_cannot_be_skipped() {
         build(&recipe).unwrap().feature_hashes["profile"],
         build(&reversed).unwrap().feature_hashes["profile"]
     );
+}
+
+fn concave_profile_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({"schema_version":2,"units":"mm","features":[
+        {"op":"polygon","id":"profile","points":[[0,0],[10,0],[10,10],[8,10],[8,2],[2,2],[2,10],[0,10]],"holes":[[[4,0.5],[4,1.5],[6,1.5],[6,0.5]]]},
+        {"op":"extrude","id":"body","profile":"profile","height":3},
+        {"op":"translate","id":"moved","body":"body","offset":[1,2,3]},
+        {"op":"rectangle","id":"other_profile","width":1,"depth":1},
+        {"op":"extrude","id":"other","profile":"other_profile","height":1}
+    ],"outputs":[{"name":"plate","feature":"moved"},{"name":"other","feature":"other"}],
+    "parts":[{"id":"plate_part","feature":"moved"}],
+    "face_datums":[{"part":"plate_part","name":"centroid","anchor_feature":"body","role":"end_cap","x_direction":[1,0,0]}],
+    "face_assertions":[
+        {"id":"notch","selector":{"anchor_feature":"body","role":"wall_4","target_feature":"moved","cardinality":{"kind":"exactly","count":1}}},
+        {"id":"hole","selector":{"anchor_feature":"body","role":"hole_0_wall_1","target_feature":"moved","cardinality":{"kind":"exactly","count":1}}}
+    ]})).unwrap()
+}
+
+#[test]
+fn concave_profile_roundtrips_caches_and_preserves_unsplit_cap_datum_and_wall_roles() {
+    let recipe = concave_profile_recipe();
+    let json = serde_json::to_string(&recipe).unwrap();
+    let mut recipe: Recipe = serde_json::from_str(&json).unwrap();
+    assert_eq!(serde_json::to_string(&recipe).unwrap(), json);
+    let cache = tempfile::tempdir().unwrap();
+    let mut engine = BuildEngine::with_cache_dir(cache.path());
+    let first = engine.build(&recipe).unwrap();
+    assert!((first.outputs["plate"].result.model.volume() - 150.0).abs() < 1e-10);
+    // One face for each ring edge and two unsplit planar caps.
+    assert_eq!(first.outputs["plate"].result.model.faces.len(), 14);
+    assert_eq!(first.face_assertions.len(), 2);
+    let datum = &first.face_datums["plate_part"]["centroid"];
+    assert_eq!(datum.selection.status, FaceResolutionStatus::Resolved);
+    for (actual, expected) in datum.frame.translation.into_iter().zip([6.0, 6.2, 6.0]) {
+        assert!((actual - expected).abs() < 1e-10);
+    }
+    let reloaded = BuildEngine::with_cache_dir(cache.path())
+        .build(&recipe)
+        .unwrap();
+    assert_eq!(reloaded.stats.computed_solids, 0);
+    assert_eq!(reloaded.stats.disk_cache_hits, 3);
+    assert_eq!(
+        reloaded.outputs["plate"].result,
+        first.outputs["plate"].result
+    );
+    assert_eq!(
+        serde_json::to_value(&reloaded.face_datums).unwrap(),
+        serde_json::to_value(&first.face_datums).unwrap()
+    );
+    // The area centroid is in the U's empty notch. It remains a valid reference frame.
+    assert_eq!(datum.frame.rotation, [0.0, 0.0, 0.0, 1.0]);
+    assert_eq!(engine.build(&recipe).unwrap().stats.computed_solids, 0);
+    if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
+        points[4][1] = 3.0;
+        points[5][1] = 3.0;
+    }
+    let changed = engine.build(&recipe).unwrap();
+    assert_eq!(changed.stats.computed_solids, 2);
+    assert_eq!(changed.stats.cache_hits, 1);
+    assert!((changed.outputs["plate"].result.model.volume() - 168.0).abs() < 1e-10);
+    assert_ne!(
+        first.feature_hashes["profile"],
+        changed.feature_hashes["profile"]
+    );
+    assert_eq!(
+        first.feature_hashes["other"],
+        changed.feature_hashes["other"]
+    );
+    assert!(
+        (changed.face_datums["plate_part"]["centroid"]
+            .frame
+            .translation[1]
+            - (2.0 + 225.0 / 56.0))
+            .abs()
+            < 1e-10
+    );
+    // The ordered input ring is source intent; rotating it changes semantic wall indices.
+    if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
+        points.rotate_left(1);
+    }
+    let reordered = engine.build(&recipe).unwrap();
+    assert_ne!(
+        reordered.feature_hashes["profile"],
+        changed.feature_hashes["profile"]
+    );
+    assert!((reordered.outputs["plate"].result.model.volume() - 168.0).abs() < 1e-10);
+}
+
+#[test]
+fn concave_profile_preflight_rejects_holes_in_notches_and_crossing_material_boundary() {
+    for hole in [
+        // All vertices lie in the outer bounding box, but inside the empty notch.
+        vec![[4.0, 4.0], [4.0, 6.0], [6.0, 6.0], [6.0, 4.0]],
+        // Vertices lie in opposite arms; edges cross the notch.
+        vec![[1.0, 4.0], [1.0, 6.0], [9.0, 6.0], [9.0, 4.0]],
+    ] {
+        let mut recipe = concave_profile_recipe();
+        recipe.face_assertions.clear();
+        recipe.face_datums.clear();
+        if let Feature::Polygon { holes, .. } = &mut recipe.features[0] {
+            holes[0] = hole;
+        }
+        assert!(matches!(
+            BuildEngine::default().build_outputs(&recipe, &["other".into()]),
+            Err(BuildError::PolygonProfile { .. })
+        ));
+    }
 }

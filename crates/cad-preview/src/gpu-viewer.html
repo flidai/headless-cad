@@ -339,7 +339,9 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
       const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(v => v.toString(16).padStart(2,'0')).join('');
       if (entry.cancelled || entry.epoch !== epoch || inflight.get(hash) !== entry || !wanted.has(hash)) return;
       if (digest !== descriptor.sha256) throw Error('Mesh SHA256 verification failed; reload a consistent artifact generation.');
-      const mesh = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      const payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      if (!payload || (payload.schema_version !== undefined && payload.schema_version !== 2)) throw Error('Unsupported display mesh schema.');
+      const mesh = payload.schema_version === 2 ? payload.mesh : payload;
       validateMesh(mesh, descriptor);
       if (entry.cancelled || entry.epoch !== epoch || !wanted.has(hash)) return;
       const group = upload(mesh, hash, byMesh.get(hash).length);

@@ -81,7 +81,7 @@ pub fn triangulate_face(
         offset += ring.len();
     }
     let data: Vec<_> = points.iter().flatten().copied().collect();
-    let indices = if holes.is_empty() {
+    let indices = if holes.is_empty() && crate::face_is_convex(model, face_id) {
         (1..ids.len() - 1)
             .flat_map(|i| [0, i, i + 1])
             .collect::<Vec<_>>()

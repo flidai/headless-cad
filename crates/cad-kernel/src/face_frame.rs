@@ -46,7 +46,7 @@ fn add(a: f64, b: f64, tol: Tolerance) -> Result<f64, KernelError> {
 }
 
 impl ModelSnapshot {
-    /// Frame of one validated convex planar face. The origin is its area
+    /// Frame of one validated planar face. The origin is its area
     /// centroid, followed by `local_offset` in the returned X/Y/Z basis (mm).
     /// `x_direction_hint` is a dimensionless world-space direction: its normal
     /// component is discarded. No automatic axis or nearest-face fallback.
@@ -117,17 +117,17 @@ impl ModelSnapshot {
         let reference = points[0];
         let mut area = Sum::default();
         let mut moment = [Sum::default(); 3];
-        for (boundary_index, &loop_id) in face.loops.iter().enumerate() {
+        for &loop_id in &face.loops {
             let points = self.loop_points(loop_id).unwrap();
             let base = sub(points[0], reference);
             for pair in points[1..].windows(2) {
                 let a = sub(pair[0], reference);
                 let b = sub(pair[1], reference);
                 let weight = dot(cross(sub(a, base), sub(b, base)), z_axis) / 2.;
-                if !weight.is_normal()
-                    || (boundary_index == 0 && weight <= 0.)
-                    || (boundary_index > 0 && weight >= 0.)
-                {
+                if weight == 0. {
+                    continue;
+                }
+                if !weight.is_normal() {
                     return Err(KernelError::NumericRange);
                 }
                 area.add(weight)?;

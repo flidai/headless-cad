@@ -85,7 +85,9 @@ fn streamed_hole_triangle_counts_force_legacy_fan_clients_to_fail_closed() {
         .find(|a| a.name == descriptor["url"].as_str().unwrap())
         .unwrap();
     let mesh: Value = serde_json::from_str(&asset.content).unwrap();
-    let faces = mesh["faces"].as_array().unwrap();
+    assert_eq!(mesh["schema_version"], 2);
+    assert!(mesh.get("faces").is_none()); // Legacy clients must reject before upload.
+    let faces = mesh["mesh"]["faces"].as_array().unwrap();
     let old_fan_bytes: usize = faces
         .iter()
         .map(|f| (f["points"].as_array().unwrap().len() - 2) * 3 * 28)

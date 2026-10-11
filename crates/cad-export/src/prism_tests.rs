@@ -244,3 +244,39 @@ fn through_holes_preserve_native_bounds_and_closed_triangle_material() {
         4
     );
 }
+
+#[test]
+fn nonconvex_caps_preserve_unsplit_step_faces_and_closed_stl_material() {
+    // A 20 by 10 plate with a 6 by 6 bay opening onto its upper edge.
+    let outline = [
+        [0., 0.],
+        [20., 0.],
+        [20., 10.],
+        [13., 10.],
+        [13., 4.],
+        [7., 4.],
+        [7., 10.],
+        [0., 10.],
+    ];
+    let model = cad_kernel::extrude_polygon_with_holes(&outline, &[], 3., Tolerance::default())
+        .unwrap()
+        .model;
+    let step = to_step(&model, Tolerance::default()).unwrap();
+    assert_eq!(step.matches("FACE_OUTER_BOUND(").count(), 10);
+    assert_eq!(step.matches("POLY_LOOP(").count(), 10);
+    assert_eq!(step.matches("FACE_BOUND(").count(), 0);
+    check_mesh(&to_stl(&model, Tolerance::default()).unwrap(), 492., 28);
+    let angle = 0.37_f64;
+    let rotated = cad_kernel::transform(
+        &model,
+        [3., 4., 5.],
+        [angle.sin(), 0., 0., angle.cos()],
+        Tolerance::default(),
+    )
+    .unwrap();
+    check_mesh(
+        &to_stl(&rotated.model, Tolerance::default()).unwrap(),
+        492.,
+        28,
+    );
+}

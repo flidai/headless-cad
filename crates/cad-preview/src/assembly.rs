@@ -312,7 +312,14 @@ pub fn to_assembly_stream_bundle_with_tolerance(
     scene.portable_preview_available = Some(portable_preview_available);
     let mut assets = BTreeMap::<String, String>::new();
     for (hash, mesh) in std::mem::take(&mut scene.meshes) {
-        let content = serde_json::to_string(&mesh)?;
+        // Explicit triangulation is mandatory for holes and concave faces. An
+        // envelope makes older fan-only clients reject the payload, even when
+        // its triangle count happens to equal a fan's n - 2 count.
+        let content = if mesh.faces.iter().any(|face| face.triangles.is_some()) {
+            serde_json::to_string(&serde_json::json!({"schema_version": 2, "mesh": &mesh}))?
+        } else {
+            serde_json::to_string(&mesh)?
+        };
         let sha256: String = Sha256::digest(content.as_bytes())
             .iter()
             .map(|byte| format!("{byte:02x}"))

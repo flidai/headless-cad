@@ -136,7 +136,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         number(value)
     }
 
-    /// Convex counter-clockwise outer ring and optional clockwise convex holes.
+    /// Simple counter-clockwise outer ring and optional clockwise convex holes.
     /// Rings omit their repeated closing point; hole order is semantic.
     fn polygon(
         id: &str,
@@ -1417,6 +1417,45 @@ mod holed_polygon_tests {
                 from_starlark("invalid.star", &source).is_err(),
                 "accepted {holes}"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod concave_polygon_tests {
+    use super::*;
+    #[test]
+    fn concave_starlark_profile_preserves_parameters_roles_and_reference_intent() {
+        let source = r#"
+notch = param(name="notch_floor", default=2)
+p = polygon(id="p", points=[[0,0],[10,0],[10,10],[8,10],[8,notch],[2,notch],[2,10],[0,10]], holes=[[[4,0.5],[4,1.5],[6,1.5],[6,0.5]]])
+b = extrude(id="b", profile=p, height=3)
+m = translate(id="m", body=b, offset=[1,2,3])
+part(id="plate", body=m, datums={"center":face_datum(from_feature=b, role="end_cap", x_direction=[1,0,0])})
+assert_faces(id="notch_face", from_feature=b, role="wall_4", in_feature=m)
+assert_faces(id="hole_face", from_feature=b, role="hole_0_wall_0", in_feature=m)
+output(name="body", feature=m)
+"#;
+        let mut engine = cad_build::BuildEngine::default();
+        for (floor, volume, center_y) in [(2.0, 150.0, 6.2), (3.0, 168.0, 2.0 + 225.0 / 56.0)] {
+            let recipe = from_starlark_with_params(
+                "concave.star",
+                source,
+                &BTreeMap::from([("notch_floor".into(), floor)]),
+            )
+            .unwrap();
+            let roundtrip: Recipe =
+                serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+            assert_eq!(roundtrip.face_datums.len(), 1);
+            assert!(roundtrip.parts[0].datums.is_empty());
+            let built = engine.build(&roundtrip).unwrap();
+            assert!((built.outputs["body"].result.model.volume() - volume).abs() < 1e-10);
+            assert_eq!(built.face_assertions.len(), 2);
+            assert!(
+                (built.face_datums["plate"]["center"].frame.translation[1] - center_y).abs()
+                    < 1e-10
+            );
+            assert_eq!(engine.build(&roundtrip).unwrap().stats.computed_solids, 0);
         }
     }
 }

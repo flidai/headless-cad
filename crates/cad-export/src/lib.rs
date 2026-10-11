@@ -4,7 +4,8 @@
 //! STEP is a narrow AP214 faceted B-rep writer, with explicit plane surfaces,
 //! polygon boundaries, product context, and millimetre units. This is not an
 //! arbitrary analytic/NURBS STEP translator. Both exporters reject invalid
-//! models and non-convex face loops rather than silently tessellating them wrong.
+//! models. Simple nonconvex cap boundaries and disjoint convex holes are retained
+//! in STEP and explicitly triangulated for STL.
 
 use cad_kernel::{ModelSnapshot, Tolerance};
 use std::fmt::Write;
@@ -119,8 +120,8 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
                 .collect();
             let normal =
                 normalized(face.plane.normal).ok_or_else(|| unsupported("invalid plane normal"))?;
-            let triangles = if face.loops.len() == 1 {
-                // Native validation certifies convex single-loop faces. Preserve
+            let triangles = if cad_kernel::face_is_convex(model, cad_kernel::FaceId(face_index)) {
+                // The validated face is convex and single-loop. Preserve
                 // the existing deterministic fan without revalidating the model per face.
                 (1..points.len() - 1)
                     .map(|i| [points[0], points[i], points[i + 1]])
@@ -236,7 +237,7 @@ fn step_solids(step: &mut Step, model: &ModelSnapshot, polygons: Vec<Polygon>) -
     solids
 }
 
-/// Export a validated convex-polygon solid as an AP214 faceted B-rep.
+/// Export a validated planar polygon solid as an AP214 faceted B-rep.
 ///
 /// The fixed header timestamp is intentional: exports have no clock dependency.
 pub fn to_step(model: &ModelSnapshot, tolerance: Tolerance) -> Result<String, ExportError> {

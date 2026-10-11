@@ -1,6 +1,6 @@
 //! A deliberately narrow, native Rust boundary-representation kernel.
 //!
-//! Supports rectangular and convex polygon extrusions, including disjoint convex
+//! Supports rectangular and simple polygon extrusions, including disjoint convex
 //! through holes, rigid placements, orthogonal solid Booleans, and bounded convex
 //! planar intersection. Polygon caps remain analytic planar faces with explicit
 //! inner loops where needed. Orthogonal Boolean faces stay rectangular and share
@@ -8,7 +8,7 @@
 //! disconnected solids are supported in that domain.
 //! Enclosed cavities, curved surfaces, and nonmanifold contacts are unsupported.
 //! General rigid rotations support a single strictly convex solid or a validated
-//! right prism with convex disjoint through holes. Exactly represented axis
+//! right prism with a simple outer boundary and convex disjoint through holes. Exactly represented axis
 //! permutations also retain the orthogonal solid domain. Multi-loop prism caps
 //! support signed-loop properties; Boolean operations on these prisms are not yet
 //! supported.
@@ -25,6 +25,7 @@ mod math;
 mod orthogonal;
 mod polygon;
 mod prism;
+mod simple_polygon;
 mod transform;
 mod triangulation;
 mod validation;
@@ -37,6 +38,7 @@ pub use orthogonal::{boolean, translate, BooleanOp};
 pub use polygon::{extrude_polygon, validate_polygon, MAX_POLYGON_POINTS};
 pub use prism::{extrude_polygon_with_holes, validate_polygon_with_holes, MAX_POLYGON_HOLES};
 use serde::{Deserialize, Serialize};
+pub use simple_polygon::face_is_convex;
 use std::collections::BTreeMap;
 use thiserror::Error;
 pub use transform::{transform, validate_transform};
