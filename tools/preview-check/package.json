@@ -9,7 +9,8 @@
     "test:assembly": "node ../../crates/cad-preview/tests/assembly-check.cjs",
     "test:nested": "node nested-check.cjs",
     "test:polygon": "node polygon-check.cjs",
-    "test:datums": "node datum-check.cjs"
+    "test:datums": "node datum-check.cjs",
+    "test:gpu": "node gpu-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

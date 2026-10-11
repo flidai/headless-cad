@@ -538,6 +538,50 @@ outputs also expose a `boundary` role. General persistent naming remains future
 work. Public snapshots must be revalidated after external editing or
 deserialization. STEP/STL exporters validate inputs.
 
+## GPU assembly inspection
+
+Normal assembly builds produce an additional `*.gpu.html` preview, linked from
+`cad serve` alongside the portable Canvas viewer. This is our own WebGL2 renderer;
+it uses no Three.js or other graphics library. Repeated occurrences share GPU
+geometry buffers. Picking retains occurrence and local face identity, and the
+inspector shows the captured recipe and named datums.
+
+To inspect a larger assembly without generating engineering exports:
+
+```sh
+cad build examples/display_rack.star --display-only --param rows=100 --param columns=100 --param variants=1 --out-dir out/display_benchmark
+cad serve out --port 8080
+# Open http://localhost:8080/display_benchmark/display_rack.gpu.html
+```
+
+`rows × columns` controls occurrence count; `variants` controls unique geometry.
+The default recipe contains 400 occurrences and four unique meshes. The command
+above contains 10,000 occurrences and one mesh. This is an inspection workload,
+not evidence of more advanced geometric modeling.
+
+`--display-only` also works with `watch`. It preserves source snapshots,
+parameters, geometry validation and atomic publication. Assembly outputs contain
+GPU HTML and compact display JSON; ordinary solid outputs retain portable HTML.
+No exact B-rep, STEP, STL, SVG, or separate BOM files are published in that mode.
+Switching publication modes removes obsolete artifacts after a successful build.
+
+The GPU viewer requires WebGL2 and a manual reload after a rebuild. All display
+assets remain embedded; streaming, culling, LOD and residency eviction are future
+work. It uses local and camera-relative float32 coordinates and reports explicit
+errors outside its display range. It is an approximate inspection client, never
+an engineering measurement or modeling backend. Normal builds include a portable
+preview fallback; display-only assemblies need a WebGL2-capable browser.
+
+GPU publication permits 100,000 occurrences, 50,000 unique faces and 200,000
+unique face points. These are resource limits, not frame-rate claims. The
+benchmark command records the actual renderer and environment:
+
+```sh
+CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
+# Defaults to SwiftShader for reproducible software-rendered CI.
+# Set CAD_GPU_HARDWARE=1 to request the available hardware path; inspect the report.
+```
+
 ## Supported domain and current limits
 
 - Rectangle profiles and strict CCW convex polygon profiles with 3–256 vertices.
@@ -603,6 +647,7 @@ npm run test:assembly
 npm run test:nested
 npm run test:polygon
 npm run test:datums
+npm run test:gpu
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.

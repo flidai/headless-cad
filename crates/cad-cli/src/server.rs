@@ -351,17 +351,32 @@ fn gallery(directory: &Dir) -> String {
                 if let Ok(child) = directory.open_dir(&name) {
                     discover(&child, &format!("{path}/"), depth + 1, remaining, previews);
                 }
-            } else if kind.is_file() && name.ends_with(".preview.html") {
+            } else if kind.is_file()
+                && (name.ends_with(".preview.html") || name.ends_with(".gpu.html"))
+            {
                 previews.push(path);
             }
         }
     }
     let mut previews = Vec::new();
     discover(directory, "", 0, &mut 5000, &mut previews);
+    let mut models = std::collections::BTreeMap::new();
+    for path in previews {
+        let stem = path
+            .strip_suffix(".preview.html")
+            .or_else(|| path.strip_suffix(".gpu.html"))
+            .unwrap()
+            .to_owned();
+        if path.ends_with(".preview.html") || !models.contains_key(&stem) {
+            models.insert(stem, path);
+        }
+    }
+    let previews: Vec<_> = models.into_values().collect();
     let mut output = String::from("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Headless CAD · Models</title><style>body{margin:0;background:#0d1522;color:#e6edf5;font:16px system-ui;padding:clamp(16px,4vw,40px)}main{max-width:1200px;margin:auto}h1{font-size:36px;margin-bottom:8px}.muted{color:#9aaec4}section{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:20px;margin-top:32px}article{background:#172438;border:1px solid #2b4059;border-radius:16px;overflow:hidden;padding:20px}img{width:100%;height:210px;object-fit:contain;background:#eff4f9;border-radius:10px}a{color:#91d1ff;text-decoration:none}a:hover{text-decoration:underline}nav{display:flex;gap:16px;flex-wrap:wrap;margin-top:18px}h2{font-size:20px;overflow-wrap:anywhere}</style></head><body><main><p class=\"muted\">RUST KERNEL / READ-ONLY VIEWER</p><h1>Model library</h1><p class=\"muted\">Recipes are the source of truth. Open a generated model to orbit, inspect faces, and download geometry.</p><section>");
     for preview in &previews {
         let stem = preview
             .strip_suffix(".preview.html")
+            .or_else(|| preview.strip_suffix(".gpu.html"))
             .expect("preview suffix");
         output.push_str(&format!("<article><a href=\"{}\">", url(preview)));
         let thumbnail = format!("{stem}.preview.svg");
@@ -387,6 +402,14 @@ fn gallery(directory: &Dir) -> String {
             "<nav><a href=\"{}\">Open viewer ↗</a>",
             url(preview)
         ));
+        let gpu = format!("{stem}.gpu.html");
+        if &gpu != preview
+            && directory
+                .metadata(&gpu)
+                .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!("<a href=\"{}\">GPU viewer ↗</a>", url(&gpu)));
+        }
         for (suffix, label) in [
             ("step", "STEP"),
             ("stl", "STL"),
@@ -522,6 +545,22 @@ mod tests {
             assert!(response.starts_with("HTTP/1.1 404"));
             assert!(!response.contains("not public"));
         }
+    }
+
+    #[test]
+    fn gallery_discovers_gpu_only_outputs_without_nonexistent_downloads() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("large.gpu.html"), "gpu").unwrap();
+        std::fs::write(dir.path().join("large.display.json"), "{}").unwrap();
+        let response = request(dir.path(), b"GET / HTTP/1.1\r\n\r\n");
+        assert!(response.contains("/large.gpu.html"));
+        assert!(response.contains("/large.display.json"));
+        assert!(!response.contains("large.step"));
+        assert!(!response.contains("large.preview.svg"));
+        std::fs::write(dir.path().join("large.preview.html"), "cpu").unwrap();
+        let response = request(dir.path(), b"GET / HTTP/1.1\r\n\r\n");
+        assert_eq!(response.matches("<article>").count(), 1);
+        assert!(response.contains("GPU viewer"));
     }
 
     #[test]

@@ -216,6 +216,7 @@ mod tests {
             crate::run_with_source(
                 crate::Cli {
                     command: crate::Command::Build {
+                        display_only: false,
                         recipe: recipe.clone(),
                         out_dir: output.clone(),
                     },
@@ -285,6 +286,7 @@ mod tests {
             let result = crate::run_with_source(
                 crate::Cli {
                     command: crate::Command::Build {
+                        display_only: false,
                         recipe: recipe.clone(),
                         out_dir: output.clone(),
                     },

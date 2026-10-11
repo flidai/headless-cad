@@ -1387,3 +1387,100 @@ fn gantry_height_edit_moves_attachment_chain_and_rebuilds_one_definition() {
         }
     }
 }
+
+#[test]
+fn display_only_publication_keeps_shared_meshes_and_removes_stale_exports() {
+    let directory = tempfile::tempdir().unwrap();
+    let recipe = directory.path().join("many.star");
+    let out = directory.path().join("out");
+    let source = "n=param(name='n',default=2)\np=rectangle(id='p',width=2,depth=3)\nb=extrude(id='b',profile=p,height=4)\nd=part(id='block',body=b)\nitems=[instance(id='i'+str(i),part=d,offset=[i*4,0,0]) for i in range(int(n))]\na=assembly(id='many',instances=items)\nassembly_output(name='many',assembly=a)\n";
+    fs::write(&recipe, source).unwrap();
+    let build = |extra: &[&str]| {
+        let mut args = vec![
+            "build",
+            recipe.to_str().unwrap(),
+            "--out-dir",
+            out.to_str().unwrap(),
+        ];
+        args.extend(extra);
+        cli(&args)
+    };
+    let full = build(&[]);
+    assert!(
+        full.status.success(),
+        "{}",
+        String::from_utf8_lossy(&full.stderr)
+    );
+    let full_manifest: serde_json::Value = serde_json::from_slice(&full.stdout).unwrap();
+    assert_eq!(full_manifest["generation_mode"], "full");
+    assert!(out.join("many.step").exists());
+    assert!(fs::read_to_string(out.join("many.gpu.html"))
+        .unwrap()
+        .contains("\"portable_preview_available\":true"));
+    let shown = build(&["--display-only", "--param", "n=10001"]);
+    assert!(
+        shown.status.success(),
+        "{}",
+        String::from_utf8_lossy(&shown.stderr)
+    );
+    let summary: serde_json::Value = serde_json::from_slice(&shown.stdout).unwrap();
+    assert_eq!(summary["generation_mode"], "display_only");
+    assert_eq!(summary["outputs"]["many"]["instances"], 10001);
+    assert_eq!(
+        summary["outputs"]["many"]["available_files"],
+        serde_json::json!(["many.display.json", "many.gpu.html"])
+    );
+    let actual: std::collections::BTreeSet<_> = fs::read_dir(&out)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    let wanted: std::collections::BTreeSet<_> = summary["artifact_files"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|name| name.as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(actual, wanted);
+    assert!(!out.join("many.step").exists());
+    assert!(!out.join("many.preview.html").exists());
+    assert!(fs::read_to_string(out.join("many.gpu.html"))
+        .unwrap()
+        .contains("\"portable_preview_available\":false"));
+    assert!(!out.join("many.preview.svg").exists());
+    assert!(!actual.iter().any(|name| name.ends_with(".brep.json")));
+    let scene: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("many.display.json")).unwrap()).unwrap();
+    assert_eq!(scene["instances"].as_array().unwrap().len(), 10001);
+    assert_eq!(scene["meshes"].as_object().unwrap().len(), 1);
+    let manifest = fs::read(out.join("manifest.json")).unwrap();
+    fs::write(&recipe, "this is invalid !").unwrap();
+    assert!(!build(&["--display-only"]).status.success());
+    assert_eq!(fs::read(out.join("manifest.json")).unwrap(), manifest);
+    assert_eq!(fs::read_to_string(out.join("recipe.star")).unwrap(), source);
+}
+
+#[test]
+fn display_only_plain_body_publishes_cpu_html_without_engineering_exports() {
+    let directory = tempfile::tempdir().unwrap();
+    let out = directory.path().join("out");
+    let built = cli(&[
+        "build",
+        &example("plate.star"),
+        "--display-only",
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]);
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let summary: serde_json::Value = serde_json::from_slice(&built.stdout).unwrap();
+    for (name, output) in summary["outputs"].as_object().unwrap() {
+        assert_eq!(
+            output["available_files"],
+            serde_json::json!([format!("{name}.preview.html")])
+        );
+        assert!(!out.join(format!("{name}.step")).exists());
+    }
+}

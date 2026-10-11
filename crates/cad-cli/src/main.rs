@@ -89,6 +89,9 @@ enum Command {
         out_dir: PathBuf,
         #[arg(long, default_value_t = 500, value_parser = clap::value_parser!(u64).range(1..))]
         interval_ms: u64,
+        /// Publish compact previews without engineering export artifacts.
+        #[arg(long)]
+        display_only: bool,
     },
     /// Serve generated previews and exports through a read-only local viewer.
     Serve {
@@ -116,6 +119,9 @@ enum Command {
         recipe: PathBuf,
         #[arg(long, default_value = "out")]
         out_dir: PathBuf,
+        /// Publish compact previews without B-rep, STEP, STL, or SVG exports.
+        #[arg(long)]
+        display_only: bool,
     },
 }
 
@@ -621,6 +627,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             recipe,
             out_dir,
             interval_ms,
+            display_only,
         } => {
             return watch::run(
                 recipe,
@@ -631,6 +638,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                             command: Command::Build {
                                 recipe: recipe.clone(),
                                 out_dir: out_dir.clone(),
+                                display_only: *display_only,
                             },
                             params: cli.params.clone(),
                             cache_dir: cli.cache_dir.clone(),
@@ -695,7 +703,17 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
     }
     let build = engine(&cli.cache_dir).build(&recipe)?;
     let mut summary = report(&recipe, &build)?;
-    if let Command::Build { out_dir, .. } = &cli.command {
+    if let Command::Build {
+        out_dir,
+        display_only,
+        ..
+    } = &cli.command
+    {
+        summary["generation_mode"] = json!(if *display_only {
+            "display_only"
+        } else {
+            "full"
+        });
         // Do not replace directories containing the source recipe or cache.
         if out_dir.exists() {
             let destination = out_dir.canonicalize()?;
@@ -742,6 +760,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         summary["recipe_context_hash"] = json!(blake3::hash(&serde_json::to_vec(&json!({
             "source_hash": summary["recipe_source_hash"],
             "source": summary["recipe_source"],
+            "generation_mode": summary["generation_mode"],
         }))?)
         .to_hex()
         .to_string());
@@ -756,16 +775,19 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             }
             let tolerance = recipe.tolerance.unwrap_or_default();
             let model = &output.result.model;
-            artifacts.push((
-                format!("{name}.brep.json"),
-                serde_json::to_string_pretty(&*output.result)?,
-            ));
-            artifacts.push((
-                format!("{name}.step"),
-                cad_export::to_step(model, tolerance)?,
-            ));
-            artifacts.push((format!("{name}.stl"), cad_export::to_stl(model, tolerance)?));
-            artifacts.push((format!("{name}.preview.svg"), cad_preview::to_svg(model)?));
+            let artifact_start = artifacts.len();
+            if !display_only {
+                artifacts.push((
+                    format!("{name}.brep.json"),
+                    serde_json::to_string_pretty(&*output.result)?,
+                ));
+                artifacts.push((
+                    format!("{name}.step"),
+                    cad_export::to_step(model, tolerance)?,
+                ));
+                artifacts.push((format!("{name}.stl"), cad_export::to_stl(model, tolerance)?));
+                artifacts.push((format!("{name}.preview.svg"), cad_preview::to_svg(model)?));
+            }
             let context = cad_preview::RecipeContext {
                 language: language.to_owned(),
                 source: source_text.to_owned(),
@@ -783,6 +805,10 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 format!("{name}.preview.html"),
                 cad_preview::to_html_with_recipe(model, &context)?,
             ));
+            summary["outputs"][name]["available_files"] = json!(artifacts[artifact_start..]
+                .iter()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>());
         }
         let mut definition_assets = BTreeSet::new();
         for (name, assembly) in &build.assemblies {
@@ -793,14 +819,17 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 )
                 .into());
             }
-            let mut definitions = serde_json::Map::new();
-            for (part_id, part) in &assembly.parts {
-                let asset = format!("definition-{}.brep.json", part.content_hash);
-                filename(&asset)?;
-                if definition_assets.insert(asset.clone()) {
-                    artifacts.push((asset.clone(), serde_json::to_string_pretty(&*part.result)?));
-                }
-                definitions.insert(part_id.clone(), json!({
+            let artifact_start = artifacts.len();
+            if !display_only {
+                let mut definitions = serde_json::Map::new();
+                for (part_id, part) in &assembly.parts {
+                    let asset = format!("definition-{}.brep.json", part.content_hash);
+                    filename(&asset)?;
+                    if definition_assets.insert(asset.clone()) {
+                        artifacts
+                            .push((asset.clone(), serde_json::to_string_pretty(&*part.result)?));
+                    }
+                    definitions.insert(part_id.clone(), json!({
                     "feature_id": part.feature_id,
                     "content_hash": part.content_hash,
                     "metadata": part.metadata,
@@ -809,45 +838,52 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     "local_bounds_mm": if part.result.model.solids.is_empty() { Value::Null } else { json!(part.result.model.bounds()) },
                     "material_volume_mm3": part.result.model.volume(),
                 }));
+                }
+                let manifest = json!({
+                    "schema_version": 1, "kind": "assembly", "units": "mm",
+                    "assembly_build_id": cad_assembly::assembly_build_id(),
+                    "assembly_id": assembly.assembly_id, "content_hash": assembly.content_hash,
+                    "tolerance": recipe.tolerance.unwrap_or_default(),
+                    "definitions": definitions, "instances": assembly.instances,
+                    "hierarchy": assembly.hierarchy, "instance_paths": assembly.instance_paths,
+                    "bounds_mm": assembly.bounds(), "bounds_kind": "conservative_axis_aligned",
+                    "material_volume_mm3": assembly.material_volume(),
+                    "volume_kind": "summed_instance_material_not_union",
+                    "display_asset": format!("{name}.display.json"),
+                });
+                artifacts.push((
+                    format!("{name}.assembly.json"),
+                    serde_json::to_string_pretty(&manifest)?,
+                ));
+                let bom = assembly.bill_of_materials(recipe.tolerance.unwrap_or_default())?;
+                artifacts.push((
+                    format!("{name}.bom.json"),
+                    serde_json::to_string_pretty(&bom_document(&bom)?)?,
+                ));
+                artifacts.push((format!("{name}.bom.csv"), cad_export::bom_to_csv(&bom)?));
             }
-            let manifest = json!({
-                "schema_version": 1, "kind": "assembly", "units": "mm",
-                "assembly_build_id": cad_assembly::assembly_build_id(),
-                "assembly_id": assembly.assembly_id, "content_hash": assembly.content_hash,
-                "tolerance": recipe.tolerance.unwrap_or_default(),
-                "definitions": definitions, "instances": assembly.instances,
-                "hierarchy": assembly.hierarchy, "instance_paths": assembly.instance_paths,
-                "bounds_mm": assembly.bounds(), "bounds_kind": "conservative_axis_aligned",
-                "material_volume_mm3": assembly.material_volume(),
-                "volume_kind": "summed_instance_material_not_union",
-                "display_asset": format!("{name}.display.json"),
-            });
-            artifacts.push((
-                format!("{name}.assembly.json"),
-                serde_json::to_string_pretty(&manifest)?,
-            ));
-            let bom = assembly.bill_of_materials(recipe.tolerance.unwrap_or_default())?;
-            artifacts.push((
-                format!("{name}.bom.json"),
-                serde_json::to_string_pretty(&bom_document(&bom)?)?,
-            ));
-            artifacts.push((format!("{name}.bom.csv"), cad_export::bom_to_csv(&bom)?));
             artifacts.push((
                 format!("{name}.display.json"),
-                cad_preview::to_assembly_scene_json(assembly)?,
+                if *display_only {
+                    cad_preview::to_assembly_gpu_scene_json(assembly)?
+                } else {
+                    cad_preview::to_assembly_scene_json(assembly)?
+                },
             ));
-            artifacts.push((
-                format!("{name}.step"),
-                cad_export::assembly_to_step(assembly, recipe.tolerance.unwrap_or_default())?,
-            ));
-            artifacts.push((
-                format!("{name}.stl"),
-                cad_export::assembly_to_stl(assembly, recipe.tolerance.unwrap_or_default())?,
-            ));
-            artifacts.push((
-                format!("{name}.preview.svg"),
-                cad_preview::to_assembly_svg(assembly)?,
-            ));
+            if !display_only {
+                artifacts.push((
+                    format!("{name}.step"),
+                    cad_export::assembly_to_step(assembly, recipe.tolerance.unwrap_or_default())?,
+                ));
+                artifacts.push((
+                    format!("{name}.stl"),
+                    cad_export::assembly_to_stl(assembly, recipe.tolerance.unwrap_or_default())?,
+                ));
+                artifacts.push((
+                    format!("{name}.preview.svg"),
+                    cad_preview::to_assembly_svg(assembly)?,
+                ));
+            }
             let context = cad_preview::RecipeContext {
                 language: language.to_owned(),
                 source: source_text.to_owned(),
@@ -858,10 +894,20 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 content_hash: assembly.content_hash.clone(),
                 recipe_context_hash: summary["recipe_context_hash"].as_str().unwrap().to_owned(),
             };
+            if !display_only {
+                artifacts.push((
+                    format!("{name}.preview.html"),
+                    cad_preview::to_assembly_html(assembly, &context)?,
+                ));
+            }
             artifacts.push((
-                format!("{name}.preview.html"),
-                cad_preview::to_assembly_html(assembly, &context)?,
+                format!("{name}.gpu.html"),
+                cad_preview::to_assembly_gpu_html_with_fallback(assembly, &context, !display_only)?,
             ));
+            summary["outputs"][name]["available_files"] = json!(artifacts[artifact_start..]
+                .iter()
+                .map(|(name, _)| name)
+                .collect::<Vec<_>>());
         }
         let mut artifact_names = BTreeSet::new();
         for (name, _) in &artifacts {

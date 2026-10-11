@@ -324,5 +324,23 @@
         ]
       ]
     }
+  },
+  "display_rack.star": {
+    "display_rack": {
+      "volume_mm3": 243200,
+      "solids": 400,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          236,
+          236,
+          11
+        ]
+      ]
+    }
   }
 }

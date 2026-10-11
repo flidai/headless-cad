@@ -1,7 +1,10 @@
 //! Compact display assets retain shared local geometry and rigid occurrences.
-//! Software rasterization expands bounded transient draw arrays; this is the
-//! baseline renderer, not a GPU instance renderer or exact B-rep viewer.
-use super::{render_html, render_svg, scene, Face, PreviewError, RecipeContext, Scene};
+//! Software previews expand bounded transient arrays. The separate opt-in GPU
+//! viewer retains shared meshes with a larger occurrence budget. Neither browser
+//! viewer loads or evaluates the exact B-rep.
+use super::{
+    render_html, render_html_template, render_svg, scene, Face, PreviewError, RecipeContext, Scene,
+};
 use cad_assembly::{BuiltAssembly, Instance};
 use cad_kernel::Tolerance;
 use serde::Serialize;
@@ -37,16 +40,19 @@ struct AssemblyScene {
     solids: usize,
     display_faces: usize,
     display_points: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    portable_preview_available: Option<bool>,
 }
 
-fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewError> {
+fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, PreviewError> {
     assembly
         .validate(Tolerance::default())
         .map_err(|error| PreviewError::Assembly(error.to_string()))?;
-    if assembly.instances.len() > MAX_INSTANCES {
-        return Err(PreviewError::Assembly(
-            "display exceeds 10,000 occurrences".into(),
-        ));
+    let instance_limit = if gpu { 100_000 } else { MAX_INSTANCES };
+    if assembly.instances.len() > instance_limit {
+        return Err(PreviewError::Assembly(format!(
+            "display exceeds {instance_limit} occurrences"
+        )));
     }
     let mut meshes = BTreeMap::new();
     let mut definitions = BTreeMap::new();
@@ -96,7 +102,7 @@ fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewErro
         points = points
             .checked_add(mesh.faces.iter().map(|face| face.points.len()).sum())
             .ok_or_else(|| PreviewError::Assembly("display count overflow".into()))?;
-        if faces > MAX_FACES || points > MAX_POINTS {
+        if !gpu && (faces > MAX_FACES || points > MAX_POINTS) {
             return Err(PreviewError::Assembly(
                 "software display exceeds 50,000 faces or 200,000 face points".into(),
             ));
@@ -135,13 +141,16 @@ fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewErro
         solids: assembly.solid_count(),
         display_faces: faces,
         display_points: points,
+        portable_preview_available: None,
     })
 }
 
 /// Versioned display JSON: one local face mesh per content hash plus instances.
 /// Material volume sums occurrences; overlaps are counted, not Boolean-unioned.
 pub fn to_assembly_scene_json(assembly: &BuiltAssembly) -> Result<String, PreviewError> {
-    Ok(serde_json::to_string_pretty(&assembly_scene(assembly)?)?)
+    Ok(serde_json::to_string_pretty(&assembly_scene(
+        assembly, false,
+    )?)?)
 }
 
 /// A standalone occurrence-aware viewer with exact source/provenance context.
@@ -154,7 +163,40 @@ pub fn to_assembly_html(
             "recipe output identity does not match assembly",
         ));
     }
-    render_html(&assembly_scene(assembly)?, Some(recipe))
+    render_html(&assembly_scene(assembly, false)?, Some(recipe))
+}
+
+/// Compact GPU display JSON with up to 100,000 occurrences. Unique local meshes
+/// remain bounded; instance geometry is not expanded into software face arrays.
+pub fn to_assembly_gpu_scene_json(assembly: &BuiltAssembly) -> Result<String, PreviewError> {
+    Ok(serde_json::to_string_pretty(&assembly_scene(
+        assembly, true,
+    )?)?)
+}
+
+/// Opt-in WebGL2 occurrence viewer, preserving shared meshes on the GPU.
+pub fn to_assembly_gpu_html(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+) -> Result<String, PreviewError> {
+    to_assembly_gpu_html_with_fallback(assembly, recipe, false)
+}
+
+/// Declare whether the published artifact set includes the portable CPU viewer.
+/// The explicit flag avoids network probes and enables local-file fallback links.
+pub fn to_assembly_gpu_html_with_fallback(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    portable_preview_available: bool,
+) -> Result<String, PreviewError> {
+    if recipe.content_hash != assembly.content_hash {
+        return Err(PreviewError::Recipe(
+            "recipe output identity does not match assembly",
+        ));
+    }
+    let mut scene = assembly_scene(assembly, true)?;
+    scene.portable_preview_available = Some(portable_preview_available);
+    render_html_template(&scene, Some(recipe), include_str!("gpu-viewer.html"))
 }
 
 fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
@@ -205,7 +247,7 @@ fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
 
 /// Deterministic isometric thumbnail; meshes expand only while drawing the SVG.
 pub fn to_assembly_svg(assembly: &BuiltAssembly) -> Result<String, PreviewError> {
-    render_svg(&expand(&assembly_scene(assembly)?)?)
+    render_svg(&expand(&assembly_scene(assembly, false)?)?)
 }
 
 #[cfg(test)]
@@ -270,7 +312,7 @@ mod tests {
         assert_eq!(value["instances"][1]["id"], "turned");
         assert_eq!(value["instances"][1]["part"], "rotated_definition");
         assert_eq!(value["display_faces"], 12);
-        let bounds = assembly_scene(&assembly).unwrap().bounds.unwrap();
+        let bounds = assembly_scene(&assembly, false).unwrap().bounds.unwrap();
         for (actual, expected) in bounds
             .into_iter()
             .flatten()
@@ -281,8 +323,41 @@ mod tests {
     }
 
     #[test]
+    fn gpu_scene_keeps_one_mesh_beyond_software_occurrence_and_face_limits() {
+        let original = fixture();
+        let instances = (0..10_001)
+            .map(|index| Instance {
+                id: format!("occurrence_{index}"),
+                part: "block".into(),
+                attachment: None,
+                transform: RigidTransform::default(),
+            })
+            .collect();
+        let large = BuiltAssembly::new(
+            "large".into(),
+            original.parts,
+            instances,
+            Tolerance::default(),
+        )
+        .unwrap();
+        assert!(to_assembly_scene_json(&large).is_err());
+        let compact: serde_json::Value =
+            serde_json::from_str(&to_assembly_gpu_scene_json(&large).unwrap()).unwrap();
+        assert_eq!(compact["instances"].as_array().unwrap().len(), 10_001);
+        assert_eq!(compact["meshes"].as_object().unwrap().len(), 1);
+        assert_eq!(compact["display_faces"], 60_006);
+        assert_eq!(
+            compact["meshes"]["shared-geometry"]["faces"]
+                .as_array()
+                .unwrap()
+                .len(),
+            6
+        );
+    }
+
+    #[test]
     fn rotated_draw_points_and_normals_match_analytic_quarter_turn() {
-        let compact = assembly_scene(&fixture()).unwrap();
+        let compact = assembly_scene(&fixture(), false).unwrap();
         let expanded = expand(&compact).unwrap();
         assert_eq!(expanded.faces.len(), 12);
         let face = &expanded.faces[6];
@@ -317,6 +392,20 @@ mod tests {
             recipe_context_hash: "source-hash".into(),
         };
         let html = to_assembly_html(&assembly, &context).unwrap();
+        let mut hostile = context.clone();
+        hostile.source = "# </script><img src=x onerror=alert(1)>".into();
+        let gpu = to_assembly_gpu_html(&assembly, &hostile).unwrap();
+        assert!(gpu.contains("\"portable_preview_available\":false"));
+        let with_fallback = to_assembly_gpu_html_with_fallback(&assembly, &hostile, true).unwrap();
+        assert!(with_fallback.contains("\"portable_preview_available\":true"));
+        assert!(!with_fallback.contains("</script><img"));
+        assert!(!to_assembly_gpu_scene_json(&assembly)
+            .unwrap()
+            .contains("portable_preview_available"));
+        assert!(!gpu.contains("</script><img"));
+        assert!(gpu.contains("\\u003c/script\\u003e"));
+        assert!(!gpu.contains("/*SCENE_DATA*/null"));
+        assert!(!gpu.contains("/*RECIPE_DATA*/null"));
         let raw = html
             .lines()
             .find_map(|line| {
@@ -356,7 +445,7 @@ mod tests {
             Tolerance::default(),
         )
         .unwrap();
-        let compact = assembly_scene(&overlapping).unwrap();
+        let compact = assembly_scene(&overlapping, false).unwrap();
         assert_eq!(compact.material_volume, 48.0);
         assert_eq!(compact.bounds, Some([[0.0, 0.0, 0.0], [2.0, 3.0, 4.0]]));
         assert_eq!(compact.instances.len(), 2);

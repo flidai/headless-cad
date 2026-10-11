@@ -8,7 +8,10 @@ use std::fmt::Write;
 use thiserror::Error;
 
 mod assembly;
-pub use assembly::{to_assembly_html, to_assembly_scene_json, to_assembly_svg};
+pub use assembly::{
+    to_assembly_gpu_html, to_assembly_gpu_html_with_fallback, to_assembly_gpu_scene_json,
+    to_assembly_html, to_assembly_scene_json, to_assembly_svg,
+};
 
 #[derive(Debug, Error)]
 pub enum PreviewError {
@@ -170,6 +173,14 @@ fn render_html(
     data: &impl Serialize,
     recipe: Option<&RecipeContext>,
 ) -> Result<String, PreviewError> {
+    render_html_template(data, recipe, include_str!("viewer.html"))
+}
+
+fn render_html_template(
+    data: &impl Serialize,
+    recipe: Option<&RecipeContext>,
+    template: &str,
+) -> Result<String, PreviewError> {
     if let Some(recipe) = recipe {
         if !matches!(recipe.language.as_str(), "starlark" | "json") {
             return Err(PreviewError::Recipe("language must be starlark or json"));
@@ -182,7 +193,7 @@ fn render_html(
     let context = script_json(&recipe)?;
     // Match complete template elements. Embedded JSON escapes '<', so an
     // arbitrary label/source containing marker text cannot trigger substitution.
-    Ok(include_str!("viewer.html")
+    Ok(template
         .replace(
             "<script id=\"cad-scene-data\" type=\"application/json\">/*SCENE_DATA*/null</script>",
             &format!("<script id=\"cad-scene-data\" type=\"application/json\">{data}</script>"),
