@@ -4,11 +4,10 @@
 //! history are independent of recipe IDs, so identical features can share them.
 
 use cad_kernel::{
-    boolean, extrude_polygon_with_holes, extrude_rectangle, transform, translate,
-    validate_polygon_with_holes, validate_transform, BooleanOp, OperationResult, Tolerance,
-    KERNEL_BUILD_ID, KERNEL_VERSION,
+    boolean, extrude_rectangle, transform, translate, validate_transform, BooleanOp,
+    OperationResult, Tolerance, KERNEL_BUILD_ID, KERNEL_VERSION,
 };
-pub use cad_kernel::{MAX_POLYGON_HOLES, MAX_POLYGON_POINTS};
+pub use cad_kernel::{CircleHole, MAX_POLYGON_HOLES, MAX_POLYGON_POINTS};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -182,6 +181,8 @@ pub enum Feature {
         points: Vec<[f64; 2]>,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         holes: Vec<Vec<[f64; 2]>>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        circular_holes: Vec<cad_kernel::CircleHole>,
         op_version: u32,
     },
     Extrude {
@@ -248,6 +249,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut profile = None;
                 let mut points = None;
                 let mut holes = None;
+                let mut circular_holes = None;
                 let mut height = None;
                 let mut body = None;
                 let mut offset = None;
@@ -275,6 +277,9 @@ impl<'de> Deserialize<'de> for Feature {
                         "profile" => read_field!(profile, String),
                         "points" => read_field!(points, Vec<[f64; 2]>),
                         "holes" => read_field!(holes, Vec<Vec<[f64; 2]>>),
+                        "circular_holes" => {
+                            read_field!(circular_holes, Vec<cad_kernel::CircleHole>)
+                        }
                         "height" => read_field!(height, f64),
                         "body" => read_field!(body, String),
                         "offset" => read_field!(offset, [f64; 3]),
@@ -295,6 +300,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "profile",
                                     "points",
                                     "holes",
+                                    "circular_holes",
                                     "height",
                                     "body",
                                     "offset",
@@ -313,7 +319,14 @@ impl<'de> Deserialize<'de> for Feature {
                 let allowed: &[&str] = match op.as_str() {
                     "circle" => &["op", "id", "op_version", "radius", "inner_radius"],
                     "rectangle" => &["op", "id", "op_version", "width", "depth"],
-                    "polygon" => &["op", "id", "op_version", "points", "holes"],
+                    "polygon" => &[
+                        "op",
+                        "id",
+                        "op_version",
+                        "points",
+                        "holes",
+                        "circular_holes",
+                    ],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
                     "transform" => &["op", "id", "op_version", "body", "offset", "rotation"],
@@ -360,6 +373,7 @@ impl<'de> Deserialize<'de> for Feature {
                         op_version,
                         points: points.ok_or_else(|| M::Error::missing_field("points"))?,
                         holes: holes.unwrap_or_default(),
+                        circular_holes: circular_holes.unwrap_or_default(),
                     },
                     "extrude" => Feature::Extrude {
                         id,
@@ -726,7 +740,12 @@ fn hash_feature(
             hash.update(&width.to_le_bytes());
             hash.update(&depth.to_le_bytes());
         }
-        Feature::Polygon { points, holes, .. } => {
+        Feature::Polygon {
+            points,
+            holes,
+            circular_holes,
+            ..
+        } => {
             hash.update(&(points.len() as u64).to_le_bytes());
             for point in points {
                 for value in point {
@@ -738,6 +757,15 @@ fn hash_feature(
                 hash.update(&(hole.len() as u64).to_le_bytes());
                 for coordinate in hole.iter().flatten() {
                     hash.update(&coordinate.to_le_bytes());
+                }
+            }
+            if !circular_holes.is_empty() {
+                hash.update(b"circular_holes");
+                hash.update(&(circular_holes.len() as u64).to_le_bytes());
+                for hole in circular_holes {
+                    for value in hole.center.into_iter().chain([hole.radius]) {
+                        hash.update(&value.to_le_bytes());
+                    }
                 }
             }
         }
@@ -984,12 +1012,20 @@ impl BuildEngine {
                     dimension(id, "depth", *depth)?;
                 }
                 Feature::Polygon {
-                    id, points, holes, ..
-                } => validate_polygon_with_holes(points, holes, tolerance).map_err(|error| {
-                    BuildError::PolygonProfile {
-                        feature: id.clone(),
-                        message: error.to_string(),
-                    }
+                    id,
+                    points,
+                    holes,
+                    circular_holes,
+                    ..
+                } => cad_kernel::validate_polygon_with_circular_holes(
+                    points,
+                    holes,
+                    circular_holes,
+                    tolerance,
+                )
+                .map_err(|error| BuildError::PolygonProfile {
+                    feature: id.clone(),
+                    message: error.to_string(),
                 })?,
                 Feature::Extrude { id, height, .. } => dimension(id, "height", *height)?,
                 Feature::Transform {
@@ -1085,9 +1121,18 @@ impl BuildEngine {
                             Feature::Rectangle { width, depth, .. } => {
                                 extrude_rectangle(*width, *depth, *height, tolerance)
                             }
-                            Feature::Polygon { points, holes, .. } => {
-                                extrude_polygon_with_holes(points, holes, *height, tolerance)
-                            }
+                            Feature::Polygon {
+                                points,
+                                holes,
+                                circular_holes,
+                                ..
+                            } => cad_kernel::extrude_polygon_with_circular_holes(
+                                points,
+                                holes,
+                                circular_holes,
+                                *height,
+                                tolerance,
+                            ),
                             _ => unreachable!("profile types validated before execution"),
                         },
                         Feature::Transform {

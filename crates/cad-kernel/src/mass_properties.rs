@@ -107,7 +107,11 @@ impl ModelSnapshot {
             return Err(KernelError::InvalidTolerance);
         }
         if self.has_curved_geometry() {
-            return crate::analytic::recognize(self, Some(tolerance))?.properties();
+            return crate::analytic::recognize(self, Some(tolerance))
+                .and_then(|g| g.properties())
+                .or_else(|_| {
+                    crate::profile_prism::recognize(self, tolerance)?.properties(tolerance)
+                });
         }
         let report = self.validate(tolerance);
         if !report.valid {

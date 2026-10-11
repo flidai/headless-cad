@@ -30,6 +30,7 @@ mod math;
 mod orthogonal;
 mod polygon;
 mod prism;
+mod profile_prism;
 mod simple_polygon;
 mod tessellation;
 mod transform;
@@ -46,10 +47,16 @@ use math::{cross, dot, sub};
 pub use orthogonal::{boolean, translate, BooleanOp};
 pub use polygon::{extrude_polygon, validate_polygon, MAX_POLYGON_POINTS};
 pub use prism::{extrude_polygon_with_holes, validate_polygon_with_holes, MAX_POLYGON_HOLES};
+pub use profile_prism::{
+    extrude_polygon_with_circular_holes, validate_polygon_with_circular_holes, CircleHole,
+    ProfilePrismGeometry,
+};
 use serde::{Deserialize, Serialize};
 pub use simple_polygon::face_is_convex;
 use std::collections::BTreeMap;
-pub use tessellation::{tessellate_cylinder, CylinderMesh, MeshPatch, TessellationPolicy};
+pub use tessellation::{
+    tessellate_analytic, tessellate_cylinder, CylinderMesh, MeshPatch, TessellationPolicy,
+};
 use thiserror::Error;
 pub use transform::{transform, validate_transform};
 pub use triangulation::triangulate_face;
@@ -280,7 +287,10 @@ impl ModelSnapshot {
     /// first: invalid references or unsupported integration terms yield NaN.
     pub fn volume(&self) -> f64 {
         if self.has_curved_geometry() {
-            return analytic::recognize(self, None).map_or(f64::NAN, |g| g.volume());
+            return analytic::recognize(self, None)
+                .map(|g| g.volume())
+                .or_else(|_| profile_prism::volume(self))
+                .unwrap_or(f64::NAN);
         }
         self.shells
             .iter()

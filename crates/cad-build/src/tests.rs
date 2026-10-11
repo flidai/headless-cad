@@ -1014,6 +1014,7 @@ fn invalid_unused_polygons_and_unsupported_booleans_fail_explicitly() {
             id: "unused".into(),
             points,
             holes: vec![],
+            circular_holes: vec![],
             op_version: 1,
         });
         assert!(
@@ -1988,6 +1989,122 @@ fn concave_profile_preflight_rejects_holes_in_notches_and_crossing_material_boun
         recipe.face_datums.clear();
         if let Feature::Polygon { holes, .. } = &mut recipe.features[0] {
             holes[0] = hole;
+        }
+        assert!(matches!(
+            BuildEngine::default().build_outputs(&recipe, &["other".into()]),
+            Err(BuildError::PolygonProfile { .. })
+        ));
+    }
+}
+
+fn circular_hole_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({"schema_version":2,"units":"mm","features":[
+        {"op":"polygon","id":"profile","points":[[0,0],[20,0],[20,10],[0,10]],"circular_holes":[{"center":[5,5],"radius":2},{"center":[15,5],"radius":1}]},
+        {"op":"extrude","id":"body","profile":"profile","height":3},
+        {"op":"translate","id":"moved","body":"body","offset":[1,2,3]},
+        {"op":"rectangle","id":"other_profile","width":1,"depth":1},
+        {"op":"extrude","id":"other","profile":"other_profile","height":1}
+    ],"outputs":[{"name":"plate","feature":"moved"},{"name":"other","feature":"other"}],"face_assertions":[
+        {"id":"bore","selector":{"anchor_feature":"body","role":"circular_hole_0_wall","target_feature":"moved","cardinality":{"kind":"exactly","count":1}}}
+    ]})).unwrap()
+}
+
+#[test]
+fn circular_holes_invalidate_dependent_cache_and_preserve_reference_obligations() {
+    let mut recipe = circular_hole_recipe();
+    let mut engine = BuildEngine::default();
+    let first = engine.build(&recipe).unwrap();
+    assert!(
+        (first.outputs["plate"].result.model.volume() - (600.0 - 15.0 * std::f64::consts::PI))
+            .abs()
+            < 1e-10
+    );
+    assert_eq!(engine.build(&recipe).unwrap().stats.computed_solids, 0);
+    for (center, radius) in [([6.0, 5.0], 2.0), ([6.0, 5.0], 2.5)] {
+        if let Feature::Polygon { circular_holes, .. } = &mut recipe.features[0] {
+            circular_holes[0] = CircleHole { center, radius };
+        }
+        let changed = engine.build(&recipe).unwrap();
+        assert_eq!(changed.stats.computed_solids, 2);
+        assert_eq!(
+            changed.feature_hashes["other"],
+            first.feature_hashes["other"]
+        );
+        assert_ne!(
+            changed.feature_hashes["profile"],
+            first.feature_hashes["profile"]
+        );
+        assert!(
+            (changed.outputs["plate"].result.model.volume()
+                - (600.0 - 3.0 * std::f64::consts::PI * (radius * radius + 1.0)))
+                .abs()
+                < 1e-10
+        );
+        assert_eq!(changed.face_assertions.len(), 1);
+    }
+    let before_swap = engine.build(&recipe).unwrap();
+    if let Feature::Polygon { circular_holes, .. } = &mut recipe.features[0] {
+        circular_holes.swap(0, 1);
+    }
+    let swapped = engine.build(&recipe).unwrap();
+    assert_ne!(
+        before_swap.feature_hashes["profile"],
+        swapped.feature_hashes["profile"]
+    );
+    assert!(
+        (before_swap.outputs["plate"].result.model.volume()
+            - swapped.outputs["plate"].result.model.volume())
+        .abs()
+            < 1e-10
+    );
+    recipe.face_assertions[0].selector.role = "circular_hole_9_wall".into();
+    assert!(matches!(
+        engine.build_outputs(&recipe, &["other".into()]),
+        Err(BuildError::FaceAssertionFailed { .. })
+    ));
+}
+
+#[test]
+fn circular_hole_schema_is_strict_and_empty_field_preserves_old_recipe_identity() {
+    let recipe = circular_hole_recipe();
+    let json = serde_json::to_string(&recipe).unwrap();
+    for invalid in [
+        json.replace("\"radius\":", "\"typo\":"),
+        json.replace("\"radius\":", "\"radius\":1,\"radius\":"),
+        json.replace(
+            "\"circular_holes\":",
+            "\"circular_holes\":[],\"circular_holes\":",
+        ),
+        json.replace("\"center\":", "\"unexpected\":0,\"center\":"),
+    ] {
+        assert!(
+            serde_json::from_str::<Recipe>(&invalid).is_err(),
+            "accepted {invalid}"
+        );
+    }
+    let old = holed_profile_recipe();
+    let old_json = serde_json::to_string(&old).unwrap();
+    let explicit_empty = old_json.replace("\"points\":", "\"circular_holes\":[],\"points\":");
+    let decoded: Recipe = serde_json::from_str(&explicit_empty).unwrap();
+    assert_eq!(serde_json::to_string(&decoded).unwrap(), old_json);
+    assert_eq!(
+        build(&old).unwrap().feature_hashes,
+        build(&decoded).unwrap().feature_hashes
+    );
+}
+
+#[test]
+fn unused_circular_holes_still_receive_geometric_preflight() {
+    for (center, radius) in [
+        ([2.0, 5.0], 2.0),
+        ([21.0, 5.0], 1.0),
+        ([15.0, 5.0], 2.0),
+        ([5.0, 5.0], 0.0),
+    ] {
+        let mut recipe = circular_hole_recipe();
+        recipe.face_assertions.clear();
+        if let Feature::Polygon { circular_holes, .. } = &mut recipe.features[0] {
+            circular_holes[0] = CircleHole { center, radius };
         }
         assert!(matches!(
             BuildEngine::default().build_outputs(&recipe, &["other".into()]),

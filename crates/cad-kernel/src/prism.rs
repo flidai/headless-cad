@@ -231,6 +231,13 @@ pub fn extrude_polygon_with_holes(
 
 /// Called only after all native references/local face geometry/topology validate.
 pub(crate) fn validate_prism(model: &ModelSnapshot, tol: Tolerance) -> Result<(), KernelError> {
+    validate_prism_caps(model, tol, false)
+}
+pub(crate) fn validate_prism_caps(
+    model: &ModelSnapshot,
+    tol: Tolerance,
+    canonical: bool,
+) -> Result<(), KernelError> {
     let bad = || {
         KernelError::Unsupported("multi-loop geometry must be one right prism with matching simple-ring caps and complete straight wall strips".into())
     };
@@ -241,7 +248,13 @@ pub(crate) fn validate_prism(model: &ModelSnapshot, tol: Tolerance) -> Result<()
         .faces
         .iter()
         .enumerate()
-        .filter(|(i, f)| f.loops.len() > 1 || !crate::face_is_convex(model, FaceId(*i)))
+        .filter(|(i, f)| {
+            if canonical {
+                *i < 2
+            } else {
+                f.loops.len() > 1 || !crate::face_is_convex(model, FaceId(*i))
+            }
+        })
         .collect();
     if caps.len() != 2 {
         return Err(bad());

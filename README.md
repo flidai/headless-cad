@@ -840,6 +840,32 @@ native snapshots fail deserialization instead of being silently reinterpreted.
 Existing planar recipes remain supported. Display assets with semantic curved
 patches use envelope version 3; older stream clients require a reload.
 
+### Circular holes in polygon plates
+
+Polygon profiles can combine polygonal relief slots with true circular bores:
+
+```python
+profile = polygon(id = "mount_profile",
+    points = [[0,0], [80,0], [80,50], [0,50]],
+    circular_holes = [{"center": [40,25], "radius": 10}])
+plate = extrude(id = "mount", profile = profile, height = 8)
+output(name = "plate", feature = plate)
+```
+
+Each bore retains circular cap boundaries and an inward cylindrical wall in
+native geometry and STEP. `circular_hole_0_wall` selects the first bore wall;
+hole order is part of the source's reference intent. Holes must be strictly
+inside the material and separated from every other boundary by the numerical
+policy. The combined polygonal/circular hole limit is 32. Display/STL caps allow
+at most 2,048 sampled boundary points; an excessive tessellation request fails
+explicitly. This is profile extrusion, not a general curved Boolean cut.
+
+[drilled_bearing_mount.star](examples/drilled_bearing_mount.star) combines a
+chamfered plate, two relief slots, five bores, a bronze sleeve, a shaft, and four
+reused bolt assemblies. Parameters change plate thickness, bearing bore and bolt
+radius. The sleeve and shaft attach to the remaining cap's material centroid.
+Prescribed clearances are design intent, not a certified interference result.
+
 ## Verify and package
 
 ```sh

@@ -121,7 +121,17 @@ impl ModelSnapshot {
         let centroid = if self.has_curved_geometry() {
             // The validated circular caps have their exact area centroid at
             // the supporting plane origin, independent of tessellation.
-            plane.origin
+            if let Some(g) = self.profile_prism_geometry(tolerance)? {
+                if face_id == g.start_cap || face_id == g.end_cap {
+                    g.cap_centroid(face_id, tolerance)?
+                } else {
+                    g.base
+                        .face_frame(face_id, x_direction_hint, [0.; 3], tolerance)?
+                        .origin
+                }
+            } else {
+                plane.origin
+            }
         } else {
             let points = self.loop_points(face.loops[0]).unwrap();
             let reference = points[0];

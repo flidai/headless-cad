@@ -4,7 +4,7 @@ fn orient(a: [f64; 2], b: [f64; 2], c: [f64; 2]) -> f64 {
     let p = |v: [f64; 2]| robust::Coord { x: v[0], y: v[1] };
     robust::orient2d(p(a), p(b), p(c))
 }
-fn distance(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
+pub(crate) fn distance(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> f64 {
     let d = [b[0] - a[0], b[1] - a[1]];
     let length = d[0].hypot(d[1]);
     let u = d.map(|v| v / length);

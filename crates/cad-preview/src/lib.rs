@@ -103,7 +103,7 @@ fn scene_with_tolerance(
 ) -> Result<Scene, PreviewError> {
     let invalid = PreviewError::Geometry;
     if model.has_curved_geometry() {
-        let mesh = cad_kernel::tessellate_cylinder(
+        let mesh = cad_kernel::tessellate_analytic(
             model,
             tolerance,
             cad_kernel::TessellationPolicy::default(),

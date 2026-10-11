@@ -73,6 +73,31 @@ kernel, solver, or manufacturing milestone.
 These requirements govern the roadmap and example progression. Performance
 targets below are proposed release gates, not results inferred from the notes.
 
+### Reference engineering workflow
+
+Use a configurable bearing-supported drive module as the first complete target
+workflow: machined housing and cover, shaft, bearings, seals, repeated fasteners,
+and mounting interfaces. Progress from today's shaft and cartridge examples to
+bores, shoulders, fillets, fits, constrained motion, and manufacturing drawings.
+The recipe declares design intent and engineering assertions; the viewer exposes
+the resulting parts, references, and captured source for inspection.
+
+A release candidate must survive a bearing-size change and a mounting-pattern
+change through the full chain: affected features rebuild, references resolve or
+fail explicitly, assembly placement and clearances are checked, and drawings,
+BOM and STEP are regenerated against the same source revision. Retain expected
+results for the original and revised configurations. A failed revision leaves
+the last released generation inspectable and identifies the failed obligation.
+
+This workflow exercises modeling depth. A separate machine/workcell assembly
+exercises scale using repeated and unique definitions; cloning thousands of
+fasteners cannot substitute for modeling or manufacturing acceptance. Record
+both workflows in a capability evidence ledger with supported input domain,
+known exclusions, test command, independent expected result, artifact revision,
+and measured performance where applicable. Each entry is planned, experimental,
+or validated for a stated release; passing one entry does not imply platform
+parity or completion of the project goal.
+
 ## System decomposition
 
 ```mermaid
@@ -366,6 +391,17 @@ geometry; manifests retain successful witnesses and semantic diffs expose
 assertion changes. This is the first build-time consumer of semantic references.
 It does not yet attach a sketch or drive a geometric operation from a reference.
 
+Mixed profile prisms now combine supported polygon boundaries with circular
+through-holes. Validation certifies the underlying planar prism and each inward
+cylindrical wall, including cap correspondence, containment and separation.
+Native volume and inertia subtract analytic bore contributions; STEP retains
+circle edges and cylindrical surfaces. Display/STL reuse sampled circle points
+between caps and walls and independently certify cap triangulation. The combined
+hole limit is 32; the derived cap limit is 2,048 boundary samples. This is a
+bounded extrusion family, not general curved intersection or arbitrary trimmed
+surface validation. `drilled_bearing_mount.star` composes these plates with
+annular parts, associative cap placement and reused nested fasteners.
+
 ## Constraints and assemblies
 
 The current M1 attachment increment resolves explicit named part frames without
@@ -421,6 +457,14 @@ has its own persistent identity, definition/version reference, rigid transform,
 configuration, suppression state, material/metadata overrides, and parent path.
 Repeated fasteners share one asset. Nested assemblies need cycle detection,
 transform composition, instance-aware picking, and distinct BOM quantity rules.
+
+Distinguish rigid subassemblies from flexible, instance-solved subassemblies.
+A rigid definition reuses one internal placement solution. A flexible occurrence
+owns its configuration and joint state, allowing two occurrences to share part
+geometry while having different internal placements. Solving one occurrence
+must not mutate the shared definition or another occurrence. Cross-boundary
+constraints join the affected solver islands explicitly; BOM identity and
+geometry reuse remain independent of the resulting motion state.
 
 Load bounds, transforms, coarse graphics, names, and required datums first.
 Request exact bodies only for affected modeling, certified queries, precise
@@ -686,6 +730,37 @@ validation results, approval state, and auditable change provenance. Distributed
 workers need cancellation, resource quotas, crash recovery, atomic publication,
 and bounded concurrency before remote multi-user hosting is offered.
 
+Source merges require semantic validation after Git's textual merge succeeds.
+Two individually valid edits may jointly invalidate a fit, face reference or
+assembly constraint. Compare the merged build with both parent revisions and
+report changed obligations; never resolve that conflict by choosing whichever
+geometry artifact was written last. Publication uses an expected base revision
+and an atomic update of the release pointer. Concurrent stale publishers return
+a conflict while their immutable artifacts remain available for review.
+
+Keep stable part numbers distinct from content hashes, source revisions and
+occurrence paths. A release manifest pins source and dependency locks, effective
+configuration, kernel and policy versions, validation evidence, drawings, BOM
+and exchange files by digest. Adapters for PDM/PLM/ERP consume that manifest;
+they cannot silently change authoritative recipes. Optional locks may coordinate
+non-mergeable imported assets or organizational release policy, but ordinary
+recipe authoring remains compatible with Git branches and offline work.
+
+Where a team requires release approval, bind it to the precise source,
+configuration, build and validation digests; a changed input requires a new
+approval. Released manifests pin the complete transitive dependency and evidence
+graph, including imported assets. Garbage collection preserves everything
+reachable from retained releases and active jobs. Schema or kernel migrations
+create new artifacts and explicit provenance links, preserving the original
+release and its evidence rather than rewriting its history.
+
+AI acceptance evidence must cover an agent proposing a source patch, receiving a
+structured geometry or reference failure, and producing a corrected revision
+through the public headless interface. Replay the accepted source with no model
+service and reproduce its declared engineering results. Preserve provenance of
+the proposal separately from deterministic evaluation: model output itself is
+not promised to be repeatable and cannot serve as a geometric correctness oracle.
+
 Version operation schemas, kernel semantics, solver policy, meshing policy,
 serializer formats, source dependencies, and build toolchains independently.
 Reuse unaffected DAG nodes. Native recipe artifacts, imported exact geometry,
@@ -809,7 +884,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

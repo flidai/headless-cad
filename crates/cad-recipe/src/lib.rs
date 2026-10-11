@@ -142,6 +142,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         id: &str,
         points: Value,
         holes: Option<Value>,
+        circular_holes: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
         let points: Vec<[f64; 2]> = serde_json::from_str(&points.to_json()?)
@@ -175,7 +176,23 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             holes.iter().flatten().flatten().all(|v| v.is_finite()),
             "polygon hole coordinates must be finite"
         );
-        store(eval)?.feature(serde_json::json!({"op":"polygon","id":id,"points":points,"holes":holes,"op_version":1}))?;
+        let circular_holes: Vec<cad_build::CircleHole> = match circular_holes {
+            Some(value) => serde_json::from_str(&value.to_json()?).map_err(|_| {
+                anyhow::anyhow!("circular_holes must be objects with center:[x,y] and radius")
+            })?,
+            None => vec![],
+        };
+        anyhow::ensure!(
+            holes.len() + circular_holes.len() <= MAX_POLYGON_HOLES,
+            "too many profile holes"
+        );
+        anyhow::ensure!(
+            circular_holes
+                .iter()
+                .all(|h| h.radius.is_finite() && h.center.iter().all(|v| v.is_finite())),
+            "circular hole values must be finite"
+        );
+        store(eval)?.feature(serde_json::json!({"op":"polygon","id":id,"points":points,"holes":holes,"circular_holes":circular_holes,"op_version":1}))?;
         Ok(id.to_owned())
     }
 
@@ -1466,6 +1483,106 @@ output(name="body", feature=m)
                     < 1e-10
             );
             assert_eq!(engine.build(&roundtrip).unwrap().stats.computed_solids, 0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod circular_hole_tests {
+    use super::*;
+
+    #[test]
+    fn circular_hole_starlark_rejects_malformed_objects_and_combined_hole_budget() {
+        for holes in [
+            "None",
+            "[{'center':[1,2]}]",
+            "[{'center':[1,2], 'radius':1,'typo':0}]",
+            "[{'center':[True,2], 'radius':1}]",
+            "[{'center':[1,2,3], 'radius':1}]",
+            "[{'center':[1,2], 'radius':True}]",
+            "[{'center':[1,2], 'radius':1}]*33",
+        ] {
+            let source = format!(
+                "polygon(id='p',points=[[0,0],[10,0],[10,10],[0,10]],circular_holes={holes})"
+            );
+            assert!(
+                from_starlark("invalid.star", &source).is_err(),
+                "accepted {holes}"
+            );
+        }
+        assert!(from_starlark("invalid.star", "polygon(id='p',points=[[0,0],[10,0],[10,10],[0,10]],holes=[[[1,1],[1,2],[2,1]]],circular_holes=[{'center':[5,5],'radius':1}]*32)").is_err());
+    }
+
+    #[test]
+    fn drilled_bearing_mount_parameters_preserve_analytic_volume_and_attachments() {
+        let source = include_str!("../../../examples/drilled_bearing_mount.star");
+        let mut engine = cad_build::BuildEngine::default();
+        for (thickness, bore, bolt) in [(8.0, 12.0, 3.0), (4.0, 10.0, 2.0), (12.0, 14.0, 4.0)] {
+            let recipe = from_starlark_with_params(
+                "drilled_bearing_mount.star",
+                source,
+                &BTreeMap::from([
+                    ("plate_thickness".into(), thickness),
+                    ("bearing_bore".into(), bore),
+                    ("bolt_radius".into(), bolt),
+                ]),
+            )
+            .unwrap();
+            let encoded = serde_json::to_string(&recipe).unwrap();
+            let decoded: Recipe = serde_json::from_str(&encoded).unwrap();
+            assert_eq!(serde_json::to_string(&decoded).unwrap(), encoded);
+            let built = engine.build(&decoded).unwrap();
+            let pi = std::f64::consts::PI;
+            let plate_volume = (6632.0 - pi * (bore * bore + 4.0 * bolt * bolt)) * thickness;
+            let sleeve_volume = pi * (bore * bore - (bore - 4.0).powi(2)) * (thickness + 8.0);
+            let shaft_volume = pi * (bore - 5.0).powi(2) * (thickness + 22.0);
+            let fastener_volume =
+                4.0 * pi * ((bolt - 0.5).powi(2) * (thickness + 4.0) + (bolt + 2.0).powi(2) * 3.0);
+            for (name, expected) in [
+                ("plate", plate_volume),
+                ("sleeve", sleeve_volume),
+                ("shaft", shaft_volume),
+            ] {
+                assert!(
+                    (built.outputs[name].result.model.volume() - expected).abs() < 1e-8,
+                    "{name}"
+                );
+            }
+            let assembly = &built.assemblies["drilled_bearing_mount"];
+            assert_eq!(assembly.instances.len(), 11);
+            assert_eq!(assembly.parts.len(), 5);
+            assert_eq!(assembly.hierarchy.len(), 2);
+            assert!(
+                (assembly.material_volume()
+                    - (plate_volume + sleeve_volume + shaft_volume + fastener_volume))
+                    .abs()
+                    < 1e-8
+            );
+            for (actual, expected) in built.face_datums["plate"]["center"]
+                .frame
+                .translation
+                .iter()
+                .zip([50.0, 35.0, thickness / 2.0])
+            {
+                assert!((actual - expected).abs() < 1e-10);
+            }
+            let bounds = assembly.bounds().unwrap();
+            assert_eq!(bounds.min, [0.0, 0.0, -11.0]);
+            assert_eq!(bounds.max, [100.0, 70.0, thickness + 11.0]);
+            assert_eq!(built.face_assertions.len(), 1);
+            assert_eq!(engine.build(&decoded).unwrap().stats.computed_solids, 0);
+        }
+        for (name, value) in [
+            ("plate_thickness", 3.0),
+            ("bearing_bore", 15.0),
+            ("bolt_radius", 1.0),
+        ] {
+            assert!(from_starlark_with_params(
+                "invalid.star",
+                source,
+                &BTreeMap::from([(name.into(), value)])
+            )
+            .is_err());
         }
     }
 }

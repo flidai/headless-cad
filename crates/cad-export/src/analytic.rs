@@ -1,4 +1,4 @@
-//! Analytic STEP entities for the validated circular-extrusion domain.
+//! Analytic STEP entities for validated mixed planar/cylindrical B-reps.
 use super::*;
 use cad_kernel::{Curve, Surface};
 
@@ -25,17 +25,32 @@ pub(super) fn solids(
     model: &ModelSnapshot,
     tolerance: Tolerance,
 ) -> Result<Vec<usize>, ExportError> {
-    let geometry = model
-        .cylinder_geometry(tolerance)
-        .map_err(|e| ExportError::InvalidModel(e.to_string()))?
-        .ok_or(ExportError::UnsupportedModel(
-            "expected an analytic cylinder",
-        ))?;
+    let validation = model.validate(tolerance);
+    if !validation.valid {
+        return Err(ExportError::InvalidModel(format!(
+            "{:?}",
+            validation.issues
+        )));
+    }
+    if model.solids.len() != 1 || model.solids[0].shells.len() != 1 {
+        return Err(ExportError::UnsupportedModel(
+            "analytic STEP requires one validated single-shell solid",
+        ));
+    }
     let mut surfaces = Vec::new();
     for face in &model.faces {
         let surface = match &face.surface {
             Surface::Plane(p) => {
-                let axis = placement(step, p.origin, p.normal, geometry.x_direction);
+                // Choose a tangent independently for each plane. A prism side
+                // may be parallel to the extrusion frame's reference direction.
+                let least = (0..3)
+                    .min_by(|&a, &b| p.normal[a].abs().total_cmp(&p.normal[b].abs()))
+                    .unwrap();
+                let mut reference = [0.; 3];
+                reference[least] = 1.;
+                let x = normalized(cross(reference, p.normal))
+                    .ok_or_else(|| ExportError::InvalidModel("invalid plane normal".into()))?;
+                let axis = placement(step, p.origin, p.normal, x);
                 step.add(format!("PLANE('',#{axis})"))
             }
             Surface::Cylinder(c) => {
@@ -70,28 +85,25 @@ pub(super) fn solids(
                 let line = step.add(format!("LINE('',#{p},#{v})"));
                 // A tube has two periodic surfaces. Each seam must carry its
                 // pcurves on its own surface, including the inward bore.
-                let wall = model
-                    .faces
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, face)| {
-                        matches!(face.surface, Surface::Cylinder(_))
-                            .then_some(i)
-                            .filter(|_| {
-                                face.loops.iter().any(|id| {
-                                    model.loops[id.0]
-                                        .edges
-                                        .iter()
-                                        .any(|u| u.edge.0 == edge_index)
-                                })
+                let wall = model.faces.iter().enumerate().find_map(|(i, face)| {
+                    matches!(face.surface, Surface::Cylinder(_))
+                        .then_some(i)
+                        .filter(|_| {
+                            face.loops.iter().any(|id| {
+                                model.loops[id.0]
+                                    .edges
+                                    .iter()
+                                    .any(|u| u.edge.0 == edge_index)
                             })
-                    })
-                    .ok_or(ExportError::UnsupportedModel(
-                        "analytic seam has no cylinder surface",
-                    ))?;
-                let a = seam_pcurve(step, surfaces[wall], 0.);
-                let b = seam_pcurve(step, surfaces[wall], std::f64::consts::TAU);
-                step.add(format!("SEAM_CURVE('',#{line},(#{a},#{b}),.CURVE_3D.)"))
+                        })
+                });
+                if let Some(wall) = wall {
+                    let a = seam_pcurve(step, surfaces[wall], 0.);
+                    let b = seam_pcurve(step, surfaces[wall], std::f64::consts::TAU);
+                    step.add(format!("SEAM_CURVE('',#{line},(#{a},#{b}),.CURVE_3D.)"))
+                } else {
+                    line
+                }
             }
         };
         edges.push(step.add(format!(
@@ -143,6 +155,47 @@ pub(super) fn solids(
 mod tests {
     use super::*;
     #[test]
+    fn drilled_prism_step_preserves_mixed_geometry_and_only_bore_seams() {
+        let t = Tolerance::default();
+        let model = cad_kernel::extrude_polygon_with_circular_holes(
+            &[[0., 0.], [80., 0.], [80., 50.], [0., 50.]],
+            &[],
+            &[
+                cad_kernel::CircleHole {
+                    center: [20., 25.],
+                    radius: 5.,
+                },
+                cad_kernel::CircleHole {
+                    center: [60., 25.],
+                    radius: 8.,
+                },
+            ],
+            12.,
+            t,
+        )
+        .unwrap()
+        .model;
+        let step = to_step(&model, t).unwrap();
+        assert_eq!(step.matches("CIRCLE('").count(), 4);
+        assert_eq!(step.matches("CYLINDRICAL_SURFACE('").count(), 2);
+        assert_eq!(step.matches("PLANE('").count(), 6);
+        assert_eq!(step.matches("SEAM_CURVE('").count(), 2);
+        assert_eq!(step.matches("PCURVE('").count(), 4);
+        assert_eq!(step.matches("FACE_OUTER_BOUND('").count(), 8);
+        assert_eq!(step.matches("FACE_BOUND('").count(), 4);
+        assert_eq!(step.matches("EDGE_CURVE('").count(), 18);
+        let faces: Vec<_> = step
+            .lines()
+            .filter(|line| line.contains("ADVANCED_FACE('"))
+            .collect();
+        assert_eq!(faces.len(), 8);
+        assert!(faces[..6].iter().all(|line| line.ends_with(",.T.);")));
+        assert!(faces[6..].iter().all(|line| line.ends_with(",.F.);")));
+        assert!(!step.contains("FACETED_BREP("));
+        assert_eq!(step, to_step(&model, t).unwrap());
+    }
+
+    #[test]
     fn annular_step_preserves_inner_bounds_inward_surface_and_distinct_seams() {
         let t = Tolerance::default();
         let m = cad_kernel::extrude_annulus(12., 8., 40., t).unwrap().model;
@@ -177,6 +230,75 @@ mod tests {
         assert_ne!(surfaces[0], surfaces[2]);
         assert!(!step.contains("FACETED_BREP("));
         assert_eq!(step, to_step(&m, t).unwrap());
+    }
+
+    #[test]
+    fn drilled_stl_is_closed_and_cap_triangles_do_not_fill_bores() {
+        let t = Tolerance::default();
+        let circles = [
+            cad_kernel::CircleHole {
+                center: [20., 25.],
+                radius: 5.,
+            },
+            cad_kernel::CircleHole {
+                center: [60., 25.],
+                radius: 8.,
+            },
+        ];
+        let model = cad_kernel::extrude_polygon_with_circular_holes(
+            &[[0., 0.], [80., 0.], [80., 50.], [0., 50.]],
+            &[],
+            &circles,
+            12.,
+            t,
+        )
+        .unwrap()
+        .model;
+        let stl = to_stl(&model, t).unwrap();
+        let points: Vec<Point> = stl
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("vertex "))
+            .map(|line| {
+                let p: Vec<f64> = line
+                    .split_whitespace()
+                    .map(|n| n.parse().unwrap())
+                    .collect();
+                [p[0], p[1], p[2]]
+            })
+            .collect();
+        let mut incidence = std::collections::BTreeMap::new();
+        let mut volume = 0.;
+        for triangle in points.as_chunks::<3>().0 {
+            let normal = cross(sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
+            assert!(dot(normal, normal) > 0.);
+            if normal[2].abs() > 1e-10 {
+                let center: Point = std::array::from_fn(|i| {
+                    (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.
+                });
+                for circle in &circles {
+                    // A chordal bore is slightly smaller than its exact circle.
+                    assert!(
+                        (center[0] - circle.center[0]).hypot(center[1] - circle.center[1])
+                            > circle.radius - 0.011
+                    );
+                }
+            }
+            volume += dot(triangle[0], cross(triangle[1], triangle[2])) / 6.;
+            for i in 0..3 {
+                let key = |p: Point| p.map(|x| if x == 0. { 0 } else { x.to_bits() });
+                let a = key(triangle[i]);
+                let b = key(triangle[(i + 1) % 3]);
+                let (edge, sign) = if a < b { ((a, b), 1) } else { ((b, a), -1) };
+                let entry = incidence.entry(edge).or_insert((0, 0));
+                entry.0 += 1;
+                entry.1 += sign;
+            }
+        }
+        assert!(incidence
+            .values()
+            .all(|&(count, sign)| count == 2 && sign == 0));
+        let exact = (4000. - std::f64::consts::PI * 89.) * 12.;
+        assert!(volume > exact && (volume - exact) / exact < 0.002);
     }
 
     #[test]

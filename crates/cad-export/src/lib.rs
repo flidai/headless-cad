@@ -42,7 +42,6 @@ fn sub(a: Point, b: Point) -> Point {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
-#[cfg(test)]
 fn cross(a: Point, b: Point) -> Point {
     [
         a[1] * b[2] - a[2] * b[1],
@@ -89,7 +88,7 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
         )));
     }
     if model.has_curved_geometry() {
-        let mesh = cad_kernel::tessellate_cylinder(
+        let mesh = cad_kernel::tessellate_analytic(
             model,
             tolerance,
             cad_kernel::TessellationPolicy::default(),

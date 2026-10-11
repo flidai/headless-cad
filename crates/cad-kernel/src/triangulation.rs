@@ -60,6 +60,45 @@ pub fn triangulate_face(
             [dot(d, x), dot(d, y)]
         })
         .collect();
+    let lengths: Vec<_> = rings.iter().map(Vec::len).collect();
+    Ok(
+        triangulate_projected(&points, &lengths, crate::face_is_convex(model, face_id))?
+            .into_iter()
+            .map(|t| t.map(|i| ids[i]))
+            .collect(),
+    )
+}
+
+/// Derived circular boundaries can need more vertices than native line profiles.
+/// Keep the quadratic certification work bounded independently of native limits.
+pub(crate) fn triangulate_rings_2d(
+    rings: &[Vec<[f64; 2]>],
+) -> Result<Vec<[usize; 3]>, KernelError> {
+    let count = rings.iter().fold(0usize, |n, r| n.saturating_add(r.len()));
+    if rings.is_empty() || rings.len() > 33 || rings.iter().any(|r| r.len() < 3) || count > 2048 {
+        return Err(KernelError::ResourceLimit(
+            "derived cap triangulation supports 1..33 rings and at most 2048 points".into(),
+        ));
+    }
+    let points: Vec<_> = rings.iter().flatten().copied().collect();
+    let lengths: Vec<_> = rings.iter().map(Vec::len).collect();
+    triangulate_projected(&points, &lengths, false)
+}
+fn triangulate_projected(
+    points: &[[f64; 2]],
+    lengths: &[usize],
+    convex: bool,
+) -> Result<Vec<[usize; 3]>, KernelError> {
+    let ids: Vec<_> = (0..points.len()).map(VertexId).collect();
+    let mut offset = 0;
+    let rings: Vec<Vec<VertexId>> = lengths
+        .iter()
+        .map(|&length| {
+            let ring = ids[offset..offset + length].to_vec();
+            offset += length;
+            ring
+        })
+        .collect();
     // Keep adaptive predicate expansions clear of overflow/underflow. This is
     // a derived triangulation envelope, not a new native coordinate limit.
     if points
@@ -87,7 +126,7 @@ pub fn triangulate_face(
         offset += ring.len();
     }
     let data: Vec<_> = points.iter().flatten().copied().collect();
-    let indices = if holes.is_empty() && crate::face_is_convex(model, face_id) {
+    let indices = if holes.is_empty() && convex {
         (1..ids.len() - 1)
             .flat_map(|i| [0, i, i + 1])
             .collect::<Vec<_>>()
@@ -213,7 +252,10 @@ pub fn triangulate_face(
             }
         }
     }
-    Ok(triangles)
+    Ok(triangles
+        .into_iter()
+        .map(|triangle| triangle.map(|id| id.0))
+        .collect())
 }
 
 #[cfg(test)]

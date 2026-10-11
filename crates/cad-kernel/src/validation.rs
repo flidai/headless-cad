@@ -32,7 +32,9 @@ pub struct ValidationReport {
 pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> ValidationReport {
     if model.has_curved_geometry() {
         let result = if tolerance.is_valid() {
-            crate::analytic::recognize(model, Some(tolerance)).map(|_| ())
+            crate::analytic::recognize(model, Some(tolerance))
+                .map(|_| ())
+                .or_else(|_| crate::profile_prism::recognize(model, tolerance).map(|_| ()))
         } else {
             Err(crate::KernelError::InvalidTolerance)
         };

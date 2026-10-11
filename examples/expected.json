@@ -780,5 +780,73 @@
         ]
       ]
     }
+  },
+  "drilled_bearing_mount.star": {
+    "plate": {
+      "volume_mm3": 48532.106578830695,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          70,
+          8
+        ]
+      ]
+    },
+    "sleeve": {
+      "volume_mm3": 4021.238596594935,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -12,
+          -12,
+          0
+        ],
+        [
+          12,
+          12,
+          16
+        ]
+      ]
+    },
+    "shaft": {
+      "volume_mm3": 4618.141200776996,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -7,
+          -7,
+          0
+        ],
+        [
+          7,
+          7,
+          30
+        ]
+      ]
+    },
+    "drilled_bearing_mount": {
+      "volume_mm3": 59056.44196835651,
+      "solids": 11,
+      "instances": 11,
+      "definitions": 5,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          -11
+        ],
+        [
+          100,
+          70,
+          19
+        ]
+      ]
+    }
   }
 }

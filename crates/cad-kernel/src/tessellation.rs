@@ -38,45 +38,7 @@ pub fn tessellate_cylinder(
     let c = model.cylinder_geometry(tolerance)?.ok_or_else(|| {
         KernelError::Unsupported("circular extrusion required for cylinder tessellation".into())
     })?;
-    if !policy.chordal_error.is_finite()
-        || policy.chordal_error <= 0.
-        || !(12..=65536).contains(&policy.max_segments)
-    {
-        return Err(KernelError::Unsupported(
-            "tessellation requires positive finite chordal error and 12..65536 maximum segments"
-                .into(),
-        ));
-    }
-    let scale = c
-        .origin
-        .iter()
-        .fold(c.radius.max(c.height), |s, v| s.max(v.abs()));
-    let roundoff = scale * 256. * f64::EPSILON;
-    let available = policy.chordal_error - roundoff;
-    if !available.is_normal() || available <= 0. {
-        return Err(KernelError::NumericRange);
-    }
-    let half_angle = (available / c.radius / 2.).min(1.).sqrt().asin();
-    let count = (std::f64::consts::PI / (2. * half_angle)).ceil().max(12.);
-    if !count.is_finite() || count > policy.max_segments as f64 {
-        return Err(KernelError::ResourceLimit(
-            "chordal error requires more cylinder segments than permitted".into(),
-        ));
-    }
-    let mut n = count as usize;
-    let error = loop {
-        let bound =
-            2. * c.radius * (std::f64::consts::PI / (2. * n as f64)).sin().powi(2) + roundoff;
-        if bound <= policy.chordal_error {
-            break bound;
-        }
-        n += 1;
-        if n > policy.max_segments {
-            return Err(KernelError::ResourceLimit(
-                "cylinder tessellation error budget exceeded".into(),
-            ));
-        }
-    };
+    let (n, error) = circle_resolution(c.radius, c.height, c.origin, policy)?;
     let y = cross(c.axis, c.x_direction);
     let mut bottom = Vec::with_capacity(n);
     let mut top = Vec::with_capacity(n);
@@ -167,9 +129,222 @@ pub fn tessellate_cylinder(
     })
 }
 
+fn circle_resolution(
+    radius: f64,
+    height: f64,
+    origin: [f64; 3],
+    policy: TessellationPolicy,
+) -> Result<(usize, f64), KernelError> {
+    if !policy.chordal_error.is_finite()
+        || policy.chordal_error <= 0.
+        || !(12..=65536).contains(&policy.max_segments)
+    {
+        return Err(KernelError::Unsupported(
+            "tessellation requires positive finite chordal error and 12..65536 maximum segments"
+                .into(),
+        ));
+    }
+    let scale = origin
+        .iter()
+        .fold(radius.max(height), |s, v| s.max(v.abs()));
+    let roundoff = scale * 256. * f64::EPSILON;
+    let available = policy.chordal_error - roundoff;
+    if !available.is_normal() || available <= 0. {
+        return Err(KernelError::NumericRange);
+    }
+    let half_angle = (available / radius / 2.).min(1.).sqrt().asin();
+    let count = (std::f64::consts::PI / (2. * half_angle)).ceil().max(12.);
+    if !count.is_finite() || count > policy.max_segments as f64 {
+        return Err(KernelError::ResourceLimit(
+            "chordal error requires more cylinder segments than permitted".into(),
+        ));
+    }
+    let mut n = count as usize;
+    let error = loop {
+        let bound = 2. * radius * (std::f64::consts::PI / (2. * n as f64)).sin().powi(2) + roundoff;
+        if bound <= policy.chordal_error {
+            break bound;
+        }
+        n += 1;
+        if n > policy.max_segments {
+            return Err(KernelError::ResourceLimit(
+                "cylinder tessellation error budget exceeded".into(),
+            ));
+        }
+    };
+    Ok((n, error))
+}
+
+/// Tessellate supported analytic bodies without changing native topology.
+pub fn tessellate_analytic(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    policy: TessellationPolicy,
+) -> Result<CylinderMesh, KernelError> {
+    let Some(g) = model.profile_prism_geometry(tolerance)? else {
+        return tessellate_cylinder(model, tolerance, policy);
+    };
+    use crate::math::{dot, sub};
+    use std::collections::BTreeMap;
+    let mut sampled = BTreeMap::<EdgeId, Vec<[f64; 3]>>::new();
+    let mut patches = Vec::new();
+    let mut segments = 0;
+    let mut bound = 0f64;
+    let cap_base_points: usize = g.base.faces[g.start_cap.0]
+        .loops
+        .iter()
+        .map(|id| g.base.loops[id.0].edges.len())
+        .sum();
+    for (i, bore) in g.bores.iter().enumerate() {
+        let lower_loop =
+            model.faces[g.start_cap.0].loops[g.base.faces[g.start_cap.0].loops.len() + i];
+        let upper_loop = model.faces[g.end_cap.0].loops[g.base.faces[g.end_cap.0].loops.len() + i];
+        let lower = model.loops[lower_loop.0].edges[0].edge;
+        let upper = model.loops[upper_loop.0].edges[0].edge;
+        let (n, error) = circle_resolution(bore.radius, bore.height, bore.origin, policy)?;
+        segments += n;
+        bound = bound.max(error);
+        if segments + cap_base_points > 2048 {
+            return Err(KernelError::ResourceLimit(
+                "derived cap exceeds 2048 sampled boundary points".into(),
+            ));
+        }
+        let y = cross(bore.axis, bore.x_direction);
+        let bottom: Vec<[f64; 3]> = (0..n)
+            .map(|k| {
+                let (s, c) = (std::f64::consts::TAU * k as f64 / n as f64).sin_cos();
+                std::array::from_fn(|a| {
+                    bore.origin[a] + bore.radius * (c * bore.x_direction[a] + s * y[a])
+                })
+            })
+            .collect();
+        let top: Vec<_> = bottom
+            .iter()
+            .map(|p| std::array::from_fn(|a| p[a] + bore.height * bore.axis[a]))
+            .collect();
+        for k in 0..n {
+            let j = (k + 1) % n;
+            let (s, c) = (std::f64::consts::TAU * (k as f64 + 0.5) / n as f64).sin_cos();
+            patches.push(MeshPatch {
+                face: bore.wall,
+                points: vec![bottom[j], bottom[k], top[k], top[j]],
+                normal: std::array::from_fn(|a| -(c * bore.x_direction[a] + s * y[a])),
+                boundary_edges: vec![Some(lower), None, Some(upper), None],
+            });
+        }
+        sampled.insert(lower, bottom);
+        sampled.insert(upper, top);
+    }
+    for (id, face) in g.base.faces.iter().enumerate() {
+        let face_id = FaceId(id);
+        let normal = face.try_plane().unwrap().normal;
+        if face_id != g.start_cap && face_id != g.end_cap {
+            let mut points = Vec::new();
+            let mut edges = Vec::new();
+            for usage in &g.base.loops[face.loops[0].0].edges {
+                points.push(
+                    g.base.vertices
+                        [g.base.edges[usage.edge.0].vertices[usize::from(usage.reversed)].0]
+                        .position,
+                );
+                edges.push(Some(usage.edge));
+            }
+            patches.push(MeshPatch {
+                face: face_id,
+                points,
+                normal,
+                boundary_edges: edges,
+            });
+            continue;
+        }
+        let mut rings = Vec::new();
+        let mut world = Vec::new();
+        let mut boundary = BTreeMap::new();
+        let x = g.x_direction;
+        let y = cross(normal, x);
+        for loop_id in &model.faces[id].loops {
+            let offset = world.len();
+            let mut ring = Vec::new();
+            let mut edge_ids = Vec::new();
+            for usage in &model.loops[loop_id.0].edges {
+                if let Some(points) = sampled.get(&usage.edge) {
+                    for k in 0..points.len() {
+                        let k = if usage.reversed {
+                            (points.len() - k) % points.len()
+                        } else {
+                            k
+                        };
+                        world.push(points[k]);
+                        edge_ids.push(usage.edge);
+                    }
+                } else {
+                    world.push(
+                        model.vertices
+                            [model.edges[usage.edge.0].vertices[usize::from(usage.reversed)].0]
+                            .position,
+                    );
+                    edge_ids.push(usage.edge);
+                }
+            }
+            for (k, &edge) in edge_ids.iter().enumerate() {
+                boundary.insert((offset + k, offset + (k + 1) % edge_ids.len()), edge);
+                let d = sub(world[offset + k], g.origin);
+                ring.push([dot(d, x), dot(d, y)]);
+            }
+            rings.push(ring);
+        }
+        for t in crate::triangulation::triangulate_rings_2d(&rings)? {
+            patches.push(MeshPatch {
+                face: face_id,
+                points: t.map(|i| world[i]).to_vec(),
+                normal,
+                boundary_edges: (0..3)
+                    .map(|k| boundary.get(&(t[k], t[(k + 1) % 3])).copied())
+                    .collect(),
+            });
+        }
+    }
+    Ok(CylinderMesh {
+        patches,
+        segments,
+        chordal_error_bound: bound,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mixed_cap_budget_fails_without_changing_authoritative_geometry() {
+        let tolerance = Tolerance::default();
+        let model = crate::extrude_polygon_with_circular_holes(
+            &[[0., 0.], [40., 0.], [40., 40.], [0., 40.]],
+            &[],
+            &[crate::CircleHole {
+                center: [20., 20.],
+                radius: 10.,
+            }],
+            5.,
+            tolerance,
+        )
+        .unwrap()
+        .model;
+        let before = serde_json::to_vec(&model).unwrap();
+        let error = tessellate_analytic(
+            &model,
+            tolerance,
+            TessellationPolicy {
+                chordal_error: 1e-6,
+                max_segments: 65536,
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(error, KernelError::ResourceLimit(_)));
+        assert_eq!(serde_json::to_vec(&model).unwrap(), before);
+        assert!(model.validate(tolerance).valid);
+        assert!(tessellate_analytic(&model, tolerance, TessellationPolicy::default()).is_ok());
+    }
+
     #[test]
     fn mesh_error_orientation_and_mass_converge_independently() {
         let t = Tolerance::default();

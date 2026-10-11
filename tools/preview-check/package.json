@@ -17,7 +17,8 @@
     "test:holes": "node holes-check.cjs",
     "test:concave": "node concave-check.cjs",
     "test:cylinder": "node cylinder-check.cjs",
-    "test:tube": "node tube-check.cjs"
+    "test:tube": "node tube-check.cjs",
+    "test:drilled": "node drilled-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"
