@@ -145,7 +145,7 @@ The geometric topology is not necessarily a DAG: boundary loops and incidence
 are inherently cyclic. Constraints also form graphs with loops. An assembly is
 not a Boolean union of its parts. Fixtures and enclosures use explicit part
 instances; the modular rack reuses nested rows and carriages. Older examples can
-still use disjoint unions. Named part frames and deterministic sibling datum
+still use disjoint unions. Named part frames and deterministic sibling/descendant datum
 attachments are implemented; joints and nonlinear constraint solving remain
 target work.
 
@@ -434,20 +434,33 @@ extends the corpus with chamfers, countersinks and a parameterized long taper.
 
 The current M1 attachment increment resolves explicit named part frames without
 solving nonlinear constraints. Part definitions retain a map of local rigid
-`datums`; an attached leaf instance retains its target sibling occurrence, own
-datum name, target datum name, and local offset transform. Evaluation uses:
+`datums`; an attached leaf instance retains its target occurrence, optional
+descendant path, own datum name, target datum name, and local offset transform.
+Evaluation uses:
 
 ```text
 placement = target_placement × target_datum × offset × inverse(own_datum)
 ```
 
 Frames default to identity, unit quaternions are validated rather than normalized,
-and checked inverse/composition enforce the placement numerical envelope. Only
-sibling leaf parts in one assembly definition can be targets. An iterative DAG
-walk rejects missing references, cycles, and chains beyond 64 occurrences before
-expansion; named frame count and assembly work budgets remain bounded. Resolution
-is independent of declaration order. Each reusable definition resolves locally
-before its occurrences receive parent placement.
+and checked inverse/composition enforce the placement numerical envelope. Targets
+are sibling parts or descendant parts inside child assembly occurrences. The
+existing `instance` reference is the first occurrence ID; optional `target_path`
+is a list of remaining literal IDs, ending at a part. No delimiter parsing,
+ancestor traversal, definition-name lookup or global search is performed. A
+nonempty path is an explicit schema-2 extension; older strict readers reject
+the new field rather than resolve the wrong sibling. Empty paths serialize as
+the original sibling form.
+
+Preflight validates every declared path and datum, including unused definitions,
+before geometry evaluation. Sibling dependency cycles, chains beyond 64 leaves
+and paths beyond 64 components fail explicitly. Existing assembly depth,
+expansion and work budgets also apply. Each reusable definition resolves once
+bottom-up; indexed path lookup composes child occurrence transforms and the
+terminal part’s resolved placement, including its own attachment. The result
+is local to the containing definition, so two instances of a module can place
+differently without changing its internal solution. Sources remain leaf parts;
+attaching an entire subassembly or referring upward requires further work.
 
 Source hierarchy preserves attachment intent; flattened placements and STEP
 occurrence transforms use the resolved result. Native validation recomputes and
@@ -465,8 +478,23 @@ selection witnesses, source/target content hashes and the resolved frame. Existi
 attachments consume these resolved frames without requiring a nonlinear solver.
 `surface_mount.star` changes a ramp slope and moves/turns an attached plate;
 independent slope equations check the plate's placement across parameter edits.
-Cross-level mating, joints,
+`instrumented_cartridge.star` exercises a sensor targeting a housing datum
+inside a reused nested cartridge. General cross-boundary mating, joints,
 multiple constraints, and DOF/residual solving remain separate future work.
+
+The attachment acceptance corpus checks noncommuting own/target datum frames,
+resolved targets with their own attachments, repeated child definitions, literal
+punctuation in occurrence IDs, and invalid references in unused definitions.
+The CLI test compares every published artifact byte-for-byte after rejected
+path edits. The cartridge has 11 occurrences and seven shared part definitions;
+spacing edits at 80, 100 and 120 mm recompute no solid geometry after the initial
+build. Its independent material-volume formula is `84768 + 26414*pi` mm³.
+`tools/preview-check/attachment-check.cjs` checks the attached mount and sensor
+positions, orientations, picking and captured recipe in all three display clients.
+The independent STEP oracle also resolves source attachment intent with matrix
+arithmetic and compares imported local and world placements, hierarchy and
+definition sharing. These checks establish this downward-reference contract,
+not general mating, collision freedom or flexible subassembly solving.
 
 Build a constraint service separately from geometric construction. The 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
@@ -943,7 +971,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped/tapered revolutions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling/descendant attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Whole-subassembly attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache and proxy fallback | Paged assembly/part spatial indexes, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |

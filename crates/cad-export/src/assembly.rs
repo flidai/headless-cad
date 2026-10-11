@@ -91,11 +91,11 @@ pub fn assembly_to_step(
     // contains only its own local placements, never composed leaf placements.
     let mut assemblies = BTreeMap::new();
     let mut placements = BTreeMap::new();
-    let mut resolved = BTreeMap::new();
+    let resolved =
+        cad_assembly::resolve_hierarchy_instances(&assembly.parts, &assembly.hierarchy, tolerance)
+            .map_err(|error| ExportError::InvalidModel(error.to_string()))?;
     for (name, definition) in &assembly.hierarchy {
-        let leaves =
-            cad_assembly::resolve_definition_instances(definition, &assembly.parts, tolerance)
-                .map_err(|error| ExportError::InvalidModel(error.to_string()))?;
+        let leaves = &resolved[name];
         let local: Vec<_> = leaves
             .iter()
             .map(|i| &i.transform)
@@ -120,7 +120,6 @@ pub fn assembly_to_step(
         ));
         assemblies.insert(name, (product, representation));
         placements.insert(name, local);
-        resolved.insert(name, leaves);
     }
     let mut definitions = BTreeMap::new();
     let mut geometry = BTreeMap::new();
@@ -469,6 +468,7 @@ mod tests {
                     part: "child".into(),
                     attachment: Some(DatumAttachment {
                         instance: "target".into(),
+                        target_path: Vec::new(),
                         datum: "mount".into(),
                         target_datum: "mount".into(),
                     }),
@@ -517,6 +517,120 @@ mod tests {
         }
         assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 2);
         assert!((assembly.material_volume() - 25.).abs() < 1e-12);
+    }
+
+    #[test]
+    fn nested_attachment_step_keeps_shared_definitions_and_resolves_local_placement() {
+        let tolerance = Tolerance::default();
+        let mut parts = two_instances().parts;
+        parts.get_mut("block").unwrap().datums = BTreeMap::from([
+            (
+                "foot".into(),
+                RigidTransform {
+                    translation: [1., 0., 0.],
+                    ..Default::default()
+                },
+            ),
+            (
+                "seat".into(),
+                RigidTransform {
+                    translation: [0., 2., 0.],
+                    ..Default::default()
+                },
+            ),
+        ]);
+        let q = std::f64::consts::FRAC_1_SQRT_2;
+        use cad_assembly::{AssemblyDefinition, AssemblyInstance, DatumAttachment};
+        let module = AssemblyDefinition {
+            id: "module".into(),
+            assemblies: vec![],
+            instances: vec![
+                Instance {
+                    id: "fixed".into(),
+                    part: "block".into(),
+                    attachment: None,
+                    transform: RigidTransform {
+                        translation: [3., 0., 0.],
+                        ..Default::default()
+                    },
+                },
+                Instance {
+                    id: "target".into(),
+                    part: "block".into(),
+                    transform: RigidTransform {
+                        translation: [0., 0., 4.],
+                        ..Default::default()
+                    },
+                    attachment: Some(DatumAttachment {
+                        instance: "fixed".into(),
+                        target_path: vec![],
+                        datum: "foot".into(),
+                        target_datum: "seat".into(),
+                    }),
+                },
+            ],
+        };
+        let root = AssemblyDefinition {
+            id: "root".into(),
+            instances: vec![Instance {
+                id: "probe".into(),
+                part: "block".into(),
+                transform: RigidTransform {
+                    translation: [0., 0., 3.],
+                    ..Default::default()
+                },
+                attachment: Some(DatumAttachment {
+                    instance: "holder".into(),
+                    target_path: vec!["target".into()],
+                    datum: "foot".into(),
+                    target_datum: "seat".into(),
+                }),
+            }],
+            assemblies: vec![
+                AssemblyInstance {
+                    id: "holder".into(),
+                    assembly: "module".into(),
+                    transform: RigidTransform {
+                        translation: [10., 20., 30.],
+                        rotation: [0., 0., q, q],
+                    },
+                },
+                AssemblyInstance {
+                    id: "spare".into(),
+                    assembly: "module".into(),
+                    transform: RigidTransform {
+                        translation: [50., 0., 0.],
+                        ..Default::default()
+                    },
+                },
+            ],
+        };
+        let defs = BTreeMap::from([("root".into(), root), ("module".into(), module)]);
+        let assembly =
+            BuiltAssembly::from_definitions("root".into(), parts, defs, tolerance).unwrap();
+        let step = assembly_to_step(&assembly, tolerance).unwrap();
+        // The attached probe is a local child of root, not an extra copy of
+        // the module or a child placed using its raw [0,0,3] offset.
+        let origins: Vec<[f64; 3]> = step
+            .lines()
+            .filter_map(|line| {
+                let (_, tail) = line.split_once("CARTESIAN_POINT('',(")?;
+                let mut values = tail
+                    .trim_end_matches("));")
+                    .split(',')
+                    .map(|v| v.parse().unwrap());
+                Some(std::array::from_fn(|_| values.next().unwrap()))
+            })
+            .collect();
+        assert!(origins.iter().any(|p| p
+            .iter()
+            .zip([6., 21., 37.])
+            .all(|(a, b)| (a - b).abs() < 1e-10)));
+        assert_eq!(step.matches("PRODUCT(").count(), 3);
+        assert_eq!(step.matches("FACETED_BREP('").count(), 1);
+        assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 5);
+        assert_eq!(assembly.instance_count(), 5);
+        assert!((assembly.material_volume() - 120.).abs() < 1e-10);
     }
 
     #[test]

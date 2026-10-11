@@ -1103,6 +1103,56 @@ fn datum_attachments_resolve_local_frames_without_rebuilding_exact_geometry() {
 }
 
 #[test]
+fn descendant_attachment_preflight_checks_unused_paths_before_geometry() {
+    let mut recipe = attached_recipe();
+    recipe.assembly_outputs.clear();
+    if let Feature::Rectangle { width, .. } = &mut recipe.features[0] {
+        *width = 1e308;
+    }
+    let target = recipe.assemblies[0].instances.pop().unwrap();
+    recipe.assemblies.push(AssemblyDefinition {
+        id: "module".into(),
+        instances: vec![target],
+        assemblies: vec![],
+    });
+    recipe.assemblies[0].assemblies.push(AssemblyInstance {
+        id: "child".into(),
+        assembly: "module".into(),
+        transform: Default::default(),
+    });
+    let attachment = recipe.assemblies[0].instances[0]
+        .attachment
+        .as_mut()
+        .unwrap();
+    attachment.instance = "child".into();
+    attachment.target_path = vec!["fixed".into()];
+    // Valid path reaches numeric geometry failure; each invalid path must be
+    // rejected earlier as a graph error even though no output uses it.
+    assert!(matches!(build(&recipe), Err(BuildError::Kernel { .. })));
+    for path in [
+        vec![],
+        vec!["missing".into()],
+        vec!["fixed".into(), "extra".into()],
+        vec!["fixed".into(); 65],
+    ] {
+        let mut invalid = recipe.clone();
+        invalid.assemblies[0].instances[0]
+            .attachment
+            .as_mut()
+            .unwrap()
+            .target_path = path;
+        assert!(matches!(build(&invalid), Err(BuildError::AssemblyGraph(_))));
+    }
+    let mut invalid = recipe.clone();
+    invalid.assemblies[0].instances[0]
+        .attachment
+        .as_mut()
+        .unwrap()
+        .target_datum = "missing".into();
+    assert!(matches!(build(&invalid), Err(BuildError::AssemblyGraph(_))));
+}
+
+#[test]
 fn datum_and_attachment_errors_fail_even_in_unused_definitions_before_geometry() {
     let mut recipe = attached_recipe();
     recipe.assembly_outputs.clear();
@@ -1137,6 +1187,7 @@ fn datum_and_attachment_errors_fail_even_in_unused_definitions_before_geometry()
             _ => {
                 recipe.assemblies[0].instances[1].attachment = Some(DatumAttachment {
                     instance: "attached".into(),
+                    target_path: Vec::new(),
                     datum: "mount".into(),
                     target_datum: "foot".into(),
                 })

@@ -853,6 +853,7 @@ fn attached(id: &str, target: &str) -> Instance {
         part: "plate".into(),
         transform: RigidTransform::default(),
         attachment: Some(DatumAttachment {
+            target_path: vec![],
             instance: target.into(),
             datum: "origin".into(),
             target_datum: "fixture".into(),
@@ -1060,5 +1061,140 @@ fn datum_metadata_edits_reposition_dependents_without_changing_geometry_and_inve
         .zip([1.0, 2.0, 3.0])
     {
         assert!((actual - expected).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn descendant_attachment_uses_resolved_leaf_and_noncommuting_occurrence_frames() {
+    let half = std::f64::consts::FRAC_1_SQRT_2;
+    let t = Tolerance::default();
+    let mut parts = parts();
+    parts.get_mut("plate").unwrap().datums = BTreeMap::from([
+        (
+            "origin".into(),
+            RigidTransform {
+                translation: [2., 0., 0.],
+                rotation: [half, 0., 0., half],
+            },
+        ),
+        (
+            "fixture".into(),
+            RigidTransform {
+                translation: [0., 3., 0.],
+                rotation: [0., half, 0., half],
+            },
+        ),
+    ]);
+    let mut base = instance("target", [10., 20., 30.]);
+    base.transform.rotation = [0., 0., half, half];
+    let mut attached_leaf = attached("attached/leaf", "target");
+    attached_leaf.transform = RigidTransform {
+        translation: [1., 2., 3.],
+        rotation: [0., 0., half, half],
+    };
+    let child = AssemblyDefinition {
+        id: "child".into(),
+        instances: vec![attached_leaf, base],
+        assemblies: vec![],
+    };
+    let mut sensor = attached("sensor", "module/one");
+    sensor.transform.translation = [1., 0., 0.];
+    sensor.attachment.as_mut().unwrap().target_path = vec!["attached/leaf".into()];
+    let mut other = sensor.clone();
+    other.id = "other".into();
+    other.attachment.as_mut().unwrap().instance = "module/two".into();
+    let root = AssemblyDefinition {
+        id: "root".into(),
+        instances: vec![sensor.clone(), other],
+        assemblies: vec![
+            AssemblyInstance {
+                id: "module/one".into(),
+                assembly: "child".into(),
+                transform: RigidTransform {
+                    translation: [100., 0., 0.],
+                    rotation: [0., half, 0., half],
+                },
+            },
+            AssemblyInstance {
+                id: "module/two".into(),
+                assembly: "child".into(),
+                transform: RigidTransform {
+                    translation: [200., 0., 0.],
+                    rotation: [0., half, 0., half],
+                },
+            },
+        ],
+    };
+    let definitions = BTreeMap::from([("root".into(), root.clone()), ("child".into(), child)]);
+    let resolved = resolve_hierarchy_instances(&parts, &definitions, t).unwrap();
+    // Independent coordinate permutations: inverse own Rx; source offset;
+    // target datum Ry; child-resolved (7-x,23-y,29+z); occurrence Ry.
+    for (name, x) in [("sensor", 128.), ("other", 228.)] {
+        let leaf = resolved["root"].iter().find(|i| i.id == name).unwrap();
+        for (actual, expected) in leaf
+            .transform
+            .point([2., 3., 4.])
+            .into_iter()
+            .zip([x, 16., -10.])
+        {
+            assert!((actual - expected).abs() < 1e-11);
+        }
+        assert!(leaf.attachment.is_none());
+    }
+    assert_eq!(resolved["child"].len(), 2);
+    assert_eq!(definitions["root"].instances[0], sensor);
+    assert!(resolve_definition_instances(&root, &parts, t).is_err());
+    let assembly = BuiltAssembly::from_definitions("root".into(), parts, definitions, t).unwrap();
+    assembly.validate(t).unwrap();
+    assert_eq!(assembly.instances.len(), 6);
+}
+
+#[test]
+fn descendant_attachment_rejects_invalid_paths_even_in_unused_definitions() {
+    let mut parts = parts();
+    parts.get_mut("plate").unwrap().datums = BTreeMap::from([
+        ("origin".into(), RigidTransform::default()),
+        ("fixture".into(), RigidTransform::default()),
+    ]);
+    let child = AssemblyDefinition {
+        id: "child".into(),
+        instances: vec![instance("target", [0.; 3])],
+        assemblies: vec![],
+    };
+    for path in [
+        vec![],
+        vec!["missing".into()],
+        vec!["target".into(), "beyond".into()],
+        vec!["".into()],
+        vec!["target".into(); 64],
+    ] {
+        let mut leaf = attached("sensor", "module");
+        leaf.attachment.as_mut().unwrap().target_path = path;
+        let unused = AssemblyDefinition {
+            id: "unused".into(),
+            instances: vec![leaf],
+            assemblies: vec![AssemblyInstance {
+                id: "module".into(),
+                assembly: "child".into(),
+                transform: RigidTransform::default(),
+            }],
+        };
+        let root = AssemblyDefinition {
+            id: "root".into(),
+            instances: vec![],
+            assemblies: vec![],
+        };
+        let definitions = BTreeMap::from([
+            ("root".into(), root),
+            ("child".into(), child.clone()),
+            ("unused".into(), unused),
+        ]);
+        assert!(BuiltAssembly::from_definitions(
+            "root".into(),
+            parts.clone(),
+            definitions,
+            Tolerance::default()
+        )
+        .is_err());
     }
 }

@@ -515,14 +515,34 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         attach_to: Option<&str>,
         datum: Option<&str>,
         target_datum: Option<&str>,
+        target_path: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
+        anyhow::ensure!(
+            target_path.is_none()
+                || (attach_to.is_some() && datum.is_some() && target_datum.is_some()),
+            "instance '{id}' target_path requires attach_to, datum and target_datum"
+        );
+        let target_path: Vec<String> = match target_path {
+            None => vec![],
+            Some(value) => {
+                anyhow::ensure!(
+                    starlark::values::list::ListRef::from_value(value).is_some(),
+                    "target_path must be a list of occurrence IDs"
+                );
+                let path: Vec<String> = serde_json::from_str(&value.to_json()?)
+                    .map_err(|_| anyhow::anyhow!("target_path must be a list of occurrence IDs"))?;
+                anyhow::ensure!(path.iter().all(|id| !id.is_empty() && id.trim() == id), "target_path components must be nonempty occurrence IDs without surrounding whitespace");
+                path
+            }
+        };
         let attachment = match (attach_to, datum, target_datum) {
             (None, None, None) => None,
             (Some(instance), Some(datum), Some(target_datum)) => Some(cad_build::DatumAttachment {
                 instance: instance.into(),
                 datum: datum.into(),
                 target_datum: target_datum.into(),
+                target_path,
             }),
             _ => {
                 anyhow::bail!("instance '{id}' requires attach_to, datum and target_datum together")
@@ -1629,5 +1649,137 @@ mod revolve_tests {
                 "accepted {source}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod target_path_tests {
+    use super::*;
+    const SOURCE: &str = "gap=param(name='gap',default=3)\nb=extrude(id='body',profile=rectangle(id='profile',width=2,depth=3),height=4)\nh=part(id='housing_part',body=b,datums={'seat':datum(offset=[1,2,3],rotation=[0,0,0.7071067811865475,0.7071067811865476])})\np=part(id='sensor_part',body=b,datums={'foot':datum(offset=[2,3,4],rotation=[0,0.7071067811865475,0,0.7071067811865476])})\ni=instance(id='housing',part=h,offset=[7,8,9],rotation=[0,0.7071067811865475,0,0.7071067811865476])\na=assembly(id='inner_definition',instances=[i])\nn=assembly_instance(id='inner',assembly=a,offset=[4,5,6],rotation=[0.7071067811865475,0,0,0.7071067811865476])\nm=assembly(id='module_definition',instances=[n])\nx=assembly_instance(id='module_a',assembly=m,offset=[-100,0,0])\ny=assembly_instance(id='module_b',assembly=m,offset=[100,20,30],rotation=[0,0,0.7071067811865475,0.7071067811865476])\ns=instance(id='sensor',part=p,attach_to='module_b',target_path=['inner','housing'],datum='foot',target_datum='seat',offset=[gap,2,1],rotation=[0.7071067811865475,0,0,0.7071067811865476])\nassembly_output(name='instrument',assembly=assembly(id='root',instances=[s,x,y]))";
+
+    fn expected(mut p: [f64; 3], gap: f64) -> [f64; 3] {
+        // Independent integer axis permutations for six noncommuting frames:
+        // root Rz90 · inner Rx90 · housing Ry90 · seat Rz90 · offset Rx90 · foot⁻¹.
+        p = [p[0] - 2., p[1] - 3., p[2] - 4.];
+        p = [-p[2], p[1], p[0]];
+        p = [p[0] + gap, -p[2] + 2., p[1] + 1.];
+        p = [-p[1] + 1., p[0] + 2., p[2] + 3.];
+        p = [p[2] + 7., p[1] + 8., -p[0] + 9.];
+        p = [p[0] + 4., -p[2] + 5., p[1] + 6.];
+        [-p[1] + 100., p[0] + 20., p[2] + 30.]
+    }
+
+    #[test]
+    fn nested_attachment_composes_noncommuting_frames_and_reuses_geometry() {
+        let mut engine = cad_build::BuildEngine::default();
+        let mut previous = None;
+        for (iteration, gap) in [3., 8.].into_iter().enumerate() {
+            let recipe = from_starlark_with_params(
+                "nested-datum.star",
+                SOURCE,
+                &BTreeMap::from([("gap".into(), gap)]),
+            )
+            .unwrap();
+            let encoded = serde_json::to_string(&recipe).unwrap();
+            assert!(encoded.contains("\"target_path\":[\"inner\",\"housing\"]"));
+            let decoded: Recipe = serde_json::from_str(&encoded).unwrap();
+            let built = engine.build(&decoded).unwrap();
+            assert_eq!(
+                built.stats.computed_solids,
+                if iteration == 0 { 1 } else { 0 }
+            );
+            let scene = &built.assemblies["instrument"];
+            let sensor = scene
+                .instances
+                .iter()
+                .find(|i| scene.instance_paths[&i.id] == ["sensor"])
+                .unwrap();
+            for p in [
+                [0., 0., 0.],
+                [1., 0., 0.],
+                [0., 1., 0.],
+                [0., 0., 1.],
+                [2., 3., 4.],
+            ] {
+                let actual = sensor.transform.point(p);
+                for (actual, expected) in actual.into_iter().zip(expected(p, gap)) {
+                    assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
+                }
+            }
+            assert_eq!(scene.instances.len(), 3);
+            assert!(scene
+                .instance_paths
+                .values()
+                .any(|p| p == &["module_a", "inner", "housing"]));
+            assert!(scene
+                .instance_paths
+                .values()
+                .any(|p| p == &["module_b", "inner", "housing"]));
+            if let Some((hashes, hash)) = previous {
+                assert_eq!(built.feature_hashes, hashes);
+                assert_ne!(scene.content_hash, hash);
+            }
+            previous = Some((built.feature_hashes.clone(), scene.content_hash.clone()));
+        }
+    }
+
+    #[test]
+    fn target_path_is_strict_and_never_interprets_navigation() {
+        for suffix in [
+            "target_path=[]",
+            "target_path=['inner']",
+            "attach_to='a',target_path=[]",
+        ] {
+            assert!(
+                from_starlark("bad.star", &format!("instance(id='s',part='p',{suffix})")).is_err()
+            );
+        }
+        for value in [
+            "'inner'",
+            "('inner',)",
+            "[1]",
+            "['']",
+            "[' inner']",
+            "{'inner':'housing'}",
+        ] {
+            let source = format!("instance(id='s',part='p',attach_to='module',datum='foot',target_datum='seat',target_path={value})");
+            assert!(
+                from_starlark("bad.star", &source).is_err(),
+                "accepted {value}"
+            );
+        }
+        for path in [
+            "['missing']",
+            "['inner']",
+            "['inner','housing','child']",
+            "['..','housing']",
+            "['/inner','housing']",
+            "['inner/housing']",
+        ] {
+            let source = SOURCE.replace("['inner','housing']", path);
+            let recipe = from_starlark("bad-target.star", &source).unwrap();
+            assert!(
+                cad_build::build(&recipe).is_err(),
+                "resolved invalid path {path}"
+            );
+        }
+        // Punctuation is literal identity, never navigation or path parsing.
+        for id in ["..", "/housing", "housing/leaf"] {
+            let source = SOURCE
+                .replace("id='housing'", &format!("id='{id}'"))
+                .replace("['inner','housing']", &format!("['inner','{id}']"));
+            let recipe = from_starlark("literal-id.star", &source).unwrap();
+            assert!(
+                cad_build::build(&recipe).is_ok(),
+                "literal occurrence ID {id}"
+            );
+        }
+        // A descendant ID is never a global lookup, even if unique elsewhere.
+        let recipe = from_starlark(
+            "bad-root.star",
+            &SOURCE.replace("attach_to='module_b'", "attach_to='housing'"),
+        )
+        .unwrap();
+        assert!(cad_build::build(&recipe).is_err());
     }
 }

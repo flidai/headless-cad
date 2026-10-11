@@ -167,7 +167,7 @@ B-rep. Modeling across placed instances requires explicit kernel operations;
 `transform` and scoped convex `intersect` operate on exact part geometry.
 Parts must reference solid features. Assemblies support both part occurrences
 and nested subassembly occurrences, with named part datums and deterministic
-sibling attachments. Joints and nonlinear constraint solving remain planned.
+sibling and descendant attachments. Joints and nonlinear constraint solving remain planned.
 
 These functions produce recipe schema 2. Existing single-part recipes retain
 schema 1; their JSON and Starlark workflows remain supported. A part's local
@@ -244,9 +244,26 @@ placed = target_placement × target_datum × instance_offset × inverse(own_datu
 The inverse own datum matters when that frame is translated or rotated. Without
 attachment arguments, instance transforms retain their ordinary placement
 meaning. All three attachment arguments (`attach_to`, `datum`, `target_datum`)
-are required together. Targets must be sibling **part occurrences in the same
-assembly definition**. Definition order does not control evaluation: references
-form a dependency DAG, with missing targets/datums and cycles rejected. Chains
+are required together. With no `target_path`, targets are sibling **part occurrences
+in the same assembly definition**. To target a part inside a child assembly,
+use `attach_to` for the child occurrence and `target_path` for the remaining
+occurrence IDs, ending at the target part:
+
+```python
+sensor = instance(id = "sensor", part = sensor_part,
+    attach_to = "cartridge", target_path = ["core", "housing"],
+    datum = "foot", target_datum = "sensor_seat")
+```
+
+Path components are literal IDs, including any punctuation; slashes are not
+separators. Paths descend from the containing assembly, never to parents or
+another output. They select occurrences, not shared definition IDs. Each
+reusable child definition resolves once before its parent; terminal part
+placements include their own attachments. The composed target placement is
+relative to the source instance’s containing assembly. Paths are limited to
+64 components including `attach_to`. Definition order does not control
+evaluation: references form a dependency DAG, with missing targets/datums
+and cycles rejected. Sibling chains
 are limited to 64 occurrences, with at most 1,024 named frames per part and the
 existing assembly expansion/work limits. Invalid unit frames and placements
 outside numerical tolerance fail explicitly; rotations are never silently
@@ -261,10 +278,12 @@ unchanged part geometry. Selected-part metadata exposes the local datum frames
 in the read-only viewer. See `examples/datum_gantry.star` for chained attachments,
 nonzero/rotated tool datums, and reuse of the completed gantry in two stations.
 
-These are source-defined frames and deterministic placements, not associated
-face references or a constraint solver. Cross-subassembly attachment paths,
-multiple simultaneous mates, joints, DOF/residual reporting, collision checking,
-and automatic datum reconstruction from changing topology remain unsupported.
+These are deterministic placements; named frames can also be associated with
+supported planar faces using `face_datum`. `instrumented_cartridge.star` shows
+a sensor attached inside a reused, nested cartridge. Moving the cartridge
+repositions the sensor without rebuilding geometry. Attaching whole subassemblies,
+upward references, multiple simultaneous mates, joints, DOF/residual reporting
+and collision checking remain unsupported.
 
 Assembly builds produce `<name>.assembly.json`, a metadata manifest referencing
 shared `definition-<hash>.brep.json` assets, and `<name>.display.json`, with one
@@ -794,7 +813,7 @@ Analytic cylinders use `ADVANCED_BREP_SHAPE_REPRESENTATION` with circles, a cyli
 The orthogonal baseline and first convex planar extension are bounded increments
 toward the commercial CAD goal. Nested assemblies, scoped face references and
 shared display assets are implemented.
-Named part datums and sibling attachments are implemented. Next come
+Named part datums and sibling/descendant attachments are implemented. Next come
 reference-driven modeling, bounded-error display LOD,
 broader analytic geometry, general planar Booleans, and general trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence

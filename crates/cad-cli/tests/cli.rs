@@ -1339,6 +1339,107 @@ fn datum_attachments_round_trip_and_failed_reference_preserves_generation() {
 }
 
 #[test]
+fn descendant_attachment_publishes_resolved_frames_and_bad_paths_preserve_all_artifacts() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("nested.star");
+    let out = dir.path().join("out");
+    let recipe = r#"
+b = extrude(id='b',profile=rectangle(id='p',width=2,depth=3),height=4)
+p = part(id='part',body=b,datums={'foot':datum(offset=[1,0,0]),'seat':datum(offset=[0,2,0])})
+m = assembly(id='module',instances=[
+    instance(id='fixed',part=p,offset=[3,0,0]),
+    instance(id='target/leaf',part=p,attach_to='fixed',datum='foot',target_datum='seat',offset=[0,0,4]),
+])
+a = assembly(id='root',instances=[
+    instance(id='probe',part=p,attach_to='holder',target_path=['target/leaf'],datum='foot',target_datum='seat',offset=[0,0,3]),
+    assembly_instance(id='holder',assembly=m,offset=[10,20,30],rotation=[0,0,0.7071067811865476,0.7071067811865476]),
+    assembly_instance(id='spare',assembly=m,offset=[50,0,0]),
+])
+assembly_output(name='nested',assembly=a)
+"#;
+    fs::write(&source, recipe).unwrap();
+    let build = || {
+        cli(&[
+            "build",
+            source.to_str().unwrap(),
+            "--out-dir",
+            out.to_str().unwrap(),
+        ])
+    };
+    let built = build();
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let manifest_path = out.join("nested.assembly.json");
+    let native: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    let probe = native["instances"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "[\"probe\"]")
+        .unwrap();
+    // Independent rigid-frame arithmetic: target resolves to [2,2,4] inside
+    // the module; probe resolves to [1,4,7], then holder rotates +90 about Z.
+    for (actual, expected) in probe["transform"]["translation"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip([6., 21., 37.])
+    {
+        assert!((actual.as_f64().unwrap() - expected).abs() < 1e-10);
+    }
+    assert_eq!(
+        native["hierarchy"]["root"]["instances"][0]["attachment"]["target_path"],
+        serde_json::json!(["target/leaf"])
+    );
+    let valid = cli(&["validate", manifest_path.to_str().unwrap()]);
+    assert!(
+        valid.status.success(),
+        "{}",
+        String::from_utf8_lossy(&valid.stderr)
+    );
+    // Record every artifact, including captured recipe, shared assets and STEP.
+    fn snapshot(root: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+        let mut result = std::collections::BTreeMap::new();
+        let mut pending = vec![root.to_path_buf()];
+        while let Some(directory) = pending.pop() {
+            for entry in fs::read_dir(directory).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    pending.push(path);
+                } else {
+                    result.insert(
+                        path.strip_prefix(root).unwrap().to_path_buf(),
+                        fs::read(path).unwrap(),
+                    );
+                }
+            }
+        }
+        result
+    }
+    let generation = snapshot(&out);
+    for replacement in [
+        "['missing']",
+        "['target','leaf']",
+        "['target/leaf','extra']",
+        "[]",
+    ] {
+        fs::write(&source, recipe.replace("['target/leaf']", replacement)).unwrap();
+        let failed = build();
+        assert!(
+            !failed.status.success(),
+            "accepted invalid path {replacement}"
+        );
+        let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+        assert_eq!(error["code"], "invalid_graph", "{error}");
+        assert_eq!(snapshot(&out), generation);
+    }
+}
+
+#[test]
 fn gantry_height_edit_moves_attachment_chain_and_rebuilds_one_definition() {
     let dir = tempfile::tempdir().unwrap();
     let cache = dir.path().join("cache");

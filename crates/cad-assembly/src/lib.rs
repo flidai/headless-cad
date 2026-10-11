@@ -10,7 +10,8 @@ mod mass_properties;
 pub use mass_properties::AssemblyMassProperties;
 mod datum;
 pub use datum::{
-    resolve_definition_instances, validate_attachment_definitions, validate_datums, DatumAttachment,
+    resolve_definition_instances, resolve_hierarchy_instances, validate_attachment_definitions,
+    validate_datums, DatumAttachment,
 };
 mod hierarchy;
 pub use bom::{BomItem, BomReport, Material, PartMetadata};

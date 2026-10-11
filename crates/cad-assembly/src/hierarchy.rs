@@ -239,15 +239,7 @@ pub(super) fn expand(
         Ok(total)
     }
     placement_work(root, parts, definitions, &mut BTreeMap::new())?;
-    let resolved: BTreeMap<_, _> = hierarchy
-        .iter()
-        .map(|(id, definition)| {
-            Ok((
-                id.as_str(),
-                resolve_definition_instances(definition, parts, tolerance)?,
-            ))
-        })
-        .collect::<Result<_, AssemblyError>>()?;
+    let resolved = resolve_hierarchy_instances(parts, &hierarchy, tolerance)?;
     let mut leaves = BTreeMap::new();
     let mut paths = BTreeMap::new();
     let mut pending = vec![(root, Vec::<String>::new(), RigidTransform::default())];

@@ -81,31 +81,46 @@ def inverse(matrix):
     return [row + [-sum(row[j] * matrix[j][3] for j in range(3))] for row in rotation]
 
 
-def resolved_placements(definition, parts):
-    """Independent matrix solution, avoiding kernel quaternion composition."""
-    instances = {instance["id"]: instance for instance in definition["instances"]}
+def resolved_placements(hierarchy, parts):
+    """Independent matrix solution, avoiding kernel quaternion composition.
+
+    References are resolved on demand by (definition, occurrence) identity;
+    this never expands repeated module occurrences to solve their local frames.
+    """
+    leaves = {name: {i["id"]: i for i in d["instances"]}
+              for name, d in hierarchy.items()}
+    children = {name: {i["id"]: i for i in d.get("assemblies", [])}
+                for name, d in hierarchy.items()}
     resolved, active = {}, set()
 
-    def resolve(name):
-        if name in resolved:
-            return resolved[name]
-        require(name not in active, "attachment cycle in expected source")
-        active.add(name)
-        instance = instances[name]
+    def resolve(definition, name):
+        key = (definition, name)
+        if key in resolved:
+            return resolved[key]
+        require(key not in active, "attachment cycle in expected source")
+        active.add(key)
+        instance = leaves[definition][name]
         placement = placement_matrix(instance["transform"])
         attachment = instance.get("attachment")
         if attachment:
-            target = instances[attachment["instance"]]
+            path = [attachment["instance"]] + attachment.get("target_path", [])
+            target_definition = definition
+            parent_frame = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]
+            for component in path[:-1]:
+                child = children[target_definition][component]
+                parent_frame = multiply(parent_frame, placement_matrix(child["transform"]))
+                target_definition = child["assembly"]
+            target = leaves[target_definition][path[-1]]
+            target_frame = multiply(parent_frame, resolve(target_definition, target["id"]))
             own_datum = placement_matrix(parts[instance["part"]]["datums"][attachment["datum"]])
             target_datum = placement_matrix(parts[target["part"]]["datums"][attachment["target_datum"]])
-            placement = multiply(multiply(multiply(resolve(target["id"]), target_datum), placement), inverse(own_datum))
-        active.remove(name)
-        resolved[name] = placement
+            placement = multiply(multiply(multiply(target_frame, target_datum), placement), inverse(own_datum))
+        active.remove(key)
+        resolved[key] = placement
         return placement
 
-    for name in instances:
-        resolve(name)
-    return resolved
+    return {definition: {name: resolve(definition, name) for name in instances}
+            for definition, instances in leaves.items()}
 
 
 def main():
@@ -221,8 +236,8 @@ def main():
             by_name = {name: identity for identity, name in assembly_definitions.items()}
             require(len(by_name) == len(assembly_definitions), "duplicated assembly definitions")
             require(by_name.keys() == expected["hierarchy"].keys(), "assembly definition graph differs")
+            resolved = resolved_placements(expected["hierarchy"], expected["definitions"])
             for name, definition in expected["hierarchy"].items():
-                resolved = resolved_placements(definition, expected["definitions"])
                 actual_edges = {edge["id"]: edge for edge in definition_edges[by_name[name]]}
                 wanted_edges = [(i, False) for i in definition["instances"]] + [(i, True) for i in definition.get("assemblies", [])]
                 require(actual_edges.keys() == {i["id"] for i, _ in wanted_edges}, f"direct children differ: {name}")
@@ -233,7 +248,7 @@ def main():
                         require(edge["definition"] == by_name[instance["assembly"]], "subassembly definition not reused")
                     else:
                         require(definitions[edge["definition"]] == instance["part"], "leaf part identity differs")
-                    wanted = placement_matrix(instance["transform"]) if nested else resolved[instance["id"]]
+                    wanted = placement_matrix(instance["transform"]) if nested else resolved[name][instance["id"]]
                     require(all(close(a, b, 1e-12) for row, target in zip(edge["placement"], wanted)
                                 for a, b in zip(row, target)), f"local placement differs: {name}/{instance['id']}")
         hash_to_reference = {}
