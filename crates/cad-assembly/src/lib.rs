@@ -3,8 +3,11 @@
 //! An assembly retains occurrences, including overlapping ones; it never performs
 //! a Boolean union. Material volume is the sum per occurrence. Rotated geometry
 //! remains local to its definition and does not expand the kernel's supported
-//! modeling domain. Nested assemblies and constraints are not implemented.
+//! modeling domain. Nested reusable definitions retain local placements and explicit
+//! occurrence paths. Assembly constraints are not implemented.
+mod hierarchy;
 use cad_kernel::{Bounds, OperationResult, Tolerance};
+pub use hierarchy::validate_definitions;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, OnceLock};
@@ -21,6 +24,7 @@ pub fn assembly_build_id() -> &'static str {
     ID.get_or_init(|| {
         let mut hash = blake3::Hasher::new();
         hash.update(include_bytes!("lib.rs"));
+        hash.update(include_bytes!("hierarchy.rs"));
         hash.update(include_bytes!("../Cargo.toml"));
         hash.update(include_bytes!("../../../Cargo.lock"));
         hash.update(cad_kernel::KERNEL_BUILD_ID.as_bytes());
@@ -48,7 +52,19 @@ pub struct Instance {
 #[serde(deny_unknown_fields)]
 pub struct AssemblyDefinition {
     pub id: String,
+    #[serde(default)]
     pub instances: Vec<Instance>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assemblies: Vec<AssemblyInstance>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AssemblyInstance {
+    pub id: String,
+    pub assembly: String,
+    #[serde(default)]
+    pub transform: RigidTransform,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -195,10 +211,18 @@ pub struct BuiltAssembly {
     pub content_hash: String,
     pub parts: BTreeMap<String, BuiltPart>,
     pub instances: Vec<Instance>,
+    /// Reachable authoritative assembly definitions; root is `assembly_id`.
+    pub hierarchy: BTreeMap<String, AssemblyDefinition>,
+    /// Explicit occurrence path for every derived flattened instance ID.
+    pub instance_paths: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Debug, Error)]
 pub enum AssemblyError {
+    #[error("invalid assembly hierarchy: {0}")]
+    Hierarchy(String),
+    #[error("derived instances or paths do not match authoritative assembly hierarchy")]
+    DerivedMismatch,
     #[error("{kind} identifier '{id}' must be nonempty with no surrounding whitespace")]
     Identifier { kind: &'static str, id: String },
     #[error("duplicate instance ID '{0}'")]
@@ -242,11 +266,43 @@ impl BuiltAssembly {
         instances: Vec<Instance>,
         tolerance: Tolerance,
     ) -> Result<Self, AssemblyError> {
+        let definition = AssemblyDefinition {
+            id: assembly_id.clone(),
+            instances,
+            assemblies: vec![],
+        };
+        Self::from_definitions(
+            assembly_id.clone(),
+            parts,
+            BTreeMap::from([(assembly_id, definition)]),
+            tolerance,
+        )
+    }
+
+    /// Build a reachable hierarchy of shared definitions, checking expansion
+    /// limits before materializing leaf occurrences. Root-local leaf IDs retain
+    /// their original spelling for flat assemblies. Nested hierarchies encode
+    /// *all* flattened IDs as JSON arrays, while `instance_paths` keeps the
+    /// original components without delimiter ambiguity.
+    pub fn from_definitions(
+        root: String,
+        parts: BTreeMap<String, BuiltPart>,
+        definitions: BTreeMap<String, AssemblyDefinition>,
+        tolerance: Tolerance,
+    ) -> Result<Self, AssemblyError> {
+        let (hierarchy, used_parts, instances, instance_paths) =
+            hierarchy::expand(&root, &parts, &definitions, tolerance)?;
+        let parts = parts
+            .into_iter()
+            .filter(|(id, _)| used_parts.contains(id))
+            .collect();
         let mut result = Self {
-            assembly_id,
+            assembly_id: root,
             content_hash: String::new(),
             parts,
             instances,
+            hierarchy,
+            instance_paths,
         };
         result.validate_structure(tolerance)?;
         result.content_hash = result.hash()?;
@@ -255,6 +311,15 @@ impl BuiltAssembly {
 
     /// Validate externally supplied/deserialized assemblies, including identity.
     pub fn validate(&self, tolerance: Tolerance) -> Result<(), AssemblyError> {
+        let (hierarchy, used_parts, instances, paths) =
+            hierarchy::expand(&self.assembly_id, &self.parts, &self.hierarchy, tolerance)?;
+        if hierarchy != self.hierarchy
+            || used_parts.len() != self.parts.len()
+            || instances != self.instances
+            || paths != self.instance_paths
+        {
+            return Err(AssemblyError::DerivedMismatch);
+        }
         self.validate_structure(tolerance)?;
         if self.content_hash != self.hash()? {
             return Err(AssemblyError::HashMismatch);
@@ -399,6 +464,17 @@ impl BuiltAssembly {
             assembly_build_id(),
             &self.assembly_id,
             definitions,
+            self.hierarchy
+                .iter()
+                .map(|(id, definition)| {
+                    let mut leaves: Vec<_> = definition.instances.iter().collect();
+                    leaves.sort_by(|a, b| a.id.cmp(&b.id));
+                    let mut children: Vec<_> = definition.assemblies.iter().collect();
+                    children.sort_by(|a, b| a.id.cmp(&b.id));
+                    (id, leaves, children)
+                })
+                .collect::<Vec<_>>(),
+            &self.instance_paths,
             instances,
         ))?;
         Ok(blake3::hash(&bytes).to_hex().to_string())

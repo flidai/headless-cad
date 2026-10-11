@@ -98,6 +98,7 @@ cad build examples/fixture.star --out-dir out/fixture
 cad build examples/enclosure.star --out-dir out/enclosure
 cad build examples/mounting_array.star --out-dir out/mounting_array
 cad build examples/reference_fixture.star --out-dir out/reference_fixture
+cad build examples/modular_rack.star --out-dir out/modular_rack
 ```
 
 | Example | What it exercises | Independently calculated result |
@@ -110,6 +111,7 @@ cad build examples/reference_fixture.star --out-dir out/reference_fixture
 | Vented enclosure | Eight vents, four attached internal supports, separate lid | 88,240 mm³, two component solids |
 | Mounting array | One slotted part, 24 instances with alternate rows rotated | 4,992 mm³ summed material, one stored part definition |
 | Reference fixture | Three grooves and raised stops; ancestral top-face selection | 23,296 mm³, one solid, 80 × 40 × 20 mm |
+| Modular rack | Reused rows and carriages, nested rotations and occurrence paths | 63,648 mm³ summed material, 17 component occurrences, four part definitions |
 
 The examples progress from single-part modeling to reusable functions, repeated
 features, and assemblies. The fixture and enclosure recipes expose named
@@ -150,13 +152,29 @@ assembly_output(name = "pair", assembly = pair)
 Rotations are unit quaternions in `[x, y, z, w]` order; translations are
 millimetres. A placement rotates a reusable part without changing its local
 B-rep. It does not enable rotated-solid Boolean operations in the kernel.
-Parts must reference solid features. Assemblies currently contain flat lists of
-part occurrences; nested assemblies, joints, and named datums remain planned.
+Parts must reference solid features. Assemblies support both part occurrences
+and nested subassembly occurrences; joints and named datums remain planned.
 
 These functions produce recipe schema 2. Existing single-part recipes retain
 schema 1; their JSON and Starlark workflows remain supported. A part's local
 geometry uses the ordinary content cache. Changing only placements reuses that
 geometry, while updating the assembly identity and conservative world bounds.
+
+Use `assembly_instance` to place an existing assembly inside another:
+
+```python
+left = assembly_instance(id = "left", assembly = carriage)
+right = assembly_instance(id = "right", assembly = carriage, offset = [48, 0, 0])
+row = assembly(id = "row", instances = [left, right])
+```
+
+An assembly can mix part and subassembly occurrences. Local placements compose
+from parent to child; repeated modules share definitions. IDs must be unique
+within a definition, and the Starlark declaration registry also requires unique
+declared instance IDs. Different occurrence paths distinguish repeated children.
+Nested leaf IDs encode their complete path as a JSON array; `instance_paths`
+retains the original path segments, so slashes in an ID cannot create collisions.
+The viewer displays those paths when selecting parts.
 
 Assembly builds produce `<name>.assembly.json`, a metadata manifest referencing
 shared `definition-<hash>.brep.json` assets, and `<name>.display.json`, with one
@@ -165,7 +183,10 @@ the compact display representation and expands it for this software renderer.
 It does not load exact B-rep assets to display an assembly. Select an occurrence
 or face to inspect its part, feature, and the actual shared recipe.
 
-STEP exports preserve reusable definitions and named occurrence placements. STL
+The native manifest retains `hierarchy` alongside derived leaf placements;
+validation rejects disagreement between hierarchy, leaf paths, and transforms.
+STEP exports preserve reusable part and subassembly definitions with local named
+occurrence placements. STL
 expands occurrences into triangles and loses assembly semantics. Assembly volume
 is explicitly **summed component material**, including overlaps; it is not a
 Boolean-union volume or an interference certificate. Bounds are conservative
@@ -183,6 +204,11 @@ after an implementation update. STEP remains independent of this native hash. Th
 is 10,000 occurrences, 50,000 expanded faces, and 200,000 points; the modeling
 assembly limit and placement-work budget are separate. GPU instancing and lazy
 streaming remain future scalability work, not claims about this Canvas renderer.
+Hierarchy validation rejects cycles, missing references, excessive depth, and
+exponential expansion before allocating placed geometry. Definitions are limited
+to 64 levels, with at most 100,000 expanded component and assembly occurrences
+per root. Nested placement is not an assembly constraint solver or interference
+check; the current viewer still expands all visible-generation leaves eagerly.
 
 ## Recipes and parameters
 
@@ -410,9 +436,9 @@ boundaries and millimetre units, with occurrence relationships for assemblies; i
 STL is unitless by specification, with coordinates written in millimetres.
 
 The working orthogonal baseline is the first milestone toward the commercial
-CAD goal. Flat assembly instances and shared display assets are implemented.
-Next come persistent design references, nested assemblies, streamed display
-assets, general planar/analytic geometry, and trim/seam correctness.
+CAD goal. Nested assemblies, scoped face references and shared display assets are implemented.
+Next come named datums, reference-driven modeling, streamed display assets,
+general planar/analytic geometry, and trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence
 for curved modeling, constraints, large assemblies, and manufacturing workflows.
 
@@ -449,6 +475,7 @@ npm run test:hosted
 npm run test:refresh
 npm run test:depth
 npm run test:assembly
+npm run test:nested
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.

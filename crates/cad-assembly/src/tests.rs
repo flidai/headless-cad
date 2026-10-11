@@ -150,7 +150,7 @@ fn placement_changes_assembly_identity_without_changing_definition() {
     renamed.instances[0].id = "renamed".into();
     assert!(matches!(
         renamed.validate(Tolerance::default()),
-        Err(AssemblyError::HashMismatch)
+        Err(AssemblyError::DerivedMismatch)
     ));
     let mut changed = parts();
     changed.get_mut("plate").unwrap().result =
@@ -343,4 +343,307 @@ fn aggregate_placement_budget_is_checked_before_per_occurrence_geometry() {
         BuiltAssembly::new("oversized".into(), definitions, instances, tolerance),
         Err(AssemblyError::ResourceLimit)
     ));
+}
+
+fn definition(
+    id: &str,
+    instances: Vec<Instance>,
+    assemblies: Vec<AssemblyInstance>,
+) -> AssemblyDefinition {
+    AssemblyDefinition {
+        id: id.into(),
+        instances,
+        assemblies,
+    }
+}
+fn child(id: &str, assembly: &str, transform: RigidTransform) -> AssemblyInstance {
+    AssemblyInstance {
+        id: id.into(),
+        assembly: assembly.into(),
+        transform,
+    }
+}
+
+#[test]
+fn nested_noncommuting_rotations_match_analytic_world_coordinates_and_reuse_definitions() {
+    let half = std::f64::consts::FRAC_1_SQRT_2;
+    let local = RigidTransform {
+        translation: [1.0, 2.0, 3.0],
+        rotation: [half, 0.0, 0.0, half],
+    };
+    let parent = RigidTransform {
+        translation: [10.0, 20.0, 30.0],
+        rotation: [0.0, 0.0, half, half],
+    };
+    let mut leaf = instance("fastener", [0.0; 3]);
+    leaf.transform = local;
+    let definitions = BTreeMap::from([
+        ("unit".into(), definition("unit", vec![leaf], vec![])),
+        (
+            "root".into(),
+            definition(
+                "root",
+                vec![],
+                vec![
+                    child("left", "unit", parent),
+                    child("right", "unit", RigidTransform::default()),
+                ],
+            ),
+        ),
+        ("unused".into(), definition("unused", vec![], vec![])),
+    ]);
+    let source = parts();
+    let built = BuiltAssembly::from_definitions(
+        "root".into(),
+        source.clone(),
+        definitions,
+        Tolerance::default(),
+    )
+    .unwrap();
+    assert_eq!(built.hierarchy.len(), 2);
+    assert_eq!(built.parts.len(), 1);
+    assert_eq!(built.instances.len(), 2);
+    assert_eq!(built.material_volume(), 48.0);
+    assert!(Arc::ptr_eq(
+        &built.parts["plate"].result,
+        &source["plate"].result
+    ));
+    let left = &built
+        .instances
+        .iter()
+        .find(|i| built.instance_paths[&i.id][0] == "left")
+        .unwrap()
+        .transform;
+    // Rx90 maps (2,3,4)->(2,-4,3); local translate ->(3,-2,6);
+    // Rz90 ->(2,3,6); parent translate ->(12,23,36).
+    for (actual, expected) in left
+        .point([2.0, 3.0, 4.0])
+        .into_iter()
+        .zip([12.0, 23.0, 36.0])
+    {
+        assert!((actual - expected).abs() < 1e-12);
+    }
+    let bounds = built.bounds().unwrap();
+    // Left rotated box bounds x[8,12], y[21,23], z[33,36].
+    // Right local-only box bounds x[1,3], y[-2,2], z[3,6].
+    for (actual, expected) in bounds
+        .min
+        .into_iter()
+        .chain(bounds.max)
+        .zip([1.0, -2.0, 3.0, 12.0, 23.0, 36.0])
+    {
+        assert!((actual - expected).abs() < 1e-12);
+    }
+    let roundtrip: BuiltAssembly =
+        serde_json::from_slice(&serde_json::to_vec(&built).unwrap()).unwrap();
+    roundtrip.validate(Tolerance::default()).unwrap();
+}
+
+#[test]
+fn nested_paths_cannot_collide_with_delimiters_or_encoded_user_ids() {
+    let definitions = BTreeMap::from([
+        (
+            "root".into(),
+            definition(
+                "root",
+                vec![instance(r#"["a","b/c"]"#, [0.0; 3])],
+                vec![
+                    child("a", "first", RigidTransform::default()),
+                    child("a/b", "second", RigidTransform::default()),
+                ],
+            ),
+        ),
+        (
+            "first".into(),
+            definition("first", vec![instance("b/c", [0.0; 3])], vec![]),
+        ),
+        (
+            "second".into(),
+            definition("second", vec![instance("c", [0.0; 3])], vec![]),
+        ),
+    ]);
+    let built =
+        BuiltAssembly::from_definitions("root".into(), parts(), definitions, Tolerance::default())
+            .unwrap();
+    assert_eq!(built.instances.len(), 3);
+    assert_eq!(built.instance_paths.len(), 3);
+    for instance in &built.instances {
+        assert_eq!(
+            serde_json::from_str::<Vec<String>>(&instance.id).unwrap(),
+            built.instance_paths[&instance.id]
+        );
+    }
+    let mut damaged = built.clone();
+    damaged.instances[0].transform.translation[0] += 1.0;
+    assert!(matches!(
+        damaged.validate(Tolerance::default()),
+        Err(AssemblyError::DerivedMismatch)
+    ));
+    let mut damaged = built.clone();
+    damaged
+        .instance_paths
+        .values_mut()
+        .next()
+        .unwrap()
+        .push("forged".into());
+    assert!(matches!(
+        damaged.validate(Tolerance::default()),
+        Err(AssemblyError::DerivedMismatch)
+    ));
+    let mut changed = built.hierarchy.clone();
+    changed.get_mut("root").unwrap().assemblies[0].id = "renamed".into();
+    let changed =
+        BuiltAssembly::from_definitions("root".into(), parts(), changed, Tolerance::default())
+            .unwrap();
+    assert_ne!(built.content_hash, changed.content_hash);
+}
+
+#[test]
+fn nested_cycles_depth_and_exponential_expansion_fail_before_geometry() {
+    let known_parts = BTreeSet::from(["plate".to_owned()]);
+    let mut definitions = BTreeMap::from([
+        (
+            "a".into(),
+            definition(
+                "a",
+                vec![],
+                vec![child("to_b", "b", RigidTransform::default())],
+            ),
+        ),
+        (
+            "b".into(),
+            definition(
+                "b",
+                vec![],
+                vec![child("to_a", "a", RigidTransform::default())],
+            ),
+        ),
+    ]);
+    assert!(matches!(
+        validate_definitions(&known_parts, &definitions),
+        Err(AssemblyError::Hierarchy(_))
+    ));
+    definitions.clear();
+    for i in 0..65 {
+        let id = format!("node{i:02}");
+        let children = if i == 64 {
+            vec![]
+        } else {
+            vec![child(
+                "next",
+                &format!("node{:02}", i + 1),
+                RigidTransform::default(),
+            )]
+        };
+        definitions.insert(id.clone(), definition(&id, vec![], children));
+    }
+    assert!(matches!(
+        validate_definitions(&known_parts, &definitions),
+        Err(AssemblyError::ResourceLimit)
+    ));
+    definitions.clear();
+    definitions.insert(
+        "node00".into(),
+        definition("node00", vec![instance("leaf", [0.0; 3])], vec![]),
+    );
+    for i in 1..18 {
+        let id = format!("node{i:02}");
+        let children = ["left", "right"]
+            .map(|name| {
+                child(
+                    name,
+                    &format!("node{:02}", i - 1),
+                    RigidTransform::default(),
+                )
+            })
+            .to_vec();
+        definitions.insert(id.clone(), definition(&id, vec![], children));
+    }
+    assert!(matches!(
+        validate_definitions(&known_parts, &definitions),
+        Err(AssemblyError::ResourceLimit)
+    ));
+}
+
+#[test]
+fn nested_duplicate_names_missing_references_and_numeric_cancellation_are_rejected() {
+    let mut definitions = BTreeMap::from([
+        (
+            "root".into(),
+            definition(
+                "root",
+                vec![instance("same", [0.0; 3])],
+                vec![child("same", "unit", RigidTransform::default())],
+            ),
+        ),
+        ("unit".into(), definition("unit", vec![], vec![])),
+    ]);
+    assert!(matches!(
+        validate_definitions(&BTreeSet::from(["plate".into()]), &definitions),
+        Err(AssemblyError::DuplicateInstance(_))
+    ));
+    definitions.get_mut("root").unwrap().instances.clear();
+    definitions.remove("unit");
+    assert!(matches!(
+        validate_definitions(&BTreeSet::new(), &definitions),
+        Err(AssemblyError::Hierarchy(_))
+    ));
+    let parent = RigidTransform {
+        translation: [1e20, 0.0, 0.0],
+        ..Default::default()
+    };
+    let local = RigidTransform {
+        translation: [1.0, 0.0, 0.0],
+        ..Default::default()
+    };
+    assert!(matches!(
+        parent.compose(&local, Tolerance::default()),
+        Err(AssemblyError::NumericRange)
+    ));
+    let invalid = RigidTransform {
+        rotation: [0.0, 0.0, 0.0, 2.0],
+        ..Default::default()
+    };
+    assert!(parent.compose(&invalid, Tolerance::default()).is_err());
+}
+
+#[test]
+fn empty_subassembly_paths_and_rotated_offset_roundoff_have_explicit_budgets() {
+    // No geometry and no leaves: expanded assembly-node path text still costs
+    // resources and must be rejected before the occurrence traversal allocates.
+    let mut definitions = BTreeMap::from([("n00".into(), definition("n00", vec![], vec![]))]);
+    for i in 1..14 {
+        let id = format!("n{i:02}");
+        let children = ["a", "b"]
+            .map(|prefix| {
+                child(
+                    &format!("{prefix}{}", "x".repeat(1000)),
+                    &format!("n{:02}", i - 1),
+                    RigidTransform::default(),
+                )
+            })
+            .to_vec();
+        definitions.insert(id.clone(), definition(&id, vec![], children));
+    }
+    assert!(matches!(
+        validate_definitions(&BTreeSet::new(), &definitions),
+        Err(AssemblyError::ResourceLimit)
+    ));
+    let half_angle = std::f64::consts::FRAC_PI_8;
+    let parent = RigidTransform {
+        rotation: [0.0, 0.0, half_angle.sin(), half_angle.cos()],
+        ..Default::default()
+    };
+    let far = RigidTransform {
+        translation: [1e12, 1e12, 0.0],
+        ..Default::default()
+    };
+    assert!(matches!(
+        parent.compose(&far, Tolerance::default()),
+        Err(AssemblyError::NumericRange)
+    ));
+    // Exact identity placement does not incur arbitrary-rotation uncertainty.
+    assert!(RigidTransform::default()
+        .compose(&far, Tolerance::default())
+        .is_ok());
 }

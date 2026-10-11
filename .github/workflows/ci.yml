@@ -15,6 +15,7 @@ jobs:
       - run: cargo run --locked -p cad-cli -- build examples/enclosure.star --out-dir out/enclosure
       - run: cargo run --locked -p cad-cli -- build examples/mounting_array.star --out-dir out/mounting_array
       - run: cargo run --locked -p cad-cli -- build examples/reference_fixture.star --out-dir out/reference_fixture
+      - run: cargo run --locked -p cad-cli -- build examples/modular_rack.star --out-dir out/modular_rack
       - run: cargo run --locked -p cad-cli -- select examples/reference_fixture.star --from blank --role end_cap --in finished --all
       - uses: actions/setup-node@v4
         with:
@@ -29,6 +30,7 @@ jobs:
       - run: npm run test:refresh --prefix tools/preview-check
       - run: npm run test:depth --prefix tools/preview-check
       - run: npm run test:assembly --prefix tools/preview-check
+      - run: npm run test:nested --prefix tools/preview-check
       - uses: actions/upload-artifact@v4
         with:
           name: cad-examples

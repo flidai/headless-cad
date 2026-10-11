@@ -180,11 +180,17 @@ fn render_html(
     }
     let data = script_json(data)?;
     let context = script_json(&recipe)?;
-    // Replace context last: arbitrary recipe text must never be interpreted as
-    // template syntax during a second replacement pass.
+    // Match complete template elements. Embedded JSON escapes '<', so an
+    // arbitrary label/source containing marker text cannot trigger substitution.
     Ok(include_str!("viewer.html")
-        .replace("/*SCENE_DATA*/null", &data)
-        .replace("/*RECIPE_DATA*/null", &context))
+        .replace(
+            "<script id=\"cad-scene-data\" type=\"application/json\">/*SCENE_DATA*/null</script>",
+            &format!("<script id=\"cad-scene-data\" type=\"application/json\">{data}</script>"),
+        )
+        .replace(
+            "<script id=\"cad-recipe-data\" type=\"application/json\">/*RECIPE_DATA*/null</script>",
+            &format!("<script id=\"cad-recipe-data\" type=\"application/json\">{context}</script>"),
+        ))
 }
 
 /// A deterministic isometric SVG useful in Git pull requests and build artifacts.
@@ -306,6 +312,26 @@ mod tests {
     }
 
     #[test]
+    fn embedded_json_dictionary_keys_and_template_markers_remain_data() {
+        let data = serde_json::json!({"__proto__": {"/*RECIPE_DATA*/null": "</script><script>bad()</script>"}});
+        let html = render_html(&data, None).unwrap();
+        let raw = html
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("<script id=\"cad-scene-data\" type=\"application/json\">")
+            })
+            .unwrap()
+            .strip_suffix("</script>")
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(raw).unwrap(),
+            data
+        );
+        assert!(html.contains("JSON.parse(document.getElementById('cad-scene-data').textContent)"));
+        assert!(!html.contains("<script>bad()"));
+    }
+
+    #[test]
     fn malformed_topology_returns_error() {
         let mut model = extrude_rectangle(1.0, 2.0, 3.0, Tolerance::default())
             .unwrap()
@@ -332,13 +358,15 @@ mod tests {
         };
         let html = to_html_with_recipe(&model, &recipe).unwrap();
         assert_eq!(html.matches("<script>").count(), 1);
-        assert_eq!(html.matches("</script>").count(), 1);
+        assert_eq!(html.matches("</script>").count(), 3);
         assert!(!html.contains("<img src=x"));
         let embedded = html
             .lines()
-            .find_map(|line| line.strip_prefix("let recipeContext = "))
+            .find_map(|line| {
+                line.strip_prefix("<script id=\"cad-recipe-data\" type=\"application/json\">")
+            })
             .unwrap()
-            .strip_suffix(';')
+            .strip_suffix("</script>")
             .unwrap();
         let restored: RecipeContext = serde_json::from_str(embedded).unwrap();
         assert_eq!(restored, recipe);
@@ -346,7 +374,7 @@ mod tests {
         assert!(html.contains("\\u2028\\u2029"));
         assert!(to_html(&model)
             .unwrap()
-            .contains("let recipeContext = null;"));
+            .contains("<script id=\"cad-recipe-data\" type=\"application/json\">null</script>"));
     }
 
     #[test]

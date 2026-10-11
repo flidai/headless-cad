@@ -29,7 +29,9 @@ pub(super) fn resource_limits(recipe: &Recipe) -> Result<(), BuildError> {
         }
     }
     let instances = recipe.assemblies.iter().fold(0usize, |total, assembly| {
-        total.saturating_add(assembly.instances.len())
+        total
+            .saturating_add(assembly.instances.len())
+            .saturating_add(assembly.assemblies.len())
     });
     if instances > MAX_INSTANCES {
         return Err(BuildError::ResourceLimit {
@@ -100,6 +102,17 @@ pub(super) fn validate<'a>(
                 })?;
         }
     }
+    let definitions = recipe
+        .assemblies
+        .iter()
+        .map(|definition| (definition.id.clone(), definition.clone()))
+        .collect();
+    let part_ids = recipe.parts.iter().map(|part| part.id.clone()).collect();
+    cad_assembly::validate_definitions(&part_ids, &definitions)
+        .map_err(|error| BuildError::AssemblyGraph(error.to_string()))?;
+    let mut exported_leaves = 0usize;
+    let mut exported_nodes = 0usize;
+    let mut counts = BTreeMap::new();
     for output in &recipe.assembly_outputs {
         identifier("output", &output.name)?;
         if !output_names.insert(&output.name) {
@@ -111,8 +124,38 @@ pub(super) fn validate<'a>(
                 output.name, output.assembly
             )));
         }
+        let (leaves, nodes) = expanded_counts(&output.assembly, &definitions, &mut counts);
+        exported_leaves = exported_leaves.saturating_add(leaves);
+        exported_nodes = exported_nodes.saturating_add(nodes);
+        if exported_leaves > MAX_INSTANCES || exported_nodes > MAX_INSTANCES {
+            return Err(BuildError::ResourceLimit {
+                resource: "expanded assembly outputs",
+                limit: MAX_INSTANCES,
+            });
+        }
     }
     Ok(())
+}
+
+// Called only after validate_definitions proves acyclicity and depth <=64.
+// Memoize counts without materializing the exponentially expanded occurrences.
+fn expanded_counts(
+    id: &str,
+    definitions: &BTreeMap<String, AssemblyDefinition>,
+    memo: &mut BTreeMap<String, (usize, usize)>,
+) -> (usize, usize) {
+    if let Some(count) = memo.get(id) {
+        return *count;
+    }
+    let definition = &definitions[id];
+    let mut count = (definition.instances.len(), 1usize);
+    for child in &definition.assemblies {
+        let nested = expanded_counts(&child.assembly, definitions, memo);
+        count.0 = count.0.saturating_add(nested.0);
+        count.1 = count.1.saturating_add(nested.1);
+    }
+    memo.insert(id.to_owned(), count);
+    count
 }
 
 pub(super) fn evaluate(
@@ -121,39 +164,42 @@ pub(super) fn evaluate(
     evaluated: &HashMap<String, Arc<OperationResult>>,
     tolerance: Tolerance,
 ) -> Result<BTreeMap<String, BuiltAssembly>, BuildError> {
-    let definitions: HashMap<_, _> = recipe
+    let parts: BTreeMap<_, _> = recipe
         .parts
         .iter()
-        .map(|part| (part.id.as_str(), part))
-        .collect();
-    let mut built = HashMap::new();
-    for assembly in &recipe.assemblies {
-        let mut parts = BTreeMap::new();
-        for instance in &assembly.instances {
-            parts.entry(instance.part.clone()).or_insert_with(|| {
-                let definition = definitions[instance.part.as_str()];
+        .map(|definition| {
+            (
+                definition.id.clone(),
                 BuiltPart {
                     feature_id: definition.feature.clone(),
                     content_hash: hashes[&definition.feature].clone(),
                     result: Arc::clone(&evaluated[&definition.feature]),
-                }
-            });
-        }
-        let result = BuiltAssembly::new(
-            assembly.id.clone(),
-            parts,
-            assembly.instances.clone(),
-            tolerance,
-        )
-        .map_err(|error| BuildError::Assembly {
-            assembly: assembly.id.clone(),
-            message: error.to_string(),
-        })?;
-        built.insert(assembly.id.as_str(), result);
-    }
-    Ok(recipe
-        .assembly_outputs
+                },
+            )
+        })
+        .collect();
+    let definitions: BTreeMap<_, _> = recipe
+        .assemblies
         .iter()
-        .map(|output| (output.name.clone(), built[output.assembly.as_str()].clone()))
-        .collect())
+        .map(|definition| (definition.id.clone(), definition.clone()))
+        .collect();
+    let mut built = HashMap::new();
+    let mut outputs = BTreeMap::new();
+    for output in &recipe.assembly_outputs {
+        if !built.contains_key(&output.assembly) {
+            let assembly = BuiltAssembly::from_definitions(
+                output.assembly.clone(),
+                parts.clone(),
+                definitions.clone(),
+                tolerance,
+            )
+            .map_err(|error| BuildError::Assembly {
+                assembly: output.assembly.clone(),
+                message: error.to_string(),
+            })?;
+            built.insert(output.assembly.clone(), assembly);
+        }
+        outputs.insert(output.name.clone(), built[&output.assembly].clone());
+    }
+    Ok(outputs)
 }

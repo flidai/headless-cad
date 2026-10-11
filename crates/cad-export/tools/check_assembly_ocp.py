@@ -7,7 +7,10 @@ Install cadquery-ocp in a disposable virtual environment, then run, for example:
 
 Checks imported product structure and shared definitions as well as placed geometry.
 An optional assembly JSON checks every occurrence name, part identity, and rigid
-placement against the independently imported STEP document. This is an
+placement against the independently imported STEP document. When hierarchy is
+present, checks every direct parent/child relationship, local placement, shared
+subassembly definition, and composed leaf placement recursively. --instances and
+--definitions count leaf occurrences and part definitions, respectively. This is an
 interoperability regression check, not complete STEP schema certification.
 """
 
@@ -28,6 +31,7 @@ from OCP.TDF import TDF_Label, TDF_Tool
 from OCP.TDocStd import TDocStd_Document
 from OCP.TopAbs import TopAbs_SOLID
 from OCP.TopExp import TopExp_Explorer
+from OCP.TopLoc import TopLoc_Location
 from OCP.XCAFDoc import XCAFDoc_DocumentTool
 
 try:
@@ -93,40 +97,65 @@ def main():
     tool.GetFreeShapes(roots)
     require(roots.Length() == args.roots, f"expected {args.roots} roots, got {roots.Length()}")
     definitions = {}
+    assembly_definitions = {}
     occurrences = {}
+    definition_edges = {}
     volume = 0.0
     solids = 0
     bounds = Bnd_Box()
     root_names = []
-    for root_index in range(1, roots.Length() + 1):
-        root = roots.Value(root_index)
-        require(tool.IsAssembly_s(root), "root is flattened geometry, not an assembly")
-        root_names.append(label_name(root))
+
+    def matrix(location):
+        transform = location.Transformation()
+        return [[transform.Value(row, column) for column in range(1, 5)] for row in range(1, 4)]
+
+    def walk(parent, path, placement, active):
+        identity = label_entry(parent)
+        require(identity not in active, "cyclic imported assembly")
+        assembly_definitions[identity] = label_name(parent)
         components = LabelSequence()
-        require(tool.GetComponents_s(root, components), "cannot enumerate assembly components")
+        require(tool.GetComponents_s(parent, components), "cannot enumerate assembly components")
+        names = set()
+        edges = []
         for index in range(1, components.Length() + 1):
             component = components.Value(index)
             reference = TDF_Label()
             require(tool.GetReferredShape_s(component, reference), "component has no definition reference")
-            require(not tool.IsAssembly_s(reference), "nested assembly is outside this check's scope")
-            identity = label_entry(reference)
-            definitions[identity] = label_name(reference)
             name = label_name(component)
-            require(name not in occurrences, f"duplicate occurrence name: {name}")
-            transform = tool.GetLocation_s(component).Transformation()
-            matrix = [[transform.Value(row, column) for column in range(1, 5)] for row in range(1, 4)]
-            occurrences[name] = {"definition": identity, "placement": matrix}
-            shape = tool.GetShape_s(component)
-            require(not shape.IsNull(), f"empty occurrence {name}")
-            require(BRepCheck_Analyzer(shape).IsValid(), f"invalid occurrence {name}")
-            properties = GProp_GProps()
-            BRepGProp.VolumeProperties_s(shape, properties)
-            volume += properties.Mass()
-            BRepBndLib.Add_s(shape, bounds)
-            explorer = TopExp_Explorer(shape, TopAbs_SOLID)
-            while explorer.More():
-                solids += 1
-                explorer.Next()
+            require(name not in names, f"duplicate sibling occurrence name: {name}")
+            names.add(name)
+            local = tool.GetLocation_s(component)
+            world = placement.Multiplied(local)
+            child_path = path + [name]
+            child_identity = label_entry(reference)
+            nested = tool.IsAssembly_s(reference)
+            edges.append({"id": name, "definition": child_identity,
+                          "assembly": nested, "placement": matrix(local)})
+            if nested:
+                walk(reference, child_path, world, active | {identity})
+            else:
+                definitions[child_identity] = label_name(reference)
+                key = tuple(child_path)
+                require(key not in occurrences, f"duplicate occurrence path: {child_path}")
+                occurrences[key] = {"definition": child_identity, "placement": matrix(world)}
+        definition_edges[identity] = edges
+
+    for root_index in range(1, roots.Length() + 1):
+        root = roots.Value(root_index)
+        require(tool.IsAssembly_s(root), "root is flattened geometry, not an assembly")
+        root_names.append(label_name(root))
+        walk(root, [], TopLoc_Location(), set())
+        shape = tool.GetShape_s(root)
+        require(not shape.IsNull(), "empty root shape")
+        require(BRepCheck_Analyzer(shape).IsValid(), "invalid assembly geometry")
+        properties = GProp_GProps()
+        BRepGProp.VolumeProperties_s(shape, properties)
+        volume += properties.Mass()
+        BRepBndLib.Add_s(shape, bounds)
+        explorer = TopExp_Explorer(shape, TopAbs_SOLID)
+        while explorer.More():
+            solids += 1
+            explorer.Next()
     require(len(occurrences) == args.instances, f"instance count: {len(occurrences)}")
     require(len(definitions) == args.definitions, f"shared definition count: {len(definitions)}")
     require(not bounds.IsVoid(), "no placed geometry")
@@ -148,9 +177,27 @@ def main():
                     for i in range(3)), f"geometry exceeds conservative bounds: {coordinates}")
     if expected:
         require(root_names == [expected["assembly_id"]], f"assembly names: {root_names}")
-        instances = {instance["id"]: instance for instance in expected["instances"]}
+        instances = {tuple(expected.get("instance_paths", {}).get(instance["id"], [instance["id"]])): instance for instance in expected["instances"]}
         require(len(instances) == len(expected["instances"]), "duplicate expected instance ID")
         require(instances.keys() == occurrences.keys(), "occurrence names differ from assembly JSON")
+        if "hierarchy" in expected:
+            by_name = {name: identity for identity, name in assembly_definitions.items()}
+            require(len(by_name) == len(assembly_definitions), "duplicated assembly definitions")
+            require(by_name.keys() == expected["hierarchy"].keys(), "assembly definition graph differs")
+            for name, definition in expected["hierarchy"].items():
+                actual_edges = {edge["id"]: edge for edge in definition_edges[by_name[name]]}
+                wanted_edges = [(i, False) for i in definition["instances"]] + [(i, True) for i in definition.get("assemblies", [])]
+                require(actual_edges.keys() == {i["id"] for i, _ in wanted_edges}, f"direct children differ: {name}")
+                for instance, nested in wanted_edges:
+                    edge = actual_edges[instance["id"]]
+                    require(edge["assembly"] == nested, "assembly occurrence was flattened")
+                    if nested:
+                        require(edge["definition"] == by_name[instance["assembly"]], "subassembly definition not reused")
+                    else:
+                        require(definitions[edge["definition"]] == instance["part"], "leaf part identity differs")
+                    wanted = placement_matrix(instance["transform"])
+                    require(all(close(a, b, 1e-12) for row, target in zip(edge["placement"], wanted)
+                                for a, b in zip(row, target)), f"local placement differs: {name}/{instance['id']}")
         hash_to_reference = {}
         reference_to_hash = {}
         for name, instance in instances.items():
@@ -167,9 +214,11 @@ def main():
             aliases = [part for part, data in expected["definitions"].items() if data["content_hash"] == content_hash]
             require(definitions[identity] in aliases, f"incorrect definition product name: {definitions[identity]}")
     print(json.dumps({"valid": True, "roots": root_names, "instances": len(occurrences),
-                      "definitions": definitions, "solids": solids,
+                      "definitions": definitions, "assembly_definitions": assembly_definitions, "solids": solids,
                       "material_volume_mm3": volume, "bounds_mm": coordinates,
-                      "placements_checked": bool(expected)}, indent=2))
+                      "definition_relationships": sum(map(len, definition_edges.values())),
+                      "placements_checked": bool(expected),
+                      "hierarchy_checked": bool(expected and "hierarchy" in expected)}, indent=2))
 
 
 if __name__ == "__main__":

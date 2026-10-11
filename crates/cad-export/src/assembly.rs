@@ -43,11 +43,15 @@ fn axis(step: &mut Step, transform: &RigidTransform) -> usize {
 fn product(
     step: &mut Step,
     name: &str,
+    namespace: &str,
     product_context: usize,
     definition_context: usize,
 ) -> (usize, usize) {
+    let identifier = string(&format!("{namespace}:{name}"));
     let name = string(name);
-    let product = step.add(format!("PRODUCT({name},{name},'',(#{product_context}))"));
+    let product = step.add(format!(
+        "PRODUCT({identifier},{name},'',(#{product_context}))"
+    ));
     let formation = step.add(format!("PRODUCT_DEFINITION_FORMATION('1','',#{product})"));
     let definition = step.add(format!(
         "PRODUCT_DEFINITION('design','',#{formation},#{definition_context})"
@@ -83,30 +87,42 @@ pub fn assembly_to_step(
     let uncertainty = step.add(format!("UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE({}),#{length},'distance_accuracy_value','model tolerance')",real(tolerance.linear)));
     let context = step.add(format!("(GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#{uncertainty})) GLOBAL_UNIT_ASSIGNED_CONTEXT((#{length},#{angle},#{solid_angle})) REPRESENTATION_CONTEXT('','3D'))"));
     let identity = axis(&mut step, &RigidTransform::default());
-    let placements: Vec<_> = assembly
-        .instances
-        .iter()
-        .map(|instance| axis(&mut step, &instance.transform))
-        .collect();
-    let (root_definition, root_shape) = product(
-        &mut step,
-        &assembly.assembly_id,
-        product_context,
-        definition_context,
-    );
-    let mut root_items = vec![identity];
-    root_items.extend(&placements);
-    let root_representation = step.add(format!(
-        "SHAPE_REPRESENTATION('',({}),#{context})",
-        refs(&root_items)
-    ));
-    step.add(format!(
-        "SHAPE_DEFINITION_REPRESENTATION(#{root_shape},#{root_representation})"
-    ));
+    // Keep definitions distinct from occurrences. Each assembly representation
+    // contains only its own local placements, never composed leaf placements.
+    let mut assemblies = BTreeMap::new();
+    let mut placements = BTreeMap::new();
+    for (name, definition) in &assembly.hierarchy {
+        let local: Vec<_> = definition
+            .instances
+            .iter()
+            .map(|i| &i.transform)
+            .chain(definition.assemblies.iter().map(|i| &i.transform))
+            .map(|transform| axis(&mut step, transform))
+            .collect();
+        let (product, shape) = product(
+            &mut step,
+            name,
+            "assembly",
+            product_context,
+            definition_context,
+        );
+        let mut items = vec![identity];
+        items.extend(&local);
+        let representation = step.add(format!(
+            "SHAPE_REPRESENTATION('',({}),#{context})",
+            refs(&items)
+        ));
+        step.add(format!(
+            "SHAPE_DEFINITION_REPRESENTATION(#{shape},#{representation})"
+        ));
+        assemblies.insert(name, (product, representation));
+        placements.insert(name, local);
+    }
     let mut definitions = BTreeMap::new();
     let mut geometry = BTreeMap::new();
     for (name, part) in &assembly.parts {
-        let (definition, shape) = product(&mut step, name, product_context, definition_context);
+        let (definition, shape) =
+            product(&mut step, name, "part", product_context, definition_context);
         let representation = if let Some(&cached) = geometry.get(&part.content_hash) {
             cached
         } else {
@@ -131,20 +147,34 @@ pub fn assembly_to_step(
         ));
         definitions.insert(name, (definition, representation));
     }
-    for (instance, placement) in assembly.instances.iter().zip(placements) {
-        let (definition, representation) = definitions[&instance.part];
-        let name = string(&instance.id);
-        let occurrence = step.add(format!("NEXT_ASSEMBLY_USAGE_OCCURRENCE({name},{name},'',#{root_definition},#{definition},{name})"));
-        let usage_shape = step.add(format!(
-            "PRODUCT_DEFINITION_SHAPE('Placement','',#{occurrence})"
-        ));
-        let transformation = step.add(format!(
-            "ITEM_DEFINED_TRANSFORMATION('','',#{identity},#{placement})"
-        ));
-        let relationship = step.add(format!("(REPRESENTATION_RELATIONSHIP('','',#{representation},#{root_representation}) REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(#{transformation}) SHAPE_REPRESENTATION_RELATIONSHIP())"));
-        step.add(format!(
-            "CONTEXT_DEPENDENT_SHAPE_REPRESENTATION(#{relationship},#{usage_shape})"
-        ));
+    for (parent, definition) in &assembly.hierarchy {
+        let (parent_definition, parent_representation) = assemblies[parent];
+        let children = definition
+            .instances
+            .iter()
+            .map(|i| (&i.id, definitions[&i.part]))
+            .chain(
+                definition
+                    .assemblies
+                    .iter()
+                    .map(|i| (&i.id, assemblies[&i.assembly])),
+            );
+        for ((name, (child_definition, child_representation)), placement) in
+            children.zip(&placements[parent])
+        {
+            let name = string(name);
+            let occurrence = step.add(format!("NEXT_ASSEMBLY_USAGE_OCCURRENCE({name},{name},'',#{parent_definition},#{child_definition},{name})"));
+            let usage_shape = step.add(format!(
+                "PRODUCT_DEFINITION_SHAPE('Placement','',#{occurrence})"
+            ));
+            let transformation = step.add(format!(
+                "ITEM_DEFINED_TRANSFORMATION('','',#{identity},#{placement})"
+            ));
+            let relationship = step.add(format!("(REPRESENTATION_RELATIONSHIP('','',#{child_representation},#{parent_representation}) REPRESENTATION_RELATIONSHIP_WITH_TRANSFORMATION(#{transformation}) SHAPE_REPRESENTATION_RELATIONSHIP())"));
+            step.add(format!(
+                "CONTEXT_DEPENDENT_SHAPE_REPRESENTATION(#{relationship},#{usage_shape})"
+            ));
+        }
     }
     let mut output = String::from("ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('headless-cad instanced planar assembly'),'2;1');\nFILE_NAME('assembly.step','1970-01-01T00:00:00',(''),(''),'headless-cad','headless-cad','');\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN'));\nENDSEC;\nDATA;\n");
     for (index, entity) in step.entities.iter().enumerate() {
@@ -296,6 +326,77 @@ mod tests {
         assert!((max[0] - (10. + 2. * std::f64::consts::FRAC_1_SQRT_2)).abs() < 1e-12);
         assert!((max[1] - 5. * std::f64::consts::FRAC_1_SQRT_2).abs() < 1e-12);
         assert_eq!(max[2], 4.);
+    }
+
+    #[test]
+    fn step_retains_shared_nested_definitions_and_local_noncommuting_rotations() {
+        use cad_assembly::{AssemblyDefinition, AssemblyInstance};
+        let flat = two_instances();
+        let q = std::f64::consts::FRAC_1_SQRT_2;
+        let local = RigidTransform {
+            translation: [1., 2., 3.],
+            rotation: [q, 0., 0., q],
+        };
+        let root = AssemblyDefinition {
+            id: "root".into(),
+            instances: vec![],
+            assemblies: vec![
+                AssemblyInstance {
+                    id: "left".into(),
+                    assembly: "block".into(),
+                    transform: RigidTransform::default(),
+                },
+                AssemblyInstance {
+                    id: "right".into(),
+                    assembly: "block".into(),
+                    transform: RigidTransform {
+                        translation: [20., 0., 0.],
+                        rotation: [0., q, 0., q],
+                    },
+                },
+            ],
+        };
+        // Deliberately share the textual ID with a part: they occupy different namespaces.
+        let module = AssemblyDefinition {
+            id: "block".into(),
+            instances: vec![Instance {
+                id: "leaf".into(),
+                part: "block".into(),
+                transform: local,
+            }],
+            assemblies: vec![],
+        };
+        let assembly = BuiltAssembly::from_definitions(
+            "root".into(),
+            flat.parts,
+            BTreeMap::from([("root".into(), root), ("block".into(), module)]),
+            Tolerance::default(),
+        )
+        .unwrap();
+        let step = assembly_to_step(&assembly, Tolerance::default()).unwrap();
+        assert_eq!(
+            step,
+            assembly_to_step(&assembly, Tolerance::default()).unwrap()
+        );
+        assert_eq!(step.matches("PRODUCT(").count(), 3);
+        assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 3);
+        assert_eq!(step.matches("FACETED_BREP('").count(), 1);
+        assert!(step.contains("PRODUCT('assembly:block','block'"));
+        assert!(step.contains("PRODUCT('part:block','block'"));
+        assert_eq!(
+            step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE('leaf'")
+                .count(),
+            1
+        );
+        assert!(step.contains("CARTESIAN_POINT('',(1.,2.,3.))"));
+        assert!(step.contains("CARTESIAN_POINT('',(20.,0.,0.))"));
+        assert_eq!(assembly.instance_count(), 2);
+        assert!((assembly.material_volume() - 48.).abs() < 1e-12);
+        let second = &assembly.instances[1];
+        let placed = second.transform.point([2., 3., 4.]);
+        for (actual, expected) in placed.into_iter().zip([26., -2., -3.]) {
+            assert!((actual - expected).abs() < 1e-12);
+        }
     }
 
     #[test]

@@ -166,6 +166,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Value {
             "material_volume_mm3": assembly.material_volume(),
             "volume_kind": "summed_instance_material_not_union",
             "definitions": assembly.parts.len(),
+            "assembly_definitions": assembly.hierarchy.len(),
             "instances": assembly.instance_count(),
             "topology": { "solids": assembly.solid_count() },
             "validation": { "valid": true, "scope": "individual definitions and rigid placements; interference not checked" },
@@ -413,6 +414,20 @@ fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn
     }
     // Typed placement parsing and count checks precede any referenced asset I/O.
     let instances = serde_json::from_value(raw["instances"].clone())?;
+    let hierarchy: BTreeMap<String, cad_assembly::AssemblyDefinition> =
+        serde_json::from_value(raw["hierarchy"].clone())?;
+    let instance_paths: BTreeMap<String, Vec<String>> =
+        serde_json::from_value(raw["instance_paths"].clone())?;
+    if hierarchy.len() > cad_build::MAX_ASSEMBLIES
+        || instance_paths.len() > cad_build::MAX_INSTANCES
+        || hierarchy.values().fold(0usize, |total, definition| {
+            total
+                .saturating_add(definition.instances.len())
+                .saturating_add(definition.assemblies.len())
+        }) > cad_build::MAX_INSTANCES
+    {
+        return Err("assembly hierarchy exceeds definition or occurrence count limit".into());
+    }
     let tolerance = serde_json::from_value(raw["tolerance"].clone())?;
     let root = path.parent().unwrap_or(Path::new(".")).canonicalize()?;
     let mut assets: BTreeMap<PathBuf, std::sync::Arc<cad_kernel::OperationResult>> =
@@ -447,6 +462,8 @@ fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn
         content_hash: text(&raw["content_hash"])?,
         parts,
         instances,
+        hierarchy,
+        instance_paths,
     };
     assembly.validate(tolerance)?;
     fn measured(value: &Value, expected: f64, field: &str) -> Result<(), Box<dyn Error>> {
@@ -493,6 +510,7 @@ fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn
     Ok(json!({
         "validation": {"valid": true, "scope": "individual definitions, rigid placements and measured metadata; interference and display proxy content not checked"},
         "instances": assembly.instance_count(), "definitions": assembly.parts.len(),
+        "assembly_definitions": assembly.hierarchy.len(),
         "material_volume_mm3": assembly.material_volume(), "bounds_mm": assembly.bounds(),
         "bounds_kind": "conservative_axis_aligned", "volume_kind": "summed_instance_material_not_union",
     }))
@@ -751,6 +769,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 "assembly_id": assembly.assembly_id, "content_hash": assembly.content_hash,
                 "tolerance": recipe.tolerance.unwrap_or_default(),
                 "definitions": definitions, "instances": assembly.instances,
+                "hierarchy": assembly.hierarchy, "instance_paths": assembly.instance_paths,
                 "bounds_mm": assembly.bounds(), "bounds_kind": "conservative_axis_aligned",
                 "material_volume_mm3": assembly.material_volume(),
                 "volume_kind": "summed_instance_material_not_union",

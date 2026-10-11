@@ -18,6 +18,73 @@ fn example(name: &str) -> String {
 }
 
 #[test]
+fn nested_rack_exports_hierarchy_shared_assets_and_validated_leaf_paths() {
+    let directory = tempfile::tempdir().unwrap();
+    let output = directory.path().join("rack");
+    let built = cli(&[
+        "build",
+        &example("modular_rack.star"),
+        "--out-dir",
+        output.to_str().unwrap(),
+    ]);
+    assert!(
+        built.status.success(),
+        "{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let summary: serde_json::Value = serde_json::from_slice(&built.stdout).unwrap();
+    let assembly = &summary["outputs"]["modular_rack"];
+    assert_eq!(assembly["instances"], 17);
+    assert_eq!(assembly["definitions"], 4);
+    assert_eq!(assembly["assembly_definitions"], 3);
+    assert!((assembly["material_volume_mm3"].as_f64().unwrap() - 63648.0).abs() < 1e-7);
+    let manifest_path = output.join("modular_rack.assembly.json");
+    let original: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    assert_eq!(
+        original["hierarchy"]["row"]["assemblies"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let path = serde_json::json!(["rear", "carriage_b", "guide_right"]);
+    let key = serde_json::to_string(&path).unwrap();
+    assert_eq!(original["instance_paths"][&key], path);
+    let display: serde_json::Value =
+        serde_json::from_slice(&fs::read(output.join("modular_rack.display.json")).unwrap())
+            .unwrap();
+    assert_eq!(display["meshes"].as_object().unwrap().len(), 4);
+    assert_eq!(display["instance_paths"], original["instance_paths"]);
+    let step = fs::read_to_string(output.join("modular_rack.step")).unwrap();
+    assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 9);
+    assert_eq!(step.matches("FACETED_BREP('").count(), 4);
+    let valid = cli(&["validate", manifest_path.to_str().unwrap()]);
+    assert!(
+        valid.status.success(),
+        "{}",
+        String::from_utf8_lossy(&valid.stderr)
+    );
+    for mutation in 0..3 {
+        let mut damaged = original.clone();
+        match mutation {
+            0 => damaged["instance_paths"][&key] = serde_json::json!(["wrong", "path"]),
+            1 => {
+                damaged["hierarchy"]["rack"]["assemblies"][0]["transform"]["translation"][0] =
+                    serde_json::json!(10)
+            }
+            _ => damaged["instances"][0]["transform"]["translation"][0] = serde_json::json!(1000),
+        }
+        fs::write(&manifest_path, serde_json::to_vec(&damaged).unwrap()).unwrap();
+        let rejected = cli(&["validate", manifest_path.to_str().unwrap()]);
+        assert!(
+            !rejected.status.success(),
+            "accepted inconsistent nested manifest mutation {mutation}"
+        );
+    }
+}
+
+#[test]
 fn starlark_build_writes_expected_geometry_and_manifest() {
     let dir = tempfile::tempdir().unwrap();
     let result = cli(&[
@@ -521,9 +588,11 @@ fn comment_only_edit_updates_exact_recipe_and_preview_without_geometry_change() 
     let embedded_context = |html: &str| -> serde_json::Value {
         let json = html
             .lines()
-            .find_map(|line| line.strip_prefix("let recipeContext = "))
+            .find_map(|line| {
+                line.strip_prefix("<script id=\"cad-recipe-data\" type=\"application/json\">")
+            })
             .unwrap()
-            .trim_end_matches(';');
+            .trim_end_matches("</script>");
         serde_json::from_str(json).unwrap()
     };
     let first_context = embedded_context(&first_html);

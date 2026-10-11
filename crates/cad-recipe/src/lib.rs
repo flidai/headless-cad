@@ -77,6 +77,47 @@ fn number(value: Value<'_>) -> anyhow::Result<f64> {
     Ok(number)
 }
 
+fn register_instance(
+    id: &str,
+    reference_key: &str,
+    reference: &str,
+    offset: Option<Value>,
+    rotation: Option<Value>,
+    eval: &mut Evaluator,
+) -> anyhow::Result<String> {
+    let translation: [f64; 3] = match offset {
+        Some(value) => serde_json::from_str(&value.to_json()?).map_err(|_| {
+            anyhow::anyhow!("instance offset must contain exactly three finite lengths")
+        })?,
+        None => [0.0; 3],
+    };
+    let rotation: [f64; 4] = match rotation {
+        Some(value) => serde_json::from_str(&value.to_json()?).map_err(|_| {
+            anyhow::anyhow!("instance rotation must be a unit quaternion [x,y,z,w]")
+        })?,
+        None => [0.0, 0.0, 0.0, 1.0],
+    };
+    let transform = cad_build::RigidTransform {
+        translation,
+        rotation,
+    };
+    transform
+        .validate()
+        .map_err(|error| anyhow::anyhow!("instance '{id}': {error}"))?;
+    let graph = store(eval)?;
+    let mut instances = graph.instances.borrow_mut();
+    anyhow::ensure!(
+        instances.len() < MAX_INSTANCES,
+        "recipe exceeds {MAX_INSTANCES} instances"
+    );
+    anyhow::ensure!(!instances.contains_key(id), "duplicate instance ID '{id}'");
+    instances.insert(
+        id.to_owned(),
+        serde_json::json!({"id":id,reference_key:reference,"transform":transform}),
+    );
+    Ok(id.to_owned())
+}
+
 #[starlark_module]
 fn cad_functions(builder: &mut GlobalsBuilder) {
     /// Millimetre annotation. Dimension-aware arithmetic is not implemented yet.
@@ -256,41 +297,21 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         rotation: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        let translation: [f64; 3] = match offset {
-            Some(value) => serde_json::from_str(&value.to_json()?).map_err(|_| {
-                anyhow::anyhow!("instance offset must contain exactly three finite lengths")
-            })?,
-            None => [0.0; 3],
-        };
-        let rotation: [f64; 4] = match rotation {
-            Some(value) => serde_json::from_str(&value.to_json()?).map_err(|_| {
-                anyhow::anyhow!("instance rotation must be a unit quaternion [x,y,z,w]")
-            })?,
-            None => [0.0, 0.0, 0.0, 1.0],
-        };
-        let transform = cad_build::RigidTransform {
-            translation,
-            rotation,
-        };
-        transform
-            .validate()
-            .map_err(|error| anyhow::anyhow!("instance '{id}': {error}"))?;
-        let graph = store(eval)?;
-        let mut instances = graph.instances.borrow_mut();
-        anyhow::ensure!(
-            instances.len() < MAX_INSTANCES,
-            "recipe exceeds {MAX_INSTANCES} instances"
-        );
-        anyhow::ensure!(!instances.contains_key(id), "duplicate instance ID '{id}'");
-        instances.insert(
-            id.to_owned(),
-            serde_json::json!({"id":id,"part":part,"transform":transform}),
-        );
-        Ok(id.to_owned())
+        register_instance(id, "part", part, offset, rotation, eval)
     }
 
-    /// Collect named instances into a flat assembly. Nested assemblies are a
-    /// future schema extension; each current instance references a part.
+    /// Place an assembly definition without duplicating its parts or geometry.
+    fn assembly_instance(
+        id: &str,
+        assembly: &str,
+        offset: Option<Value>,
+        rotation: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        register_instance(id, "assembly", assembly, offset, rotation, eval)
+    }
+
+    /// Collect part and nested assembly instances into a reusable definition.
     fn assembly(id: &str, instances: Value, eval: &mut Evaluator) -> anyhow::Result<String> {
         let ids: Vec<String> = serde_json::from_str(&instances.to_json()?)
             .map_err(|_| anyhow::anyhow!("assembly instances must be a list of instance IDs"))?;
@@ -307,24 +328,32 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         );
         let records = graph.instances.borrow();
         let mut seen = BTreeSet::new();
-        let mut embedded = Vec::with_capacity(ids.len());
+        let mut embedded = Vec::new();
+        let mut nested = Vec::new();
         for instance in &ids {
             anyhow::ensure!(
                 seen.insert(instance),
                 "assembly '{id}' repeats instance ID '{instance}'"
             );
-            embedded.push(
-                records
-                    .get(instance)
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("assembly '{id}' references unknown instance '{instance}'")
-                    })?
-                    .clone(),
-            );
+            let record = records
+                .get(instance)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("assembly '{id}' references unknown instance '{instance}'")
+                })?
+                .clone();
+            if record.get("assembly").is_some() {
+                nested.push(record);
+            } else {
+                embedded.push(record);
+            }
         }
         graph.used_instances.borrow_mut().extend(ids);
         *graph.embedded_instances.borrow_mut() = count;
-        assemblies.push(serde_json::json!({"id":id,"instances":embedded}));
+        let mut definition = serde_json::json!({"id":id,"instances":embedded});
+        if !nested.is_empty() {
+            definition["assemblies"] = serde_json::json!(nested);
+        }
+        assemblies.push(definition);
         Ok(id.to_owned())
     }
 
@@ -774,5 +803,71 @@ output(name='part',feature=moved)
             from_starlark("legacy.star", MODEL).unwrap().schema_version,
             1
         );
+    }
+}
+
+#[cfg(test)]
+mod nested_assembly_tests {
+    use super::*;
+    const NESTED: &str = r#"
+gap = param(name="gap", default=30)
+p = rectangle(id="p", width=2, depth=3)
+b = extrude(id="b", profile=p, height=4)
+d = part(id="block", body=b)
+leaf = assembly(id="module", instances=[instance(id="bolt", part=d, offset=[1,0,0])])
+mid = assembly(id="mid", instances=[assembly_instance(id="inner", assembly=leaf, offset=[0,5,0], rotation=[0,0,1,0])])
+a = assembly_instance(id="left", assembly=mid)
+b = assembly_instance(id="right", assembly=mid, offset=[gap,0,0])
+assembly_output(name="pair", assembly=assembly(id="pair",instances=[a,b]))
+"#;
+    #[test]
+    fn nested_starlark_roundtrip_keeps_paths_and_placement_only_cache_hits() {
+        let recipe = from_starlark("nested.star", NESTED).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        assert_eq!(recipe.assemblies[2].assemblies.len(), 2);
+        assert!(recipe.assemblies[2].instances.is_empty());
+        let decoded: Recipe =
+            serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+        let mut engine = cad_build::BuildEngine::default();
+        let first = engine.build(&decoded).unwrap();
+        let assembly = &first.assemblies["pair"];
+        assert_eq!(assembly.instance_count(), 2);
+        assert_eq!(assembly.parts.len(), 1);
+        assert_eq!(assembly.material_volume(), 48.0);
+        assert_eq!(assembly.bounds().unwrap().min, [-3.0, 2.0, 0.0]);
+        assert_eq!(assembly.bounds().unwrap().max, [29.0, 5.0, 4.0]);
+        let modified = from_starlark_with_params(
+            "nested.star",
+            NESTED,
+            &BTreeMap::from([("gap".into(), 40.0)]),
+        )
+        .unwrap();
+        let moved = engine.build(&modified).unwrap();
+        assert_eq!(moved.stats.computed_solids, 0);
+        assert_eq!(first.feature_hashes, moved.feature_hashes);
+        assert_ne!(assembly.content_hash, moved.assemblies["pair"].content_hash);
+    }
+    #[test]
+    fn nested_instance_registry_rejects_bad_shapes_duplicates_and_discarded_records() {
+        for source in [
+            "assembly_instance(id='a',assembly='module')",
+            "assembly_instance(id='a',assembly='module',offset=[])",
+            "assembly_instance(id='a',assembly='module',rotation=[0,0,0,0])",
+            "instance(id='a',part='p')\nassembly_instance(id='a',assembly='module')",
+        ] {
+            assert!(from_starlark("bad.star", source).is_err(), "{source}");
+        }
+        let recipe = from_starlark(
+            "missing.star",
+            "a=assembly_instance(id='a',assembly='missing')\nassembly(id='root',instances=[a])",
+        )
+        .unwrap();
+        assert!(cad_build::build(&recipe).is_err());
+        let recipe = from_starlark(
+            "cycle.star",
+            "a=assembly_instance(id='a',assembly='root')\nassembly(id='root',instances=[a])",
+        )
+        .unwrap();
+        assert!(cad_build::build(&recipe).is_err());
     }
 }

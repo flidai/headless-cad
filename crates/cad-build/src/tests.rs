@@ -497,6 +497,7 @@ fn assembly_recipe() -> Recipe {
         feature: "plate".into(),
     }];
     input.assemblies = vec![AssemblyDefinition {
+        assemblies: vec![],
         id: "pair".into(),
         instances: vec![
             Instance {
@@ -661,4 +662,166 @@ fn assembly_references_duplicates_types_and_output_collisions_are_rejected() {
             ..
         })
     ));
+}
+
+fn nested_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({
+        "schema_version":2,"units":"mm",
+        "features":[{"op":"rectangle","id":"p","width":2,"depth":3},{"op":"extrude","id":"body","profile":"p","height":4}],
+        "parts":[{"id":"part","feature":"body"}],
+        "assemblies":[
+            {"id":"leaf","instances":[{"id":"bolt","part":"part","transform":{"translation":[1,0,0]}}]},
+            {"id":"mid","instances":[],"assemblies":[{"id":"inner","assembly":"leaf","transform":{"translation":[0,5,0],"rotation":[0,0,std::f64::consts::FRAC_1_SQRT_2,std::f64::consts::FRAC_1_SQRT_2]}}]},
+            {"id":"root","instances":[],"assemblies":[
+                {"id":"left","assembly":"mid","transform":{"translation":[10,0,0],"rotation":[0,0,1,0]}},
+                {"id":"right","assembly":"mid","transform":{"translation":[30,0,0]}}
+            ]}
+        ],"assembly_outputs":[{"name":"assembly","assembly":"root"}]
+    })).unwrap()
+}
+
+#[test]
+fn nested_placements_compose_noncommuting_frames_and_reuse_exact_geometry() {
+    let mut recipe = nested_recipe();
+    let mut engine = BuildEngine::default();
+    let first = engine.build(&recipe).unwrap();
+    let assembly = &first.assemblies["assembly"];
+    assert_eq!(assembly.parts.len(), 1);
+    assert_eq!(assembly.instances.len(), 2);
+    assert_eq!(assembly.hierarchy.len(), 3);
+    assert_eq!(assembly.material_volume(), 48.0);
+    let paths: std::collections::BTreeSet<_> = assembly.instance_paths.values().cloned().collect();
+    assert_eq!(
+        paths,
+        std::collections::BTreeSet::from([
+            vec!["left".to_owned(), "inner".to_owned(), "bolt".to_owned()],
+            vec!["right".to_owned(), "inner".to_owned(), "bolt".to_owned()]
+        ])
+    );
+    let bounds = assembly.bounds().unwrap();
+    for axis in 0..3 {
+        assert!((bounds.min[axis] - [10.0, -8.0, 0.0][axis]).abs() < 1e-12);
+        assert!((bounds.max[axis] - [30.0, 8.0, 4.0][axis]).abs() < 1e-12);
+    }
+    recipe.assemblies[2].assemblies[1].transform.translation[0] = 40.0;
+    let changed = engine.build(&recipe).unwrap();
+    assert_eq!(changed.stats.computed_solids, 0);
+    assert_eq!(first.feature_hashes, changed.feature_hashes);
+    assert_ne!(
+        assembly.content_hash,
+        changed.assemblies["assembly"].content_hash
+    );
+    assert!(Arc::ptr_eq(
+        &assembly.parts["part"].result,
+        &changed.assemblies["assembly"].parts["part"].result
+    ));
+    let roundtrip: Recipe = serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+    assert_eq!(
+        build(&roundtrip).unwrap().assemblies["assembly"].content_hash,
+        changed.assemblies["assembly"].content_hash
+    );
+}
+
+#[test]
+fn nested_invalid_references_cycles_and_expansion_are_rejected_before_geometry() {
+    let mut recipe = nested_recipe();
+    if let Feature::Rectangle { width, .. } = &mut recipe.features[0] {
+        *width = 1e308;
+    }
+    recipe.assemblies.push(AssemblyDefinition {
+        id: "orphan".into(),
+        instances: vec![],
+        assemblies: vec![AssemblyInstance {
+            id: "self".into(),
+            assembly: "orphan".into(),
+            transform: Default::default(),
+        }],
+    });
+    assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+    recipe.assemblies[3].assemblies[0].assembly = "missing".into();
+    assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+    let mut recipe = nested_recipe();
+    recipe.assemblies[0].assemblies.push(AssemblyInstance {
+        id: "bolt".into(),
+        assembly: "mid".into(),
+        transform: Default::default(),
+    });
+    assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+    let mut recipe = nested_recipe();
+    recipe.assemblies.truncate(1);
+    for level in 1..19 {
+        let previous = if level == 1 {
+            "leaf".to_owned()
+        } else {
+            format!("level{}", level - 1)
+        };
+        recipe.assemblies.push(AssemblyDefinition {
+            id: format!("level{level}"),
+            instances: vec![],
+            assemblies: vec![
+                AssemblyInstance {
+                    id: "a".into(),
+                    assembly: previous.clone(),
+                    transform: Default::default(),
+                },
+                AssemblyInstance {
+                    id: "b".into(),
+                    assembly: previous,
+                    transform: Default::default(),
+                },
+            ],
+        });
+    }
+    recipe.assembly_outputs[0].assembly = "leaf".into(); // Invalid unreachable graph still rejected.
+    assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+}
+
+#[test]
+fn nested_depth_and_aggregate_export_expansion_have_preflight_limits() {
+    let mut recipe = nested_recipe();
+    recipe.assemblies.truncate(1);
+    for level in 1..=65 {
+        let previous = if level == 1 {
+            "leaf".to_owned()
+        } else {
+            format!("level{}", level - 1)
+        };
+        recipe.assemblies.push(AssemblyDefinition {
+            id: format!("level{level}"),
+            instances: vec![],
+            assemblies: vec![AssemblyInstance {
+                id: "child".into(),
+                assembly: previous,
+                transform: Default::default(),
+            }],
+        });
+    }
+    recipe.assembly_outputs[0].assembly = "leaf".into();
+    assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+    recipe.assemblies.truncate(16);
+    for definition in &mut recipe.assemblies[1..] {
+        let mut sibling = definition.assemblies[0].clone();
+        sibling.id = "sibling".into();
+        definition.assemblies.push(sibling);
+    }
+    recipe.assembly_outputs = vec![
+        AssemblyOutput {
+            name: "one".into(),
+            assembly: "level15".into(),
+        },
+        AssemblyOutput {
+            name: "two".into(),
+            assembly: "level15".into(),
+        },
+    ];
+    assert!(matches!(
+        build(&recipe),
+        Err(BuildError::ResourceLimit {
+            resource: "expanded assembly outputs",
+            ..
+        })
+    ));
+    let mut raw = serde_json::to_value(nested_recipe()).unwrap();
+    raw["assemblies"][1]["assemblies"][0]["part"] = "part".into();
+    assert!(serde_json::from_value::<Recipe>(raw).is_err());
 }

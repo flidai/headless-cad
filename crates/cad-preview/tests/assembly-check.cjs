@@ -80,7 +80,31 @@ function fixture(){
   manifest.recipe_context_hash=commentRecipe.recipe_context_hash;currentHtml=render(nextRaw,commentRecipe);
   await live.waitForFunction(()=>recipeContext.source.includes('# comment only'));
   assert.equal(await live.evaluate(()=>selectedInstance),'rotated','source-only edits preserve occurrence selection');
+  // JSON dictionary keys are data, including __proto__; exercise both initial
+  // document parsing and refreshed snapshots with flat and hierarchical paths.
+  const protoRaw=structuredClone(nextRaw),protoRecipe={...nextRecipe,content_hash:'proto-v1',recipe_context_hash:'proto-source-v1'};
+  protoRaw.definitions=Object.fromEntries([['__proto__',{mesh:'shared',feature_id:'prototype-part'}]]);
+  protoRaw.instances=protoRaw.instances.map((item,index)=>({...item,id:index===0?'__proto__':JSON.stringify(['__proto__',String(index)]),part:'__proto__'}));
+  protoRaw.instance_paths=Object.fromEntries(protoRaw.instances.map((item,index)=>[item.id,index===0?['__proto__']:['__proto__',String(index)]]));
+  protoRecipe.parameters=Object.fromEntries([['__proto__',37]]);
+  protoRaw.content_hash='proto-v1';currentHtml=render(protoRaw,protoRecipe);
+  manifest={outputs:{fixture:{content_hash:'proto-v1'}},recipe_context_hash:'proto-source-v1'};
+  await live.reload();
+  await live.waitForFunction(()=>recipeContext.content_hash==='proto-v1'&&scene.faces.length===18);
+  assert.equal(await live.evaluate(()=>Object.hasOwn(compactScene.definitions,'__proto__')),true);
+  assert.equal(await live.evaluate(()=>Object.hasOwn(scene.instance_paths,'__proto__')),true);
+  assert.equal(await live.evaluate(()=>recipeContext.parameters.__proto__),37);
+  await live.locator('#occurrence-select').selectOption('__proto__');
+  assert.match(await live.locator('#selection').textContent(),/Occurrence: __proto__/);
+  protoRaw.content_hash='proto-v2';protoRecipe.content_hash='proto-v2';protoRecipe.recipe_context_hash='proto-source-v2';protoRecipe.parameters.__proto__=41;
+  protoRaw.instances[0].transform.translation[0]+=1;
+  currentHtml=render(protoRaw,protoRecipe);manifest={outputs:{fixture:{content_hash:'proto-v2'}},recipe_context_hash:'proto-source-v2'};
+  await live.waitForFunction(()=>recipeContext.content_hash==='proto-v2');
+  assert.equal(await live.evaluate(()=>Object.hasOwn(compactScene.definitions,'__proto__')),true);
+  assert.equal(await live.evaluate(()=>recipeContext.parameters.__proto__),41);
+  assert.equal(await live.evaluate(()=>occurrenceLabel(JSON.stringify(['__proto__','1']))), '"__proto__" / "1"');
   assert.deepEqual(errors,[]);
+  result.prototypeKeysInitialAndRefresh=true;
   result.compactRefresh=true;result.failedGenerationPreserved=true;result.sourceOnlySelectionPreserved=true;
   console.log(JSON.stringify(result));
  }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));fs.rmSync(dir,{recursive:true,force:true})}

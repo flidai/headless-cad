@@ -112,9 +112,9 @@ window system, network, or language-model provider is permitted.
 
 The geometric topology is not necessarily a DAG: boundary loops and incidence
 are inherently cyclic. Constraints also form graphs with loops. An assembly is
-not a Boolean union of its parts. The fixture, enclosure, and mounting-array examples now use explicit flat part
-instances. Older examples can still use disjoint unions; nested instances, joints,
-and datums remain target work.
+not a Boolean union of its parts. Fixtures and enclosures use explicit part
+instances; the modular rack reuses nested rows and carriages. Older examples can
+still use disjoint unions. Joints and datums remain target work.
 
 ## Authoring and AI-native execution
 
@@ -381,10 +381,10 @@ reviewed decision based on evidence, not by relabeling missed targets.
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
 | Kernel | Validated orthogonal B-rep; rectangular extrusion; translation; Booleans | General geometry, robust intersections, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, flat rigid instances, shared assets and occurrence-aware STEP | Nested instances, datums, constraints, configurations, BOM |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, explicit paths, shared assets and hierarchical STEP | Datums, constraints, configurations, BOM |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, depth-buffer Canvas inspection, compact instanced display assets, occurrence picking, recipe panel, live refresh | GPU instancing, lazy assets, bounded LOD streaming, sections/overlays |
-| Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, nested assembly fidelity, AP242 PMI support, loss reporting |
+| Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
 | Engineering | Volume/bounds and validation reports | Sketch/assembly solving, drawings, GD&T, material/mass/BOM workflows |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).

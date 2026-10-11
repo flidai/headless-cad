@@ -26,6 +26,8 @@ struct AssemblyScene {
     meshes: BTreeMap<String, Scene>,
     definitions: BTreeMap<String, Definition>,
     instances: Vec<Instance>,
+    instance_paths: BTreeMap<String, Vec<String>>,
+    assembly_definitions: usize,
     bounds: Option<[[f64; 3]; 2]>,
     material_volume: f64,
     solids: usize,
@@ -115,6 +117,8 @@ fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewErro
         meshes,
         definitions,
         instances: assembly.instances.clone(),
+        instance_paths: assembly.instance_paths.clone(),
+        assembly_definitions: assembly.hierarchy.len(),
         bounds,
         material_volume,
         solids: assembly.solid_count(),
@@ -300,9 +304,11 @@ mod tests {
         let html = to_assembly_html(&assembly, &context).unwrap();
         let raw = html
             .lines()
-            .find_map(|line| line.strip_prefix("let scene = "))
+            .find_map(|line| {
+                line.strip_prefix("<script id=\"cad-scene-data\" type=\"application/json\">")
+            })
             .unwrap()
-            .trim_end_matches(';');
+            .trim_end_matches("</script>");
         let value: serde_json::Value = serde_json::from_str(raw).unwrap();
         assert!(value.get("faces").is_none());
         assert_eq!(value["meshes"].as_object().unwrap().len(), 1);

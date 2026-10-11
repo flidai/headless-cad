@@ -38,7 +38,7 @@ function fixture() {
 (async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(),'cad-depth-'));
   const file = path.join(directory,'occlusion.preview.html');
-  fs.writeFileSync(file,fs.readFileSync(path.join(root,'crates/cad-preview/src/viewer.html'),'utf8').replace('/*SCENE_DATA*/null',JSON.stringify(fixture())));
+  fs.writeFileSync(file,fs.readFileSync(path.join(root,'crates/cad-preview/src/viewer.html'),'utf8').replace('/*SCENE_DATA*/null',JSON.stringify(fixture())).replace('/*RECIPE_DATA*/null','null'));
   const browser = await chromium.launch({headless:true,executablePath:process.env.CAD_BROWSER || undefined,args:['--no-sandbox']});
   try {
     const page = await browser.newPage({viewport:{width:1100,height:850},deviceScaleFactor:2});

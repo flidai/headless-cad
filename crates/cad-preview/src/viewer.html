@@ -9,10 +9,12 @@ main.recipe-open{grid-template-columns:minmax(0,1fr) minmax(340px,440px)}#recipe
 </style>
 <header><b>HEADLESS CAD</b><span>/ model inspector</span><span class="badge">LOCAL ARTIFACT</span></header>
 <main><div class="viewport"><canvas id="view" tabindex="0" aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, click a face to inspect. Use view buttons for keyboard access."></canvas><div class="toolbar"><button data-view="iso">Isometric</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Right</button><button id="fit">Fit</button><button id="edges" aria-pressed="true">Edges</button><button id="recipe-toggle" aria-expanded="false" aria-controls="recipe-panel">Recipe</button></div><div class="hint">Drag to orbit · Scroll to zoom · Click to inspect a face</div></div><aside><h1>Model overview</h1><div class="muted">Boundary representation<br>All dimensions in millimetres</div><section id="recipe-panel" class="section" aria-labelledby="recipe-heading" hidden><h2 id="recipe-heading">Recipe source</h2><div id="recipe-summary" class="muted"></div><dl id="recipe-parameters"></dl><pre id="recipe-source" tabindex="0" aria-label="Read-only recipe source"></pre></section><div id="occurrences-section" class="section" hidden><h2>Assembly occurrences</h2><select id="occurrence-select" aria-label="Select assembly occurrence" style="width:100%;padding:8px;border:1px solid #d7dfd8;border-radius:6px;background:white"></select><p class="muted">Material volume sums occurrences, including overlaps. Bounds conservatively enclose transformed local bounds. Software display expands shared meshes only while drawing.</p></div><div class="section"><h2>Geometry</h2><dl id="geometry"></dl></div><div class="section"><h2>Dimensions</h2><dl id="dimensions"></dl></div><div class="section"><h2>Face inspector</h2><div id="selection" aria-live="polite">Select a face in the viewport.</div></div><footer>This preview is generated from the model's face boundaries. Use the build manifest for validation results and STEP for CAD interchange.</footer></aside></main>
+<script id="cad-scene-data" type="application/json">/*SCENE_DATA*/null</script>
+<script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
 <script>
 'use strict';
-let scene = /*SCENE_DATA*/null;
-let recipeContext = /*RECIPE_DATA*/null;
+let scene = JSON.parse(document.getElementById('cad-scene-data').textContent);
+let recipeContext = JSON.parse(document.getElementById('cad-recipe-data').textContent);
 function validBody(body){
  const vector=value=>Array.isArray(value)&&value.length===3&&value.every(Number.isFinite);
  return body&&Array.isArray(body.faces)&&body.faces.length<=50000&&Array.isArray(body.crease_edges)&&body.crease_edges.every(Number.isInteger)
@@ -30,6 +32,7 @@ function normalizeScene(raw){
  const ids=new Set();
  for(const instance of raw.instances){
   if(typeof instance.id!=='string'||typeof instance.part!=='string'||ids.has(instance.id)||!Object.hasOwn(raw.definitions,instance.part))throw Error('Invalid occurrence');ids.add(instance.id);
+  if(raw.instance_paths!==undefined&&(!Object.hasOwn(raw.instance_paths,instance.id)||!Array.isArray(raw.instance_paths[instance.id])||raw.instance_paths[instance.id].length<1||raw.instance_paths[instance.id].length>65||!raw.instance_paths[instance.id].every(segment=>typeof segment==='string'&&segment.length>0)))throw Error('Invalid occurrence path');
   const definition=raw.definitions[instance.part],mesh=raw.meshes[definition.mesh],transform=instance.transform,q=transform?.rotation,t=transform?.translation;
   if(!mesh||typeof definition.feature_id!=='string'||!Array.isArray(q)||q.length!==4||!q.every(Number.isFinite)||Math.abs(Math.hypot(...q)-1)>1e-8||!Array.isArray(t)||t.length!==3||!t.every(Number.isFinite))throw Error('Invalid occurrence transform');
   for(const face of mesh.faces){
@@ -40,9 +43,10 @@ function normalizeScene(raw){
   }
   crease_edges.push(...mesh.crease_edges.map(id=>id+edges));vertices+=mesh.vertices;edges+=mesh.edges;solids+=mesh.solids;
  }
- const result={faces,crease_edges,vertices,edges,solids,bounds:raw.bounds,volume:raw.material_volume,is_assembly:true,instances:raw.instances,definitions:raw.definitions,unique_meshes:Object.keys(raw.meshes).length};
+ const result={faces,crease_edges,vertices,edges,solids,bounds:raw.bounds,volume:raw.material_volume,is_assembly:true,instances:raw.instances,instance_paths:raw.instance_paths||{},assembly_definitions:raw.assembly_definitions||1,definitions:raw.definitions,unique_meshes:Object.keys(raw.meshes).length};
  if(!validBody(result))throw Error('Invalid expanded assembly');return result;
 }
+function occurrenceLabel(id){const path=scene.instance_paths?.[id];return path?.length>1?path.map(segment=>JSON.stringify(segment)).join(' / '):(path?.[0]??id)}
 let compactScene=scene;
 scene=normalizeScene(compactScene);
 let selectedInstance=null,selectionContext=null;
@@ -53,9 +57,9 @@ const rows=(id,items)=>{const dl=document.getElementById(id);for(const [name,val
 let bounds,size,center;
 function overview(){
  document.getElementById('geometry').replaceChildren();document.getElementById('dimensions').replaceChildren();
- rows('geometry',[...(scene.is_assembly?[['Occurrences',scene.instances.length],['Definitions',Object.keys(scene.definitions).length],['Unique meshes',scene.unique_meshes]]:[]),['Solids',scene.solids],['Faces',scene.faces.length],['Edges',scene.edges],['Vertices',scene.vertices],[scene.is_assembly?'Material volume (sum)':'Volume',fmt(scene.volume)+' mm³']]);
+ rows('geometry',[...(scene.is_assembly?[['Occurrences',scene.instances.length],['Part definitions',Object.keys(scene.definitions).length],['Assembly definitions',scene.assembly_definitions],['Unique meshes',scene.unique_meshes]]:[]),['Solids',scene.solids],['Faces',scene.faces.length],['Edges',scene.edges],['Vertices',scene.vertices],[scene.is_assembly?'Material volume (sum)':'Volume',fmt(scene.volume)+' mm³']]);
  const section=document.getElementById('occurrences-section'),select=document.getElementById('occurrence-select');section.hidden=!scene.is_assembly;select.replaceChildren();
- if(scene.is_assembly){const all=document.createElement('option');all.value='';all.textContent='All occurrences';select.append(all);for(const instance of scene.instances){const option=document.createElement('option');option.value=instance.id;option.textContent=instance.id+' · '+instance.part;select.append(option)}select.value=selectedInstance||'';}
+ if(scene.is_assembly){const all=document.createElement('option');all.value='';all.textContent='All occurrences';select.append(all);for(const instance of scene.instances){const option=document.createElement('option');option.value=instance.id;option.textContent=occurrenceLabel(instance.id)+' · '+instance.part;select.append(option)}select.value=selectedInstance||'';}
  bounds=scene.bounds||[[0,0,0],[0,0,0]];size=bounds[1].map((n,i)=>n-bounds[0][i]);center=bounds[0].map((n,i)=>n/2+bounds[1][i]/2);
  rows('dimensions',[['Width / X',fmt(size[0])],['Depth / Y',fmt(size[1])],['Height / Z',fmt(size[2])]]);
 }
@@ -64,7 +68,7 @@ function recipeOverview(){
  parameters.replaceChildren();
  document.querySelector('h1').textContent=context?context.output_name:'Model overview';
  if(!context){summary.textContent='Recipe source was not included in this artifact.';source.textContent='';return}
- summary.textContent=`${context.source_name} · ${context.language === 'starlark' ? 'Starlark' : 'JSON'}\nOutput: ${context.output_name} · Feature: ${selectionContext?.feature_id||context.feature_id}${selectionContext?`\nOccurrence: ${selectionContext.instance_id} · Definition: ${selectionContext.part_id}`:''}\nFull shared recipe for this build. Parameter overrides are shown below; the source is unchanged.`;
+ summary.textContent=`${context.source_name} · ${context.language === 'starlark' ? 'Starlark' : 'JSON'}\nOutput: ${context.output_name} · Feature: ${selectionContext?.feature_id||context.feature_id}${selectionContext?`\nOccurrence: ${occurrenceLabel(selectionContext.instance_id)} · Definition: ${selectionContext.part_id}`:''}\nFull shared recipe for this build. Parameter overrides are shown below; the source is unchanged.`;
  summary.style.whiteSpace='pre-line';source.textContent=context.source;
  const entries=Object.entries(context.parameters);
  rows('recipe-parameters',entries.length?entries.map(([name,value])=>[name,String(value)]):[['Parameter overrides','None']]);
@@ -145,9 +149,9 @@ function select(x,y){
  const px=Math.floor(x*renderRatio),py=Math.floor(y*renderRatio);
  selected=px>=0&&py>=0&&px<bufferWidth&&py<bufferHeight?faceBuffer[py*bufferWidth+px]:-1;
  const element=document.getElementById('selection'),face=scene.faces.find(f=>f.id===selected);
- if(face){selectedInstance=face.instance_id||null;selectionContext=face.instance_id?face:null;let area=0;for(let i=1;i+1<face.points.length;i++){const c=cross(sub(face.points[i],face.points[0]),sub(face.points[i+1],face.points[0]));area+=Math.hypot(...c)/2}element.textContent=`Face ${face.local_face_id??face.id} · ${face.points.length} edges${face.instance_id?`\nOccurrence: ${face.instance_id}\nDefinition: ${face.part_id}\nFeature: ${face.feature_id}`:''}\nArea: ${fmt(area)} mm²\nNormal: [${face.normal.map(fmt).join(', ')}]`;element.style.whiteSpace='pre-line'}else{selectedInstance=null;selectionContext=null;element.textContent='Select a face in the viewport.'}document.getElementById('occurrence-select').value=selectedInstance||'';recipeOverview();draw();
+ if(face){selectedInstance=face.instance_id||null;selectionContext=face.instance_id?face:null;let area=0;for(let i=1;i+1<face.points.length;i++){const c=cross(sub(face.points[i],face.points[0]),sub(face.points[i+1],face.points[0]));area+=Math.hypot(...c)/2}element.textContent=`Face ${face.local_face_id??face.id} · ${face.points.length} edges${face.instance_id?`\nOccurrence: ${occurrenceLabel(face.instance_id)}\nDefinition: ${face.part_id}\nFeature: ${face.feature_id}`:''}\nArea: ${fmt(area)} mm²\nNormal: [${face.normal.map(fmt).join(', ')}]`;element.style.whiteSpace='pre-line'}else{selectedInstance=null;selectionContext=null;element.textContent='Select a face in the viewport.'}document.getElementById('occurrence-select').value=selectedInstance||'';recipeOverview();draw();
 }
-document.getElementById('occurrence-select').addEventListener('change',event=>{selected=-1;selectedInstance=event.target.value||null;const instance=scene.instances?.find(item=>item.id===selectedInstance);selectionContext=instance?{instance_id:instance.id,part_id:instance.part,feature_id:scene.definitions[instance.part].feature_id}:null;document.getElementById('selection').textContent=instance?`Occurrence: ${instance.id}\nDefinition: ${instance.part}\nSelect a face for local topology details.`:'Select a face in the viewport.';recipeOverview();draw()});
+document.getElementById('occurrence-select').addEventListener('change',event=>{selected=-1;selectedInstance=event.target.value||null;const instance=scene.instances?.find(item=>item.id===selectedInstance);selectionContext=instance?{instance_id:instance.id,part_id:instance.part,feature_id:scene.definitions[instance.part].feature_id}:null;document.getElementById('selection').textContent=instance?`Occurrence: ${occurrenceLabel(instance.id)}\nDefinition: ${instance.part}\nSelect a face for local topology details.`:'Select a face in the viewport.';recipeOverview();draw()});
 let drag=null;canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY};canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-drag.lastX)*.008;pitch=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch+(e.clientY-drag.lastY)*.008));drag.lastX=e.clientX;drag.lastY=e.clientY;draw()});canvas.addEventListener('pointerup',e=>{if(drag&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<4){const r=canvas.getBoundingClientRect();select(e.clientX-r.left,e.clientY-r.top)}drag=null});canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.1,Math.min(15,zoom*Math.exp(-e.deltaY*.001)));draw()},{passive:false});
 document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{[yaw,pitch]=({iso:[-.75,.6],top:[-Math.PI/2,Math.PI/2],front:[-Math.PI/2,0],right:[0,0]})[button.dataset.view];zoom=1;draw()}));document.getElementById('fit').onclick=()=>{zoom=1;draw()};document.getElementById('edges').onclick=e=>{drawEdges=!drawEdges;e.currentTarget.setAttribute('aria-pressed',String(drawEdges));draw()};canvas.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='f'){zoom=1;draw()}if(e.key.toLowerCase()==='e')document.getElementById('edges').click()});new ResizeObserver(draw).observe(canvas);draw();
 // Only HTTP(S) artifacts participate in live refresh; local files make no requests.
@@ -168,9 +172,9 @@ if(location.protocol==='http:'||location.protocol==='https:'){
   return JSON.stringify([entries.map(([name,output])=>[name,output.content_hash]).sort(([a],[b])=>a.localeCompare(b)),manifest.recipe_context_hash??manifest.recipe_source_hash??null,manifest.recipe_source?.parameter_overrides??null]);
  }
  function replacement(html){
-  const embedded=html.match(/\b(?:const|let) scene = (\{[^\r\n]*\});/);if(!embedded)throw Error('Incomplete preview');
+  const embedded=html.match(/<script id="cad-scene-data" type="application\/json">([^\r\n]*)<\/script>/);if(!embedded)throw Error('Incomplete preview');
   const raw=JSON.parse(embedded[1]),next=normalizeScene(raw);
-  const contextData=html.match(/\b(?:const|let) recipeContext = (\{[^\r\n]*\}|null);/);if(!contextData)throw Error('Incomplete recipe context');
+  const contextData=html.match(/<script id="cad-recipe-data" type="application\/json">([^\r\n]*)<\/script>/);if(!contextData)throw Error('Incomplete recipe context');
   const context=JSON.parse(contextData[1]);
   if(context!==null&&(!context||!['language','source','source_name','output_name','feature_id','content_hash','recipe_context_hash'].every(key=>typeof context[key]==='string')
    ||!['starlark','json'].includes(context.language)||!context.parameters||typeof context.parameters!=='object'||Array.isArray(context.parameters)||!Object.values(context.parameters).every(Number.isFinite)))throw Error('Incomplete recipe context');
