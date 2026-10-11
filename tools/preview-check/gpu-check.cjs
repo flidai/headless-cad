@@ -22,6 +22,8 @@ f = instance(id = "front", part = p, offset = [2, 1, 10], rotation = [0, 0.17364
 assembly_output(name = "boxes", assembly = assembly(id = "boxes", instances = [n, f]))
 t = part(id = "triangle", body = extrude(id = "triangle_body", profile = polygon(id = "triangle_profile", points = [[0,0], [40,0], [0,20]]), height = 4))
 assembly_output(name = "triangle", assembly = assembly(id = "triangle_assembly", instances = [instance(id = "triangle_instance", part = t)]))
+thin = part(id = "thin", body = extrude(id = "thin_body", profile = rectangle(id = "thin_profile", width = 10000, depth = 10000), height = 0.001))
+assembly_output(name = "thin", assembly = assembly(id = "thin_assembly", instances = [instance(id = "thin_instance", part = thin)]))
 `;
 let browser, temporary;
 (async () => {
@@ -143,6 +145,34 @@ let browser, temporary;
     return {inside,outside,visiblePixels};
   });
   assert.ok(triangle.inside>20&&triangle.outside>20);
+  await open(path.join(output,'thin.gpu.html'));
+  const thinPlate=await page.evaluate(()=>{
+    cadGpuTest.setView('top');cadGpuTest.fit();
+    const mesh=Object.values(compactScene.meshes)[0],cap=mesh.faces.find(face=>face.normal[2]===1);
+    const canvas=document.getElementById('view'),gl=canvas.getContext('webgl2');
+    let topHits=0,background=0;
+    // XY shifts exercise panning; either sign of the eye-axis target shift
+    // must leave the geometry within the depth clipping interval.
+    for(const target of [[5000,5000,.0005],[6400,4200,2],[3600,5800,-2]]){
+      cadGpuTest.setCamera({target});cadGpuTest.render();
+      for(const world of [[2000,2000,.001],[5000,5000,.001],[8000,8000,.001],[-1000,5000,.001],[11000,5000,.001]]){
+        const [x,y,depth]=cadGpuTest.project(world),hit=cadGpuTest.pick(x,y);
+        const inside=world[0]>0&&world[0]<10000;
+        if(inside){
+          if(hit?.instance!==0||hit.face!==cap.id)throw Error(`Thin plate top lost to bottom or clipping at target ${target}: ${JSON.stringify(hit)}`);
+          if(Math.abs(depth)>=1)throw Error('Thin plate projected outside clipping interval');
+          topHits++;
+        }else{if(hit!==null)throw Error('Thin plate background incorrectly pickable');background++;}
+        const rect=canvas.getBoundingClientRect(),rgba=new Uint8Array(4);
+        gl.readPixels(Math.floor(x*canvas.width/rect.width),canvas.height-1-Math.floor(y*canvas.height/rect.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);
+        const difference=Math.abs(rgba[0]-234)+Math.abs(rgba[1]-240)+Math.abs(rgba[2]-236);
+        if(rgba[3]!==255||(inside?difference<30:difference>6))throw Error('Thin plate visible framebuffer disagrees with analytic silhouette');
+      }
+    }
+    return {width_to_thickness:10000000,topHits,background,shifted_targets:3};
+  });
+  assert.equal(thinPlate.topHits,9);
+  assert.equal(thinPlate.background,6);
   await open(path.join(large,'display_rack.gpu.html'));
   const shared=await page.evaluate(()=>({stats:cadGpuStats,localFaces:Object.values(compactScene.meshes).reduce((n,m)=>n+m.faces.length,0),localPoints:Object.values(compactScene.meshes).reduce((n,m)=>n+m.faces.reduce((sum,f)=>sum+f.points.length,0),0),expandedFaces:Object.hasOwn(compactScene,'faces')}));
   assert.equal(shared.stats.instanceCount,10000);
@@ -180,5 +210,5 @@ let browser, temporary;
   await unavailable.goto(pathToFileURL(path.join(output,'boxes.gpu.html')).href);
   await unavailable.waitForFunction(()=>document.body.innerText.match(/WebGL2.*(unavailable|not available|unsupported|not supported)/i));
   assert.equal(await unavailable.evaluate(()=>window.cadGpuStats?.ready),false);
-  console.log(JSON.stringify({backend:'Chromium ANGLE SwiftShader',boxes,triangle,shared,largePicks,numeric_range_rejected:true,explicit_unsupported:true,exact_brep_requests:exactRequests.length}));
+  console.log(JSON.stringify({backend:'Chromium ANGLE SwiftShader',boxes,triangle,thinPlate,shared,largePicks,numeric_range_rejected:true,explicit_unsupported:true,exact_brep_requests:exactRequests.length}));
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{if(browser)await browser.close();if(temporary)await fs.rm(temporary,{recursive:true,force:true});});
