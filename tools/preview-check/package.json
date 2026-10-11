@@ -21,7 +21,8 @@
     "test:drilled": "node drilled-check.cjs",
     "test:bvh": "node bvh-check.cjs",
     "test:bvh:numeric": "node bvh-numeric-check.cjs",
-    "test:revolve": "node revolve-check.cjs"
+    "test:revolve": "node revolve-check.cjs",
+    "test:cone": "node cone-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

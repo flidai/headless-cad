@@ -916,5 +916,57 @@
         ]
       ]
     }
+  },
+  "tapered_nozzle.star": {
+    "nozzle": {
+      "volume_mm3": 43655.571514283765,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -24,
+          -24,
+          0
+        ],
+        [
+          24,
+          24,
+          46
+        ]
+      ]
+    },
+    "pin": {
+      "volume_mm3": 2710.1472624967946,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -5,
+          -5,
+          0
+        ],
+        [
+          5,
+          5,
+          44
+        ]
+      ]
+    },
+    "tapered_nozzle": {
+      "volume_mm3": 46365.71877678056,
+      "solids": 2,
+      "instances": 2,
+      "definitions": 2,
+      "bounds_mm": [
+        [
+          -24,
+          -24,
+          0
+        ],
+        [
+          65,
+          24,
+          46
+        ]
+      ]
+    }
   }
 }

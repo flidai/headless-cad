@@ -365,10 +365,14 @@ fn tessellate_revolve(
         .collect();
     let mut patches = Vec::with_capacity(n * geometry.segments.len());
     for segment in &geometry.segments {
-        if segment.start[0] == segment.end[0] {
+        if segment.start[1] != segment.end[1] {
             let start = &rings[&segment.start_circle.unwrap()];
             let end = &rings[&segment.end_circle.unwrap()];
             let sign = (segment.end[1] - segment.start[1]).signum();
+            let slope = (segment.end[0] - segment.start[0]) / (segment.end[1] - segment.start[1]);
+            // Use the normal of the planar chordal trapezoid exported to STL.
+            let facet_slope = slope * (std::f64::consts::PI / n as f64).cos();
+            let normal_length = facet_slope.hypot(1.);
             let y = cross(geometry.axis, geometry.x_direction);
             for i in 0..n {
                 let j = (i + 1) % n;
@@ -377,7 +381,9 @@ fn tessellate_revolve(
                     face: segment.face,
                     points: vec![start[i], start[j], end[j], end[i]],
                     normal: std::array::from_fn(|a| {
-                        sign * (c * geometry.x_direction[a] + s * y[a])
+                        sign * (c * geometry.x_direction[a] + s * y[a]
+                            - facet_slope * geometry.axis[a])
+                            / normal_length
                     }),
                     boundary_edges: vec![segment.start_circle, None, segment.end_circle, None],
                 });

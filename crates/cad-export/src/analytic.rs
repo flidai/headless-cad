@@ -1,4 +1,4 @@
-//! Analytic STEP entities for validated mixed planar/cylindrical B-reps.
+//! Analytic STEP entities for validated planar/cylindrical/conical B-reps.
 use super::*;
 use cad_kernel::{Curve, Surface};
 
@@ -8,10 +8,13 @@ fn placement(step: &mut Step, origin: Point, axis: Point, x: Point) -> usize {
     let x = step.add(format!("DIRECTION('',({}))", triple(x)));
     step.add(format!("AXIS2_PLACEMENT_3D('',#{p},#{z},#{x})"))
 }
-fn seam_pcurve(step: &mut Step, surface: usize, u: f64) -> usize {
+fn seam_pcurve(step: &mut Step, surface: usize, u: f64, v_scale: f64) -> usize {
     let p = step.add(format!("CARTESIAN_POINT('',({},0.))", real(u)));
-    let d = step.add("DIRECTION('',(0.,1.))".into());
-    let v = step.add(format!("VECTOR('',#{d},1.)"));
+    let d = step.add(format!(
+        "DIRECTION('',(0.,{}))",
+        if v_scale < 0. { "-1." } else { "1." }
+    ));
+    let v = step.add(format!("VECTOR('',#{d},{})", real(v_scale.abs())));
     let line = step.add(format!("LINE('',#{p},#{v})"));
     let context = step.add("(GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('',''))".into());
     let representation = step.add(format!(
@@ -60,6 +63,21 @@ pub(super) fn solids(
                     real(c.radius)
                 ))
             }
+            Surface::Cone(c) => {
+                // Use positive semi-angles for importer interoperability. Axis
+                // reversal preserves the support, with reversed seam V below.
+                let z = if c.slope < 0. {
+                    c.axis.map(|v| -v)
+                } else {
+                    c.axis
+                };
+                let axis = placement(step, c.origin, z, c.x_direction);
+                step.add(format!(
+                    "CONICAL_SURFACE('',#{axis},{},{})",
+                    real(c.radius),
+                    real(c.slope.abs().atan())
+                ))
+            }
         };
         surfaces.push(surface);
     }
@@ -86,7 +104,7 @@ pub(super) fn solids(
                 // A tube has two periodic surfaces. Each seam must carry its
                 // pcurves on its own surface, including the inward bore.
                 let wall = model.faces.iter().enumerate().find_map(|(i, face)| {
-                    matches!(face.surface, Surface::Cylinder(_))
+                    matches!(face.surface, Surface::Cylinder(_) | Surface::Cone(_))
                         .then_some(i)
                         .filter(|_| {
                             face.loops.iter().any(|id| {
@@ -98,8 +116,14 @@ pub(super) fn solids(
                         })
                 });
                 if let Some(wall) = wall {
-                    let a = seam_pcurve(step, surfaces[wall], 0.);
-                    let b = seam_pcurve(step, surfaces[wall], std::f64::consts::TAU);
+                    // STEP's conical V parameter is axial distance. Match the
+                    // unit-length 3D generatrix with dV/dt = cos(semi_angle).
+                    let scale = match &model.faces[wall].surface {
+                        Surface::Cone(c) => c.slope.signum() / c.slope.hypot(1.),
+                        _ => 1.,
+                    };
+                    let a = seam_pcurve(step, surfaces[wall], 0., scale);
+                    let b = seam_pcurve(step, surfaces[wall], std::f64::consts::TAU, scale);
                     step.add(format!("SEAM_CURVE('',#{line},(#{a},#{b}),.CURVE_3D.)"))
                 } else {
                     line
@@ -138,7 +162,9 @@ pub(super) fn solids(
             "ADVANCED_FACE('',({}),#{},{})",
             refs(&bounds),
             surfaces[i],
-            if matches!(&face.surface, Surface::Cylinder(c) if c.inward) {
+            if matches!(&face.surface, Surface::Cylinder(c) if c.inward)
+                || matches!(&face.surface, Surface::Cone(c) if c.inward)
+            {
                 ".F."
             } else {
                 ".T."
@@ -235,7 +261,7 @@ mod tests {
     #[test]
     fn revolved_shoulder_and_bore_exports_preserve_closed_boundaries() {
         let t = Tolerance::default();
-        for (profile, expected_volume, cylinders) in [
+        for (profile, expected_volume, cylinders, cones) in [
             (
                 vec![
                     [0., 0.],
@@ -249,6 +275,7 @@ mod tests {
                 ],
                 3494. * std::f64::consts::PI,
                 3,
+                0,
             ),
             (
                 vec![
@@ -263,6 +290,7 @@ mod tests {
                 ],
                 10952. * std::f64::consts::PI,
                 4,
+                0,
             ),
             (
                 vec![
@@ -275,6 +303,19 @@ mod tests {
                 ],
                 10720. * std::f64::consts::PI,
                 2,
+                0,
+            ),
+            (
+                vec![[2., 0.], [8., 0.], [4., 12.], [3., 12.]],
+                372. * std::f64::consts::PI,
+                0,
+                2,
+            ),
+            (
+                vec![[1., 0.], [4., 0.], [8., 12.], [1., 12.]],
+                436. * std::f64::consts::PI,
+                1,
+                1,
             ),
         ] {
             let model = cad_kernel::revolve_polygon(&profile, t).unwrap().model;
@@ -286,7 +327,21 @@ mod tests {
             ] {
                 let step = to_step(&model, t).unwrap();
                 assert_eq!(step.matches("CYLINDRICAL_SURFACE(").count(), cylinders);
-                assert_eq!(step.matches("SEAM_CURVE(").count(), cylinders);
+                assert_eq!(step.matches("CONICAL_SURFACE(").count(), cones);
+                assert_eq!(step.matches("SEAM_CURVE(").count(), cylinders + cones);
+                for line in step
+                    .lines()
+                    .filter(|line| line.contains("CONICAL_SURFACE("))
+                {
+                    let angle: f64 = line
+                        .rsplit(',')
+                        .next()
+                        .unwrap()
+                        .trim_end_matches(");")
+                        .parse()
+                        .unwrap();
+                    assert!(angle > 0. && angle < std::f64::consts::FRAC_PI_2);
+                }
                 assert!(!step.contains("FACETED_BREP("));
                 let stl = to_stl(&model, t).unwrap();
                 let points: Vec<Point> = stl
@@ -300,12 +355,28 @@ mod tests {
                         [p[0], p[1], p[2]]
                     })
                     .collect();
+                let normals: Vec<Point> = stl
+                    .lines()
+                    .filter_map(|line| line.trim().strip_prefix("facet normal "))
+                    .map(|line| {
+                        let p: Vec<f64> = line
+                            .split_whitespace()
+                            .map(|n| n.parse().unwrap())
+                            .collect();
+                        [p[0], p[1], p[2]]
+                    })
+                    .collect();
                 let mut incidence = std::collections::BTreeMap::new();
                 let mut volume = 0.;
-                for triangle in points.as_chunks::<3>().0 {
+                for (triangle, declared) in points.as_chunks::<3>().0.iter().zip(&normals) {
                     let normal =
                         cross(sub(triangle[1], triangle[0]), sub(triangle[2], triangle[0]));
                     assert!(dot(normal, normal) > 0.);
+                    let norm = dot(normal, normal).sqrt();
+                    assert!(normal
+                        .iter()
+                        .zip(declared)
+                        .all(|(a, b)| (a / norm - b).abs() < 1e-10));
                     volume += dot(triangle[0], cross(triangle[1], triangle[2])) / 6.;
                     for i in 0..3 {
                         let key = |p: Point| p.map(|x| if x == 0. { 0 } else { x.to_bits() });

@@ -13,8 +13,9 @@ not a single release criterion.
 
 Engineering reliability, large-assembly performance, automation, reproducibility,
 and manufacturing interoperability are the competitive measures. The current
-orthogonal, convex-planar and simple-profile prism implementation is an executable starting point. Its limits do
-not define the target product. Feature development must expand the example and
+orthogonal and planar solids, analytic extrusions, and full-turn piecewise-linear
+revolutions are an executable starting point. Their limits do not define the
+target product. Feature development must expand the example and
 regression corpus toward increasingly demanding real engineering work.
 
 The competitive target is Autodesk-class mechanical engineering, rather than
@@ -402,8 +403,8 @@ bounded extrusion family, not general curved intersection or arbitrary trimmed
 surface validation. `drilled_bearing_mount.star` composes these plates with
 annular parts, associative cap placement and reused nested fasteners.
 
-The first revolution increment turns a simple orthogonal CCW meridian through
-360 degrees about +Z. It creates a connected planar/cylindrical B-rep with shared
+The revolution increment turns a simple piecewise-linear CCW meridian through
+360 degrees about +Z. It creates a connected planar/cylindrical/conical B-rep with shared
 circle edges and periodic seams, including stepped shafts, annular shoulders,
 counterbores and blind axial bores. Radius is nonnegative; at most one continuous
 axis-contact interval is supported. Source segment roles preserve feature intent.
@@ -412,10 +413,22 @@ compares topology and bounded geometry; it does not trust operation provenance.
 Positive annular axial slices provide compensated volume/centroid/inertia
 integration, with independent composite-cylinder formulas and OCCT STEP checks.
 Planar datums use the axis-centered material centroid. Derived meshes share ring
-samples across shoulder and wall faces. Sloped profiles, cones, partial turns,
+samples across shoulder and wall faces. Regular conical frusta support sloped profiles with positive endpoint radii.
+Positive polynomial coefficients integrate annular-frustum moments without
+subtracting nearly equal fourth powers. Apex singularities, partial turns,
 general trim topology and curved Booleans remain future work.
 `stepped_spindle.star` exercises connected solids, parameter edits and analytic
 STEP alongside an exploded assembly inspection view.
+
+`Cone` stores a reference-plane origin/radius, an orthonormal frame, signed
+radial slope and inward orientation. STEP uses a positive semi-angle and reverses
+the support axis and seam parameter direction for narrowing cones; independent
+imports check both taper directions, inward walls and oblique placement. The
+native 3D seam and STEP pcurve agree under the axial-distance parameterization.
+See the [STEP conical-surface definition](https://steptools.com/stds/smrl/data/resource_docs/geometric_and_topological_representation/sys/4_schema.htm).
+Derived conical patches share exact sampled rings with their neighboring faces,
+and exported facet normals match the chordal trapezoids. `tapered_nozzle.star`
+extends the corpus with chamfers, countersinks and a parameterized long taper.
 
 ## Constraints and assemblies
 
@@ -928,7 +941,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped revolutions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped/tapered revolutions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

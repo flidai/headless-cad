@@ -2216,9 +2216,9 @@ fn revolve_schema_is_strict_and_profile_type_is_explicit() {
 #[test]
 fn unselected_revolve_still_requires_valid_meridian_and_version() {
     let mut recipe = revolved_recipe();
-    // Valid simple polygon, but a sloped meridian edge is outside this operation.
+    // Valid simple polygon, but a cone apex on the revolution axis is unsupported.
     if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
-        *points = vec![[0., 0.], [5., 0.], [4., 10.], [0., 10.]];
+        *points = vec![[0., 0.], [5., 0.], [0., 10.]];
     }
     assert!(
         matches!(BuildEngine::default().build_outputs(&recipe, &["other".into()]), Err(BuildError::Kernel { feature, .. }) if feature == "shaft")

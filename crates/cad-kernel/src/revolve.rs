@@ -1,4 +1,4 @@
-//! Exact full-turn solids from bounded orthogonal meridians.
+//! Exact full-turn solids from bounded piecewise-linear meridians.
 use crate::math::{dot, norm, sub};
 use crate::*;
 
@@ -20,7 +20,9 @@ pub struct RevolveGeometry {
     pub segments: Vec<RevolveSegment>,
 }
 fn unsupported() -> KernelError {
-    KernelError::Unsupported("expected a canonical full-turn orthogonal meridian solid".into())
+    KernelError::Unsupported(
+        "expected a canonical full-turn piecewise-linear meridian solid".into(),
+    )
 }
 pub fn validate_revolve_profile(points: &[[f64; 2]], tol: Tolerance) -> Result<(), KernelError> {
     crate::simple_polygon::validate_ring(points, tol)?;
@@ -28,8 +30,28 @@ pub fn validate_revolve_profile(points: &[[f64; 2]], tol: Tolerance) -> Result<(
     for i in 0..points.len() {
         let a = points[i];
         let b = points[(i + 1) % points.len()];
-        if a[0] < 0. || (a[0] > 0. && a[0] <= tol.linear) || !((a[0] == b[0]) ^ (a[1] == b[1])) {
+        if a[0] < 0. || (a[0] > 0. && a[0] <= tol.linear) {
             return Err(unsupported());
+        }
+        if a[0] != b[0]
+            && a[1] != b[1]
+            && (a[0] == 0.
+                || b[0] == 0.
+                || (b[0] - a[0]).abs() <= tol.linear
+                || (b[1] - a[1]).abs() <= tol.linear)
+        {
+            return Err(KernelError::Unsupported("conical edges require positive endpoint radii and radial/axial spans above tolerance; apex singularities unsupported".into()));
+        }
+        if a[0] != b[0] && a[1] != b[1] {
+            let slope = (b[0] - a[0]) / (b[1] - a[1]);
+            let angle = slope.atan();
+            if !slope.is_normal()
+                || angle == 0.
+                || angle.abs() >= std::f64::consts::FRAC_PI_2
+                || (angle.tan() - slope).abs() * (b[1] - a[1]).abs() > tol.linear / 16.
+            {
+                return Err(KernelError::NumericRange);
+            }
         }
         if a[0] == 0. && b[0] == 0. {
             axis_edges += 1;
@@ -111,24 +133,40 @@ fn construct(mut g: RevolveGeometry) -> (ModelSnapshot, RevolveGeometry) {
             seam = Some(s);
             let down = b[1] < a[1];
             let (lo, hi) = if down { (cb, ca) } else { (ca, cb) };
+            let lower = if down { b } else { a };
+            let slope = (b[0] - a[0]) / (b[1] - a[1]);
+            let length = slope.hypot(1.);
             m.edges.push(Edge {
                 vertices: [m.edges[lo.0].vertices[0], m.edges[hi.0].vertices[0]],
                 curve: Curve::Line(Line {
-                    origin: world(&g, a[0], a[1].min(b[1])),
-                    direction: g.axis,
+                    origin: world(&g, lower[0], lower[1]),
+                    direction: std::array::from_fn(|i| {
+                        (g.axis[i] + g.x_direction[i] * slope) / length
+                    }),
                 }),
             });
             loops.push(LoopId(m.loops.len()));
             m.loops.push(Loop {
                 edges: vec![eu(ca, false), eu(s, down), eu(cb, true), eu(s, !down)],
             });
-            Surface::Cylinder(Cylinder {
-                origin: world(&g, 0., a[1].min(b[1])),
-                axis: g.axis,
-                x_direction: g.x_direction,
-                radius: a[0],
-                inward: b[1] < a[1],
-            })
+            if a[0] != b[0] {
+                Surface::Cone(Cone {
+                    origin: world(&g, 0., lower[1]),
+                    axis: g.axis,
+                    x_direction: g.x_direction,
+                    radius: lower[0],
+                    slope,
+                    inward: down,
+                })
+            } else {
+                Surface::Cylinder(Cylinder {
+                    origin: world(&g, 0., a[1].min(b[1])),
+                    axis: g.axis,
+                    x_direction: g.x_direction,
+                    radius: a[0],
+                    inward: b[1] < a[1],
+                })
+            }
         };
         let face = FaceId(m.faces.len());
         m.faces.push(Face { surface, loops });
@@ -185,7 +223,11 @@ pub fn revolve_polygon(
         let mut roles = vec![if a[1] == b[1] {
             "planar_faces"
         } else {
-            "cylindrical_faces"
+            if a[0] == b[0] {
+                "cylindrical_faces"
+            } else {
+                "conical_faces"
+            }
         }];
         if a[1] != b[1] {
             roles.push(if b[1] > a[1] {
@@ -294,7 +336,7 @@ pub(crate) fn recognize(m: &ModelSnapshot, tol: Tolerance) -> Result<RevolveGeom
                     ([radii[1], z], [radii[0], z])
                 }
             }
-            Surface::Cylinder(c) => {
+            Surface::Cylinder(_) | Surface::Cone(_) => {
                 if f.loops.len() != 1 {
                     return Err(unsupported());
                 }
@@ -305,8 +347,8 @@ pub(crate) fn recognize(m: &ModelSnapshot, tol: Tolerance) -> Result<RevolveGeom
                 let ca = get_circle(l.edges[0].edge)?;
                 let cb = get_circle(l.edges[2].edge)?;
                 (
-                    [c.radius, dot(sub(ca.origin, g.origin), g.axis)],
-                    [c.radius, dot(sub(cb.origin, g.origin), g.axis)],
+                    [ca.radius, dot(sub(ca.origin, g.origin), g.axis)],
+                    [cb.radius, dot(sub(cb.origin, g.origin), g.axis)],
                 )
             }
         };
@@ -364,6 +406,7 @@ pub(crate) fn recognize(m: &ModelSnapshot, tol: Tolerance) -> Result<RevolveGeom
         if a.vertices != b.vertices {
             return Err(unsupported());
         }
+        let b_edge_vertices = b.vertices;
         let valid = match (&a.curve, &b.curve) {
             (Curve::Circle(a), Curve::Circle(b)) => {
                 near(a.origin, b.origin, error)
@@ -372,7 +415,13 @@ pub(crate) fn recognize(m: &ModelSnapshot, tol: Tolerance) -> Result<RevolveGeom
                     && a.radius == b.radius
             }
             (Curve::Line(a), Curve::Line(b)) => {
-                near(a.origin, b.origin, error) && near(a.direction, b.direction, unit)
+                let edge_length = norm(sub(
+                    expected.vertices[b_edge_vertices[1].0].position,
+                    expected.vertices[b_edge_vertices[0].0].position,
+                ));
+                near(a.origin, b.origin, error)
+                    && (norm(a.direction) - 1.).abs() <= unit
+                    && near(a.direction, b.direction, unit + 2. * error / edge_length)
             }
             _ => false,
         };
@@ -380,13 +429,26 @@ pub(crate) fn recognize(m: &ModelSnapshot, tol: Tolerance) -> Result<RevolveGeom
             return Err(unsupported());
         }
     }
-    for (a, b) in m.faces.iter().zip(&expected.faces) {
+    for (index, (a, b)) in m.faces.iter().zip(&expected.faces).enumerate() {
         if a.loops != b.loops {
             return Err(unsupported());
         }
         let valid = match (&a.surface, &b.surface) {
             (Surface::Plane(a), Surface::Plane(b)) => {
                 near(a.origin, b.origin, error) && near(a.normal, b.normal, unit)
+            }
+            (Surface::Cone(a), Surface::Cone(b)) => {
+                near(a.origin, b.origin, error)
+                    && near(a.axis, b.axis, unit)
+                    && near(a.x_direction, b.x_direction, unit)
+                    && a.radius == b.radius
+                    && a.inward == b.inward
+                    && a.slope.is_finite()
+                    && b.slope.is_finite()
+                    && (a.slope - b.slope).abs() / a.slope.hypot(1.)
+                        <= 4096. * f64::EPSILON * b.slope.abs() / a.slope.hypot(1.)
+                            + 2. * error
+                                / (g.segments[index].end[1] - g.segments[index].start[1]).abs()
             }
             (Surface::Cylinder(a), Surface::Cylinder(b)) => {
                 near(a.origin, b.origin, error)
@@ -436,36 +498,88 @@ impl RevolveGeometry {
         for w in levels.windows(2) {
             let mid = w[0] / 2. + w[1] / 2.;
             let h = w[1] - w[0];
-            let mut radii = vec![];
+            let mut radial_segments = vec![];
             for i in 0..self.profile.len() {
                 let a = self.profile[i];
                 let b = self.profile[(i + 1) % self.profile.len()];
-                if a[0] == b[0] && mid > a[1].min(b[1]) && mid < a[1].max(b[1]) {
-                    radii.push(a[0]);
+                if mid > a[1].min(b[1]) && mid < a[1].max(b[1]) {
+                    let (lo, hi) = if a[1] < b[1] { (a, b) } else { (b, a) };
+                    let radius = |z: f64| {
+                        if z == lo[1] {
+                            lo[0]
+                        } else if z == hi[1] {
+                            hi[0]
+                        } else {
+                            let t = (z - lo[1]) / (hi[1] - lo[1]);
+                            lo[0] * (1. - t) + hi[0] * t
+                        }
+                    };
+                    radial_segments.push([radius(w[0]), radius(w[1])]);
                 }
             }
-            radii.sort_by(f64::total_cmp);
-            if radii.len() % 2 != 0 {
+            radial_segments
+                .sort_by(|a, b| (a[0] / 2. + a[1] / 2.).total_cmp(&(b[0] / 2. + b[1] / 2.)));
+            if radial_segments.len() % 2 != 0 {
                 return Err(unsupported());
             }
-            for rs in radii.as_chunks::<2>().0 {
-                let v = std::f64::consts::PI * (rs[1] - rs[0]) * (rs[1] + rs[0]) * h;
-                let sum = rs[1] * rs[1] + rs[0] * rs[0];
-                if !v.is_normal() || v <= 0. {
+            for pair in radial_segments.as_chunks::<2>().0 {
+                let [inner, outer] = *pair;
+                let d = [outer[0] - inner[0], outer[1] - inner[1]];
+                let s = [outer[0] + inner[0], outer[1] + inner[1]];
+                if d.iter().any(|x| *x < 0.) {
+                    return Err(unsupported());
+                }
+                // Positive Bernstein coefficients of outer²-inner² and
+                // outer²+inner² retain thin annular walls without cancellation.
+                let area = [d[0] * s[0], (d[0] * s[1] + d[1] * s[0]) / 2., d[1] * s[1]];
+                let squared = [
+                    outer[0] * outer[0] + inner[0] * inner[0],
+                    outer[0] * outer[1] + inner[0] * inner[1],
+                    outer[1] * outer[1] + inner[1] * inner[1],
+                ];
+                let a0 = area.iter().sum::<f64>() / 3.;
+                let a1 = area
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| a * (i + 1) as f64 / 12.)
+                    .sum::<f64>();
+                let a2 = area
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| a * ((i + 1) * (i + 2)) as f64 / 60.)
+                    .sum::<f64>();
+                let v = std::f64::consts::PI * h * a0;
+                let mean = a1 / a0;
+                let variance = a2 / a0 - mean * mean;
+                if !v.is_normal() || v <= 0. || !variance.is_normal() || variance <= 0. {
                     return Err(KernelError::NumericRange);
                 }
+                let mut fourth = Sum::default();
+                let binomial2 = [1., 2., 1.];
+                let binomial4 = [1., 4., 6., 4., 1.];
+                for i in 0..3 {
+                    for j in 0..3 {
+                        fourth.add(
+                            area[i] * squared[j] * binomial2[i] * binomial2[j]
+                                / binomial4[i + j]
+                                / 5.,
+                        )?;
+                    }
+                }
+                let axial = std::f64::consts::PI * h * fourth.value / 2.;
+                let center = w[0] + h * mean;
                 volume_sum.add(v)?;
-                first.add(v * (mid - reference))?;
-                slices.push((v, mid, h, sum));
+                first.add(v * (center - reference))?;
+                slices.push((v, center, h * h * variance, axial));
             }
         }
         let volume = volume_sum.value;
         let z = reference + first.value / volume;
         let mut axial_sum = Sum::default();
         let mut transverse_sum = Sum::default();
-        for (v, mid, h, sum) in slices {
-            axial_sum.add(v * sum / 2.)?;
-            transverse_sum.add(v * (sum / 4. + h * h / 12. + (mid - z) * (mid - z)))?;
+        for (v, center, variance, axial) in slices {
+            axial_sum.add(axial)?;
+            transverse_sum.add(axial / 2. + v * (variance + (center - z) * (center - z)))?;
         }
         let axial = axial_sum.value;
         let transverse = transverse_sum.value;
@@ -664,7 +778,7 @@ mod tests {
             assert!(bad.revolve_geometry(t).is_err());
         }
         let invalid = [
-            vec![[0., 0.], [5., 0.], [4., 10.], [0., 10.]],
+            vec![[0., 0.], [5., 0.], [0., 10.]],
             vec![[-1., 0.], [5., 0.], [5., 10.], [-1., 10.]],
             vec![[0., 0.], [0., 10.], [5., 10.], [5., 0.]],
         ];
@@ -681,6 +795,121 @@ mod tests {
         let moved = translate(&m, [-100., 0., 0.], t).unwrap().model;
         near(moved.volume(), 10000. * std::f64::consts::PI);
         near(moved.volume(), moved.mass_properties(t).unwrap().volume);
+    }
+    #[test]
+    fn conical_solids_have_independent_polynomial_properties() {
+        let t = Tolerance::default();
+        let pi = std::f64::consts::PI;
+        for hollow in [false, true] {
+            let profile = if hollow {
+                vec![[1., 0.], [2., 0.], [5., 3.], [3., 3.]]
+            } else {
+                vec![[0., 0.], [2., 0.], [5., 3.], [0., 3.]]
+            };
+            let m = revolve_polygon(&profile, t).unwrap().model;
+            let p = m.mass_properties(t).unwrap();
+            let volume = if hollow { 26. } else { 39. };
+            let first = if hollow { 48.75 } else { 74.25 };
+            let second = if hollow { 108. } else { 165.6 };
+            let axial = if hollow { 273. } else { 309.3 };
+            near(p.volume, volume * pi);
+            near(p.centroid.unwrap()[2], first / volume);
+            let transverse = (axial / 2. + second - first * first / volume) * pi;
+            near(p.central_inertia.unwrap()[0][0], transverse);
+            near(p.central_inertia.unwrap()[2][2], axial * pi);
+            let angle = 0.71_f64;
+            let axis = [angle.sin(), 0., angle.cos()];
+            let moved = transform(
+                &m,
+                [12., -7., 4.],
+                [0., (angle / 2.).sin(), 0., (angle / 2.).cos()],
+                t,
+            )
+            .unwrap()
+            .model;
+            let p = moved.mass_properties(t).unwrap();
+            for i in 0..3 {
+                for j in 0..3 {
+                    near(
+                        p.central_inertia.unwrap()[i][j],
+                        (if i == j { transverse } else { 0. })
+                            + (axial * pi - transverse) * axis[i] * axis[j],
+                    );
+                }
+            }
+            assert!(moved.validate(t).valid);
+            near(moved.volume(), volume * pi);
+        }
+        let m = revolve_polygon(&[[0., 0.], [2., 0.], [5., 3.], [0., 3.]], t)
+            .unwrap()
+            .model;
+        let angle = 0.71_f64;
+        assert!(transform(
+            &m,
+            [10000., -7000., 4000.],
+            [0., (angle / 2.).sin(), 0., (angle / 2.).cos()],
+            t
+        )
+        .is_ok());
+        let profile = [
+            [0., 0.],
+            [10., 0.],
+            [12., 2.],
+            [12., 8.],
+            [8., 18.],
+            [6., 18.],
+            [3., 12.],
+            [3., 4.],
+            [0., 4.],
+        ];
+        assert!(
+            revolve_polygon(&profile, t)
+                .unwrap()
+                .model
+                .validate(t)
+                .valid
+        );
+    }
+    #[test]
+    fn conical_support_corruption_and_singularities_fail() {
+        let t = Tolerance::default();
+        let m = revolve_polygon(&[[0., 0.], [2., 0.], [5., 3.], [0., 3.]], t)
+            .unwrap()
+            .model;
+        for i in 0..5 {
+            let mut bad = m.clone();
+            let Surface::Cone(c) = &mut bad.faces[1].surface else {
+                panic!()
+            };
+            match i {
+                0 => c.slope = -c.slope,
+                1 => c.radius += 0.01,
+                2 => c.inward = true,
+                3 => c.axis = [0., 1., 0.],
+                _ => c.slope = f64::NAN,
+            }
+            assert!(!bad.validate(t).valid);
+            assert!(bad.revolve_geometry(t).is_err());
+        }
+        for p in [
+            vec![[0., 0.], [2., 0.], [0., 3.]],
+            vec![[0., 0.], [2., 0.], [2. + t.linear / 2., 3.], [0., 3.]],
+            vec![[0., 0.], [2., 0.], [3., t.linear / 2.], [0., t.linear / 2.]],
+        ] {
+            assert!(revolve_polygon(&p, t).is_err());
+        }
+        for scale in [1e-6, 1., 1e3] {
+            let p = [[0., 0.], [5., 0.], [2., 3.], [0., 3.]].map(|p| p.map(|v| v * scale));
+            let m = revolve_polygon(
+                &p,
+                Tolerance {
+                    linear: scale * 1e-8,
+                },
+            )
+            .unwrap()
+            .model;
+            near(m.volume(), 39. * std::f64::consts::PI * scale.powi(3));
+        }
     }
     #[test]
     fn annular_steps_and_small_scale() {
