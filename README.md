@@ -102,6 +102,7 @@ cad build examples/mounting_array.star --out-dir out/mounting_array
 cad build examples/reference_fixture.star --out-dir out/reference_fixture
 cad build examples/modular_rack.star --out-dir out/modular_rack
 cad build examples/angled_fixture.star --out-dir out/angled_fixture
+cad build examples/datum_gantry.star --out-dir out/datum_gantry
 ```
 
 | Example | What it exercises | Independently calculated result |
@@ -116,6 +117,7 @@ cad build examples/angled_fixture.star --out-dir out/angled_fixture
 | Reference fixture | Three grooves and raised stops; ancestral top-face selection | 23,296 mm³, one solid, 80 × 40 × 20 mm |
 | Modular rack | Reused rows and carriages, nested rotations and occurrence paths | 63,648 mm³ summed material, 17 component occurrences, four part definitions |
 | Angled fixture | Two rotated triangular-prism ramps, four hexagonal seats, and an orthogonal slotted base | 47,346.83063257983 mm³ summed material, seven occurrences; each ramp is 12,000 mm³ |
+| Datum gantry | Sibling datum attachments for posts, bridge, tool and clamps; two repeated stations | 80,440 mm³ and seven occurrences per gantry; inspection line doubles both |
 
 The examples progress from single-part modeling to reusable functions, repeated
 features, and assemblies. The fixture and enclosure recipes expose named
@@ -157,7 +159,8 @@ Rotations are unit quaternions in `[x, y, z, w]` order; translations are
 millimetres. A placement rotates a reusable part without changing its local
 B-rep. It does not enable rotated-solid Boolean operations in the kernel.
 Parts must reference solid features. Assemblies support both part occurrences
-and nested subassembly occurrences; joints and named datums remain planned.
+and nested subassembly occurrences, with named part datums and deterministic
+sibling attachments. Joints and nonlinear constraint solving remain planned.
 
 These functions produce recipe schema 2. Existing single-part recipes retain
 schema 1; their JSON and Starlark workflows remain supported. A part's local
@@ -179,6 +182,60 @@ declared instance IDs. Different occurrence paths distinguish repeated children.
 Nested leaf IDs encode their complete path as a JSON array; `instance_paths`
 retains the original path segments, so slashes in an ID cannot create collisions.
 The viewer displays those paths when selecting parts.
+
+### Named datums and rigid attachment
+
+A datum is a named local frame on a part definition. `datum()` defaults to zero
+translation and identity quaternion; `offset` is in millimetres and `rotation`
+is a unit quaternion `[x, y, z, w]`. Define frames in source and attach a sibling
+part occurrence by naming its own datum and the target's datum:
+
+```python
+profile = rectangle(id = "profile", width = 10, depth = 6)
+body = extrude(id = "body", profile = profile, height = 4)
+block = part(id = "block", body = body, datums = {
+    "foot": datum(),
+    "top": datum(offset = [0, 0, 4]),
+})
+base = instance(id = "base", part = block)
+upper = instance(id = "upper", part = block, attach_to = "base",
+                 datum = "foot", target_datum = "top", offset = [0, 0, 2])
+stack = assembly(id = "stack", instances = [upper, base])
+assembly_output(name = "stack", assembly = stack)
+```
+
+The upper block is placed at Z = 6 mm. For an attached instance, its `offset`
+and `rotation` describe an additional local frame relative to the target datum,
+not a world-space placement. Using transform composition from right to left:
+
+```text
+placed = target_placement × target_datum × instance_offset × inverse(own_datum)
+```
+
+The inverse own datum matters when that frame is translated or rotated. Without
+attachment arguments, instance transforms retain their ordinary placement
+meaning. All three attachment arguments (`attach_to`, `datum`, `target_datum`)
+are required together. Targets must be sibling **part occurrences in the same
+assembly definition**. Definition order does not control evaluation: references
+form a dependency DAG, with missing targets/datums and cycles rejected. Chains
+are limited to 64 occurrences, with at most 1,024 named frames per part and the
+existing assembly expansion/work limits. Invalid unit frames and placements
+outside numerical tolerance fail explicitly; rotations are never silently
+normalized.
+
+Frames and attachment intent remain in the recipe/native assembly hierarchy;
+derived leaf placements and STEP occurrence transforms contain the resolved
+placement. Native validation recomputes it and rejects inconsistent derived
+data. STEP does **not** preserve named datum or attachment semantics themselves.
+Datum edits update assembly identity and dependent placements while reusing
+unchanged part geometry. Selected-part metadata exposes the local datum frames
+in the read-only viewer. See `examples/datum_gantry.star` for chained attachments,
+nonzero/rotated tool datums, and reuse of the completed gantry in two stations.
+
+These are source-defined frames and deterministic placements, not associated
+face references or a constraint solver. Cross-subassembly attachment paths,
+multiple simultaneous mates, joints, DOF/residual reporting, collision checking,
+and automatic datum reconstruction from changing topology remain unsupported.
 
 Assembly builds produce `<name>.assembly.json`, a metadata manifest referencing
 shared `definition-<hash>.brep.json` assets, and `<name>.display.json`, with one
@@ -363,7 +420,8 @@ Polygon extrusions generate `start_cap`, `end_cap`, `walls`, and `wall_0` throug
 preserves those roles through lineage. Polygon Boolean lineage is unsupported.
 
 This is the initial scoped face-reference contract. It does not yet provide
-edge/vertex selectors, adjacency predicates, datums, assembly-instance selectors,
+edge/vertex selectors, adjacency predicates, topology-associated datums,
+assembly-instance selectors,
 or references consumed by downstream sketch/fillet operations. Keep semantic
 intent in source; numeric face IDs in witnesses belong only to the reported
 build snapshot. B-rep patch counts can change after edits, even when a visible
@@ -503,7 +561,8 @@ STL is unitless by specification, with coordinates written in millimetres.
 The orthogonal baseline and first convex planar extension are bounded increments
 toward the commercial CAD goal. Nested assemblies, scoped face references and
 shared display assets are implemented.
-Next come named datums, reference-driven modeling, streamed display assets,
+Named part datums and sibling attachments are implemented. Next come
+reference-driven modeling, streamed display assets,
 profiles with holes, curved analytic geometry, and trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence
 for curved modeling, constraints, large assemblies, and manufacturing workflows.
@@ -543,6 +602,7 @@ npm run test:depth
 npm run test:assembly
 npm run test:nested
 npm run test:polygon
+npm run test:datums
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.
@@ -550,6 +610,9 @@ For `test:polygon`, build `examples/angled_fixture.star` into `out/angled_fixtur
 using the command above; the test checks the triangular ramp silhouette and
 picking against an independent XY half-plane oracle, including empty corners
 of its bounding rectangle. Set `CAD_POLYGON_PREVIEW` to override that preview path.
+For `test:datums`, build `examples/datum_gantry.star` into `out/datum_gantry`.
+It checks 14 occurrences sharing five meshes, analytically expected rotated tool
+vertices, and the selected part’s datum metadata and exact recipe panel.
 The hosted test starts temporary server/watch processes and checks live recipe
 edits, automatic refresh, failed-build preservation, recovery, and STEP download.
 The refresh regression simulates interleaved generations during edit/revert so

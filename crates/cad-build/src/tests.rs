@@ -493,6 +493,7 @@ fn assembly_recipe() -> Recipe {
     input.schema_version = 2;
     input.outputs.clear();
     input.parts = vec![PartDefinition {
+        datums: BTreeMap::new(),
         metadata: Default::default(),
         id: "plate-part".into(),
         feature: "plate".into(),
@@ -502,11 +503,13 @@ fn assembly_recipe() -> Recipe {
         id: "pair".into(),
         instances: vec![
             Instance {
+                attachment: None,
                 id: "left".into(),
                 part: "plate-part".into(),
                 transform: RigidTransform::default(),
             },
             Instance {
+                attachment: None,
                 id: "right".into(),
                 part: "plate-part".into(),
                 transform: RigidTransform {
@@ -570,6 +573,7 @@ fn identical_geometry_keeps_distinct_part_feature_and_instance_identities() {
         op_version: 1,
     });
     input.parts.push(PartDefinition {
+        datums: BTreeMap::new(),
         metadata: Default::default(),
         id: "other-part".into(),
         feature: "other-solid".into(),
@@ -864,6 +868,7 @@ fn metadata_edits_preserve_geometry_cache_and_change_assembly_identity() {
 fn invalid_metadata_on_unused_parts_is_rejected_before_geometry() {
     let mut recipe = nested_recipe();
     recipe.parts.push(PartDefinition {
+        datums: BTreeMap::new(),
         id: "unused".into(),
         feature: "body".into(),
         metadata: Default::default(),
@@ -1030,4 +1035,118 @@ fn invalid_unused_polygons_and_unsupported_booleans_fail_explicitly() {
         build(&recipe),
         Err(BuildError::OperationVersion { .. })
     ));
+}
+
+fn attached_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({
+        "schema_version":2,"units":"mm",
+        "features":[{"op":"rectangle","id":"p","width":2,"depth":3},{"op":"extrude","id":"body","profile":"p","height":4}],
+        "parts":[
+            {"id":"base","feature":"body","datums":{"mount":{"translation":[0,2,0]}}},
+            {"id":"bracket","feature":"body","datums":{"foot":{"translation":[1,0,0],"rotation":[0,0,1,0]}}}
+        ],"assemblies":[{"id":"assembly","instances":[
+            {"id":"attached","part":"bracket","transform":{"translation":[0,0,3]},"attachment":{"instance":"fixed","datum":"foot","target_datum":"mount"}},
+            {"id":"fixed","part":"base","transform":{"translation":[10,0,0],"rotation":[0,0,std::f64::consts::FRAC_1_SQRT_2,std::f64::consts::FRAC_1_SQRT_2]}}
+        ]}],"assembly_outputs":[{"name":"assembly","assembly":"assembly"}]
+    })).unwrap()
+}
+
+#[test]
+fn datum_attachments_resolve_local_frames_without_rebuilding_exact_geometry() {
+    let mut recipe = attached_recipe();
+    let mut engine = BuildEngine::default();
+    let first = engine.build(&recipe).unwrap();
+    assert_eq!(first.stats.computed_solids, 1);
+    let assembly = &first.assemblies["assembly"];
+    let child = assembly
+        .instances
+        .iter()
+        .find(|instance| instance.id == "attached")
+        .unwrap();
+    assert!(child.attachment.is_none());
+    for axis in 0..3 {
+        assert!((child.transform.translation[axis] - [8.0, 1.0, 3.0][axis]).abs() < 1e-12);
+    }
+    let placed = child.transform.point([1.0, 0.0, 0.0]);
+    for axis in 0..3 {
+        assert!((placed[axis] - [8.0, 0.0, 3.0][axis]).abs() < 1e-12);
+    }
+    assert!(assembly.hierarchy["assembly"]
+        .instances
+        .iter()
+        .any(|instance| instance.attachment.is_some()));
+    recipe.parts[0].datums.get_mut("mount").unwrap().translation[1] = 4.0;
+    let changed = engine.build(&recipe).unwrap();
+    assert_eq!(changed.stats.computed_solids, 0);
+    assert_eq!(first.feature_hashes, changed.feature_hashes);
+    assert_ne!(
+        assembly.content_hash,
+        changed.assemblies["assembly"].content_hash
+    );
+    let child = changed.assemblies["assembly"]
+        .instances
+        .iter()
+        .find(|instance| instance.id == "attached")
+        .unwrap();
+    assert!((child.transform.translation[0] - 6.0).abs() < 1e-12);
+    assert!(Arc::ptr_eq(
+        &assembly.parts["base"].result,
+        &changed.assemblies["assembly"].parts["bracket"].result
+    ));
+    let decoded: Recipe = serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+    assert_eq!(
+        build(&decoded).unwrap().assemblies["assembly"].content_hash,
+        changed.assemblies["assembly"].content_hash
+    );
+}
+
+#[test]
+fn datum_and_attachment_errors_fail_even_in_unused_definitions_before_geometry() {
+    let mut recipe = attached_recipe();
+    recipe.assembly_outputs.clear();
+    if let Feature::Rectangle { width, .. } = &mut recipe.features[0] {
+        *width = 1e308;
+    }
+    let original = recipe.clone();
+    for change in 0..4 {
+        let mut recipe = original.clone();
+        match change {
+            0 => {
+                recipe.assemblies[0].instances[0]
+                    .attachment
+                    .as_mut()
+                    .unwrap()
+                    .instance = "missing".into()
+            }
+            1 => {
+                recipe.assemblies[0].instances[0]
+                    .attachment
+                    .as_mut()
+                    .unwrap()
+                    .datum = "missing".into()
+            }
+            2 => {
+                recipe.assemblies[0].instances[0]
+                    .attachment
+                    .as_mut()
+                    .unwrap()
+                    .target_datum = "missing".into()
+            }
+            _ => {
+                recipe.assemblies[0].instances[1].attachment = Some(DatumAttachment {
+                    instance: "attached".into(),
+                    datum: "mount".into(),
+                    target_datum: "foot".into(),
+                })
+            }
+        }
+        assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+    }
+    recipe.parts[0]
+        .datums
+        .insert(" bad ".into(), Default::default());
+    assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+    let mut raw = serde_json::to_value(attached_recipe()).unwrap();
+    raw["assemblies"][0]["instances"][0]["attachment"]["typo"] = "oops".into();
+    assert!(serde_json::from_value::<Recipe>(raw).is_err());
 }

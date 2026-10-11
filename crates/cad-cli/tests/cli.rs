@@ -1264,3 +1264,126 @@ fn bom_missing_material_reports_unknown_total_and_known_partial_mass() {
     assert!(slider["unit_mass_kg"].is_null());
     assert!(slider["total_mass_kg"].is_null());
 }
+
+#[test]
+fn datum_attachments_round_trip_and_failed_reference_preserves_generation() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("pair.star");
+    let out = dir.path().join("out");
+    let recipe = fs::read_to_string(example("datum_pair.star")).unwrap();
+    fs::write(&source, &recipe).unwrap();
+    let build = || {
+        cli(&[
+            "build",
+            source.to_str().unwrap(),
+            "--out-dir",
+            out.to_str().unwrap(),
+        ])
+    };
+    let result = build();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let native_path = out.join("datum_pair.assembly.json");
+    let bytes = fs::read(&native_path).unwrap();
+    let native: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(
+        native["definitions"]["base"]["datums"]["seat"]["translation"],
+        serde_json::json!([5.0, 5.0, 2.0])
+    );
+    let upper = native["instances"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "upper")
+        .unwrap();
+    for (actual, expected) in upper["transform"]["translation"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip([6.0, 3.0, 2.0])
+    {
+        assert!((actual.as_f64().unwrap() - expected).abs() < 1e-10);
+    }
+    let intent = &native["hierarchy"]["pair"]["instances"][0];
+    assert_eq!(intent["attachment"]["target_datum"], "seat");
+    assert_eq!(
+        intent["transform"]["translation"],
+        serde_json::json!([0.0, 0.0, 0.0])
+    );
+    let valid = cli(&["validate", native_path.to_str().unwrap()]);
+    assert!(
+        valid.status.success(),
+        "{}",
+        String::from_utf8_lossy(&valid.stderr)
+    );
+    // A changed datum cannot be smuggled into an otherwise valid published assembly.
+    let mut damaged = native.clone();
+    damaged["definitions"]["base"]["datums"]["seat"]["translation"][0] = 7.0.into();
+    fs::write(&native_path, serde_json::to_vec(&damaged).unwrap()).unwrap();
+    assert!(!cli(&["validate", native_path.to_str().unwrap()])
+        .status
+        .success());
+    fs::write(&native_path, &bytes).unwrap();
+    let generation = fs::read(out.join("manifest.json")).unwrap();
+    fs::write(
+        &source,
+        recipe.replace("target_datum = \"seat\"", "target_datum = \"missing\""),
+    )
+    .unwrap();
+    assert!(!build().status.success());
+    assert_eq!(fs::read(out.join("manifest.json")).unwrap(), generation);
+    assert_eq!(fs::read(&native_path).unwrap(), bytes);
+}
+
+#[test]
+fn gantry_height_edit_moves_attachment_chain_and_rebuilds_one_definition() {
+    let dir = tempfile::tempdir().unwrap();
+    let cache = dir.path().join("cache");
+    let out = dir.path().join("out");
+    let source = example("datum_gantry.star");
+    successful_json(cli(&[
+        "inspect",
+        &source,
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    let changed = successful_json(cli(&[
+        "build",
+        &source,
+        "--param",
+        "post_height=55",
+        "--cache-dir",
+        cache.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+    ]));
+    assert_eq!(changed["stats"]["computed_solids"], 1);
+    assert_eq!(changed["outputs"]["gantry"]["volume_mm3"], 83240.0);
+    assert_eq!(
+        changed["outputs"]["inspection_line"]["volume_mm3"],
+        166480.0
+    );
+    let native: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("inspection_line.assembly.json")).unwrap())
+            .unwrap();
+    for (leaf, z) in [
+        ("bridge", 61.0),
+        ("tool", 65.0),
+        ("left_clamp", 69.0),
+        ("right_clamp", 69.0),
+    ] {
+        for station in ["station_a", "station_b"] {
+            let id = serde_json::to_string(&[station, leaf]).unwrap();
+            let occurrence = native["instances"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|i| i["id"] == id)
+                .unwrap();
+            assert!((occurrence["transform"]["translation"][2].as_f64().unwrap() - z).abs() < 1e-9);
+        }
+    }
+}

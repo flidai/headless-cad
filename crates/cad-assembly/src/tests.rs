@@ -5,6 +5,7 @@ fn parts() -> BTreeMap<String, BuiltPart> {
     BTreeMap::from([(
         "plate".into(),
         BuiltPart {
+            datums: BTreeMap::new(),
             metadata: PartMetadata::default(),
             feature_id: "blank".into(),
             content_hash: "geometry-123".into(),
@@ -14,6 +15,7 @@ fn parts() -> BTreeMap<String, BuiltPart> {
 }
 fn instance(id: &str, translation: [f64; 3]) -> Instance {
     Instance {
+        attachment: None,
         id: id.into(),
         part: "plate".into(),
         transform: RigidTransform {
@@ -279,6 +281,7 @@ fn colliding_declared_definition_hashes_cannot_alias_different_geometry() {
     let occurrences = vec![
         instance("one", [0.0; 3]),
         Instance {
+            attachment: None,
             id: "two".into(),
             part: "different".into(),
             transform: Default::default(),
@@ -300,6 +303,7 @@ fn colliding_declared_definition_hashes_cannot_alias_different_geometry() {
         vec![
             instance("one", [0.0; 3]),
             Instance {
+                attachment: None,
                 id: "two".into(),
                 part: "alias".into(),
                 transform: Default::default(),
@@ -682,6 +686,7 @@ fn bom_counts_reused_nested_parts_and_computes_independent_material_mass() {
             definition(
                 "root",
                 vec![Instance {
+                    attachment: None,
                     id: "alias".into(),
                     part: "same_geometry_other_part".into(),
                     transform: RigidTransform::default(),
@@ -840,4 +845,220 @@ fn bom_rejects_mass_overflow_underflow_and_reports_empty_total() {
     assert_eq!(empty.total_volume_mm3, 0.0);
     assert_eq!(empty.total_mass_kg, Some(0.0));
     assert_eq!(empty.missing_material_occurrences, 0);
+}
+
+fn attached(id: &str, target: &str) -> Instance {
+    Instance {
+        id: id.into(),
+        part: "plate".into(),
+        transform: RigidTransform::default(),
+        attachment: Some(DatumAttachment {
+            instance: target.into(),
+            datum: "origin".into(),
+            target_datum: "fixture".into(),
+        }),
+    }
+}
+
+#[test]
+fn datum_attachment_noncommuting_frames_match_analytic_coordinates_and_intent() {
+    let half = std::f64::consts::FRAC_1_SQRT_2;
+    let mut parts = parts();
+    parts.get_mut("plate").unwrap().datums = BTreeMap::from([
+        (
+            "origin".into(),
+            RigidTransform {
+                translation: [2.0, 0.0, 0.0],
+                rotation: [half, 0.0, 0.0, half],
+            },
+        ),
+        (
+            "fixture".into(),
+            RigidTransform {
+                translation: [0.0, 3.0, 0.0],
+                rotation: [0.0, half, 0.0, half],
+            },
+        ),
+    ]);
+    let mut base = instance("target", [10.0, 20.0, 30.0]);
+    base.transform.rotation = [0.0, 0.0, half, half];
+    let mut leaf = attached("attached", "target");
+    leaf.transform = RigidTransform {
+        translation: [1.0, 2.0, 3.0],
+        rotation: [0.0, 0.0, half, half],
+    };
+    let source = vec![leaf.clone(), base]; // dependency declared later intentionally
+    let built = BuiltAssembly::new(
+        "fixture".into(),
+        parts.clone(),
+        source.clone(),
+        Tolerance::default(),
+    )
+    .unwrap();
+    let placed = built.instances.iter().find(|i| i.id == "attached").unwrap();
+    assert!(placed.attachment.is_none());
+    // Hand-derived mapping for these four noncommuting frames:
+    // (x,y,z) -> (7-x,23-y,29+z).
+    for (actual, expected) in placed
+        .transform
+        .point([2.0, 3.0, 4.0])
+        .into_iter()
+        .zip([5.0, 20.0, 33.0])
+    {
+        assert!((actual - expected).abs() < 1e-12);
+    }
+    let bounds = built.bounds().unwrap();
+    for (actual, expected) in bounds
+        .min
+        .into_iter()
+        .chain(bounds.max)
+        .zip([5.0, 20.0, 29.0, 10.0, 23.0, 34.0])
+    {
+        assert!((actual - expected).abs() < 1e-12);
+    }
+    assert_eq!(
+        built.hierarchy["fixture"].instances[0].attachment,
+        leaf.attachment
+    );
+    let roundtrip: BuiltAssembly =
+        serde_json::from_slice(&serde_json::to_vec(&built).unwrap()).unwrap();
+    roundtrip.validate(Tolerance::default()).unwrap();
+    let mut reversed = source;
+    reversed.reverse();
+    let reordered =
+        BuiltAssembly::new("fixture".into(), parts, reversed, Tolerance::default()).unwrap();
+    assert_eq!(built.content_hash, reordered.content_hash);
+    assert_eq!(built.instances, reordered.instances);
+    let mut corrupted = built;
+    corrupted.instances[0].transform.translation[0] += 1.0;
+    assert!(matches!(
+        corrupted.validate(Tolerance::default()),
+        Err(AssemblyError::DerivedMismatch)
+    ));
+}
+
+#[test]
+fn datum_attachment_rejects_cycles_missing_frames_and_invalid_datum_data() {
+    let mut parts = parts();
+    parts.get_mut("plate").unwrap().datums = BTreeMap::from([
+        ("origin".into(), RigidTransform::default()),
+        ("fixture".into(), RigidTransform::default()),
+    ]);
+    for instances in [
+        vec![attached("a", "a")],
+        vec![attached("a", "b"), attached("b", "a")],
+        vec![attached("a", "missing")],
+    ] {
+        assert!(matches!(
+            BuiltAssembly::new("bad".into(), parts.clone(), instances, Tolerance::default()),
+            Err(AssemblyError::Attachment(_))
+        ));
+    }
+    let mut missing = attached("a", "b");
+    missing.attachment.as_mut().unwrap().datum = "missing".into();
+    assert!(BuiltAssembly::new(
+        "bad".into(),
+        parts.clone(),
+        vec![missing, instance("b", [0.0; 3])],
+        Tolerance::default()
+    )
+    .is_err());
+    for (name, frame) in [
+        (" bad", RigidTransform::default()),
+        (
+            "valid",
+            RigidTransform {
+                rotation: [0.0, 0.0, 0.0, 2.0],
+                ..Default::default()
+            },
+        ),
+        (
+            "valid",
+            RigidTransform {
+                translation: [f64::NAN, 0.0, 0.0],
+                ..Default::default()
+            },
+        ),
+    ] {
+        assert!(validate_datums(&BTreeMap::from([(name.into(), frame)])).is_err());
+    }
+    let chain = (0..65)
+        .map(|i| {
+            if i == 64 {
+                instance(&format!("i{i}"), [0.0; 3])
+            } else {
+                attached(&format!("i{i}"), &format!("i{}", i + 1))
+            }
+        })
+        .collect();
+    assert!(matches!(
+        BuiltAssembly::new("deep".into(), parts, chain, Tolerance::default()),
+        Err(AssemblyError::ResourceLimit)
+    ));
+}
+
+#[test]
+fn datum_metadata_edits_reposition_dependents_without_changing_geometry_and_inversion_checks_range()
+{
+    let mut parts = parts();
+    parts.get_mut("plate").unwrap().datums = BTreeMap::from([
+        ("origin".into(), RigidTransform::default()),
+        ("fixture".into(), RigidTransform::default()),
+    ]);
+    let source = vec![instance("base", [0.0; 3]), attached("placed", "base")];
+    let before = BuiltAssembly::new(
+        "fixture".into(),
+        parts.clone(),
+        source.clone(),
+        Tolerance::default(),
+    )
+    .unwrap();
+    parts
+        .get_mut("plate")
+        .unwrap()
+        .datums
+        .get_mut("fixture")
+        .unwrap()
+        .translation = [5.0, 0.0, 0.0];
+    let after = BuiltAssembly::new("fixture".into(), parts, source, Tolerance::default()).unwrap();
+    assert_ne!(before.content_hash, after.content_hash);
+    assert_eq!(
+        before.parts["plate"].content_hash,
+        after.parts["plate"].content_hash
+    );
+    assert!(Arc::ptr_eq(
+        &before.parts["plate"].result,
+        &after.parts["plate"].result
+    ));
+    assert_eq!(
+        after
+            .instances
+            .iter()
+            .find(|i| i.id == "placed")
+            .unwrap()
+            .transform
+            .translation,
+        [5.0, 0.0, 0.0]
+    );
+    let half = std::f64::consts::FRAC_1_SQRT_2;
+    let large = RigidTransform {
+        translation: [1e20, 0.0, 0.0],
+        rotation: [0.0, 0.0, half, half],
+    };
+    assert!(matches!(
+        large.inverse(Tolerance::default()),
+        Err(AssemblyError::NumericRange)
+    ));
+    let frame = RigidTransform {
+        translation: [4.0, -3.0, 2.0],
+        rotation: [half, 0.0, 0.0, half],
+    };
+    let inverse = frame.inverse(Tolerance::default()).unwrap();
+    for (actual, expected) in inverse
+        .point(frame.point([1.0, 2.0, 3.0]))
+        .into_iter()
+        .zip([1.0, 2.0, 3.0])
+    {
+        assert!((actual - expected).abs() < 1e-12);
+    }
 }

@@ -14,7 +14,7 @@ use starlark::environment::{GlobalsBuilder, Module};
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::syntax::{AstModule, Dialect};
-use starlark::values::{none::NoneType, Value};
+use starlark::values::{none::NoneType, Heap, Value};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -77,14 +77,10 @@ fn number(value: Value<'_>) -> anyhow::Result<f64> {
     Ok(number)
 }
 
-fn register_instance(
-    id: &str,
-    reference_key: &str,
-    reference: &str,
+fn frame(
     offset: Option<Value>,
     rotation: Option<Value>,
-    eval: &mut Evaluator,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<cad_build::RigidTransform> {
     let translation: [f64; 3] = match offset {
         Some(value) => serde_json::from_str(&value.to_json()?).map_err(|_| {
             anyhow::anyhow!("instance offset must contain exactly three finite lengths")
@@ -103,7 +99,20 @@ fn register_instance(
     };
     transform
         .validate()
-        .map_err(|error| anyhow::anyhow!("instance '{id}': {error}"))?;
+        .map_err(|error| anyhow::anyhow!("invalid datum/placement frame: {error}"))?;
+    Ok(transform)
+}
+
+fn register_instance(
+    id: &str,
+    reference_key: &str,
+    reference: &str,
+    attachment: Option<cad_build::DatumAttachment>,
+    offset: Option<Value>,
+    rotation: Option<Value>,
+    eval: &mut Evaluator,
+) -> anyhow::Result<String> {
+    let transform = frame(offset, rotation)?;
     let graph = store(eval)?;
     let mut instances = graph.instances.borrow_mut();
     anyhow::ensure!(
@@ -111,10 +120,11 @@ fn register_instance(
         "recipe exceeds {MAX_INSTANCES} instances"
     );
     anyhow::ensure!(!instances.contains_key(id), "duplicate instance ID '{id}'");
-    instances.insert(
-        id.to_owned(),
-        serde_json::json!({"id":id,reference_key:reference,"transform":transform}),
-    );
+    let mut record = serde_json::json!({"id":id,reference_key:reference,"transform":transform});
+    if let Some(attachment) = attachment {
+        record["attachment"] = serde_json::to_value(attachment)?;
+    }
+    instances.insert(id.to_owned(), record);
     Ok(id.to_owned())
 }
 
@@ -296,6 +306,15 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// A named local rigid frame; attach it to a part with part(datums={...}).
+    fn datum<'v>(
+        offset: Option<Value<'v>>,
+        rotation: Option<Value<'v>>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        Ok(heap.alloc(serde_json::to_value(frame(offset, rotation)?)?))
+    }
+
     /// Give a solid feature a reusable part-definition identity.
     #[allow(clippy::too_many_arguments)]
     fn part(
@@ -306,6 +325,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         description: Option<&str>,
         material: Option<&str>,
         density_kg_per_m3: Option<Value>,
+        datums: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
         let material = match (material, density_kg_per_m3) {
@@ -327,6 +347,14 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         metadata
             .validate()
             .map_err(|error| anyhow::anyhow!("part '{id}': {error}"))?;
+        let datums: BTreeMap<String, cad_build::RigidTransform> = match datums {
+            Some(value) => serde_json::from_str(&value.to_json()?).map_err(|error| {
+                anyhow::anyhow!("part '{id}' datums must map names to rigid frames: {error}")
+            })?,
+            None => BTreeMap::new(),
+        };
+        cad_build::validate_datums(&datums)
+            .map_err(|error| anyhow::anyhow!("part '{id}': {error}"))?;
         let graph = store(eval)?;
         let mut parts = graph.parts.borrow_mut();
         anyhow::ensure!(parts.len() < MAX_PARTS, "recipe exceeds {MAX_PARTS} parts");
@@ -334,20 +362,38 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         if metadata != cad_build::PartMetadata::default() {
             definition["metadata"] = serde_json::to_value(metadata)?;
         }
+        if !datums.is_empty() {
+            definition["datums"] = serde_json::to_value(datums)?;
+        }
         parts.push(definition);
         Ok(id.to_owned())
     }
 
     /// Instance placement does not modify or duplicate its part's exact B-rep.
     /// Rotation is a unit quaternion [x,y,z,w]; offset is in millimetres.
+    #[allow(clippy::too_many_arguments)]
     fn instance(
         id: &str,
         part: &str,
         offset: Option<Value>,
         rotation: Option<Value>,
+        attach_to: Option<&str>,
+        datum: Option<&str>,
+        target_datum: Option<&str>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        register_instance(id, "part", part, offset, rotation, eval)
+        let attachment = match (attach_to, datum, target_datum) {
+            (None, None, None) => None,
+            (Some(instance), Some(datum), Some(target_datum)) => Some(cad_build::DatumAttachment {
+                instance: instance.into(),
+                datum: datum.into(),
+                target_datum: target_datum.into(),
+            }),
+            _ => {
+                anyhow::bail!("instance '{id}' requires attach_to, datum and target_datum together")
+            }
+        };
+        register_instance(id, "part", part, attachment, offset, rotation, eval)
     }
 
     /// Place an assembly definition without duplicating its parts or geometry.
@@ -358,7 +404,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         rotation: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        register_instance(id, "assembly", assembly, offset, rotation, eval)
+        register_instance(id, "assembly", assembly, None, offset, rotation, eval)
     }
 
     /// Collect part and nested assembly instances into a reusable definition.
@@ -1045,5 +1091,57 @@ mod polygon_tests {
             cad_build::build(&clockwise),
             Err(cad_build::BuildError::PolygonProfile { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+mod datum_tests {
+    use super::*;
+    const SOURCE:&str="gap=param(name='gap',default=3)\np=rectangle(id='p',width=2,depth=3)\nb=extrude(id='b',profile=p,height=4)\nd=part(id='part',body=b,datums={'bottom':datum(),'top':datum(offset=[0,0,4])})\nchild=instance(id='child',part=d,attach_to='parent',datum='bottom',target_datum='top',offset=[0,0,gap])\nparent=instance(id='parent',part=d)\na=assembly(id='a',instances=[child,parent])\nassembly_output(name='a',assembly=a)";
+    #[test]
+    fn datum_dsl_roundtrips_attachment_intent_and_keeps_placement_cache_shared() {
+        let recipe = from_starlark("datums.star", SOURCE).unwrap();
+        assert_eq!(recipe.parts[0].datums.len(), 2);
+        assert!(recipe.assemblies[0].instances[0].attachment.is_some());
+        let decoded: Recipe =
+            serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+        let mut engine = cad_build::BuildEngine::default();
+        let first = engine.build(&decoded).unwrap();
+        let child = first.assemblies["a"]
+            .instances
+            .iter()
+            .find(|instance| instance.id == "child")
+            .unwrap();
+        assert_eq!(child.transform.translation, [0.0, 0.0, 7.0]);
+        let moved = from_starlark_with_params(
+            "datums.star",
+            SOURCE,
+            &BTreeMap::from([("gap".into(), 5.0)]),
+        )
+        .unwrap();
+        let changed = engine.build(&moved).unwrap();
+        assert_eq!(changed.stats.computed_solids, 0);
+        assert_eq!(first.feature_hashes, changed.feature_hashes);
+        assert_ne!(
+            first.assemblies["a"].content_hash,
+            changed.assemblies["a"].content_hash
+        );
+    }
+    #[test]
+    fn datum_dsl_rejects_partial_attachment_arguments_and_invalid_frames() {
+        for source in [
+            "datum(offset=[1,2])",
+            "datum(rotation=[0,0,0,0])",
+            "part(id='p',body='b',datums={'':datum()})",
+            "part(id='p',body='b',datums={'mount':{'typo':1}})",
+            "instance(id='i',part='p',attach_to='a')",
+            "instance(id='i',part='p',datum='mount',target_datum='top')",
+            "part(id='p',body='b',datums=[])",
+        ] {
+            assert!(
+                from_starlark("bad.star", source).is_err(),
+                "accepted {source}"
+            );
+        }
     }
 }

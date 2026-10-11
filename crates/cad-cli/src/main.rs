@@ -469,6 +469,12 @@ fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn
         parts.insert(
             name.clone(),
             cad_assembly::BuiltPart {
+                datums: serde_json::from_value(
+                    definition
+                        .get("datums")
+                        .cloned()
+                        .unwrap_or_else(|| json!({})),
+                )?,
                 feature_id: text(&definition["feature_id"])?,
                 content_hash: text(&definition["content_hash"])?,
                 result,
@@ -798,6 +804,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     "feature_id": part.feature_id,
                     "content_hash": part.content_hash,
                     "metadata": part.metadata,
+                    "datums": part.datums,
                     "geometry_asset": asset,
                     "local_bounds_mm": if part.result.model.solids.is_empty() { Value::Null } else { json!(part.result.model.bounds()) },
                     "material_volume_mm3": part.result.model.volume(),

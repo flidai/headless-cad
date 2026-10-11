@@ -50,6 +50,8 @@ pub(super) fn validate<'a>(
     let mut parts = HashSet::new();
     for part in &recipe.parts {
         identifier("part", &part.id)?;
+        validate_datums(&part.datums)
+            .map_err(|error| BuildError::AssemblyGraph(format!("part '{}': {error}", part.id)))?;
         part.metadata
             .validate()
             .map_err(|error| BuildError::AssemblyGraph(format!("part '{}': {error}", part.id)))?;
@@ -112,6 +114,13 @@ pub(super) fn validate<'a>(
         .collect();
     let part_ids = recipe.parts.iter().map(|part| part.id.clone()).collect();
     cad_assembly::validate_definitions(&part_ids, &definitions)
+        .map_err(|error| BuildError::AssemblyGraph(error.to_string()))?;
+    let part_definitions = recipe
+        .parts
+        .iter()
+        .map(|part| (part.id.clone(), part.clone()))
+        .collect();
+    cad_assembly::validate_attachment_definitions(&part_definitions, &definitions)
         .map_err(|error| BuildError::AssemblyGraph(error.to_string()))?;
     let mut exported_leaves = 0usize;
     let mut exported_nodes = 0usize;
@@ -176,6 +185,7 @@ pub(super) fn evaluate(
                 BuiltPart {
                     feature_id: definition.feature.clone(),
                     metadata: definition.metadata.clone(),
+                    datums: definition.datums.clone(),
                     content_hash: hashes[&definition.feature].clone(),
                     result: Arc::clone(&evaluated[&definition.feature]),
                 },

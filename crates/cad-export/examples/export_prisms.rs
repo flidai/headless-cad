@@ -42,6 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::collections::BTreeMap::from([(
             "wedge".into(),
             cad_assembly::BuiltPart {
+                datums: Default::default(),
                 feature_id: "extrude".into(),
                 content_hash: "triangle".into(),
                 metadata: Default::default(),
@@ -49,6 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         )]),
         vec![cad_assembly::Instance {
+            attachment: None,
             id: "turned".into(),
             part: "wedge".into(),
             transform: cad_assembly::RigidTransform {

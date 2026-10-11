@@ -89,6 +89,7 @@ fn rotated_triangular_prism_assembly_has_correct_world_mesh() {
         BTreeMap::from([(
             "wedge".into(),
             BuiltPart {
+                datums: Default::default(),
                 feature_id: "extrude".into(),
                 content_hash: "triangle".into(),
                 metadata: Default::default(),
@@ -96,6 +97,7 @@ fn rotated_triangular_prism_assembly_has_correct_world_mesh() {
             },
         )]),
         vec![Instance {
+            attachment: None,
             id: "turned".into(),
             part: "wedge".into(),
             transform: RigidTransform {

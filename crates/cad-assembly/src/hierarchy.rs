@@ -195,6 +195,7 @@ pub(super) fn expand(
         return Err(AssemblyError::Tolerance);
     }
     validate_definitions(&parts.keys().cloned().collect(), definitions)?;
+    crate::datum::validate_built_attachments(parts, definitions)?;
     let root_definition = definitions
         .get(root)
         .ok_or_else(|| AssemblyError::Hierarchy(format!("missing root '{root}'")))?;
@@ -238,11 +239,20 @@ pub(super) fn expand(
         Ok(total)
     }
     placement_work(root, parts, definitions, &mut BTreeMap::new())?;
+    let resolved: BTreeMap<_, _> = hierarchy
+        .iter()
+        .map(|(id, definition)| {
+            Ok((
+                id.as_str(),
+                resolve_definition_instances(definition, parts, tolerance)?,
+            ))
+        })
+        .collect::<Result<_, AssemblyError>>()?;
     let mut leaves = BTreeMap::new();
     let mut paths = BTreeMap::new();
     let mut pending = vec![(root, Vec::<String>::new(), RigidTransform::default())];
     while let Some((id, prefix, transform)) = pending.pop() {
-        for leaf in &definitions[id].instances {
+        for leaf in &resolved[id] {
             let mut path = prefix.clone();
             path.push(leaf.id.clone());
             let leaf_id = if nested {
@@ -253,6 +263,7 @@ pub(super) fn expand(
             leaves.insert(
                 leaf_id.clone(),
                 Instance {
+                    attachment: None,
                     id: leaf_id.clone(),
                     part: leaf.part.clone(),
                     transform: transform.compose(&leaf.transform, tolerance)?,

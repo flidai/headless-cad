@@ -16,6 +16,7 @@ struct Definition {
     mesh: String,
     feature_id: String,
     metadata: cad_assembly::PartMetadata,
+    datums: BTreeMap<String, cad_assembly::RigidTransform>,
 }
 
 #[derive(Serialize)]
@@ -81,6 +82,7 @@ fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewErro
                 mesh: part.content_hash.clone(),
                 feature_id: part.feature_id.clone(),
                 metadata: part.metadata.clone(),
+                datums: part.datums.clone(),
             },
         );
     }
@@ -215,6 +217,7 @@ mod tests {
 
     fn fixture() -> BuiltAssembly {
         let part = BuiltPart {
+            datums: Default::default(),
             metadata: Default::default(),
             feature_id: "blank".into(),
             content_hash: "shared-geometry".into(),
@@ -228,11 +231,13 @@ mod tests {
             ]),
             vec![
                 Instance {
+                    attachment: None,
                     id: "original".into(),
                     part: "block".into(),
                     transform: RigidTransform::default(),
                 },
                 Instance {
+                    attachment: None,
                     id: "turned".into(),
                     part: "rotated_definition".into(),
                     transform: RigidTransform {
@@ -357,6 +362,7 @@ mod tests {
         assert_eq!(compact.instances.len(), 2);
         let instances = (0..8_334)
             .map(|index| Instance {
+                attachment: None,
                 id: format!("occurrence_{index}"),
                 part: "block".into(),
                 transform: RigidTransform::default(),

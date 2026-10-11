@@ -71,6 +71,43 @@ def placement_matrix(transform):
     ]
 
 
+def multiply(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) +
+             (a[i][3] if j == 3 else 0) for j in range(4)] for i in range(3)]
+
+
+def inverse(matrix):
+    rotation = [[matrix[j][i] for j in range(3)] for i in range(3)]
+    return [row + [-sum(row[j] * matrix[j][3] for j in range(3))] for row in rotation]
+
+
+def resolved_placements(definition, parts):
+    """Independent matrix solution, avoiding kernel quaternion composition."""
+    instances = {instance["id"]: instance for instance in definition["instances"]}
+    resolved, active = {}, set()
+
+    def resolve(name):
+        if name in resolved:
+            return resolved[name]
+        require(name not in active, "attachment cycle in expected source")
+        active.add(name)
+        instance = instances[name]
+        placement = placement_matrix(instance["transform"])
+        attachment = instance.get("attachment")
+        if attachment:
+            target = instances[attachment["instance"]]
+            own_datum = placement_matrix(parts[instance["part"]]["datums"][attachment["datum"]])
+            target_datum = placement_matrix(parts[target["part"]]["datums"][attachment["target_datum"]])
+            placement = multiply(multiply(multiply(resolve(target["id"]), target_datum), placement), inverse(own_datum))
+        active.remove(name)
+        resolved[name] = placement
+        return placement
+
+    for name in instances:
+        resolve(name)
+    return resolved
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("step")
@@ -185,6 +222,7 @@ def main():
             require(len(by_name) == len(assembly_definitions), "duplicated assembly definitions")
             require(by_name.keys() == expected["hierarchy"].keys(), "assembly definition graph differs")
             for name, definition in expected["hierarchy"].items():
+                resolved = resolved_placements(definition, expected["definitions"])
                 actual_edges = {edge["id"]: edge for edge in definition_edges[by_name[name]]}
                 wanted_edges = [(i, False) for i in definition["instances"]] + [(i, True) for i in definition.get("assemblies", [])]
                 require(actual_edges.keys() == {i["id"] for i, _ in wanted_edges}, f"direct children differ: {name}")
@@ -195,7 +233,7 @@ def main():
                         require(edge["definition"] == by_name[instance["assembly"]], "subassembly definition not reused")
                     else:
                         require(definitions[edge["definition"]] == instance["part"], "leaf part identity differs")
-                    wanted = placement_matrix(instance["transform"])
+                    wanted = placement_matrix(instance["transform"]) if nested else resolved[instance["id"]]
                     require(all(close(a, b, 1e-12) for row, target in zip(edge["placement"], wanted)
                                 for a, b in zip(row, target)), f"local placement differs: {name}/{instance['id']}")
         hash_to_reference = {}

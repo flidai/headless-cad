@@ -272,5 +272,57 @@
         ]
       ]
     }
+  },
+  "datum_pair.star": {
+    "datum_pair": {
+      "volume_mm3": 224,
+      "solids": 2,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          10,
+          10,
+          5
+        ]
+      ]
+    }
+  },
+  "datum_gantry.star": {
+    "gantry": {
+      "volume_mm3": 80440,
+      "solids": 7,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          120,
+          80,
+          63
+        ]
+      ]
+    },
+    "inspection_line": {
+      "volume_mm3": 160880,
+      "solids": 14,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          120,
+          180,
+          63
+        ]
+      ]
+    }
   }
 }

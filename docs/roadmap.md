@@ -12,7 +12,7 @@ regression performance. A green test count alone does not close a milestone.
 | Milestone | Deliverable and example progression | Acceptance evidence | Status |
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
-| M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; broader selectors, datums and downstream modeling consumers remain |
+| M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums/sibling attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associated datums, broader selectors and downstream modeling consumers remain |
 | M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: strict convex CCW polygon extrusion (3–256 vertices), polygon caps and single-convex-solid planar validation implemented; holes, curves, general transforms/Booleans and trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | Planned; independent of curved-kernel completion |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
@@ -33,12 +33,18 @@ operations are already supported.
 
 ## Next concrete implementation increments
 
-1. Extend implemented schema-2 nested assemblies with named datums and explicit
-   configuration identity. Schema 1 remains supported; keep migration, nested
-   transform composition, and repeated-definition reuse tests.
+1. Extend implemented schema-2 nested assemblies and named part datums with
+   topology-associated frames, cross-level attachment semantics and explicit
+   configuration identity. Sibling rigid attachments now evaluate a bounded DAG
+   using target placement × target datum × local offset × inverse own datum;
+   they are not a nonlinear mate solver. Preserve the source intent/resolved
+   placement distinction, schema migration, noncommuting transform tests and
+   repeated-definition reuse. `datum_gantry.star` progresses from attached posts
+   and a rotated tool frame to a repeated inspection line; STEP preserves the
+   resulting placements but not the datum/attachment semantics.
 2. Extend implemented face-role selector results (`resolved`, `deleted`,
    `ambiguous`, `unsupported`) and orthogonal face lineage to richer predicates,
-   datums and downstream modeling consumers. Recipe `assert_faces` now enforces
+   topology-associated datums and downstream modeling consumers. Recipe `assert_faces` now enforces
    these references before publication and preserves reports for review.
    Expand the generated edit corpus beyond orthogonal cuts and translations
    before claiming general persistent naming reliability.

@@ -6,6 +6,10 @@
 //! modeling domain. Nested reusable definitions retain local placements and explicit
 //! occurrence paths. Assembly constraints are not implemented.
 mod bom;
+mod datum;
+pub use datum::{
+    resolve_definition_instances, validate_attachment_definitions, validate_datums, DatumAttachment,
+};
 mod hierarchy;
 pub use bom::{BomItem, BomReport, Material, PartMetadata};
 use cad_kernel::{Bounds, OperationResult, Tolerance};
@@ -28,6 +32,7 @@ pub fn assembly_build_id() -> &'static str {
         hash.update(include_bytes!("lib.rs"));
         hash.update(include_bytes!("hierarchy.rs"));
         hash.update(include_bytes!("bom.rs"));
+        hash.update(include_bytes!("datum.rs"));
         hash.update(include_bytes!("../Cargo.toml"));
         hash.update(include_bytes!("../../../Cargo.lock"));
         hash.update(cad_kernel::KERNEL_BUILD_ID.as_bytes());
@@ -38,6 +43,8 @@ pub fn assembly_build_id() -> &'static str {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PartDefinition {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub datums: BTreeMap<String, RigidTransform>,
     pub id: String,
     pub feature: String,
     #[serde(default)]
@@ -47,6 +54,8 @@ pub struct PartDefinition {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Instance {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment: Option<DatumAttachment>,
     pub id: String,
     pub part: String,
     #[serde(default)]
@@ -204,6 +213,8 @@ impl RigidTransform {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BuiltPart {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub datums: BTreeMap<String, RigidTransform>,
     #[serde(default)]
     pub metadata: PartMetadata,
     pub feature_id: String,
@@ -226,6 +237,8 @@ pub struct BuiltAssembly {
 
 #[derive(Debug, Error)]
 pub enum AssemblyError {
+    #[error("invalid datum attachment: {0}")]
+    Attachment(String),
     #[error("invalid engineering metadata: {0}")]
     Metadata(&'static str),
     #[error("invalid assembly hierarchy: {0}")]
@@ -348,6 +361,7 @@ impl BuiltAssembly {
         for (id, part) in &self.parts {
             identifier("part", id)?;
             part.metadata.validate()?;
+            validate_datums(&part.datums)?;
             identifier("feature", &part.feature_id)?;
             identifier("definition hash", &part.content_hash)?;
             let report = part.result.model.validate(tolerance);
@@ -466,6 +480,7 @@ impl BuiltAssembly {
                         &part.feature_id,
                         &part.content_hash,
                         &part.metadata,
+                        &part.datums,
                         blake3::hash(&bytes).to_hex().to_string(),
                     ),
                 ))

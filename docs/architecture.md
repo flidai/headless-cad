@@ -114,7 +114,9 @@ The geometric topology is not necessarily a DAG: boundary loops and incidence
 are inherently cyclic. Constraints also form graphs with loops. An assembly is
 not a Boolean union of its parts. Fixtures and enclosures use explicit part
 instances; the modular rack reuses nested rows and carriages. Older examples can
-still use disjoint unions. Joints and datums remain target work.
+still use disjoint unions. Named part frames and deterministic sibling datum
+attachments are implemented; joints and nonlinear constraint solving remain
+target work.
 
 ## Authoring and AI-native execution
 
@@ -225,7 +227,7 @@ translation lineage to a target feature, and require one, N, or all nonempty
 descendants. Reports distinguish resolved, deleted, ambiguous, and unsupported,
 with snapshot fingerprints and face/operation witnesses. This is recomputed from
 source intent on each build; it is not persistent numbering. General geometric
-predicates, edge/vertex selectors, datums, instance paths, and consumption by
+predicates, edge/vertex selectors, topology-associated datums, instance paths, and consumption by
 downstream modeling operations remain work to implement.
 
 Starlark `assert_faces` persists this selector intent in schema-2 recipes. The
@@ -235,6 +237,32 @@ assertion changes. This is the first build-time consumer of semantic references.
 It does not yet attach a sketch or drive a geometric operation from a reference.
 
 ## Constraints and assemblies
+
+The current M1 attachment increment resolves explicit named part frames without
+solving nonlinear constraints. Part definitions retain a map of local rigid
+`datums`; an attached leaf instance retains its target sibling occurrence, own
+datum name, target datum name, and local offset transform. Evaluation uses:
+
+```text
+placement = target_placement × target_datum × offset × inverse(own_datum)
+```
+
+Frames default to identity, unit quaternions are validated rather than normalized,
+and checked inverse/composition enforce the placement numerical envelope. Only
+sibling leaf parts in one assembly definition can be targets. An iterative DAG
+walk rejects missing references, cycles, and chains beyond 64 occurrences before
+expansion; named frame count and assembly work budgets remain bounded. Resolution
+is independent of declaration order. Each reusable definition resolves locally
+before its occurrences receive parent placement.
+
+Source hierarchy preserves attachment intent; flattened placements and STEP
+occurrence transforms use the resolved result. Native validation recomputes and
+compares derived placements. STEP exports placements, not the named datum or
+attachment semantics. Datum-only edits change assembly identity and reuse exact
+part geometry. `examples/datum_gantry.star` demonstrates attached posts, bridge,
+clamps, and a rotated tool datum, then reuses the gantry in an inspection line.
+These frames are not associated with evolving faces. Cross-level mating, joints,
+multiple constraints, and DOF/residual solving remain separate future work.
 
 Build a constraint service separately from geometric construction. The 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
@@ -399,8 +427,8 @@ reviewed decision based on evidence, not by relabeling missed targets.
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
-| References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, nested rigid instances, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Datums, constraints and configurations |
+| References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Topology-associated datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, depth-buffer Canvas inspection, compact instanced display assets, occurrence picking, recipe panel, live refresh | GPU instancing, lazy assets, bounded LOD streaming, sections/overlays |
 | Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |

@@ -91,9 +91,12 @@ pub fn assembly_to_step(
     // contains only its own local placements, never composed leaf placements.
     let mut assemblies = BTreeMap::new();
     let mut placements = BTreeMap::new();
+    let mut resolved = BTreeMap::new();
     for (name, definition) in &assembly.hierarchy {
-        let local: Vec<_> = definition
-            .instances
+        let leaves =
+            cad_assembly::resolve_definition_instances(definition, &assembly.parts, tolerance)
+                .map_err(|error| ExportError::InvalidModel(error.to_string()))?;
+        let local: Vec<_> = leaves
             .iter()
             .map(|i| &i.transform)
             .chain(definition.assemblies.iter().map(|i| &i.transform))
@@ -117,6 +120,7 @@ pub fn assembly_to_step(
         ));
         assemblies.insert(name, (product, representation));
         placements.insert(name, local);
+        resolved.insert(name, leaves);
     }
     let mut definitions = BTreeMap::new();
     let mut geometry = BTreeMap::new();
@@ -149,8 +153,7 @@ pub fn assembly_to_step(
     }
     for (parent, definition) in &assembly.hierarchy {
         let (parent_definition, parent_representation) = assemblies[parent];
-        let children = definition
-            .instances
+        let children = resolved[parent]
             .iter()
             .map(|i| (&i.id, definitions[&i.part]))
             .chain(
@@ -254,6 +257,7 @@ mod tests {
             BTreeMap::from([(
                 "block".into(),
                 BuiltPart {
+                    datums: Default::default(),
                     metadata: Default::default(),
                     feature_id: "box".into(),
                     content_hash: "block-geometry".into(),
@@ -262,11 +266,13 @@ mod tests {
             )]),
             vec![
                 Instance {
+                    attachment: None,
                     id: "first".into(),
                     part: "block".into(),
                     transform: RigidTransform::default(),
                 },
                 Instance {
+                    attachment: None,
                     id: "second".into(),
                     part: "block".into(),
                     transform: RigidTransform {
@@ -361,6 +367,7 @@ mod tests {
         let module = AssemblyDefinition {
             id: "block".into(),
             instances: vec![Instance {
+                attachment: None,
                 id: "leaf".into(),
                 part: "block".into(),
                 transform: local,
@@ -398,6 +405,116 @@ mod tests {
         for (actual, expected) in placed.into_iter().zip([26., -2., -3.]) {
             assert!((actual - expected).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn step_uses_resolved_datum_placement_instead_of_source_offset() {
+        use cad_assembly::DatumAttachment;
+        let tolerance = Tolerance::default();
+        let q = std::f64::consts::FRAC_1_SQRT_2;
+        let part = |width, depth, height, hash: &str, datum| BuiltPart {
+            feature_id: hash.into(),
+            content_hash: hash.into(),
+            metadata: Default::default(),
+            datums: BTreeMap::from([("mount".into(), datum)]),
+            result: Arc::new(
+                cad_kernel::extrude_rectangle(width, depth, height, tolerance).unwrap(),
+            ),
+        };
+        let parts = BTreeMap::from([
+            (
+                "anchor".into(),
+                part(
+                    1.,
+                    1.,
+                    1.,
+                    "anchor",
+                    RigidTransform {
+                        translation: [0., 2., 0.],
+                        rotation: [0., q, 0., q],
+                    },
+                ),
+            ),
+            (
+                "child".into(),
+                part(
+                    2.,
+                    3.,
+                    4.,
+                    "child",
+                    RigidTransform {
+                        translation: [1., 0., 0.],
+                        rotation: [q, 0., 0., q],
+                    },
+                ),
+            ),
+        ]);
+        let assembly = BuiltAssembly::new(
+            "datums".into(),
+            parts,
+            vec![
+                Instance {
+                    id: "target".into(),
+                    part: "anchor".into(),
+                    attachment: None,
+                    transform: RigidTransform {
+                        translation: [10., 20., 30.],
+                        rotation: [0., 0., q, q],
+                    },
+                },
+                Instance {
+                    id: "attached".into(),
+                    part: "child".into(),
+                    attachment: Some(DatumAttachment {
+                        instance: "target".into(),
+                        datum: "mount".into(),
+                        target_datum: "mount".into(),
+                    }),
+                    transform: RigidTransform {
+                        translation: [0., 0., 3.],
+                        ..Default::default()
+                    },
+                },
+            ],
+            tolerance,
+        )
+        .unwrap();
+        let step = assembly_to_step(&assembly, tolerance).unwrap();
+        // Independent equation gives p_world = [8-z, 23-y, 31-x]. The
+        // attachment offset [0,0,3] is not the occurrence's resolved origin.
+        let origins: Vec<[f64; 3]> = step
+            .lines()
+            .filter_map(|line| {
+                let (_, tail) = line.split_once("CARTESIAN_POINT('',(")?;
+                let values: Vec<f64> = tail
+                    .trim_end_matches("));")
+                    .split(',')
+                    .map(|v| v.parse().unwrap())
+                    .collect();
+                Some([values[0], values[1], values[2]])
+            })
+            .collect();
+        assert!(origins.iter().any(|origin| origin
+            .iter()
+            .zip([8., 23., 31.])
+            .all(|(a, b)| (a - b).abs() < 1e-12)));
+        assert!(!origins.contains(&[0., 0., 3.]));
+        let attached = assembly
+            .instances
+            .iter()
+            .find(|i| i.id == "attached")
+            .unwrap();
+        for point in [[0., 0., 0.], [2., 3., 4.]] {
+            let wanted = [8. - point[2], 23. - point[1], 31. - point[0]];
+            assert!(attached
+                .transform
+                .point(point)
+                .into_iter()
+                .zip(wanted)
+                .all(|(a, b)| (a - b).abs() < 1e-12));
+        }
+        assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 2);
+        assert!((assembly.material_volume() - 25.).abs() < 1e-12);
     }
 
     #[test]
