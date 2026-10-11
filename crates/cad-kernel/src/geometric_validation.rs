@@ -36,10 +36,10 @@ pub(super) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<Valid
     let orthogonal = model.faces.iter().all(|face| {
         model.loops[face.loops[0].0].edges.len() == 4
             && (0..3).any(|axis| {
-                face.plane.normal[axis].abs() == 1.0
+                face.try_plane().unwrap().normal[axis].abs() == 1.0
                     && (0..3)
                         .filter(|&i| i != axis)
-                        .all(|i| face.plane.normal[i] == 0.0)
+                        .all(|i| face.try_plane().unwrap().normal[i] == 0.0)
             })
     }) && model.edges.iter().all(|edge| {
         let a = model.vertices[edge.vertices[0].0].position;
@@ -95,9 +95,9 @@ pub(crate) fn validate_convex(model: &ModelSnapshot, tolerance: Tolerance) -> Ve
             if vertices.contains(&VertexId(id)) {
                 continue;
             }
-            let delta = crate::math::sub(vertex.position, face.plane.origin);
+            let delta = crate::math::sub(vertex.position, face.try_plane().unwrap().origin);
             let products: [f64; 3] =
-                std::array::from_fn(|axis| delta[axis] * face.plane.normal[axis]);
+                std::array::from_fn(|axis| delta[axis] * face.try_plane().unwrap().normal[axis]);
             let distance: f64 = products.into_iter().sum();
             let uncertainty =
                 products.into_iter().map(f64::abs).sum::<f64>() * (16.0 * f64::EPSILON);
@@ -122,10 +122,10 @@ fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
     for (index, face) in model.faces.iter().enumerate() {
         let boundary = &model.loops[face.loops[0].0];
         let axis = (0..3).find(|&axis| {
-            face.plane.normal[axis].abs() == 1.0
+            face.try_plane().unwrap().normal[axis].abs() == 1.0
                 && (0..3)
                     .filter(|&i| i != axis)
-                    .all(|i| face.plane.normal[i] == 0.0)
+                    .all(|i| face.try_plane().unwrap().normal[i] == 0.0)
         });
         let Some(axis) = axis else {
             return issue(
@@ -152,7 +152,7 @@ fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
                 max[axis] = max[axis].max(coordinate);
             }
         }
-        if min[axis] != max[axis] || min[axis] != face.plane.origin[axis] {
+        if min[axis] != max[axis] || min[axis] != face.try_plane().unwrap().origin[axis] {
             return issue(
                 "unsupported_geometry",
                 format!(
@@ -172,10 +172,11 @@ fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
                 );
             }
             let direction_axis = changing[0];
-            if edge.line.direction[direction_axis].abs() != 1.0
-                || (0..3)
-                    .filter(|&i| i != direction_axis)
-                    .any(|i| edge.line.direction[i] != 0.0 || edge.line.origin[i] != a[i])
+            if edge.try_line().unwrap().direction[direction_axis].abs() != 1.0
+                || (0..3).filter(|&i| i != direction_axis).any(|i| {
+                    edge.try_line().unwrap().direction[i] != 0.0
+                        || edge.try_line().unwrap().origin[i] != a[i]
+                })
             {
                 return issue(
                     "unsupported_geometry",
@@ -188,7 +189,11 @@ fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
         }
         rectangles.push(Rectangle {
             axis,
-            sign: if face.plane.normal[axis] > 0.0 { 1 } else { -1 },
+            sign: if face.try_plane().unwrap().normal[axis] > 0.0 {
+                1
+            } else {
+                -1
+            },
             min,
             max,
             vertices,

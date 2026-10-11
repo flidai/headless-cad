@@ -79,7 +79,12 @@ impl ModelSnapshot {
             .faces
             .get(face_id.0)
             .ok_or_else(|| KernelError::InvalidFaceFrame("face ID does not exist".into()))?;
-        let z_axis = face.plane.normal.map(|v| v / norm(face.plane.normal));
+        let plane = face.try_plane().ok_or_else(|| {
+            KernelError::InvalidFaceFrame(
+                "curved faces do not have a unique planar face frame".into(),
+            )
+        })?;
+        let z_axis = plane.normal.map(|v| v / norm(plane.normal));
         let scale = x_direction_hint
             .into_iter()
             .map(f64::abs)
@@ -113,48 +118,55 @@ impl ModelSnapshot {
         {
             return Err(KernelError::NumericRange);
         }
-        let points = self.loop_points(face.loops[0]).unwrap();
-        let reference = points[0];
-        let mut area = Sum::default();
-        let mut moment = [Sum::default(); 3];
-        for &loop_id in &face.loops {
-            let points = self.loop_points(loop_id).unwrap();
-            let base = sub(points[0], reference);
-            for pair in points[1..].windows(2) {
-                let a = sub(pair[0], reference);
-                let b = sub(pair[1], reference);
-                let weight = dot(cross(sub(a, base), sub(b, base)), z_axis) / 2.;
-                if weight == 0. {
-                    continue;
-                }
-                if !weight.is_normal() {
-                    return Err(KernelError::NumericRange);
-                }
-                area.add(weight)?;
-                for i in 0..3 {
-                    let center = base[i] / 3. + a[i] / 3. + b[i] / 3.;
-                    let contribution = weight * center;
-                    if center != 0. && !contribution.is_normal() {
+        let centroid = if self.has_curved_geometry() {
+            // The validated circular caps have their exact area centroid at
+            // the supporting plane origin, independent of tessellation.
+            plane.origin
+        } else {
+            let points = self.loop_points(face.loops[0]).unwrap();
+            let reference = points[0];
+            let mut area = Sum::default();
+            let mut moment = [Sum::default(); 3];
+            for &loop_id in &face.loops {
+                let points = self.loop_points(loop_id).unwrap();
+                let base = sub(points[0], reference);
+                for pair in points[1..].windows(2) {
+                    let a = sub(pair[0], reference);
+                    let b = sub(pair[1], reference);
+                    let weight = dot(cross(sub(a, base), sub(b, base)), z_axis) / 2.;
+                    if weight == 0. {
+                        continue;
+                    }
+                    if !weight.is_normal() {
                         return Err(KernelError::NumericRange);
                     }
-                    moment[i].add(contribution)?;
+                    area.add(weight)?;
+                    for i in 0..3 {
+                        let center = base[i] / 3. + a[i] / 3. + b[i] / 3.;
+                        let contribution = weight * center;
+                        if center != 0. && !contribution.is_normal() {
+                            return Err(KernelError::NumericRange);
+                        }
+                        moment[i].add(contribution)?;
+                    }
                 }
             }
-        }
-        if !area.value.is_normal() || area.value <= 0. {
-            return Err(KernelError::NumericRange);
-        }
-        let mut centroid = [0.; 3];
-        for i in 0..3 {
-            let local = moment[i].value / area.value;
-            let error = (moment[i].absolute / area.value
-                + local.abs() * area.absolute / area.value)
-                * (128. * f64::EPSILON);
-            if !error.is_finite() || error > tolerance.linear / 16. {
+            if !area.value.is_normal() || area.value <= 0. {
                 return Err(KernelError::NumericRange);
             }
-            centroid[i] = add(reference[i], local, tolerance)?;
-        }
+            let mut centroid = [0.; 3];
+            for i in 0..3 {
+                let local = moment[i].value / area.value;
+                let error = (moment[i].absolute / area.value
+                    + local.abs() * area.absolute / area.value)
+                    * (128. * f64::EPSILON);
+                if !error.is_finite() || error > tolerance.linear / 16. {
+                    return Err(KernelError::NumericRange);
+                }
+                centroid[i] = add(reference[i], local, tolerance)?;
+            }
+            centroid
+        };
         let axes = [x_axis, y_axis, z_axis];
         let permutation = axes.iter().all(|axis| {
             axis.iter().filter(|&&v| v != 0.).count() == 1

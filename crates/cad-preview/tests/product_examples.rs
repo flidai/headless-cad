@@ -40,9 +40,10 @@ fn tooling_plate_top_reference_preserves_ancestry_and_independent_area() {
         let mut selected_area = 0.0;
         for witness in &resolution.witnesses {
             let face = &model.faces[witness.target_face.0];
-            assert_eq!(face.plane.normal, [0.0, 0.0, 1.0]);
+            assert_eq!(face.try_plane().unwrap().normal, [0.0, 0.0, 1.0]);
             assert_eq!(
-                face.plane.origin[2], thickness,
+                face.try_plane().unwrap().origin[2],
+                thickness,
                 "selected a stop top or groove floor"
             );
             let mut min = [f64::INFINITY; 2];
@@ -254,7 +255,13 @@ fn tilted_jig_parameter_edits_preserve_exact_tool_coordinates_and_cap_intent() {
         assert_eq!(selection.status, FaceResolutionStatus::Resolved);
         let face = &model.faces[selection.witnesses[0].target_face.0];
         let expected_normal = [0.5, -cosine, 0.0];
-        for (actual, expected) in face.plane.normal.into_iter().zip(expected_normal) {
+        for (actual, expected) in face
+            .try_plane()
+            .unwrap()
+            .normal
+            .into_iter()
+            .zip(expected_normal)
+        {
             assert!((actual - expected).abs() < 1e-12);
         }
     }
@@ -335,7 +342,7 @@ fn clipped_tools_edits_match_independent_cross_sections_and_both_operand_referen
             });
             assert_eq!(selection.status, FaceResolutionStatus::Resolved);
             let face = &model.faces[selection.witnesses[0].target_face.0];
-            for (actual, expected) in face.plane.normal.into_iter().zip(normal) {
+            for (actual, expected) in face.try_plane().unwrap().normal.into_iter().zip(normal) {
                 assert!((actual - expected).abs() < 1e-12);
             }
         }

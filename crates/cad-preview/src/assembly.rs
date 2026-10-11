@@ -315,7 +315,13 @@ pub fn to_assembly_stream_bundle_with_tolerance(
         // Explicit triangulation is mandatory for holes and concave faces. An
         // envelope makes older fan-only clients reject the payload, even when
         // its triangle count happens to equal a fan's n - 2 count.
-        let content = if mesh.faces.iter().any(|face| face.triangles.is_some()) {
+        let content = if mesh
+            .faces
+            .iter()
+            .any(|face| face.semantic_face_id.is_some())
+        {
+            serde_json::to_string(&serde_json::json!({"schema_version": 3, "mesh": &mesh}))?
+        } else if mesh.faces.iter().any(|face| face.triangles.is_some()) {
             serde_json::to_string(&serde_json::json!({"schema_version": 2, "mesh": &mesh}))?
         } else {
             serde_json::to_string(&mesh)?
@@ -360,6 +366,11 @@ pub fn to_assembly_stream_bundle_with_tolerance(
 
 fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
     let mut result = Scene {
+        tessellation_error_mm: scene
+            .meshes
+            .values()
+            .filter_map(|m| m.tessellation_error_mm)
+            .reduce(f64::max),
         faces: vec![],
         crease_edges: vec![],
         vertices: 0,
@@ -390,6 +401,7 @@ fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
             }
             result.faces.push(Face {
                 id: result.faces.len(),
+                semantic_face_id: face.semantic_face_id,
                 points,
                 edges: face.edges.iter().map(|id| id + edge_offset).collect(),
                 normal,

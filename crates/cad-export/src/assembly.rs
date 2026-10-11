@@ -136,13 +136,15 @@ pub fn assembly_to_step(
                     "STEP assembly parts must have at least one solid",
                 ));
             }
-            let polygons = polygons(model, tolerance)?;
             let mut items = vec![identity];
-            items.extend(step_solids(&mut step, model, polygons));
-            let representation = step.add(format!(
-                "FACETED_BREP_SHAPE_REPRESENTATION('',({}),#{context})",
-                refs(&items)
-            ));
+            let kind = if model.has_curved_geometry() {
+                items.extend(crate::analytic::solids(&mut step, model, tolerance)?);
+                "ADVANCED_BREP_SHAPE_REPRESENTATION"
+            } else {
+                items.extend(step_solids(&mut step, model, polygons(model, tolerance)?));
+                "FACETED_BREP_SHAPE_REPRESENTATION"
+            };
+            let representation = step.add(format!("{kind}('',({}),#{context})", refs(&items)));
             geometry.insert(part.content_hash.clone(), representation);
             representation
         };

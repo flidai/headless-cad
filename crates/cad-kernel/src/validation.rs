@@ -30,6 +30,24 @@ pub struct ValidationReport {
 }
 
 pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> ValidationReport {
+    if model.has_curved_geometry() {
+        let result = if tolerance.is_valid() {
+            crate::analytic::recognize(model, Some(tolerance)).map(|_| ())
+        } else {
+            Err(crate::KernelError::InvalidTolerance)
+        };
+        return ValidationReport {
+            valid: result.is_ok(),
+            issues: result
+                .err()
+                .map(|error| ValidationIssue {
+                    code: "invalid_analytic_geometry".into(),
+                    message: error.to_string(),
+                })
+                .into_iter()
+                .collect(),
+        };
+    }
     let mut issues = Vec::new();
     let mut issue = |code: &str, message: String| {
         issues.push(ValidationIssue {
@@ -125,9 +143,9 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 format!("Edge {index} is nonfinite or shorter than tolerance"),
             );
         }
-        let direction_norm = norm(edge.line.direction);
-        if !finite(edge.line.origin)
-            || !finite(edge.line.direction)
+        let direction_norm = norm(edge.try_line().unwrap().direction);
+        if !finite(edge.try_line().unwrap().origin)
+            || !finite(edge.try_line().unwrap().direction)
             || (direction_norm - 1.0).abs() > 1.0e-12
         {
             issue(
@@ -137,8 +155,8 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
         }
         for vertex in [a, b] {
             let distance = norm(cross(
-                sub(vertex.position, edge.line.origin),
-                edge.line.direction,
+                sub(vertex.position, edge.try_line().unwrap().origin),
+                edge.try_line().unwrap().direction,
             ));
             if !distance.is_finite() || distance > tolerance.linear {
                 issue(
@@ -215,9 +233,9 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 ),
             );
         }
-        let normal_norm = norm(face.plane.normal);
-        if !finite(face.plane.origin)
-            || !finite(face.plane.normal)
+        let normal_norm = norm(face.try_plane().unwrap().normal);
+        if !finite(face.try_plane().unwrap().origin)
+            || !finite(face.try_plane().unwrap().normal)
             || (normal_norm - 1.0).abs() > 1.0e-12
         {
             issue(
@@ -239,7 +257,11 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 continue;
             };
             for &point in &points {
-                let distance = dot(sub(point, face.plane.origin), face.plane.normal).abs();
+                let distance = dot(
+                    sub(point, face.try_plane().unwrap().origin),
+                    face.try_plane().unwrap().normal,
+                )
+                .abs();
                 if !distance.is_finite() || distance > tolerance.linear {
                     issue(
                         "face_geometry_mismatch",
@@ -258,12 +280,15 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 );
                 continue;
             }
-            let convex =
-                crate::simple_polygon::convex_ring(&points, face.plane.normal, orientation);
+            let convex = crate::simple_polygon::convex_ring(
+                &points,
+                face.try_plane().unwrap().normal,
+                orientation,
+            );
             if !convex {
                 let direction = sub(points[1], points[0]);
                 let x = direction.map(|v| v / norm(direction));
-                let y = cross(face.plane.normal, x);
+                let y = cross(face.try_plane().unwrap().normal, x);
                 let mut projected: Vec<_> = points
                     .iter()
                     .map(|p| {
@@ -285,7 +310,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             for triangle in points[1..].windows(2) {
                 let triangle_area_twice = dot(
                     cross(sub(triangle[0], points[0]), sub(triangle[1], points[0])),
-                    face.plane.normal,
+                    face.try_plane().unwrap().normal,
                 );
                 if triangle_area_twice != 0.0 && !(triangle_area_twice / 2.0).is_normal() {
                     issue(

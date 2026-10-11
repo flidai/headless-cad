@@ -13,9 +13,14 @@ not a single release criterion.
 
 Engineering reliability, large-assembly performance, automation, reproducibility,
 and manufacturing interoperability are the competitive measures. The current
-orthogonal and convex-planar implementation is an executable starting point. Its limits do
+orthogonal, convex-planar and simple-profile prism implementation is an executable starting point. Its limits do
 not define the target product. Feature development must expand the example and
 regression corpus toward increasingly demanding real engineering work.
+
+The competitive target is Autodesk-class mechanical engineering, rather than
+feature parity with FreeCAD. Success means a team can author, revise, validate,
+inspect and release an engineering assembly from source. A fast viewer, a large
+test count, or a recipe-to-STL demo alone does not satisfy that goal.
 
 First-party kernel, recipe compiler, headless services, interchange, and viewer
 are Apache-2.0. Third-party components retain their own licenses and notices;
@@ -120,6 +125,36 @@ target work.
 
 ## Authoring and AI-native execution
 
+### Target request and representation boundaries
+
+These contracts describe the target runtime; they do not claim that all services
+or residency controls exist today.
+
+| Request | Required representation | Execution boundary |
+| --- | --- | --- |
+| Open, orbit, hide or isolate an assembly | Manifest, occurrence bounds and streamed display pages | Read-only inspection client; no exact-body loads or recipe evaluation |
+| Pick a part and inspect its recipe | Generation-pinned occurrence identity, definition identity and captured source mapping | Read-only artifact fetch; show the actual Starlark source and effective overrides, with module/span links when available |
+| Refine a coarse face selection | Display hierarchy and semantic mapping | Resolve a candidate set before reporting a face; picking never starts a modeling operation |
+| Change a dimension or introduce a feature | Source patch, locked dependencies and expected base revision | CLI/agent build job evaluates affected dependencies and validation obligations; publishes atomically |
+| Measure clearance, classify interference or create a precise section | Conservative spatial candidates, then required authoritative bodies | Explicit headless query job with accuracy, revision and evidence in its result |
+| Solve assembly motion | Rigid frames, joints and constraints | Constraint worker; geometry loads only for separately requested collision checks |
+| Release drawings, BOM and exchange files | Pinned design/configuration, exact geometry and annotation intent | Headless release job with validation and an exchange-loss report |
+
+The viewer may display query artifacts, but selecting a part is not an implicit
+request to run an AI agent, evaluate its recipe or mutate the design. Source
+inspection must stay usable while detailed display pages are unavailable. Every
+artifact links back to its source generation; the viewer must label an older
+generation instead of pairing it with current working-tree source.
+
+Keep independent lifecycle state for exact bodies, display pages and query
+results. Evicting a display page cannot invalidate a geometric result; changing
+geometry invalidates dependent queries and display artifacts even if the logical
+part ID is unchanged. Cancellation releases reservations and cannot publish a
+partial generation. Large-assembly tests must observe these boundaries directly,
+including counting exact-body loads, rather than infer them from frame rate.
+
+### Recipe and job protocol
+
 Keep **Starlark as the initial authoring language**, with a typed, versioned IR as
 the stable boundary and a native Rust SDK for library consumers. JSON is the
 resolved interchange/debug form. YAML need not become a second programming
@@ -151,8 +186,8 @@ current Starlark interpreter limits alone are not this service boundary.
 ### Geometry and numerical policy
 
 Separate geometric primitives/evaluators from oriented topology and modeling
-operations. Extend supporting lines and planes to circles, ellipses, analytic
-surfaces, B-splines/NURBS, trimmed curves/surfaces, periodic seams, singularities,
+operations. Extend initial line/circle and plane/cylinder support to ellipses,
+other analytic surfaces, B-splines/NURBS, general trimmed curves/surfaces, seams, singularities,
 and per-edge parameter-space curves. A 3D edge shared by two faces can have a
 different parameter-space curve on each face.
 
@@ -244,9 +279,8 @@ openings and a centroid-associated locator with independent planar-moment,
 STEP and browser through-hole picking evidence. Preview APIs now propagate the
 recipe tolerance. Multi-loop scenes use an explicit embedded capability marker:
 new clients can refresh between plain and holed scenes, while older Canvas
-clients reject the unsupported replacement and require a reload. Older streamed
-clients reject the changed triangle-byte descriptor rather than rendering a fan
-across an opening.
+clients reject the unsupported replacement and require a reload. Streamed
+compatibility is enforced by the versioned mesh envelope described below.
 
 `fork_mount.star` extends the corpus to a U-shaped cap with two arm openings.
 Simple-ring validation checks nonadjacent segment crossings and numerical
@@ -262,6 +296,23 @@ An old fan-only client rejects this payload even when triangle counts equal a
 fan; byte-count checks alone cannot detect a concave single-loop face. Bare
 convex payloads remain compatible. New renderers preserve cap identity across
 triangulation and pick through the notch and holes.
+
+The first analytic increment is now a true circular extrusion: tagged line/circle
+curves and plane/cylinder surfaces, two circular boundary edges, and one periodic
+seam used in both directions. The validator certifies this canonical solid-cylinder
+family and rigid placements; it does not yet certify arbitrary reordered curved
+B-reps, tubes, curved intersections or general trimming. Volume, centroid, inertia,
+bounds and cap datum frames come from the analytic boundary. Wall datum frames
+and curved Booleans are explicit unsupported outcomes.
+
+`shaft_stack.star` attaches a shaft, flange and end cap through cap datums and
+exports a separately rotated shaft. STEP uses analytic circles/cylinders and seam
+pcurves; OCCT independently checks solid validity, topology, volume and assembly
+placements. Derived STL/display patches have a declared radial chord-error policy
+(default 0.01 mm, maximum 4,096 segments), including an arithmetic allowance.
+Display envelope 3 preserves native face IDs across wall patches, rejects older
+clients, and records the achieved bound. Native JSON uses tagged geometry in
+kernel 0.3; previous generated snapshots must be rebuilt from source.
 
 Progress through general nonconvex solid operations, curved extrusion,
 revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,
@@ -453,6 +504,14 @@ camera changes, selected objects and stale depth. Unique geometry, depth
 complexity and request latency still affect cost: this architecture does not
 promise constant work for arbitrary assemblies.
 
+Page assembly metadata and spatial nodes as well as mesh data. A root manifest
+must not require expanding every nested occurrence before first coverage.
+Descriptors declare bounded decoded metadata sizes; page traversal preserves
+stable occurrence paths and configuration identity. When even all part-level
+root meshes exceed residency limits, retain assembly-level conservative proxies
+with explicit unresolved detail and ownership. Measure first meaningful coverage
+separately from full overview coverage and requested-detail completion.
+
 Benchmark a fixed camera trace with repeated parts, many unique parts, thin
 features, deeply nested instances, rapid camera reversals and a constrained
 network. Record first coarse coverage, time to requested detail, frame-time
@@ -556,6 +615,15 @@ validated geometry result with tolerance/error. Bounding boxes can reject
 collision candidates; overlapping boxes cannot prove collision. Approximate
 LOD meshes cannot certify clearance or machining dimensions. Exact query workers
 load only candidate bodies and attach evidence to the result.
+
+Bind each query to an immutable generation, configuration, occurrence scope,
+coordinate frame, accuracy policy and implementation version. Return witnesses
+and an explicit complete, indeterminate, unsupported or cancelled status. A
+negative interference result requires complete conservative candidate traversal;
+missing bodies or exhausted budgets cannot become a claim of no interference.
+Keep authoritative geometry bounds separate from display bounds expanded for
+tessellation/quantization error and from camera-dependent screen bounds. Display
+simplification must never shrink the bounds used to reject engineering candidates.
 
 The native mass-property query now integrates volume, volume centroid and central
 volume inertia directly from validated planar B-rep boundaries. Assembly queries
@@ -730,12 +798,12 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation | Curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, frustum culling, bounded geometry cache and proxy fallback | Spatial BVHs, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
-| Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
+| Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
 | Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
@@ -743,9 +811,11 @@ The current working commands are in [README.md](../README.md).
 
 ## Supporting-library evaluation
 
-These are candidates, not newly installed dependencies or substitutes for our
-kernel. Pin versions, evaluate numerical/performance behavior on our corpus, and
-review transitive licenses before adoption.
+These are supporting-library evaluation areas, not substitutes for our kernel.
+`robust` is already pinned and used for adaptive predicates; the other entries
+remain candidates. Pin versions, evaluate numerical/performance behavior on our
+corpus, and review transitive licenses before adoption. The current dependency
+inventory and notices are in [dependency-licenses.md](dependency-licenses.md).
 
 | Candidate | Intended boundary | Upstream license and evidence |
 | --- | --- | --- |

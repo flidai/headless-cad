@@ -204,6 +204,11 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(graph.overrides.get(name).copied().unwrap_or(default))
     }
 
+    fn circle(id: &str, radius: Value, eval: &mut Evaluator) -> anyhow::Result<String> {
+        store(eval)?.feature(serde_json::json!({"op": "circle", "id": id, "op_version": 1, "radius": number(radius)?}))?;
+        Ok(id.to_owned())
+    }
+
     fn rectangle(
         id: &str,
         width: Value,

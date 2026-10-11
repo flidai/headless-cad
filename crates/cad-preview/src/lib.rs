@@ -48,6 +48,8 @@ pub struct RecipeContext {
 #[derive(Clone, Serialize)]
 struct Face {
     id: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    semantic_face_id: Option<usize>,
     points: Vec<[f64; 3]>,
     edges: Vec<usize>,
     normal: [f64; 3],
@@ -80,6 +82,8 @@ impl Face {
 
 #[derive(Clone, Serialize)]
 struct Scene {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tessellation_error_mm: Option<f64>,
     faces: Vec<Face>,
     crease_edges: Vec<usize>,
     vertices: usize,
@@ -98,6 +102,53 @@ fn scene_with_tolerance(
     tolerance: Tolerance,
 ) -> Result<Scene, PreviewError> {
     let invalid = PreviewError::Geometry;
+    if model.has_curved_geometry() {
+        let mesh = cad_kernel::tessellate_cylinder(
+            model,
+            tolerance,
+            cad_kernel::TessellationPolicy::default(),
+        )
+        .map_err(|_| PreviewError::Geometry("analytic display tessellation failed"))?;
+        let mut crease_edges = std::collections::BTreeSet::new();
+        let faces = mesh
+            .patches
+            .into_iter()
+            .enumerate()
+            .map(|(id, patch)| {
+                let edges = patch
+                    .boundary_edges
+                    .into_iter()
+                    .map(|edge| match edge {
+                        Some(edge) => {
+                            crease_edges.insert(edge.0);
+                            edge.0
+                        }
+                        None => model.edges.len() - 1,
+                    })
+                    .collect();
+                Face {
+                    id,
+                    semantic_face_id: Some(patch.face.0),
+                    points: patch.points,
+                    edges,
+                    normal: patch.normal,
+                    triangles: None,
+                    loop_starts: None,
+                }
+            })
+            .collect();
+        let bounds = model.bounds();
+        return Ok(Scene {
+            tessellation_error_mm: Some(mesh.chordal_error_bound),
+            faces,
+            crease_edges: crease_edges.into_iter().collect(),
+            vertices: model.vertices.len(),
+            edges: model.edges.len(),
+            solids: model.solids.len(),
+            bounds: Some([bounds.min, bounds.max]),
+            volume: Some(model.volume()),
+        });
+    }
     if model.faces.len() > 50_000 {
         return Err(invalid("software preview exceeds 50,000 faces"));
     }
@@ -114,7 +165,13 @@ fn scene_with_tolerance(
         if face.loops.is_empty() {
             return Err(invalid("missing face loop"));
         }
-        if face.plane.normal.iter().any(|n| !n.is_finite()) {
+        if face
+            .try_plane()
+            .ok_or(invalid("curved face requires display tessellation"))?
+            .normal
+            .iter()
+            .any(|n| !n.is_finite())
+        {
             return Err(invalid("nonfinite normal"));
         }
         let mut points = Vec::new();
@@ -164,9 +221,13 @@ fn scene_with_tolerance(
         };
         faces.push(Face {
             id,
+            semantic_face_id: None,
             points,
             edges,
-            normal: face.plane.normal,
+            normal: face
+                .try_plane()
+                .ok_or(invalid("curved face requires display tessellation"))?
+                .normal,
             triangles,
             loop_starts: (starts.len() > 1).then_some(starts),
         });
@@ -187,6 +248,7 @@ fn scene_with_tolerance(
         .filter_map(|(id, ns)| (ns.len() != 2 || dot(ns[0], ns[1]) < 1.0 - 1e-10).then_some(id))
         .collect();
     Ok(Scene {
+        tessellation_error_mm: None,
         faces,
         crease_edges,
         vertices: model.vertices.len(),
@@ -280,7 +342,20 @@ fn render_html_template(
             .is_some_and(|meshes| meshes.values().any(has_holes));
     // Old live viewers require the exact legacy marker. A capability-specific
     // element makes them reject an unsupported replacement and retain the old scene.
-    let scene_id = if requires_loops {
+    let has_semantic_patches = |body: &serde_json::Value| {
+        body["faces"].as_array().is_some_and(|faces| {
+            faces
+                .iter()
+                .any(|face| face.get("semantic_face_id").is_some())
+        })
+    };
+    let requires_patches = has_semantic_patches(&value)
+        || value["meshes"]
+            .as_object()
+            .is_some_and(|meshes| meshes.values().any(has_semantic_patches));
+    let scene_id = if requires_patches {
+        "cad-scene-data-v3"
+    } else if requires_loops {
         "cad-scene-data-v2"
     } else {
         "cad-scene-data"
@@ -465,7 +540,7 @@ mod tests {
             serde_json::from_str::<serde_json::Value>(raw).unwrap(),
             data
         );
-        assert!(html.contains("JSON.parse((document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent)"));
+        assert!(html.contains("JSON.parse((document.getElementById('cad-scene-data-v3')||document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent)"));
         assert!(!html.contains("<script>bad()"));
     }
 

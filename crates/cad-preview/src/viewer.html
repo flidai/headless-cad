@@ -13,7 +13,7 @@ main.recipe-open{grid-template-columns:minmax(0,1fr) minmax(340px,440px)}#recipe
 <script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
 <script>
 'use strict';
-let scene = JSON.parse((document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
+let scene = JSON.parse((document.getElementById('cad-scene-data-v3')||document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
 let recipeContext = JSON.parse(document.getElementById('cad-recipe-data').textContent);
 function faceTriangles(face){return face.triangles??Array.from({length:face.points.length-2},(_,i)=>[0,i+1,i+2])}
 function validFaceTopology(face){
@@ -47,7 +47,7 @@ function normalizeScene(raw){
    points+=face.points.length;if(faces.length>=50000||points>200000)throw Error('Software display limit exceeded');
    const transformed=face.points.map(p=>rotate(p,q).map((v,i)=>v+t[i])),normal=rotate(face.normal,q);
    if(!transformed.every(p=>p.every(Number.isFinite))||!normal.every(Number.isFinite))throw Error('Display coordinate overflow');
-   faces.push({id:faces.length,local_face_id:face.id,instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id,points:transformed,normal,triangles:face.triangles,loop_starts:face.loop_starts,edges:face.edges.map(id=>id+edges)});
+   faces.push({id:faces.length,local_face_id:face.semantic_face_id??face.id,semantic_face_id:face.semantic_face_id,instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id,points:transformed,normal,triangles:face.triangles,loop_starts:face.loop_starts,edges:face.edges.map(id=>id+edges)});
   }
   crease_edges.push(...mesh.crease_edges.map(id=>id+edges));vertices+=mesh.vertices;edges+=mesh.edges;solids+=mesh.solids;
  }
@@ -123,7 +123,7 @@ function draw(){
  }
  for(const {f,points} of visible){
   const shade=Math.round(175+55*Math.max(-1,Math.min(1,dot(f.normal,[.3,-.5,.8]))));
-  const color=f.id===selected||f.instance_id===selectedInstance?[143,206,184]:[shade-18,shade,shade-5];
+  const color=f.id===selected||(f.semantic_face_id!==undefined&&f.semantic_face_id===scene.faces.find(p=>p.id===selected)?.semantic_face_id&&f.instance_id===scene.faces.find(p=>p.id===selected)?.instance_id)||f.instance_id===selectedInstance?[143,206,184]:[shade-18,shade,shade-5];
   for(const [a,b,c] of faceTriangles(f))triangle(points[a],points[b],points[c],f.id,color);
  }
  function edge(a,b,faceId,highlight){
@@ -159,7 +159,7 @@ function select(x,y){
  const px=Math.floor(x*renderRatio),py=Math.floor(y*renderRatio);
  selected=px>=0&&py>=0&&px<bufferWidth&&py<bufferHeight?faceBuffer[py*bufferWidth+px]:-1;
  const element=document.getElementById('selection'),face=scene.faces.find(f=>f.id===selected);
- if(face){selectedInstance=face.instance_id||null;selectionContext=face.instance_id?face:null;let area=0;for(const [a,b,d] of faceTriangles(face)){const c=cross(sub(face.points[b],face.points[a]),sub(face.points[d],face.points[a]));area+=Math.hypot(...c)/2}element.textContent=`Face ${face.local_face_id??face.id} · ${face.points.length} edges${face.instance_id?`\nOccurrence: ${occurrenceLabel(face.instance_id)}\nDefinition: ${face.part_id}\nFeature: ${face.feature_id}`:''}\nArea: ${fmt(area)} mm²\nNormal: [${face.normal.map(fmt).join(', ')}]`;element.style.whiteSpace='pre-line'}else{selectedInstance=null;selectionContext=null;element.textContent='Select a face in the viewport.'}document.getElementById('occurrence-select').value=selectedInstance||'';recipeOverview();draw();
+ if(face){selectedInstance=face.instance_id||null;selectionContext=face.instance_id?face:null;let area=0;for(const [a,b,d] of faceTriangles(face)){const c=cross(sub(face.points[b],face.points[a]),sub(face.points[d],face.points[a]));area+=Math.hypot(...c)/2}element.textContent=`Face ${face.local_face_id??face.semantic_face_id??face.id} · ${face.points.length} edges${face.instance_id?`\nOccurrence: ${occurrenceLabel(face.instance_id)}\nDefinition: ${face.part_id}\nFeature: ${face.feature_id}`:''}\nDisplay patch area (approx.): ${fmt(area)} mm²\nDisplay patch normal: [${face.normal.map(fmt).join(', ')}]`;element.style.whiteSpace='pre-line'}else{selectedInstance=null;selectionContext=null;element.textContent='Select a face in the viewport.'}document.getElementById('occurrence-select').value=selectedInstance||'';recipeOverview();draw();
 }
 document.getElementById('occurrence-select').addEventListener('change',event=>{selected=-1;selectedInstance=event.target.value||null;const instance=scene.instances?.find(item=>item.id===selectedInstance);selectionContext=instance?{instance_id:instance.id,part_id:instance.part,feature_id:scene.definitions[instance.part].feature_id}:null;document.getElementById('selection').textContent=instance?`Occurrence: ${occurrenceLabel(instance.id)}\nDefinition: ${instance.part}\nSelect a face for local topology details.`:'Select a face in the viewport.';recipeOverview();draw()});
 let drag=null;canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY};canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw-=(e.clientX-drag.lastX)*.008;pitch=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitch+(e.clientY-drag.lastY)*.008));drag.lastX=e.clientX;drag.lastY=e.clientY;draw()});canvas.addEventListener('pointerup',e=>{if(drag&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<4){const r=canvas.getBoundingClientRect();select(e.clientX-r.left,e.clientY-r.top)}drag=null});canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=Math.max(.1,Math.min(15,zoom*Math.exp(-e.deltaY*.001)));draw()},{passive:false});
@@ -182,7 +182,7 @@ if(location.protocol==='http:'||location.protocol==='https:'){
   return JSON.stringify([entries.map(([name,output])=>[name,output.content_hash]).sort(([a],[b])=>a.localeCompare(b)),manifest.recipe_context_hash??manifest.recipe_source_hash??null,manifest.recipe_source?.parameter_overrides??null]);
  }
  function replacement(html){
-  const embedded=html.match(/<script id="cad-scene-data(?:-v2)?" type="application\/json">([^\r\n]*)<\/script>/);if(!embedded)throw Error('Incomplete preview');
+  const embedded=html.match(/<script id="cad-scene-data(?:-v[23])?" type="application\/json">([^\r\n]*)<\/script>/);if(!embedded)throw Error('Incomplete preview');
   const raw=JSON.parse(embedded[1]),next=normalizeScene(raw);
   const contextData=html.match(/<script id="cad-recipe-data" type="application\/json">([^\r\n]*)<\/script>/);if(!contextData)throw Error('Incomplete recipe context');
   const context=JSON.parse(contextData[1]);

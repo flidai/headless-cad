@@ -420,6 +420,17 @@ impl BuiltAssembly {
                         part: instance.part.clone(),
                     })?;
             let model = &part.result.model;
+            // Periodic circles have coincident endpoints, so endpoint-length
+            // checks alone cannot certify representability after placement.
+            if model.has_curved_geometry() {
+                cad_kernel::transform(
+                    model,
+                    instance.transform.translation,
+                    instance.transform.rotation,
+                    tolerance,
+                )
+                .map_err(|_| AssemblyError::NumericRange)?;
+            }
             solids = solids
                 .checked_add(model.solids.len())
                 .ok_or(AssemblyError::ResourceLimit)?;

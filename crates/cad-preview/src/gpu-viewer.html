@@ -5,7 +5,7 @@
 <script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
 <script>
 'use strict';
-const compactScene = JSON.parse((document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
+const compactScene = JSON.parse((document.getElementById('cad-scene-data-v3')||document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
 const recipeContext = JSON.parse(document.getElementById('cad-recipe-data').textContent);
 window.compactScene = compactScene;
 window.recipeContext = recipeContext;
@@ -166,6 +166,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
     let points = 0, gpuBytes = 0; const ids = new Set();
     for (const face of mesh.faces) {
       if (!Number.isInteger(face.id) || face.id < 0 || face.id >= 16777215 || ids.has(face.id)
+          || (face.semantic_face_id !== undefined && (!Number.isInteger(face.semantic_face_id) || face.semantic_face_id < 0 || face.semantic_face_id >= 16777215))
         || !finite3(face.normal) || Math.abs(Math.hypot(...face.normal) - 1) > 1e-5
         || !Array.isArray(face.points) || face.points.length < 3 || face.points.length > 256 || !validFaceTopology(face)) throw Error('Invalid bounded face payload.');
       ids.add(face.id); points += face.points.length; gpuBytes += faceTriangles(face).length * 3 * 28;
@@ -183,7 +184,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
     const local = mesh.bounds, center = local ? local[0].map((v, i) => v + (local[1][i] - v) / 2) : [0, 0, 0];
     const vertices = [];
     for (const face of mesh.faces) for (const ids of faceTriangles(face)) {
-      for (const point of ids.map(i=>face.points[i])) vertices.push(...sub(point, center), ...face.normal, face.id);
+      for (const point of ids.map(i=>face.points[i])) vertices.push(...sub(point, center), ...face.normal, face.semantic_face_id??face.id);
     }
     const floats = new Float32Array(vertices.map(gpuFloat));
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -340,8 +341,8 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
       if (entry.cancelled || entry.epoch !== epoch || inflight.get(hash) !== entry || !wanted.has(hash)) return;
       if (digest !== descriptor.sha256) throw Error('Mesh SHA256 verification failed; reload a consistent artifact generation.');
       const payload = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-      if (!payload || (payload.schema_version !== undefined && payload.schema_version !== 2)) throw Error('Unsupported display mesh schema.');
-      const mesh = payload.schema_version === 2 ? payload.mesh : payload;
+      if (!payload || (payload.schema_version !== undefined && payload.schema_version !== 2 && payload.schema_version !== 3)) throw Error('Unsupported display mesh schema.');
+      const mesh = [2,3].includes(payload.schema_version) ? payload.mesh : payload;
       validateMesh(mesh, descriptor);
       if (entry.cancelled || entry.epoch !== epoch || !wanted.has(hash)) return;
       const group = upload(mesh, hash, byMesh.get(hash).length);

@@ -117,7 +117,7 @@ pub fn face_is_convex(model: &ModelSnapshot, id: FaceId) -> bool {
     let Some(face) = model.faces.get(id.0) else {
         return false;
     };
-    if face.loops.len() != 1 {
+    if model.has_curved_geometry() || face.loops.len() != 1 {
         return false;
     }
     let Some(points) = model.loop_points(face.loops[0]) else {
@@ -126,7 +126,7 @@ pub fn face_is_convex(model: &ModelSnapshot, id: FaceId) -> bool {
     if points.len() < 3 {
         return false;
     }
-    convex_ring(&points, face.plane.normal, 1.)
+    convex_ring(&points, face.try_plane().unwrap().normal, 1.)
 }
 
 pub(crate) fn convex_ring(points: &[[f64; 3]], normal: [f64; 3], orientation: f64) -> bool {

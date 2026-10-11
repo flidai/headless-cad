@@ -78,8 +78,8 @@ pub(crate) fn intersect(
     let mut planes: Vec<Support> = vec![];
     for (operand, model) in [a, b].into_iter().enumerate() {
         for (i, face) in model.faces.iter().enumerate() {
-            let origin = sub(face.plane.origin, reference);
-            let normal = face.plane.normal;
+            let origin = sub(face.try_plane().unwrap().origin, reference);
+            let normal = face.try_plane().unwrap().normal;
             let mut found = None;
             for (j, plane) in planes.iter().enumerate() {
                 if norm(sub(normal, plane.normal)) <= 32. * f64::EPSILON {
@@ -252,10 +252,10 @@ pub(crate) fn intersect(
                 let length = norm(delta);
                 model.edges.push(Edge {
                     vertices: [VertexId(key.0), VertexId(key.1)],
-                    line: Line {
+                    curve: Curve::Line(Line {
                         origin,
                         direction: delta.map(|x| x / length),
-                    },
+                    }),
                 });
                 id
             });
@@ -268,10 +268,10 @@ pub(crate) fn intersect(
         let loop_id = LoopId(model.loops.len());
         model.loops.push(Loop { edges: uses });
         model.faces.push(Face {
-            plane: Plane {
+            surface: Surface::Plane(Plane {
                 origin: model.vertices[ring[0]].position,
                 normal: plane.normal,
-            },
+            }),
             loops: vec![loop_id],
         });
         for &(operand, source) in &plane.sources {

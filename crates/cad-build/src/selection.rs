@@ -383,7 +383,7 @@ mod tests {
             .iter()
             .map(|w| {
                 let face = &model.faces[w.target_face.0];
-                assert_eq!(face.plane.normal, [0.0, 0.0, 1.0]);
+                assert_eq!(face.try_plane().unwrap().normal, [0.0, 0.0, 1.0]);
                 let mut min = [f64::INFINITY; 2];
                 let mut max = [f64::NEG_INFINITY; 2];
                 for edge in &model.loops[face.loops[0].0].edges {
@@ -523,7 +523,8 @@ mod tests {
         assert!(wall.lineage.iter().any(|step| step.input_slot == "right"));
         assert_eq!(
             built.outputs["cut"].result.model.faces[wall.witnesses[0].target_face.0]
-                .plane
+                .try_plane()
+                .unwrap()
                 .normal,
             [1.0, 0.0, 0.0]
         );

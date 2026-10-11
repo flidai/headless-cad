@@ -6,18 +6,23 @@
 //! inner loops where needed. Orthogonal Boolean faces stay rectangular and share
 //! explicit edges and vertices; open pockets, through-holes, empty results, and
 //! disconnected solids are supported in that domain.
-//! Enclosed cavities, curved surfaces, and nonmanifold contacts are unsupported.
+//! Circular extrusions additionally retain exact circles, planar caps, a cylindrical
+//! wall, and an explicit periodic seam. Enclosed cavities, general curved
+//! Booleans, and nonmanifold contacts remain unsupported.
 //! General rigid rotations support a single strictly convex solid or a validated
 //! right prism with a simple outer boundary and convex disjoint through holes. Exactly represented axis
 //! permutations also retain the orthogonal solid domain. Multi-loop prism caps
 //! support signed-loop properties; Boolean operations on these prisms are not yet
 //! supported.
 //! All coordinates, dimensions, and linear tolerances are millimetres; volume is
-//! mm³. Results contain analytic lines and planes and explicit oriented topology.
+//! mm³. Results contain tagged analytic curves/surfaces and explicit oriented topology.
 //! Validated mass properties integrate volume, centroid, and central volume
 //! inertia (mm⁵) from this boundary; material density is an application concern.
-//! There is no external CAD kernel, mesh approximation, or stored volume shortcut.
+//! Authoritative solids use neither an external CAD kernel nor mesh approximation.
+//! Display and STL meshes are derived with an explicit chordal-error policy;
+//! native physical properties never integrate those approximations.
 
+mod analytic;
 mod convex_intersection;
 mod face_frame;
 mod mass_properties;
@@ -26,10 +31,12 @@ mod orthogonal;
 mod polygon;
 mod prism;
 mod simple_polygon;
+mod tessellation;
 mod transform;
 mod triangulation;
 mod validation;
 
+pub use analytic::{extrude_circle, validate_circle, CylinderGeometry};
 pub use face_frame::FaceFrame;
 pub use mass_properties::MassProperties;
 pub use math::Tolerance;
@@ -40,6 +47,7 @@ pub use prism::{extrude_polygon_with_holes, validate_polygon_with_holes, MAX_POL
 use serde::{Deserialize, Serialize};
 pub use simple_polygon::face_is_convex;
 use std::collections::BTreeMap;
+pub use tessellation::{tessellate_cylinder, CylinderMesh, MeshPatch, TessellationPolicy};
 use thiserror::Error;
 pub use transform::{transform, validate_transform};
 pub use triangulation::triangulate_face;
@@ -70,10 +78,83 @@ pub struct Line {
     pub direction: [f64; 3],
 }
 
+/// Oriented periodic circle. Parameter zero is origin + radius*x_direction;
+/// increasing parameter follows axis cross x_direction. A full circle edge
+/// has the same vertex at both endpoints; it is not a zero-length line.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Circle {
+    pub origin: [f64; 3],
+    pub axis: [f64; 3],
+    pub x_direction: [f64; 3],
+    pub radius: f64,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "geometry",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum Curve {
+    Line(Line),
+    Circle(Circle),
+}
+/// An outward-oriented analytic cylinder. Axial bounds belong to topology,
+/// not to the supporting infinite surface.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Cylinder {
+    pub origin: [f64; 3],
+    pub axis: [f64; 3],
+    pub x_direction: [f64; 3],
+    pub radius: f64,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "geometry",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum Surface {
+    Plane(Plane),
+    Cylinder(Cylinder),
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Edge {
     pub vertices: [VertexId; 2],
-    pub line: Line,
+    pub curve: Curve,
+}
+
+impl Edge {
+    pub fn try_line(&self) -> Option<&Line> {
+        match &self.curve {
+            Curve::Line(v) => Some(v),
+            _ => None,
+        }
+    }
+    pub fn try_line_mut(&mut self) -> Option<&mut Line> {
+        match &mut self.curve {
+            Curve::Line(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+impl Face {
+    pub fn try_plane(&self) -> Option<&Plane> {
+        match &self.surface {
+            Surface::Plane(v) => Some(v),
+            _ => None,
+        }
+    }
+    pub fn try_plane_mut(&mut self) -> Option<&mut Plane> {
+        match &mut self.surface {
+            Surface::Plane(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,7 +176,7 @@ pub struct Plane {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Face {
-    pub plane: Plane,
+    pub surface: Surface,
     pub loops: Vec<LoopId>,
 }
 
@@ -126,6 +207,16 @@ pub struct ModelSnapshot {
 }
 
 impl ModelSnapshot {
+    pub fn has_curved_geometry(&self) -> bool {
+        self.edges
+            .iter()
+            .any(|e| !matches!(e.curve, Curve::Line(_)))
+            || self
+                .faces
+                .iter()
+                .any(|f| !matches!(f.surface, Surface::Plane(_)))
+    }
+
     pub fn validate(&self, tolerance: Tolerance) -> ValidationReport {
         validation::validate(self, tolerance)
     }
@@ -136,6 +227,17 @@ impl ModelSnapshot {
             min: [f64::INFINITY; 3],
             max: [f64::NEG_INFINITY; 3],
         };
+        // Periodic circles carry analytic extrema absent from seam vertices.
+        for edge in &self.edges {
+            if let Curve::Circle(circle) = &edge.curve {
+                let y = cross(circle.axis, circle.x_direction);
+                for (axis, y_component) in y.iter().enumerate() {
+                    let extent = circle.radius * circle.x_direction[axis].hypot(*y_component);
+                    result.min[axis] = result.min[axis].min(circle.origin[axis] - extent);
+                    result.max[axis] = result.max[axis].max(circle.origin[axis] + extent);
+                }
+            }
+        }
         for vertex in &self.vertices {
             for axis in 0..3 {
                 result.min[axis] = result.min[axis].min(vertex.position[axis]);
@@ -163,10 +265,15 @@ impl ModelSnapshot {
             .collect()
     }
 
-    /// Signed enclosed volume from oriented boundary triangles, in mm³.
+    /// Enclosed volume from the analytic boundary, in mm³. Planar models use
+    /// signed boundary integration; validated circular extrusions use exact
+    /// circular cross-section integration.
     /// Empty models have volume zero. Validate deserialized or edited snapshots
     /// first: invalid references or unsupported integration terms yield NaN.
     pub fn volume(&self) -> f64 {
+        if self.has_curved_geometry() {
+            return analytic::recognize(self, None).map_or(f64::NAN, |g| g.volume());
+        }
         self.shells
             .iter()
             .map(|shell| self.faces_volume(&shell.faces))
@@ -345,10 +452,10 @@ pub fn extrude_rectangle(
                 let length = math::norm(delta);
                 model.edges.push(Edge {
                     vertices: [VertexId(key.0), VertexId(key.1)],
-                    line: Line {
+                    curve: Curve::Line(Line {
                         origin: positions[key.0],
                         direction: delta.map(|v| v / length),
-                    },
+                    }),
                 });
                 id
             });
@@ -360,10 +467,10 @@ pub fn extrude_rectangle(
         let loop_id = LoopId(model.loops.len());
         model.loops.push(Loop { edges: uses });
         model.faces.push(Face {
-            plane: Plane {
+            surface: Surface::Plane(Plane {
                 origin: positions[ring[0]],
                 normal: normals[face_index],
-            },
+            }),
             loops: vec![loop_id],
         });
     }

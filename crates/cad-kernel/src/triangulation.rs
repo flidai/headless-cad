@@ -22,6 +22,12 @@ pub fn triangulate_face(
     if !report.valid {
         return Err(KernelError::InvalidInput(report));
     }
+    if model.has_curved_geometry() {
+        return Err(KernelError::Unsupported(
+            "analytic curved boundaries require bounded-error tessellation with derived vertices"
+                .into(),
+        ));
+    }
     let face = model
         .faces
         .get(face_id.0)
@@ -46,7 +52,7 @@ pub fn triangulate_face(
     let origin = model.vertices[ids[0].0].position;
     let delta = sub(model.vertices[ids[1].0].position, origin);
     let x = delta.map(|v| v / norm(delta));
-    let y = cross(face.plane.normal, x);
+    let y = cross(face.try_plane().unwrap().normal, x);
     let points: Vec<_> = ids
         .iter()
         .map(|id| {

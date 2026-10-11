@@ -20,7 +20,7 @@ explicit exchange-loss report.
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums/sibling attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
-| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with convex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic curves, nonconvex hole rings, general Booleans and trim/seam handling remain |
+| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with convex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic circular extrusions and their periodic seam implemented; arcs, revolution, nonconvex hole rings, general Booleans and generalized trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, frustum culling and bounded cache implemented; LOD, spatial hierarchy and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
@@ -42,6 +42,20 @@ adds two transformed tools with cap/wall lineage assertions; manufacturing files
 contain their transformed native coordinates.
 
 ## Next concrete implementation increments
+
+Apply the architecture's request/representation contracts to each increment:
+opening and picking are read-only display/source requests; modeling, solving,
+validated measurements and releases are explicit headless jobs. Preserve this
+separation in acceptance tests as the viewer becomes more capable.
+
+The first analytic example, `shaft_stack.star`, now combines true circular
+extrusions, periodic seams, independent mass-property formulas, cap datums and
+analytic STEP validation. Its display/STL tessellation has a declared chord-error
+policy; native cylinders remain analytic. Expand this toward a hollow collar and
+bearing housing as inner cylinders and curved operations become available.
+Subsequent examples should combine new operations with
+reference-preserving parameter edits and engineering deliverables, not only add
+more copies of existing parts.
 
 1. Extend implemented schema-2 nested assemblies and named part datums with
    cross-level attachment semantics and explicit

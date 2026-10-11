@@ -60,6 +60,19 @@ pub fn translate(
     offset: [f64; 3],
     tolerance: Tolerance,
 ) -> Result<OperationResult, KernelError> {
+    if model.has_curved_geometry() {
+        let mut result = crate::transform(model, offset, [0., 0., 0., 1.], tolerance)?;
+        let faces = result
+            .history
+            .generated_faces
+            .remove("transformed")
+            .unwrap();
+        result
+            .history
+            .generated_faces
+            .insert("translated".into(), faces);
+        return Ok(result);
+    }
     validated(model, tolerance)?;
     if !finite(offset) {
         return Err(KernelError::NumericRange);
@@ -77,10 +90,10 @@ pub fn translate(
         vertex.position = shift(vertex.position)?;
     }
     for edge in &mut moved.edges {
-        edge.line.origin = shift(edge.line.origin)?;
+        edge.try_line_mut().unwrap().origin = shift(edge.try_line().unwrap().origin)?;
     }
     for face in &mut moved.faces {
-        face.plane.origin = shift(face.plane.origin)?;
+        face.try_plane_mut().unwrap().origin = shift(face.try_plane().unwrap().origin)?;
     }
     for edge in &model.edges {
         let [a, b] = edge.vertices;
@@ -203,10 +216,10 @@ fn rectangular_faces(model: &ModelSnapshot) -> Result<Vec<RectFace>, KernelError
             }
             let axis = (0..3)
                 .find(|&axis| {
-                    face.plane.normal[axis].abs() == 1.0
+                    face.try_plane().unwrap().normal[axis].abs() == 1.0
                         && (0..3)
                             .filter(|&i| i != axis)
-                            .all(|i| face.plane.normal[i] == 0.0)
+                            .all(|i| face.try_plane().unwrap().normal[i] == 0.0)
                 })
                 .ok_or_else(|| {
                     KernelError::Unsupported(
@@ -255,7 +268,11 @@ fn rectangular_faces(model: &ModelSnapshot) -> Result<Vec<RectFace>, KernelError
             }
             Ok(RectFace {
                 axis,
-                sign: if face.plane.normal[axis] > 0.0 { 1 } else { -1 },
+                sign: if face.try_plane().unwrap().normal[axis] > 0.0 {
+                    1
+                } else {
+                    -1
+                },
                 bounds,
             })
         })
@@ -323,6 +340,11 @@ pub fn boolean(
 ) -> Result<OperationResult, KernelError> {
     validated(a, tolerance)?;
     validated(b, tolerance)?;
+    if a.has_curved_geometry() || b.has_curved_geometry() {
+        return Err(KernelError::Unsupported(
+            "Booleans with analytic curved surfaces are not yet supported".into(),
+        ));
+    }
     let rectangles = (rectangular_faces(a), rectangular_faces(b));
     if matches!(operation, BooleanOp::Intersection)
         && (rectangles.0.is_err() || rectangles.1.is_err())
@@ -467,10 +489,10 @@ pub fn boolean(
                     let length = norm(delta);
                     model.edges.push(Edge {
                         vertices: key,
-                        line: Line {
+                        curve: Curve::Line(Line {
                             origin,
                             direction: delta.map(|v| v / length),
-                        },
+                        }),
                     });
                     id
                 });
@@ -486,10 +508,10 @@ pub fn boolean(
             normal[axis] = sign as f64;
             let face_id = FaceId(model.faces.len());
             model.faces.push(Face {
-                plane: Plane {
+                surface: Surface::Plane(Plane {
                     origin: model.vertices[ring[0].0].position,
                     normal,
-                },
+                }),
                 loops: vec![loop_id],
             });
             component_faces[components[i]].push(face_id);

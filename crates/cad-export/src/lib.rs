@@ -1,15 +1,16 @@
-//! Deterministic exports for the kernel's closed, planar polygon B-reps.
+//! Deterministic exports for supported planar and analytic cylinder B-reps.
 //!
 //! STL is a unitless triangle format; coordinates are written in millimetres.
-//! STEP is a narrow AP214 faceted B-rep writer, with explicit plane surfaces,
+//! STEP retains planar faceted B-reps and analytic circular extrusions, with explicit surfaces,
 //! polygon boundaries, product context, and millimetre units. This is not an
-//! arbitrary analytic/NURBS STEP translator. Both exporters reject invalid
+//! general trimmed-surface/NURBS STEP translator. Both exporters reject invalid
 //! models. Simple nonconvex cap boundaries and disjoint convex holes are retained
 //! in STEP and explicitly triangulated for STL.
 
 use cad_kernel::{ModelSnapshot, Tolerance};
 use std::fmt::Write;
 
+mod analytic;
 mod assembly;
 mod bom;
 pub use assembly::{assembly_to_step, assembly_to_stl};
@@ -87,6 +88,29 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
             validation.issues
         )));
     }
+    if model.has_curved_geometry() {
+        let mesh = cad_kernel::tessellate_cylinder(
+            model,
+            tolerance,
+            cad_kernel::TessellationPolicy::default(),
+        )
+        .map_err(|error| ExportError::InvalidModel(error.to_string()))?;
+        return Ok(mesh
+            .patches
+            .into_iter()
+            .map(|patch| {
+                let triangles = (1..patch.points.len() - 1)
+                    .map(|i| [patch.points[0], patch.points[i], patch.points[i + 1]])
+                    .collect();
+                Polygon {
+                    boundaries: Vec::new(),
+                    triangles,
+                    points: patch.points,
+                    normal: patch.normal,
+                }
+            })
+            .collect());
+    }
     if model.solids.iter().any(|solid| solid.shells.len() != 1) {
         return Err(ExportError::UnsupportedModel(
             "each solid must have one outer shell; cavity shells are not supported",
@@ -118,8 +142,12 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
                 .iter()
                 .map(|&id| model.vertices[id].position)
                 .collect();
-            let normal =
-                normalized(face.plane.normal).ok_or_else(|| unsupported("invalid plane normal"))?;
+            let normal = normalized(
+                face.try_plane()
+                    .ok_or_else(|| unsupported("curved face requires tessellation"))?
+                    .normal,
+            )
+            .ok_or_else(|| unsupported("invalid plane normal"))?;
             let triangles = if cad_kernel::face_is_convex(model, cad_kernel::FaceId(face_index)) {
                 // The validated face is convex and single-loop. Preserve
                 // the existing deterministic fan without revalidating the model per face.
@@ -241,7 +269,11 @@ fn step_solids(step: &mut Step, model: &ModelSnapshot, polygons: Vec<Polygon>) -
 ///
 /// The fixed header timestamp is intentional: exports have no clock dependency.
 pub fn to_step(model: &ModelSnapshot, tolerance: Tolerance) -> Result<String, ExportError> {
-    let polygons = polygons(model, tolerance)?;
+    let polygons = if model.has_curved_geometry() {
+        None
+    } else {
+        Some(polygons(model, tolerance)?)
+    };
     if model.solids.is_empty() {
         return Err(ExportError::UnsupportedModel(
             "STEP export requires at least one solid; the result is empty",
@@ -269,9 +301,17 @@ pub fn to_step(model: &ModelSnapshot, tolerance: Tolerance) -> Result<String, Ex
     let uncertainty = step.add(format!("UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE({}),#{length_unit},'distance_accuracy_value','model tolerance')", real(tolerance.linear)));
     let context = step.add(format!("(GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#{uncertainty})) GLOBAL_UNIT_ASSIGNED_CONTEXT((#{length_unit},#{angle_unit},#{solid_angle_unit})) REPRESENTATION_CONTEXT('','3D'))"));
 
-    let solids = step_solids(&mut step, model, polygons);
+    let solids = match polygons {
+        Some(polygons) => step_solids(&mut step, model, polygons),
+        None => analytic::solids(&mut step, model, tolerance)?,
+    };
+    let representation_kind = if model.has_curved_geometry() {
+        "ADVANCED_BREP_SHAPE_REPRESENTATION"
+    } else {
+        "FACETED_BREP_SHAPE_REPRESENTATION"
+    };
     let representation = step.add(format!(
-        "FACETED_BREP_SHAPE_REPRESENTATION('',({}),#{context})",
+        "{representation_kind}('',({}),#{context})",
         refs(&solids)
     ));
     step.add(format!(

@@ -102,10 +102,10 @@ pub fn extrude_polygon(
                 let length = norm(delta);
                 model.edges.push(Edge {
                     vertices: [VertexId(key.0), VertexId(key.1)],
-                    line: Line {
+                    curve: Curve::Line(Line {
                         origin: positions[key.0],
                         direction: delta.map(|v| v / length),
-                    },
+                    }),
                 });
                 id
             });
@@ -117,10 +117,10 @@ pub fn extrude_polygon(
         let loop_id = LoopId(model.loops.len());
         model.loops.push(Loop { edges: uses });
         model.faces.push(Face {
-            plane: Plane {
+            surface: Surface::Plane(Plane {
                 origin: positions[ring[0]],
                 normal,
-            },
+            }),
             loops: vec![loop_id],
         });
     }

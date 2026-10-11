@@ -180,10 +180,10 @@ pub fn extrude_polygon_with_holes(
                     let length = norm(d);
                     model.edges.push(Edge {
                         vertices: [VertexId(key.0), VertexId(key.1)],
-                        line: Line {
+                        curve: Curve::Line(Line {
                             origin: positions[key.0],
                             direction: d.map(|v| v / length),
-                        },
+                        }),
                     });
                     id
                 });
@@ -196,10 +196,10 @@ pub fn extrude_polygon_with_holes(
             model.loops.push(Loop { edges: uses });
         }
         model.faces.push(Face {
-            plane: Plane {
+            surface: Surface::Plane(Plane {
                 origin: positions[rings[0][0]],
                 normal,
-            },
+            }),
             loops,
         });
     }
@@ -251,8 +251,15 @@ pub(crate) fn validate_prism(model: &ModelSnapshot, tol: Tolerance) -> Result<()
     if a.loops.len() != b.loops.len() || a.loops.len() > MAX_POLYGON_HOLES + 1 {
         return Err(bad());
     }
-    let z = a.plane.normal.map(|v| v / norm(a.plane.normal));
-    if norm(std::array::from_fn(|i| z[i] + b.plane.normal[i])) > 1e-12 {
+    let z = a
+        .try_plane()
+        .unwrap()
+        .normal
+        .map(|v| v / norm(a.try_plane().unwrap().normal));
+    if norm(std::array::from_fn(|i| {
+        z[i] + b.try_plane().unwrap().normal[i]
+    })) > 1e-12
+    {
         return Err(bad());
     }
     let ids = |face: &Face| -> Vec<Vec<VertexId>> {
@@ -295,7 +302,7 @@ pub(crate) fn validate_prism(model: &ModelSnapshot, tol: Tolerance) -> Result<()
     let outer = project(&ar[0]);
     let holes: Vec<_> = ar[1..].iter().map(project).collect();
     validate_polygon_with_holes(&outer, &holes, tol)?;
-    let height = -dot(sub(b.plane.origin, origin), z);
+    let height = -dot(sub(b.try_plane().unwrap().origin, origin), z);
     if !height.is_finite() || height <= tol.linear {
         return Err(bad());
     }
@@ -312,8 +319,11 @@ pub(crate) fn validate_prism(model: &ModelSnapshot, tol: Tolerance) -> Result<()
         for ring in ids(face) {
             for id in ring {
                 if dot(
-                    sub(model.vertices[id.0].position, face.plane.origin),
-                    face.plane.normal,
+                    sub(
+                        model.vertices[id.0].position,
+                        face.try_plane().unwrap().origin,
+                    ),
+                    face.try_plane().unwrap().normal,
                 )
                 .abs()
                     > geometry_error
@@ -476,7 +486,8 @@ mod tests {
         let hole = vec![[2., 2.], [2., 4.], [5., 4.], [5., 2.]];
         assert!(validate_polygon_with_holes(&outer, &[hole.clone(), hole], t).is_err());
         let mut model = sample().model;
-        model.faces[2].plane.normal = model.faces[2].plane.normal.map(|v| -v);
+        model.faces[2].try_plane_mut().unwrap().normal =
+            model.faces[2].try_plane().unwrap().normal.map(|v| -v);
         assert!(!model.validate(t).valid);
     }
 }
@@ -532,18 +543,18 @@ mod robustness_tests {
             let a = model.vertices[edge.vertices[0].0].position;
             let b = model.vertices[edge.vertices[1].0].position;
             let d = sub(b, a);
-            edge.line = Line {
+            edge.curve = Curve::Line(Line {
                 origin: a,
                 direction: d.map(|v| v / norm(d)),
-            };
+            });
         }
         for i in 0..model.faces.len() {
             let points = model.loop_points(model.faces[i].loops[0]).unwrap();
             let normal = cross(sub(points[1], points[0]), sub(points[2], points[0]));
-            model.faces[i].plane = Plane {
+            model.faces[i].surface = Surface::Plane(Plane {
                 origin: points[0],
                 normal: normal.map(|v| v / norm(normal)),
-            };
+            });
         }
         assert!(
             !model.validate(t).valid,
@@ -741,18 +752,18 @@ mod concave_tests {
             let a = m.vertices[edge.vertices[0].0].position;
             let b = m.vertices[edge.vertices[1].0].position;
             let d = sub(b, a);
-            edge.line = Line {
+            edge.curve = Curve::Line(Line {
                 origin: a,
                 direction: d.map(|v| v / norm(d)),
-            };
+            });
         }
         for i in 0..m.faces.len() {
             let p = m.loop_points(m.faces[i].loops[0]).unwrap();
             let n = cross(sub(p[1], p[0]), sub(p[2], p[0]));
-            m.faces[i].plane = Plane {
+            m.faces[i].surface = Surface::Plane(Plane {
                 origin: p[0],
                 normal: n.map(|v| v / norm(n)),
-            };
+            });
         }
         assert!(!m.validate(t).valid);
     }

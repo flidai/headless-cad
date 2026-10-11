@@ -164,6 +164,11 @@ impl<'de> Deserialize<'de> for Recipe {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Feature {
+    Circle {
+        id: String,
+        radius: f64,
+        op_version: u32,
+    },
     Rectangle {
         id: String,
         width: f64,
@@ -234,6 +239,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut op = None;
                 let mut id = None;
                 let mut op_version = None;
+                let mut radius = None;
                 let mut width = None;
                 let mut depth = None;
                 let mut profile = None;
@@ -259,6 +265,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "op" => read_field!(op, String),
                         "id" => read_field!(id, String),
                         "op_version" => read_field!(op_version, u32),
+                        "radius" => read_field!(radius, f64),
                         "width" => read_field!(width, f64),
                         "depth" => read_field!(depth, f64),
                         "profile" => read_field!(profile, String),
@@ -277,6 +284,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "op",
                                     "id",
                                     "op_version",
+                                    "radius",
                                     "width",
                                     "depth",
                                     "profile",
@@ -298,6 +306,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let id = id.ok_or_else(|| M::Error::missing_field("id"))?;
                 let op_version = op_version.unwrap_or_else(operation_version);
                 let allowed: &[&str] = match op.as_str() {
+                    "circle" => &["op", "id", "op_version", "radius"],
                     "rectangle" => &["op", "id", "op_version", "width", "depth"],
                     "polygon" => &["op", "id", "op_version", "points", "holes"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
@@ -310,6 +319,7 @@ impl<'de> Deserialize<'de> for Feature {
                         return Err(M::Error::unknown_variant(
                             &op,
                             &[
+                                "circle",
                                 "rectangle",
                                 "polygon",
                                 "extrude",
@@ -328,6 +338,11 @@ impl<'de> Deserialize<'de> for Feature {
                     }
                 }
                 Ok(match op.as_str() {
+                    "circle" => Feature::Circle {
+                        id,
+                        op_version,
+                        radius: radius.ok_or_else(|| M::Error::missing_field("radius"))?,
+                    },
                     "rectangle" => Feature::Rectangle {
                         id,
                         op_version,
@@ -388,7 +403,8 @@ impl<'de> Deserialize<'de> for Feature {
 impl Feature {
     pub fn id(&self) -> &str {
         match self {
-            Self::Rectangle { id, .. }
+            Self::Circle { id, .. }
+            | Self::Rectangle { id, .. }
             | Self::Polygon { id, .. }
             | Self::Extrude { id, .. }
             | Self::Translate { id, .. }
@@ -400,7 +416,7 @@ impl Feature {
     }
     pub fn dependencies(&self) -> Vec<&str> {
         match self {
-            Self::Rectangle { .. } | Self::Polygon { .. } => vec![],
+            Self::Circle { .. } | Self::Rectangle { .. } | Self::Polygon { .. } => vec![],
             Self::Extrude { profile, .. } => vec![profile],
             Self::Translate { body, .. } | Self::Transform { body, .. } => vec![body],
             Self::Union { left, right, .. }
@@ -409,11 +425,15 @@ impl Feature {
         }
     }
     pub fn is_solid(&self) -> bool {
-        !matches!(self, Self::Rectangle { .. } | Self::Polygon { .. })
+        !matches!(
+            self,
+            Self::Circle { .. } | Self::Rectangle { .. } | Self::Polygon { .. }
+        )
     }
     fn version(&self) -> u32 {
         match self {
-            Self::Rectangle { op_version, .. }
+            Self::Circle { op_version, .. }
+            | Self::Rectangle { op_version, .. }
             | Self::Polygon { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Translate { op_version, .. }
@@ -425,6 +445,7 @@ impl Feature {
     }
     fn operation(&self) -> &'static str {
         match self {
+            Self::Circle { .. } => "circle",
             Self::Rectangle { .. } => "rectangle",
             Self::Polygon { .. } => "polygon",
             Self::Extrude { .. } => "extrude",
@@ -680,6 +701,9 @@ fn hash_feature(
         hash.update(hashes[dependency].as_bytes());
     }
     match feature {
+        Feature::Circle { radius, .. } => {
+            hash.update(&radius.to_le_bytes());
+        }
         Feature::Rectangle { width, depth, .. } => {
             hash.update(&width.to_le_bytes());
             hash.update(&depth.to_le_bytes());
@@ -924,6 +948,14 @@ impl BuildEngine {
         let order = ordered_features(recipe, &indices)?;
         for feature in &recipe.features {
             match feature {
+                Feature::Circle { id, radius, .. } => {
+                    cad_kernel::validate_circle(*radius, tolerance).map_err(|error| {
+                        BuildError::Kernel {
+                            feature: id.clone(),
+                            message: error.to_string(),
+                        }
+                    })?
+                }
                 Feature::Rectangle {
                     id, width, depth, ..
                 } => {
@@ -1019,6 +1051,9 @@ impl BuildEngine {
                         Feature::Extrude {
                             profile, height, ..
                         } => match &recipe.features[indices[profile.as_str()]] {
+                            Feature::Circle { radius, .. } => {
+                                cad_kernel::extrude_circle(*radius, *height, tolerance)
+                            }
                             Feature::Rectangle { width, depth, .. } => {
                                 extrude_rectangle(*width, *depth, *height, tolerance)
                             }
@@ -1051,7 +1086,9 @@ impl BuildEngine {
                                 tolerance,
                             )
                         }
-                        Feature::Rectangle { .. } | Feature::Polygon { .. } => unreachable!(),
+                        Feature::Circle { .. }
+                        | Feature::Rectangle { .. }
+                        | Feature::Polygon { .. } => unreachable!(),
                     };
                     let result = operation.map_err(|e| BuildError::Kernel {
                         feature: feature.id().into(),

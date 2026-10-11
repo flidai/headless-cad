@@ -19,9 +19,10 @@ pub fn validate_transform(offset: [f64; 3], rotation: [f64; 4]) -> Result<(), Ke
     Ok(())
 }
 
-/// Apply `R(rotation) * point + offset` to native line/plane geometry.
+/// Apply `R(rotation) * point + offset` to native curves and surfaces.
 /// General rotations require one strictly convex solid, a validated right prism
-/// with a simple outer ring and convex through-hole rings, or an empty model.
+/// with a simple outer ring and convex through-hole rings, a validated analytic
+/// circular extrusion, or an empty model.
 /// Exactly represented signed-permutation rotations additionally support the
 /// existing orthogonal nonconvex/multiple-solid domain. Near-axis rotations are
 /// never snapped. Topology IDs and outward winding remain unchanged; provenance
@@ -65,7 +66,7 @@ pub fn transform(
         row.iter().filter(|&&v| v != 0.0).count() == 1
             && row.iter().all(|&v| matches!(v, -1.0 | 0.0 | 1.0))
     });
-    if !permutation && !model.solids.is_empty() {
+    if !permutation && !model.solids.is_empty() && !model.has_curved_geometry() {
         let issues = if model
             .faces
             .iter()
@@ -115,12 +116,30 @@ pub fn transform(
         vertex.position = point(vertex.position)?;
     }
     for edge in &mut moved.edges {
-        edge.line.origin = point(edge.line.origin)?;
-        edge.line.direction = vector(edge.line.direction);
+        match &mut edge.curve {
+            Curve::Line(line) => {
+                line.origin = point(line.origin)?;
+                line.direction = vector(line.direction);
+            }
+            Curve::Circle(circle) => {
+                circle.origin = point(circle.origin)?;
+                circle.axis = vector(circle.axis);
+                circle.x_direction = vector(circle.x_direction);
+            }
+        }
     }
     for face in &mut moved.faces {
-        face.plane.origin = point(face.plane.origin)?;
-        face.plane.normal = vector(face.plane.normal);
+        match &mut face.surface {
+            Surface::Plane(plane) => {
+                plane.origin = point(plane.origin)?;
+                plane.normal = vector(plane.normal);
+            }
+            Surface::Cylinder(cylinder) => {
+                cylinder.origin = point(cylinder.origin)?;
+                cylinder.axis = vector(cylinder.axis);
+                cylinder.x_direction = vector(cylinder.x_direction);
+            }
+        }
     }
     for edge in &model.edges {
         let [a, b] = edge.vertices;
@@ -194,9 +213,9 @@ mod tests {
         let identity = transform(&source.model, [0.; 3], [0., 0., 0., 1.], t).unwrap();
         assert_eq!(identity.model, source.model);
         for (face, rotated) in source.model.faces.iter().zip(&moved.model.faces) {
-            let [x, y, z] = face.plane.normal;
+            let [x, y, z] = face.try_plane().unwrap().normal;
             close(
-                rotated.plane.normal,
+                rotated.try_plane().unwrap().normal,
                 [
                     angle.cos() * x - angle.sin() * y,
                     angle.sin() * x + angle.cos() * y,

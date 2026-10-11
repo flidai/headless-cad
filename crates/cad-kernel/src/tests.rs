@@ -102,10 +102,18 @@ fn subnormal_geometry_and_integration_terms_are_rejected() {
         vertex.position = vertex.position.map(|coordinate| coordinate * 1e-160);
     }
     for edge in &mut model.edges {
-        edge.line.origin = edge.line.origin.map(|coordinate| coordinate * 1e-160);
+        edge.try_line_mut().unwrap().origin = edge
+            .try_line()
+            .unwrap()
+            .origin
+            .map(|coordinate| coordinate * 1e-160);
     }
     for face in &mut model.faces {
-        face.plane.origin = face.plane.origin.map(|coordinate| coordinate * 1e-160);
+        face.try_plane_mut().unwrap().origin = face
+            .try_plane()
+            .unwrap()
+            .origin
+            .map(|coordinate| coordinate * 1e-160);
     }
     let report = model.validate(Tolerance { linear: 1e-170 });
     assert!(!report.valid);
@@ -133,12 +141,12 @@ fn volume_is_derived_from_geometry_and_translation_invariant() {
         }
     }
     for edge in &mut model.edges {
-        for coordinate in &mut edge.line.origin {
+        for coordinate in &mut edge.try_line_mut().unwrap().origin {
             *coordinate += 1024.0;
         }
     }
     for face in &mut model.faces {
-        for coordinate in &mut face.plane.origin {
+        for coordinate in &mut face.try_plane_mut().unwrap().origin {
             *coordinate += 1024.0;
         }
     }
@@ -173,10 +181,10 @@ fn corrupted_topology_is_rejected_without_panicking() {
         |m| {
             m.loops[0].edges.pop();
         },
-        |m| m.faces[0].plane.normal = [0.0, 0.0, 1.0],
+        |m| m.faces[0].try_plane_mut().unwrap().normal = [0.0, 0.0, 1.0],
         |m| m.vertices[0].position[2] = 0.5,
         |m| m.vertices[0].position[0] = f64::NAN,
-        |m| m.edges[0].line.direction = [0.0; 3],
+        |m| m.edges[0].try_line_mut().unwrap().direction = [0.0; 3],
         |m| m.shells[0].faces[1] = m.shells[0].faces[0],
         |m| m.loops[0].edges.clear(),
         |m| m.vertices.clear(),
@@ -445,7 +453,7 @@ fn move_component_unchecked(model: &mut ModelSnapshot, solid: usize, offset: [f6
         for face_id in &model.shells[shell.0].faces {
             let face = &mut model.faces[face_id.0];
             for (axis, delta) in offset.into_iter().enumerate() {
-                face.plane.origin[axis] += delta;
+                face.try_plane_mut().unwrap().origin[axis] += delta;
             }
             for loop_id in &face.loops {
                 for edge_use in &model.loops[loop_id.0].edges {
@@ -457,7 +465,7 @@ fn move_component_unchecked(model: &mut ModelSnapshot, solid: usize, offset: [f6
     }
     for id in edges {
         for (axis, delta) in offset.into_iter().enumerate() {
-            model.edges[id.0].line.origin[axis] += delta;
+            model.edges[id.0].try_line_mut().unwrap().origin[axis] += delta;
         }
     }
     for id in vertices {
@@ -533,10 +541,10 @@ fn self_intersecting_triangle_shell_is_outside_supported_domain() {
                     let length = math::norm(delta);
                     model.edges.push(Edge {
                         vertices: key.map(VertexId),
-                        line: Line {
+                        curve: Curve::Line(Line {
                             origin: points[key[0]],
                             direction: delta.map(|v| v / length),
-                        },
+                        }),
                     });
                     id
                 });
@@ -553,10 +561,10 @@ fn self_intersecting_triangle_shell_is_outside_supported_domain() {
             );
             let length = math::norm(normal);
             model.faces.push(Face {
-                plane: Plane {
+                surface: Surface::Plane(Plane {
                     origin: points[ring[0]],
                     normal: normal.map(|v| v / length),
-                },
+                }),
                 loops: vec![loop_id],
             });
         }
@@ -621,8 +629,11 @@ fn cut_lineage_tracks_split_cap_and_reversed_tool_walls() {
     assert_eq!(top.len(), 2);
     assert_eq!(mapped_area(&cut.model, top), 80.0);
     for &id in top {
-        assert_eq!(cut.model.faces[id.0].plane.normal, [0.0, 0.0, 1.0]);
-        assert_eq!(cut.model.faces[id.0].plane.origin[2], 2.0);
+        assert_eq!(
+            cut.model.faces[id.0].try_plane().unwrap().normal,
+            [0.0, 0.0, 1.0]
+        );
+        assert_eq!(cut.model.faces[id.0].try_plane().unwrap().origin[2], 2.0);
     }
     let tool = &cut.history.input_faces["right"];
     for (source, expected_normal, x) in [
@@ -631,8 +642,8 @@ fn cut_lineage_tracks_split_cap_and_reversed_tool_walls() {
     ] {
         assert_eq!(tool[&source].len(), 1);
         let face = &cut.model.faces[tool[&source][0].0];
-        assert_eq!(face.plane.normal, expected_normal);
-        assert_eq!(face.plane.origin[0], x);
+        assert_eq!(face.try_plane().unwrap().normal, expected_normal);
+        assert_eq!(face.try_plane().unwrap().origin[0], x);
         assert_eq!(mapped_area(&cut.model, &tool[&source]), 20.0);
     }
     for i in [0, 1, 2, 4] {
@@ -726,8 +737,11 @@ fn intersection_lineage_preserves_tool_orientation_and_empty_inputs() {
         let descendants = &intersection.history.input_faces["right"][&FaceId(i)];
         assert_eq!(descendants.len(), 1);
         assert_eq!(
-            intersection.model.faces[descendants[0].0].plane.normal,
-            cutter.faces[i].plane.normal
+            intersection.model.faces[descendants[0].0]
+                .try_plane()
+                .unwrap()
+                .normal,
+            cutter.faces[i].try_plane().unwrap().normal
         );
     }
     let empty = boolean(&base, &base, BooleanOp::Difference, Tolerance::default()).unwrap();
@@ -849,19 +863,19 @@ fn repair_polygon_supports(model: &mut ModelSnapshot) {
         let b = model.vertices[edge.vertices[1].0].position;
         let delta = sub(b, a);
         let length = math::norm(delta);
-        edge.line = Line {
+        edge.curve = Curve::Line(Line {
             origin: a,
             direction: delta.map(|v| v / length),
-        };
+        });
     }
     for i in 0..model.faces.len() {
         let points = model.loop_points(model.faces[i].loops[0]).unwrap();
         let normal = cross(sub(points[1], points[0]), sub(points[2], points[0]));
         let length = math::norm(normal);
-        model.faces[i].plane = Plane {
+        model.faces[i].surface = Surface::Plane(Plane {
             origin: points[0],
             normal: normal.map(|v| v / length),
-        };
+        });
     }
 }
 
@@ -889,7 +903,7 @@ fn general_validator_rejects_tampered_nonconvex_folded_and_reversed_boundaries()
     for edge in ring {
         edge.reversed = !edge.reversed;
     }
-    reversed.faces[1].plane.normal = [0.0, 0.0, -1.0];
+    reversed.faces[1].try_plane_mut().unwrap().normal = [0.0, 0.0, -1.0];
     assert!(!reversed.validate(Tolerance::default()).valid);
     let mut folded = original;
     folded.vertices[8].position[2] = -1.0;

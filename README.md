@@ -15,7 +15,7 @@ See the [dependency license inventory](docs/dependency-licenses.md).
 A local, CLI-first CAD product built around our own Rust B-rep kernel. Recipes
 are plain text suitable for Git, results are inspectable JSON, and exports are
 STEP and STL. Modeling currently supports **orthogonal solids and simple polygon extrusions, including nonconvex
-outlines and convex polygonal through-holes**: slotted brackets, open trays, triangular ramps, and polygonal
+outlines and convex polygonal through-holes, plus true circular extrusions**: slotted brackets, open trays, triangular ramps, and polygonal
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union and cut remain orthogonal-only; intersection also supports bounded,
@@ -782,21 +782,48 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 - Explicit rejection of enclosed cavities, nonmanifold contacts, unsupported
   geometry, and computations outside the numerical/resource envelope.
 
-Round holes, circles/cylinders, general rotated nonconvex modeling, sketch constraints, general
-polygon union/cut and nonconvex polygon Booleans, nonconvex hole rings, curved surfaces,
+Round-hole cutting, tubes, general rotated nonconvex modeling, sketch constraints, general
+polygon union/cut and nonconvex polygon Booleans, nonconvex hole rings, general trimmed curved surfaces,
 fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
 boundaries and millimetre units, with occurrence relationships for assemblies; it does not preserve the executable recipe.
-STL is unitless by specification, with coordinates written in millimetres.
+Analytic cylinders use `ADVANCED_BREP_SHAPE_REPRESENTATION` with circles, a cylindrical surface and an explicit periodic seam. STL is unitless by specification, with coordinates written in millimetres.
 
 The orthogonal baseline and first convex planar extension are bounded increments
 toward the commercial CAD goal. Nested assemblies, scoped face references and
 shared display assets are implemented.
 Named part datums and sibling attachments are implemented. Next come
 reference-driven modeling, bounded-error display LOD,
-curved analytic geometry, general planar Booleans, and trim/seam correctness.
+broader analytic geometry, general planar Booleans, and general trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence
 for curved modeling, constraints, large assemblies, and manufacturing workflows.
+
+## Analytic circular parts
+
+`circle(id = "profile", radius = 8)` followed by `extrude(..., height = 60)`
+creates an authoritative cylinder with three faces, three edges and two seam
+vertices. Native transforms, mass properties, cap datums, STEP and inspection
+preserve its circular geometry. See [shaft_stack.star](examples/shaft_stack.star)
+for a shaft, flange and end cap attached through face datums, plus a separately
+rotated shaft. These are separate solid parts; curved Booleans and hollow tubes
+are not yet supported.
+
+```sh
+cad build examples/shaft_stack.star --out-dir out/shaft_stack
+cad properties examples/shaft_stack.star --output shaft
+```
+
+Display/STL tessellation uses a default 0.01 mm radial chord-error ceiling and
+at most 4,096 circumference segments; an unmet error budget fails explicitly.
+The Rust tessellation API accepts a policy. Display assets record the achieved
+bound and map every wall patch to the same native face. Viewer measurements
+remain approximate. STEP keeps the analytic boundary independently of this mesh.
+
+Kernel 0.3 changes native JSON from `edge.line`/`face.plane` to tagged
+`edge.curve`/`face.surface`. Rebuild old generated artifacts from recipes; old
+native snapshots fail deserialization instead of being silently reinterpreted.
+Existing planar recipes remain supported. Display assets with semantic curved
+patches use envelope version 3; older stream clients require a reload.
 
 ## Verify and package
 

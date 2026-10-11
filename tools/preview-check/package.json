@@ -15,7 +15,8 @@
     "test:transform": "node transform-check.cjs",
     "test:clipped": "node clipped-check.cjs",
     "test:holes": "node holes-check.cjs",
-    "test:concave": "node concave-check.cjs"
+    "test:concave": "node concave-check.cjs",
+    "test:cylinder": "node cylinder-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"
