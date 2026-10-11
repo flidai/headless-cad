@@ -17,7 +17,8 @@ mod assembly;
 mod selection;
 pub use assembly::{MAX_ASSEMBLIES, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS, MAX_PARTS};
 pub use cad_assembly::{
-    AssemblyDefinition, AssemblyInstance, AssemblyOutput, Instance, PartDefinition, RigidTransform,
+    AssemblyDefinition, AssemblyInstance, AssemblyOutput, Instance, Material, PartDefinition,
+    PartMetadata, RigidTransform,
 };
 pub use selection::{
     FaceCardinality, FaceLineageStep, FaceResolution, FaceResolutionStatus, FaceSelector,

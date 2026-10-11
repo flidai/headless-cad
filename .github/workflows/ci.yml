@@ -16,6 +16,7 @@ jobs:
       - run: cargo run --locked -p cad-cli -- build examples/mounting_array.star --out-dir out/mounting_array
       - run: cargo run --locked -p cad-cli -- build examples/reference_fixture.star --out-dir out/reference_fixture
       - run: cargo run --locked -p cad-cli -- build examples/modular_rack.star --out-dir out/modular_rack
+      - run: python3 crates/cad-export/tools/check_bom_csv.py out/modular_rack/modular_rack.bom.csv out/modular_rack/modular_rack.bom.json
       - run: cargo run --locked -p cad-cli -- select examples/reference_fixture.star --from blank --role end_cap --in finished --all
       - uses: actions/setup-node@v4
         with:

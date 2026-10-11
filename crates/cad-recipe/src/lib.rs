@@ -280,11 +280,44 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
     }
 
     /// Give a solid feature a reusable part-definition identity.
-    fn part(id: &str, body: &str, eval: &mut Evaluator) -> anyhow::Result<String> {
+    #[allow(clippy::too_many_arguments)]
+    fn part(
+        id: &str,
+        body: &str,
+        part_number: Option<&str>,
+        revision: Option<&str>,
+        description: Option<&str>,
+        material: Option<&str>,
+        density_kg_per_m3: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let material = match (material, density_kg_per_m3) {
+            (None, None) => None,
+            (Some(name), Some(density)) => Some(cad_build::Material {
+                name: name.to_owned(),
+                density_kg_per_m3: number(density).map_err(|_| {
+                    anyhow::anyhow!("part density_kg_per_m3 must be a finite number")
+                })?,
+            }),
+            _ => anyhow::bail!("part '{id}' requires material and density_kg_per_m3 together"),
+        };
+        let metadata = cad_build::PartMetadata {
+            part_number: part_number.map(str::to_owned),
+            revision: revision.map(str::to_owned),
+            description: description.map(str::to_owned),
+            material,
+        };
+        metadata
+            .validate()
+            .map_err(|error| anyhow::anyhow!("part '{id}': {error}"))?;
         let graph = store(eval)?;
         let mut parts = graph.parts.borrow_mut();
         anyhow::ensure!(parts.len() < MAX_PARTS, "recipe exceeds {MAX_PARTS} parts");
-        parts.push(serde_json::json!({"id":id,"feature":body}));
+        let mut definition = serde_json::json!({"id":id,"feature":body});
+        if metadata != cad_build::PartMetadata::default() {
+            definition["metadata"] = serde_json::to_value(metadata)?;
+        }
+        parts.push(definition);
         Ok(id.to_owned())
     }
 
@@ -869,5 +902,71 @@ assembly_output(name="pair", assembly=assembly(id="pair",instances=[a,b]))
         )
         .unwrap();
         assert!(cad_build::build(&recipe).is_err());
+    }
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::*;
+    const SOURCE: &str = "p=rectangle(id='p',width=2,depth=3)\nb=extrude(id='b',profile=p,height=4)\nd=part(id='part',body=b,part_number='P-01',revision='A',description='Support',material='Steel',density_kg_per_m3=7850)\ni=instance(id='leaf',part=d)\na=assembly(id='a',instances=[i])\nassembly_output(name='a',assembly=a)\n";
+
+    #[test]
+    fn part_metadata_roundtrips_and_edits_reuse_geometry() {
+        let recipe = from_starlark("material.star", SOURCE).unwrap();
+        assert_eq!(
+            recipe.parts[0].metadata.part_number.as_deref(),
+            Some("P-01")
+        );
+        assert_eq!(
+            recipe.parts[0]
+                .metadata
+                .material
+                .as_ref()
+                .unwrap()
+                .density_kg_per_m3,
+            7850.0
+        );
+        let decoded: Recipe =
+            serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+        let mut engine = cad_build::BuildEngine::default();
+        let first = engine.build(&decoded).unwrap();
+        let revised = from_starlark(
+            "material.star",
+            &SOURCE
+                .replace("revision='A'", "revision='B'")
+                .replace("7850", "2700"),
+        )
+        .unwrap();
+        let next = engine.build(&revised).unwrap();
+        assert_eq!(next.stats.computed_solids, 0);
+        assert_eq!(first.feature_hashes, next.feature_hashes);
+        assert_ne!(
+            first.assemblies["a"].content_hash,
+            next.assemblies["a"].content_hash
+        );
+    }
+
+    #[test]
+    fn metadata_dsl_rejects_incomplete_pairs_bad_strings_and_invalid_density() {
+        for args in [
+            "material='Steel'",
+            "density_kg_per_m3=7850",
+            "material='Steel',density_kg_per_m3=0",
+            "material='Steel',density_kg_per_m3=-1",
+            "material='',density_kg_per_m3=1",
+            "material='Steel',density_kg_per_m3='heavy'",
+            "material='Steel',density_kg_per_m3=True",
+            "part_number=''",
+            "revision=' A'",
+            "description=''",
+            "part_number=42",
+            "part_nubmer='typo'",
+        ] {
+            let source = format!("part(id='part',body='body',{args})");
+            assert!(
+                from_starlark("bad-metadata.star", &source).is_err(),
+                "accepted {args}"
+            );
+        }
     }
 }

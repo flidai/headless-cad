@@ -216,6 +216,7 @@ fn handle(mut stream: TcpStream, root: &Path) -> io::Result<()> {
         Some("html") => "text/html; charset=utf-8",
         Some("svg") => "image/svg+xml",
         Some("json") => "application/json",
+        Some("csv") => "text/csv; charset=utf-8",
         Some("step" | "stp") => "application/step",
         Some("stl") => "model/stl",
         _ => "application/octet-stream",
@@ -392,6 +393,8 @@ fn gallery(directory: &Dir) -> String {
             ("brep.json", "B-rep JSON"),
             ("assembly.json", "Assembly JSON"),
             ("display.json", "Display JSON"),
+            ("bom.json", "BOM JSON"),
+            ("bom.csv", "BOM CSV"),
         ] {
             let artifact = format!("{stem}.{suffix}");
             if directory

@@ -1104,3 +1104,163 @@ fn face_assertion_only_edits_are_visible_in_diff_without_geometry_changes() {
         }
     }
 }
+
+#[test]
+fn nested_rack_bom_reports_quantities_mass_and_published_metadata_integrity() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let source = example("modular_rack.star");
+    let built = successful_json(cli(&["build", &source, "--out-dir", out.to_str().unwrap()]));
+    let bom = successful_json(cli(&["bom", &source, "--assembly", "modular_rack"]));
+    assert_eq!(bom["schema_version"], 1);
+    assert_eq!(bom["volume_units"], "mm3");
+    assert_eq!(bom["mass_units"], "kg");
+    assert_eq!(bom["total_occurrences"], 17);
+    assert!((bom["total_mass_kg"].as_f64().unwrap() - 0.2058336).abs() < 1e-12);
+    assert_eq!(bom["missing_material_occurrences"], 0);
+    let items = bom["items"].as_array().unwrap();
+    let quantities: std::collections::BTreeMap<_, _> = items
+        .iter()
+        .map(|item| {
+            (
+                item["part_id"].as_str().unwrap(),
+                item["quantity"].as_u64().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        quantities,
+        std::collections::BTreeMap::from([
+            ("guide", 8),
+            ("plate", 4),
+            ("rack_base", 1),
+            ("slider", 4)
+        ])
+    );
+    assert_eq!(
+        bom["items"],
+        built["outputs"]["modular_rack"]["bom"]["items"]
+    );
+    let published: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("modular_rack.bom.json")).unwrap()).unwrap();
+    assert_eq!(published["items"], bom["items"]);
+    assert_eq!(published["content_hash"], bom["content_hash"]);
+    let csv = fs::read_to_string(out.join("modular_rack.bom.csv")).unwrap();
+    assert_eq!(csv.lines().count(), 5);
+    assert!(csv.contains("guide,RACK-GUIDE,A,Reversible guide,Demo steel,7800,8,"));
+    let path = out.join("modular_rack.assembly.json");
+    let mut native: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(native["hierarchy"].as_object().unwrap().len(), 3);
+    assert_eq!(native["instances"].as_array().unwrap().len(), 17);
+    assert_eq!(
+        native["definitions"]["guide"]["metadata"]["material"]["density_kg_per_m3"],
+        7800.0
+    );
+    assert!(cli(&["validate", path.to_str().unwrap()]).status.success());
+    native["definitions"]["guide"]["metadata"]["revision"] = "tampered".into();
+    fs::write(&path, serde_json::to_vec(&native).unwrap()).unwrap();
+    let result = cli(&["validate", path.to_str().unwrap()]);
+    assert!(!result.status.success());
+    assert!(
+        serde_json::from_slice::<serde_json::Value>(&result.stderr).unwrap()["error"].is_string()
+    );
+    let unknown = cli(&["bom", &source, "--assembly", "rack"]); // Root ID is not an output alias.
+    assert!(!unknown.status.success());
+    assert!(String::from_utf8_lossy(&unknown.stderr).contains("unknown assembly output"));
+}
+
+#[test]
+fn bom_metadata_only_edits_reuse_geometry_and_diff_exposes_mass_change() {
+    let dir = tempfile::tempdir().unwrap();
+    let before = dir.path().join("before.star");
+    let after = dir.path().join("after.star");
+    let cache = dir.path().join("cache");
+    let source = fs::read_to_string(example("modular_rack.star")).unwrap();
+    fs::write(&before, &source).unwrap();
+    fs::write(
+        &after,
+        source.replace("density_kg_per_m3 = 7800", "density_kg_per_m3 = 3900"),
+    )
+    .unwrap();
+    let first = successful_json(cli(&[
+        "inspect",
+        before.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    let changed = successful_json(cli(&[
+        "inspect",
+        after.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    assert_eq!(changed["stats"]["computed_solids"], 0);
+    assert_eq!(first["feature_hashes"], changed["feature_hashes"]);
+    assert_eq!(
+        first["outputs"]["modular_rack"]["volume_mm3"],
+        changed["outputs"]["modular_rack"]["volume_mm3"]
+    );
+    assert_ne!(
+        first["outputs"]["modular_rack"]["content_hash"],
+        changed["outputs"]["modular_rack"]["content_hash"]
+    );
+    assert!(
+        (changed["outputs"]["modular_rack"]["bom"]["total_mass_kg"]
+            .as_f64()
+            .unwrap()
+            - 0.1758816)
+            .abs()
+            < 1e-12
+    );
+    let diff = successful_json(cli(&[
+        "diff",
+        before.to_str().unwrap(),
+        after.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    let change = &diff["outputs"]["modular_rack"];
+    assert_eq!(change["status"], "changed");
+    assert_eq!(change["volume_delta_mm3"], 0.0);
+    assert_eq!(
+        change["before"]["bom"]["items"],
+        first["outputs"]["modular_rack"]["bom"]["items"]
+    );
+    assert_eq!(
+        change["after"]["bom"]["items"],
+        changed["outputs"]["modular_rack"]["bom"]["items"]
+    );
+}
+
+#[test]
+fn bom_missing_material_reports_unknown_total_and_known_partial_mass() {
+    let dir = tempfile::tempdir().unwrap();
+    let recipe = dir.path().join("partial.star");
+    let source = fs::read_to_string(example("modular_rack.star")).unwrap();
+    fs::write(
+        &recipe,
+        source.replace(
+            ", material = \"Demo polymer\", density_kg_per_m3 = 1200",
+            "",
+        ),
+    )
+    .unwrap();
+    let report = successful_json(cli(&[
+        "bom",
+        recipe.to_str().unwrap(),
+        "--assembly",
+        "modular_rack",
+    ]));
+    assert!(report["total_mass_kg"].is_null());
+    assert_eq!(report["missing_material_occurrences"], 4);
+    assert!((report["known_mass_kg"].as_f64().unwrap() - 0.2016864).abs() < 1e-12);
+    let slider = report["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["part_id"] == "slider")
+        .unwrap();
+    assert_eq!(slider["quantity"], 4);
+    assert!(slider["unit_mass_kg"].is_null());
+    assert!(slider["total_mass_kg"].is_null());
+}

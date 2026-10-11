@@ -50,6 +50,9 @@ pub(super) fn validate<'a>(
     let mut parts = HashSet::new();
     for part in &recipe.parts {
         identifier("part", &part.id)?;
+        part.metadata
+            .validate()
+            .map_err(|error| BuildError::AssemblyGraph(format!("part '{}': {error}", part.id)))?;
         if !parts.insert(&part.id) {
             return Err(BuildError::AssemblyGraph(format!(
                 "duplicate part ID '{}'",
@@ -172,6 +175,7 @@ pub(super) fn evaluate(
                 definition.id.clone(),
                 BuiltPart {
                     feature_id: definition.feature.clone(),
+                    metadata: definition.metadata.clone(),
                     content_hash: hashes[&definition.feature].clone(),
                     result: Arc::clone(&evaluated[&definition.feature]),
                 },

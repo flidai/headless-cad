@@ -5,6 +5,7 @@ fn parts() -> BTreeMap<String, BuiltPart> {
     BTreeMap::from([(
         "plate".into(),
         BuiltPart {
+            metadata: PartMetadata::default(),
             feature_id: "blank".into(),
             content_hash: "geometry-123".into(),
             result: Arc::new(extrude_rectangle(2.0, 3.0, 4.0, Tolerance::default()).unwrap()),
@@ -646,4 +647,197 @@ fn empty_subassembly_paths_and_rotated_offset_roundoff_have_explicit_budgets() {
     assert!(RigidTransform::default()
         .compose(&far, Tolerance::default())
         .is_ok());
+}
+
+fn aluminium() -> PartMetadata {
+    PartMetadata {
+        part_number: Some("P-100".into()),
+        revision: Some("A".into()),
+        description: Some("Mounting plate".into()),
+        material: Some(Material {
+            name: "Aluminium".into(),
+            density_kg_per_m3: 2700.0,
+        }),
+    }
+}
+
+#[test]
+fn bom_counts_reused_nested_parts_and_computes_independent_material_mass() {
+    let mut definitions = parts();
+    definitions.get_mut("plate").unwrap().metadata = aluminium();
+    let mut alias = definitions["plate"].clone();
+    alias.metadata.material = None;
+    definitions.insert("same_geometry_other_part".into(), alias);
+    let hierarchy = BTreeMap::from([
+        (
+            "unit".into(),
+            definition(
+                "unit",
+                vec![instance("a", [0.0; 3]), instance("b", [0.0; 3])],
+                vec![],
+            ),
+        ),
+        (
+            "root".into(),
+            definition(
+                "root",
+                vec![Instance {
+                    id: "alias".into(),
+                    part: "same_geometry_other_part".into(),
+                    transform: RigidTransform::default(),
+                }],
+                ["first", "second", "third"]
+                    .map(|id| child(id, "unit", RigidTransform::default()))
+                    .to_vec(),
+            ),
+        ),
+    ]);
+    let built = BuiltAssembly::from_definitions(
+        "root".into(),
+        definitions,
+        hierarchy,
+        Tolerance::default(),
+    )
+    .unwrap();
+    let bom = built.bill_of_materials(Tolerance::default()).unwrap();
+    assert_eq!(bom.content_hash, built.content_hash);
+    assert_eq!(
+        bom.items.len(),
+        2,
+        "equal geometry and part numbers must not merge logical parts"
+    );
+    assert_eq!(bom.items[0].part_id, "plate");
+    assert_eq!(bom.items[0].quantity, 6);
+    assert_eq!(bom.items[1].quantity, 1);
+    assert_eq!(bom.items[0].unit_volume_mm3, 24.0);
+    assert_eq!(bom.items[0].total_volume_mm3, 144.0);
+    assert!((bom.items[0].unit_mass_kg.unwrap() - 0.0000648).abs() < 1e-18);
+    assert!((bom.items[0].total_mass_kg.unwrap() - 0.0003888).abs() < 1e-18);
+    assert_eq!(bom.total_occurrences, 7);
+    assert_eq!(bom.total_volume_mm3, 168.0);
+    assert_eq!(bom.total_mass_kg, None);
+    assert!((bom.known_mass_kg - 0.0003888).abs() < 1e-18);
+    assert_eq!(bom.missing_material_occurrences, 1);
+    assert_eq!(bom.items[1].unit_mass_kg, None);
+    assert_eq!(bom.items[1].total_mass_kg, None);
+    assert_eq!(
+        serde_json::from_slice::<BomReport>(&serde_json::to_vec(&bom).unwrap()).unwrap(),
+        bom
+    );
+}
+
+#[test]
+fn metadata_changes_assembly_identity_without_changing_shared_geometry() {
+    let source = parts();
+    let before = build(source.clone(), vec![instance("one", [0.0; 3])]);
+    let mut changed = source.clone();
+    changed.get_mut("plate").unwrap().metadata = aluminium();
+    let after = build(changed, vec![instance("one", [0.0; 3])]);
+    assert_ne!(before.content_hash, after.content_hash);
+    assert_eq!(
+        before.parts["plate"].content_hash,
+        after.parts["plate"].content_hash
+    );
+    assert!(Arc::ptr_eq(
+        &before.parts["plate"].result,
+        &after.parts["plate"].result
+    ));
+    let bom = after.bill_of_materials(Tolerance::default()).unwrap();
+    assert_eq!(bom.missing_material_occurrences, 0);
+    assert_eq!(bom.total_mass_kg, Some(bom.known_mass_kg));
+    let mut forged = after.clone();
+    forged.parts.get_mut("plate").unwrap().metadata.revision = Some("B".into());
+    assert!(matches!(
+        forged.validate(Tolerance::default()),
+        Err(AssemblyError::HashMismatch)
+    ));
+    let mut roundtrip: BuiltAssembly =
+        serde_json::from_slice(&serde_json::to_vec(&after).unwrap()).unwrap();
+    roundtrip.validate(Tolerance::default()).unwrap();
+    roundtrip
+        .parts
+        .get_mut("plate")
+        .unwrap()
+        .metadata
+        .material
+        .as_mut()
+        .unwrap()
+        .density_kg_per_m3 = f64::NAN;
+    assert!(matches!(
+        roundtrip.bill_of_materials(Tolerance::default()),
+        Err(AssemblyError::Metadata(_))
+    ));
+}
+
+#[test]
+fn metadata_is_strict_and_rejects_invalid_identifiers_and_densities() {
+    for raw in [
+        r#"{"part_number":""}"#,
+        r#"{"revision":" A"}"#,
+        r#"{"description":"  \n "}"#,
+        r#"{"material":{"name":" steel","density_kg_per_m3":7800}}"#,
+        r#"{"material":{"name":"steel","density_kg_per_m3":0}}"#,
+    ] {
+        let metadata: PartMetadata = serde_json::from_str(raw).unwrap();
+        assert!(metadata.validate().is_err(), "{raw}");
+    }
+    for raw in [
+        r#"{"part_numer":"typo"}"#,
+        r#"{"material":{"name":"steel","density":7800}}"#,
+        r#"{"material":{"name":"steel","density_kg_per_m3":7800,"grade":"unexpected"}}"#,
+    ] {
+        assert!(serde_json::from_str::<PartMetadata>(raw).is_err());
+    }
+    for density in [f64::NAN, f64::INFINITY, -1.0, 0.0] {
+        let mut metadata = aluminium();
+        metadata.material.as_mut().unwrap().density_kg_per_m3 = density;
+        let mut definitions = parts();
+        definitions.get_mut("plate").unwrap().metadata = metadata;
+        assert!(matches!(
+            BuiltAssembly::new(
+                "bad".into(),
+                definitions,
+                vec![instance("one", [0.0; 3])],
+                Tolerance::default()
+            ),
+            Err(AssemblyError::Metadata(_))
+        ));
+    }
+    let legacy: PartDefinition = serde_json::from_str(r#"{"id":"p","feature":"f"}"#).unwrap();
+    assert_eq!(legacy.metadata, PartMetadata::default());
+}
+
+#[test]
+fn bom_rejects_mass_overflow_underflow_and_reports_empty_total() {
+    for (side, density, quantity) in [
+        (10000.0, 1e308, 1),
+        (1000.0, 1e308, 2),
+        (1.0, f64::from_bits(1), 1),
+    ] {
+        let mut definitions = parts();
+        let part = definitions.get_mut("plate").unwrap();
+        part.result = Arc::new(extrude_rectangle(side, side, side, Tolerance::default()).unwrap());
+        part.metadata = aluminium();
+        part.metadata.material.as_mut().unwrap().density_kg_per_m3 = density;
+        let instances = (0..quantity)
+            .map(|i| instance(&format!("i{i}"), [0.0; 3]))
+            .collect();
+        assert!(matches!(
+            BuiltAssembly::new(
+                "overflow".into(),
+                definitions,
+                instances,
+                Tolerance::default()
+            ),
+            Err(AssemblyError::NumericRange)
+        ));
+    }
+    let empty = build(BTreeMap::new(), vec![])
+        .bill_of_materials(Tolerance::default())
+        .unwrap();
+    assert!(empty.items.is_empty());
+    assert_eq!(empty.total_occurrences, 0);
+    assert_eq!(empty.total_volume_mm3, 0.0);
+    assert_eq!(empty.total_mass_kg, Some(0.0));
+    assert_eq!(empty.missing_material_occurrences, 0);
 }

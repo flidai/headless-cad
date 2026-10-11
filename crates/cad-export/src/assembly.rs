@@ -254,6 +254,7 @@ mod tests {
             BTreeMap::from([(
                 "block".into(),
                 BuiltPart {
+                    metadata: Default::default(),
                     feature_id: "box".into(),
                     content_hash: "block-geometry".into(),
                     result,

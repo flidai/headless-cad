@@ -15,6 +15,7 @@ const MAX_POINTS: usize = 200_000;
 struct Definition {
     mesh: String,
     feature_id: String,
+    metadata: cad_assembly::PartMetadata,
 }
 
 #[derive(Serialize)]
@@ -28,6 +29,8 @@ struct AssemblyScene {
     instances: Vec<Instance>,
     instance_paths: BTreeMap<String, Vec<String>>,
     assembly_definitions: usize,
+    total_mass_kg: Option<f64>,
+    missing_material_occurrences: usize,
     bounds: Option<[[f64; 3]; 2]>,
     material_volume: f64,
     solids: usize,
@@ -77,6 +80,7 @@ fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewErro
             Definition {
                 mesh: part.content_hash.clone(),
                 feature_id: part.feature_id.clone(),
+                metadata: part.metadata.clone(),
             },
         );
     }
@@ -109,6 +113,9 @@ fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewErro
             "display measurements exceed numerical range".into(),
         ));
     }
+    let bom = assembly
+        .bill_of_materials(Tolerance::default())
+        .map_err(|error| PreviewError::Assembly(error.to_string()))?;
     Ok(AssemblyScene {
         schema_version: 1,
         kind: "assembly",
@@ -119,6 +126,8 @@ fn assembly_scene(assembly: &BuiltAssembly) -> Result<AssemblyScene, PreviewErro
         instances: assembly.instances.clone(),
         instance_paths: assembly.instance_paths.clone(),
         assembly_definitions: assembly.hierarchy.len(),
+        total_mass_kg: bom.total_mass_kg,
+        missing_material_occurrences: bom.missing_material_occurrences,
         bounds,
         material_volume,
         solids: assembly.solid_count(),
@@ -206,6 +215,7 @@ mod tests {
 
     fn fixture() -> BuiltAssembly {
         let part = BuiltPart {
+            metadata: Default::default(),
             feature_id: "blank".into(),
             content_hash: "shared-geometry".into(),
             result: Arc::new(extrude_rectangle(2.0, 3.0, 4.0, Tolerance::default()).unwrap()),

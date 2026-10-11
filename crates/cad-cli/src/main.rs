@@ -60,6 +60,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Report component quantities, materials, and mass for an assembly output.
+    Bom {
+        recipe: PathBuf,
+        #[arg(long)]
+        assembly: String,
+    },
     /// Resolve a semantic face role through the feature graph without publishing artifacts.
     Select {
         recipe: PathBuf,
@@ -130,7 +136,7 @@ fn load_source(
     }
 }
 
-fn report(recipe: &Recipe, build: &BuildResult) -> Value {
+fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>> {
     let mut outputs: serde_json::Map<String, Value> = build
         .outputs
         .iter()
@@ -156,6 +162,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Value {
         })
         .collect();
     for (name, assembly) in &build.assemblies {
+        let bom = assembly.bill_of_materials(recipe.tolerance.unwrap_or_default())?;
         outputs.insert(name.clone(), json!({
             "kind": "assembly",
             "feature_id": assembly.assembly_id,
@@ -168,11 +175,12 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Value {
             "definitions": assembly.parts.len(),
             "assembly_definitions": assembly.hierarchy.len(),
             "instances": assembly.instance_count(),
+            "bom": bom,
             "topology": { "solids": assembly.solid_count() },
             "validation": { "valid": true, "scope": "individual definitions and rigid placements; interference not checked" },
         }));
     }
-    json!({
+    Ok(json!({
         "kernel_version": cad_kernel::KERNEL_VERSION,
         "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
         "executor_build_id": cad_build::executor_build_id(),
@@ -183,7 +191,17 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Value {
         "feature_hashes": build.feature_hashes,
         "face_assertions": build.face_assertions,
         "outputs": outputs,
-    })
+    }))
+}
+
+fn bom_document(bom: &cad_assembly::BomReport) -> Result<Value, Box<dyn Error>> {
+    let mut document = serde_json::to_value(bom)?;
+    document["schema_version"] = json!(1);
+    document["volume_units"] = json!("mm3");
+    document["mass_units"] = json!("kg");
+    document["scope"] =
+        json!("leaf part occurrences; overlaps counted; no interference or material certification");
+    Ok(document)
 }
 
 // Recipe output names are logical IDs. Only portable filename components may
@@ -348,7 +366,7 @@ fn difference(before: &Value, after: &Value) -> Value {
             (Some(a), Some(b)) if a["content_hash"] == b["content_hash"] => "unchanged",
             _ => "changed",
         };
-        let details = |v: Option<&Value>| v.map(|v| json!({"content_hash":v["content_hash"],"volume_mm3":v["volume_mm3"],"bounds_mm":v["bounds_mm"],"topology":v["topology"]}));
+        let details = |v: Option<&Value>| v.map(|v| json!({"content_hash":v["content_hash"],"volume_mm3":v["volume_mm3"],"bounds_mm":v["bounds_mm"],"topology":v["topology"],"bom":v["bom"]}));
         let delta = match (a,b) {
             (Some(a),Some(b)) => Some(b["volume_mm3"].as_f64().unwrap() - a["volume_mm3"].as_f64().unwrap()),
             _ => None,
@@ -454,6 +472,12 @@ fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn
                 feature_id: text(&definition["feature_id"])?,
                 content_hash: text(&definition["content_hash"])?,
                 result,
+                metadata: serde_json::from_value(
+                    definition
+                        .get("metadata")
+                        .cloned()
+                        .unwrap_or_else(|| json!({})),
+                )?,
             },
         );
     }
@@ -531,6 +555,21 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         return Err("parameter overrides apply only to recipe commands".into());
     }
     match &cli.command {
+        Command::Bom { recipe, assembly } => {
+            let source = fs::read(recipe)?;
+            let recipe = load_source(recipe, std::str::from_utf8(&source)?, &parameters)?;
+            let built = engine(&cli.cache_dir).build(&recipe)?;
+            let model = built
+                .assemblies
+                .get(assembly)
+                .ok_or_else(|| format!("unknown assembly output '{assembly}'"))?;
+            let mut result =
+                bom_document(&model.bill_of_materials(recipe.tolerance.unwrap_or_default())?)?;
+            result["recipe_source_hash"] = json!(blake3::hash(&source).to_hex().to_string());
+            result["parameter_overrides"] = json!(parameters);
+            result["stats"] = json!(built.stats);
+            return Ok(result);
+        }
         Command::Select {
             recipe,
             anchor,
@@ -624,8 +663,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             let b = load(after, &parameters)?;
             let mut engine = engine(&cli.cache_dir);
             return Ok(difference(
-                &report(&a, &engine.build(&a)?),
-                &report(&b, &engine.build(&b)?),
+                &report(&a, &engine.build(&a)?)?,
+                &report(&b, &engine.build(&b)?)?,
             ));
         }
         _ => {}
@@ -649,7 +688,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         return Ok(serde_json::to_value(recipe)?);
     }
     let build = engine(&cli.cache_dir).build(&recipe)?;
-    let mut summary = report(&recipe, &build);
+    let mut summary = report(&recipe, &build)?;
     if let Command::Build { out_dir, .. } = &cli.command {
         // Do not replace directories containing the source recipe or cache.
         if out_dir.exists() {
@@ -758,6 +797,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 definitions.insert(part_id.clone(), json!({
                     "feature_id": part.feature_id,
                     "content_hash": part.content_hash,
+                    "metadata": part.metadata,
                     "geometry_asset": asset,
                     "local_bounds_mm": if part.result.model.solids.is_empty() { Value::Null } else { json!(part.result.model.bounds()) },
                     "material_volume_mm3": part.result.model.volume(),
@@ -779,6 +819,12 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 format!("{name}.assembly.json"),
                 serde_json::to_string_pretty(&manifest)?,
             ));
+            let bom = assembly.bill_of_materials(recipe.tolerance.unwrap_or_default())?;
+            artifacts.push((
+                format!("{name}.bom.json"),
+                serde_json::to_string_pretty(&bom_document(&bom)?)?,
+            ));
+            artifacts.push((format!("{name}.bom.csv"), cad_export::bom_to_csv(&bom)?));
             artifacts.push((
                 format!("{name}.display.json"),
                 cad_preview::to_assembly_scene_json(assembly)?,

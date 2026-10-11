@@ -26,6 +26,7 @@ function validBody(body){
 function normalizeScene(raw){
  if(raw?.kind!=='assembly'){if(!validBody(raw))throw Error('Incomplete scene');return raw}
  if(raw.schema_version!==1||!raw.meshes||!raw.definitions||!Array.isArray(raw.instances)||raw.instances.length>10000||!Number.isFinite(raw.material_volume))throw Error('Incomplete assembly scene');
+ if(raw.total_mass_kg!=null&&(!Number.isFinite(raw.total_mass_kg)||raw.total_mass_kg<0))throw Error('Invalid assembly mass');
  for(const mesh of Object.values(raw.meshes))if(!validBody(mesh))throw Error('Incomplete local mesh');
  const faces=[],crease_edges=[];let vertices=0,edges=0,solids=0,points=0;
  const rotate=(p,q)=>{const [x,y,z,w]=q,[a,b,c]=p,tx=2*(y*c-z*b),ty=2*(z*a-x*c),tz=2*(x*b-y*a);return[a+w*tx+y*tz-z*ty,b+w*ty+z*tx-x*tz,c+w*tz+x*ty-y*tx]};
@@ -43,7 +44,7 @@ function normalizeScene(raw){
   }
   crease_edges.push(...mesh.crease_edges.map(id=>id+edges));vertices+=mesh.vertices;edges+=mesh.edges;solids+=mesh.solids;
  }
- const result={faces,crease_edges,vertices,edges,solids,bounds:raw.bounds,volume:raw.material_volume,is_assembly:true,instances:raw.instances,instance_paths:raw.instance_paths||{},assembly_definitions:raw.assembly_definitions||1,definitions:raw.definitions,unique_meshes:Object.keys(raw.meshes).length};
+ const result={faces,crease_edges,vertices,edges,solids,bounds:raw.bounds,volume:raw.material_volume,is_assembly:true,instances:raw.instances,instance_paths:raw.instance_paths||{},assembly_definitions:raw.assembly_definitions||1,total_mass_kg:raw.total_mass_kg??null,missing_material_occurrences:raw.missing_material_occurrences??raw.instances.length,definitions:raw.definitions,unique_meshes:Object.keys(raw.meshes).length};
  if(!validBody(result))throw Error('Invalid expanded assembly');return result;
 }
 function occurrenceLabel(id){const path=scene.instance_paths?.[id];return path?.length>1?path.map(segment=>JSON.stringify(segment)).join(' / '):(path?.[0]??id)}
@@ -57,7 +58,7 @@ const rows=(id,items)=>{const dl=document.getElementById(id);for(const [name,val
 let bounds,size,center;
 function overview(){
  document.getElementById('geometry').replaceChildren();document.getElementById('dimensions').replaceChildren();
- rows('geometry',[...(scene.is_assembly?[['Occurrences',scene.instances.length],['Part definitions',Object.keys(scene.definitions).length],['Assembly definitions',scene.assembly_definitions],['Unique meshes',scene.unique_meshes]]:[]),['Solids',scene.solids],['Faces',scene.faces.length],['Edges',scene.edges],['Vertices',scene.vertices],[scene.is_assembly?'Material volume (sum)':'Volume',fmt(scene.volume)+' mm³']]);
+ rows('geometry',[...(scene.is_assembly?[['Occurrences',scene.instances.length],['Part definitions',Object.keys(scene.definitions).length],['Assembly definitions',scene.assembly_definitions],['Unique meshes',scene.unique_meshes],['Mass (sum)',scene.total_mass_kg===null?'Unknown ('+scene.missing_material_occurrences+' occurrences without material)':fmt(scene.total_mass_kg)+' kg']]:[]),['Solids',scene.solids],['Faces',scene.faces.length],['Edges',scene.edges],['Vertices',scene.vertices],[scene.is_assembly?'Material volume (sum)':'Volume',fmt(scene.volume)+' mm³']]);
  const section=document.getElementById('occurrences-section'),select=document.getElementById('occurrence-select');section.hidden=!scene.is_assembly;select.replaceChildren();
  if(scene.is_assembly){const all=document.createElement('option');all.value='';all.textContent='All occurrences';select.append(all);for(const instance of scene.instances){const option=document.createElement('option');option.value=instance.id;option.textContent=occurrenceLabel(instance.id)+' · '+instance.part;select.append(option)}select.value=selectedInstance||'';}
  bounds=scene.bounds||[[0,0,0],[0,0,0]];size=bounds[1].map((n,i)=>n-bounds[0][i]);center=bounds[0].map((n,i)=>n/2+bounds[1][i]/2);
@@ -69,6 +70,7 @@ function recipeOverview(){
  document.querySelector('h1').textContent=context?context.output_name:'Model overview';
  if(!context){summary.textContent='Recipe source was not included in this artifact.';source.textContent='';return}
  summary.textContent=`${context.source_name} · ${context.language === 'starlark' ? 'Starlark' : 'JSON'}\nOutput: ${context.output_name} · Feature: ${selectionContext?.feature_id||context.feature_id}${selectionContext?`\nOccurrence: ${occurrenceLabel(selectionContext.instance_id)} · Definition: ${selectionContext.part_id}`:''}\nFull shared recipe for this build. Parameter overrides are shown below; the source is unchanged.`;
+ if(selectionContext){const metadata=scene.definitions?.[selectionContext.part_id]?.metadata;if(metadata){for(const [label,key] of [['Part number','part_number'],['Revision','revision'],['Description','description']])if(typeof metadata[key]==='string')summary.textContent+='\n'+label+': '+metadata[key];if(metadata.material)summary.textContent+='\nMaterial: '+metadata.material.name+' · '+metadata.material.density_kg_per_m3+' kg/m³'}}
  summary.style.whiteSpace='pre-line';source.textContent=context.source;
  const entries=Object.entries(context.parameters);
  rows('recipe-parameters',entries.length?entries.map(([name,value])=>[name,String(value)]):[['Parameter overrides','None']]);

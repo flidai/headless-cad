@@ -18,6 +18,8 @@ const { pathToFileURL } = require('node:url');
     await page.getByRole('button', { name: 'Recipe', exact: true }).click();
     assert.equal(await page.locator('#recipe-source').textContent(), expectedSource);
     assert.match(await page.locator('#recipe-summary').textContent(), /"rear" \/ "carriage_b" \/ "guide_right"/);
+    assert.match(await page.locator('#recipe-summary').textContent(), /Part number: RACK-GUIDE/);
+    assert.match(await page.locator('#recipe-summary').textContent(), /Material: Demo steel/);
     const state = await page.evaluate(id => {
       const faces = scene.faces.filter(face => face.instance_id === id);
       const points = faces.flatMap(face => face.points);
@@ -26,6 +28,7 @@ const { pathToFileURL } = require('node:url');
         parts: Object.keys(scene.definitions).length,
         assemblies: scene.assembly_definitions,
         meshes: scene.unique_meshes,
+        mass_kg: scene.total_mass_kg,
         selected: selectedInstance,
         path: scene.instance_paths[id],
         min: [0, 1, 2].map(axis => Math.min(...points.map(p => p[axis]))),
@@ -37,6 +40,7 @@ const { pathToFileURL } = require('node:url');
     assert.equal(state.parts, 4);
     assert.equal(state.assemblies, 3);
     assert.equal(state.meshes, 4);
+    assert.ok(Math.abs(state.mass_kg - 0.2058336) < 1e-12);
     assert.equal(state.selected, id);
     assert.deepEqual(state.path, ['rear', 'carriage_b', 'guide_right']);
     assert.deepEqual(state.features, ['guide']);

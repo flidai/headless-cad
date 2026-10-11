@@ -385,7 +385,7 @@ reviewed decision based on evidence, not by relabeling missed targets.
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, depth-buffer Canvas inspection, compact instanced display assets, occurrence picking, recipe panel, live refresh | GPU instancing, lazy assets, bounded LOD streaming, sections/overlays |
 | Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
-| Engineering | Volume/bounds and validation reports | Sketch/assembly solving, drawings, GD&T, material/mass/BOM workflows |
+| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations and mass moments |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
 The current working commands are in [README.md](../README.md).

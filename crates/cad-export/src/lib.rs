@@ -10,11 +10,15 @@ use cad_kernel::{ModelSnapshot, Tolerance};
 use std::fmt::Write;
 
 mod assembly;
+mod bom;
 pub use assembly::{assembly_to_step, assembly_to_stl};
+pub use bom::bom_to_csv;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ExportError {
+    #[error("cannot export an invalid bill of materials: {0}")]
+    InvalidBom(String),
     #[error("cannot export an invalid model: {0}")]
     InvalidModel(String),
     #[error("model is outside export scope: {0}")]

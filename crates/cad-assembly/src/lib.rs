@@ -5,7 +5,9 @@
 //! remains local to its definition and does not expand the kernel's supported
 //! modeling domain. Nested reusable definitions retain local placements and explicit
 //! occurrence paths. Assembly constraints are not implemented.
+mod bom;
 mod hierarchy;
+pub use bom::{BomItem, BomReport, Material, PartMetadata};
 use cad_kernel::{Bounds, OperationResult, Tolerance};
 pub use hierarchy::validate_definitions;
 use serde::{Deserialize, Serialize};
@@ -25,6 +27,7 @@ pub fn assembly_build_id() -> &'static str {
         let mut hash = blake3::Hasher::new();
         hash.update(include_bytes!("lib.rs"));
         hash.update(include_bytes!("hierarchy.rs"));
+        hash.update(include_bytes!("bom.rs"));
         hash.update(include_bytes!("../Cargo.toml"));
         hash.update(include_bytes!("../../../Cargo.lock"));
         hash.update(cad_kernel::KERNEL_BUILD_ID.as_bytes());
@@ -37,6 +40,8 @@ pub fn assembly_build_id() -> &'static str {
 pub struct PartDefinition {
     pub id: String,
     pub feature: String,
+    #[serde(default)]
+    pub metadata: PartMetadata,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -199,6 +204,8 @@ impl RigidTransform {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BuiltPart {
+    #[serde(default)]
+    pub metadata: PartMetadata,
     pub feature_id: String,
     pub content_hash: String,
     pub result: Arc<OperationResult>,
@@ -219,6 +226,8 @@ pub struct BuiltAssembly {
 
 #[derive(Debug, Error)]
 pub enum AssemblyError {
+    #[error("invalid engineering metadata: {0}")]
+    Metadata(&'static str),
     #[error("invalid assembly hierarchy: {0}")]
     Hierarchy(String),
     #[error("derived instances or paths do not match authoritative assembly hierarchy")]
@@ -338,6 +347,7 @@ impl BuiltAssembly {
         let mut definition_digests = BTreeMap::new();
         for (id, part) in &self.parts {
             identifier("part", id)?;
+            part.metadata.validate()?;
             identifier("feature", &part.feature_id)?;
             identifier("definition hash", &part.content_hash)?;
             let report = part.result.model.validate(tolerance);
@@ -435,6 +445,7 @@ impl BuiltAssembly {
                 return Err(AssemblyError::NumericRange);
             }
         }
+        self.calculate_bom()?;
         Ok(())
     }
 
@@ -454,6 +465,7 @@ impl BuiltAssembly {
                     (
                         &part.feature_id,
                         &part.content_hash,
+                        &part.metadata,
                         blake3::hash(&bytes).to_hex().to_string(),
                     ),
                 ))

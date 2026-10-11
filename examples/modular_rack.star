@@ -22,9 +22,14 @@ slot = translate(id = "slot_placed", body = slot_tool, offset = [16, 6, -1])
 plate_body = cut(id = "carriage_plate", left = plate_blank, right = slot)
 guide_body = box("guide", 4, 24, 10)
 slider_body = box("slider", 12, 12, 6)
-plate = part(id = "plate", body = plate_body)
-guide = part(id = "guide", body = guide_body)
-slider = part(id = "slider", body = slider_body)
+# These illustrative material inputs demonstrate mass accounting; substitute
+# the density and specification for the material used in a manufactured part.
+plate = part(id = "plate", body = plate_body, part_number = "RACK-PLATE", revision = "A",
+             description = "Slotted carriage plate", material = "Demo alloy", density_kg_per_m3 = 2700)
+guide = part(id = "guide", body = guide_body, part_number = "RACK-GUIDE", revision = "A",
+             description = "Reversible guide", material = "Demo steel", density_kg_per_m3 = 7800)
+slider = part(id = "slider", body = slider_body, part_number = "RACK-SLIDER", revision = "A",
+              description = "Sliding block", material = "Demo polymer", density_kg_per_m3 = 1200)
 
 carriage = assembly(id = "carriage", instances = [
     instance(id = "plate", part = plate),
@@ -40,7 +45,8 @@ row = assembly(id = "row", instances = [
 rack_width = max(spacing + 44, rear_x + 4)
 rack_depth = rear_y + spacing + 44
 rack_body = box("rack_base", rack_width, rack_depth, 3)
-rack_base = part(id = "rack_base", body = rack_body)
+rack_base = part(id = "rack_base", body = rack_body, part_number = "RACK-BASE", revision = "A",
+                 material = "Demo alloy", density_kg_per_m3 = 2700)
 rack = assembly(id = "rack", instances = [
     instance(id = "base", part = rack_base),
     assembly_instance(id = "front", assembly = row, offset = [0, 0, 3]),

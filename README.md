@@ -210,6 +210,42 @@ to 64 levels, with at most 100,000 expanded component and assembly occurrences
 per root. Nested placement is not an assembly constraint solver or interference
 check; the current viewer still expands all visible-generation leaves eagerly.
 
+## Materials and bill of materials
+
+Part definitions can carry engineering metadata. Densities are explicit recipe
+inputs in kg/m³, not guessed from a material name:
+
+```python
+guide = part(id = "guide", body = guide_body, part_number = "RACK-GUIDE",
+             revision = "A", description = "Reversible guide",
+             material = "Demo steel", density_kg_per_m3 = 7800)
+```
+
+`material` and `density_kg_per_m3` must be supplied together. The modular rack uses
+illustrative densities; replace them with the intended material specification.
+
+```sh
+cad bom examples/modular_rack.star --assembly modular_rack
+```
+
+The BOM expands nested quantities and groups by logical part ID. Identical
+geometry, part numbers, or revisions do not merge distinct definitions. The rack
+contains eight guides, four plates, four sliders, and one base. Metadata edits
+reuse geometry but change assembly identity and appear in `cad diff`.
+
+Assembly builds write `<name>.bom.json` and `<name>.bom.csv`, linked from the
+viewer gallery. Reports include per-part and summed volume/mass. Mass is
+`volume_mm3 × 1e-9 × density_kg_per_m3`; overlaps remain counted per occurrence.
+If any occurrence lacks a material, total mass is null, with known mass and the
+missing-material count reported separately. CSV uses empty unknown numeric
+fields and preserves quoted text; import textual columns as text in spreadsheet
+tools. The viewer shows selected part metadata and summed mass.
+
+Native assembly artifacts retain metadata. STEP currently preserves assembly
+geometry and structure, but does not carry these material or revision fields;
+use the accompanying BOM. Materials do not yet include certified property
+libraries, occurrence overrides, configurations, or mass moments/inertia.
+
 ## Recipes and parameters
 
 ```python

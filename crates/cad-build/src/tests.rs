@@ -493,6 +493,7 @@ fn assembly_recipe() -> Recipe {
     input.schema_version = 2;
     input.outputs.clear();
     input.parts = vec![PartDefinition {
+        metadata: Default::default(),
         id: "plate-part".into(),
         feature: "plate".into(),
     }];
@@ -569,6 +570,7 @@ fn identical_geometry_keeps_distinct_part_feature_and_instance_identities() {
         op_version: 1,
     });
     input.parts.push(PartDefinition {
+        metadata: Default::default(),
         id: "other-part".into(),
         feature: "other-solid".into(),
     });
@@ -823,5 +825,87 @@ fn nested_depth_and_aggregate_export_expansion_have_preflight_limits() {
     ));
     let mut raw = serde_json::to_value(nested_recipe()).unwrap();
     raw["assemblies"][1]["assemblies"][0]["part"] = "part".into();
+    assert!(serde_json::from_value::<Recipe>(raw).is_err());
+}
+
+#[test]
+fn metadata_edits_preserve_geometry_cache_and_change_assembly_identity() {
+    let mut recipe = nested_recipe();
+    let mut engine = BuildEngine::default();
+    let initial = engine.build(&recipe).unwrap();
+    recipe.parts[0].metadata = PartMetadata {
+        part_number: Some("BRACKET-001".into()),
+        revision: Some("B".into()),
+        description: Some("Support bracket".into()),
+        material: Some(Material {
+            name: "Aluminum".into(),
+            density_kg_per_m3: 2700.0,
+        }),
+    };
+    let edited = engine.build(&recipe).unwrap();
+    assert_eq!(edited.stats.computed_solids, 0);
+    assert_eq!(initial.feature_hashes, edited.feature_hashes);
+    let before = &initial.assemblies["assembly"];
+    let after = &edited.assemblies["assembly"];
+    assert_ne!(before.content_hash, after.content_hash);
+    assert!(Arc::ptr_eq(
+        &before.parts["part"].result,
+        &after.parts["part"].result
+    ));
+    assert_eq!(after.parts["part"].metadata, recipe.parts[0].metadata);
+    let decoded: Recipe = serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+    assert_eq!(
+        engine.build(&decoded).unwrap().assemblies["assembly"].content_hash,
+        after.content_hash
+    );
+}
+
+#[test]
+fn invalid_metadata_on_unused_parts_is_rejected_before_geometry() {
+    let mut recipe = nested_recipe();
+    recipe.parts.push(PartDefinition {
+        id: "unused".into(),
+        feature: "body".into(),
+        metadata: Default::default(),
+    });
+    if let Feature::Rectangle { width, .. } = &mut recipe.features[0] {
+        *width = 1e308;
+    }
+    for metadata in [
+        PartMetadata {
+            part_number: Some(" ".into()),
+            ..Default::default()
+        },
+        PartMetadata {
+            revision: Some("A ".into()),
+            ..Default::default()
+        },
+        PartMetadata {
+            description: Some("".into()),
+            ..Default::default()
+        },
+        PartMetadata {
+            material: Some(Material {
+                name: "Steel".into(),
+                density_kg_per_m3: 0.0,
+            }),
+            ..Default::default()
+        },
+        PartMetadata {
+            material: Some(Material {
+                name: "Steel".into(),
+                density_kg_per_m3: f64::INFINITY,
+            }),
+            ..Default::default()
+        },
+    ] {
+        recipe.parts[1].metadata = metadata;
+        assert!(matches!(build(&recipe), Err(BuildError::AssemblyGraph(_))));
+    }
+    let mut raw = serde_json::to_value(nested_recipe()).unwrap();
+    raw["parts"][0]["metadata"] = serde_json::json!({"part_nubmer":"typo"});
+    assert!(serde_json::from_value::<Recipe>(raw.clone()).is_err());
+    raw["parts"][0]["metadata"] =
+        serde_json::json!({"material":{"name":"Steel","density_kg_per_m3":7850,"density":7850}});
     assert!(serde_json::from_value::<Recipe>(raw).is_err());
 }
