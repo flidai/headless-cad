@@ -188,6 +188,28 @@ The viewer displays those paths when selecting parts.
 
 ### Named datums and rigid attachment
 
+Named frames can be fixed or derived from one semantic face. For example:
+
+```python
+ramp = part(id = "ramp", body = ramp_body, datums = {
+    "seat": face_datum(from_feature = prism, role = "wall_1",
+                       x_direction = [1, 0, 0]),
+})
+```
+
+The selector follows feature lineage to the owning part's body and must resolve
+to exactly one face. The frame starts at its area centroid, uses the outward
+normal as Z, and projects the explicit `x_direction` into the plane for X.
+Optional `offset = [x, y, z]` is in this local frame. Split/deleted faces,
+parallel or ill-conditioned hints and numerically unreliable frames fail before
+publication. No automatic retargeting or axis fallback occurs.
+
+Source intent is retained in schema-2 `face_datums`; inspect/build reports retain
+selection evidence and resolved frames. Existing attachments use those frames.
+See `examples/surface_mount.star`: changing `ramp_rise` moves and turns its
+attached plate. STEP preserves the resulting geometry/placements.
+
+
 A datum is a named local frame on a part definition. `datum()` defaults to zero
 translation and identity quaternion; `offset` is in millimetres and `rotation`
 is a unit quaternion `[x, y, z, w]`. Define frames in source and attach a sibling

@@ -9,12 +9,17 @@ use cad_kernel::{
     validate_transform, BooleanOp, OperationResult, Tolerance, KERNEL_BUILD_ID, KERNEL_VERSION,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
 mod assembly;
+mod face_datums;
+pub use face_datums::{
+    FaceDatumDefinition, FaceDatumResolution, ResolvedFaceDatums, MAX_FACE_DATUMS,
+    MAX_FACE_DATUM_GEOMETRY_WORK,
+};
 mod selection;
 pub use assembly::{MAX_ASSEMBLIES, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS, MAX_PARTS};
 pub use cad_assembly::{
@@ -43,6 +48,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("lib.rs").as_slice(),
             include_bytes!("assembly.rs").as_slice(),
             include_bytes!("selection.rs").as_slice(),
+            include_bytes!("face_datums.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -84,6 +90,8 @@ pub struct Recipe {
     pub assembly_outputs: Vec<AssemblyOutput>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_assertions: Vec<FaceAssertion>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub face_datums: Vec<FaceDatumDefinition>,
 }
 
 impl<'de> Deserialize<'de> for Recipe {
@@ -113,6 +121,8 @@ impl<'de> Deserialize<'de> for Recipe {
             assembly_outputs: Option<Vec<AssemblyOutput>>,
             #[serde(default, deserialize_with = "present_vec")]
             face_assertions: Option<Vec<FaceAssertion>>,
+            #[serde(default, deserialize_with = "present_vec")]
+            face_datums: Option<Vec<FaceDatumDefinition>>,
         }
         let raw = RawRecipe::deserialize(deserializer)?;
         if raw.schema_version == 1
@@ -127,6 +137,11 @@ impl<'de> Deserialize<'de> for Recipe {
                 "face assertions require recipe schema version 2",
             ));
         }
+        if raw.schema_version == 1 && raw.face_datums.is_some() {
+            return Err(serde::de::Error::custom(
+                "face datums require recipe schema version 2",
+            ));
+        }
         Ok(Self {
             schema_version: raw.schema_version,
             units: raw.units,
@@ -137,6 +152,7 @@ impl<'de> Deserialize<'de> for Recipe {
             assemblies: raw.assemblies.unwrap_or_default(),
             assembly_outputs: raw.assembly_outputs.unwrap_or_default(),
             face_assertions: raw.face_assertions.unwrap_or_default(),
+            face_datums: raw.face_datums.unwrap_or_default(),
         })
     }
 }
@@ -447,11 +463,34 @@ pub struct BuildResult {
     pub feature_hashes: BTreeMap<String, String>,
     pub stats: BuildStats,
     pub face_assertions: BTreeMap<String, FaceResolution>,
+    pub face_datums: ResolvedFaceDatums,
     selection_graph: selection::SelectionGraph,
 }
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("face datums require recipe schema version 2")]
+    FaceDatumSchema,
+    #[error("invalid face datum '{part}/{name}': {message}")]
+    InvalidFaceDatum {
+        part: String,
+        name: String,
+        message: String,
+    },
+    #[error("face datum '{part}/{name}' did not resolve to exactly one face")]
+    FaceDatumFailed {
+        part: String,
+        name: String,
+        resolution: Box<FaceResolution>,
+        target_content_hash: Option<String>,
+        anchor_content_hash: Option<String>,
+    },
+    #[error("face datum '{part}/{name}' could not form a rigid frame: {message}")]
+    FaceDatumFrame {
+        part: String,
+        name: String,
+        message: String,
+    },
     #[error("invalid polygon profile '{feature}': {message}")]
     PolygonProfile { feature: String, message: String },
     #[error("face assertions require recipe schema version 2")]
@@ -786,6 +825,7 @@ impl BuildEngine {
             return Err(BuildError::SchemaVersion(recipe.schema_version));
         }
         assembly::resource_limits(recipe)?;
+        face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
         }
@@ -1004,14 +1044,14 @@ impl BuildEngine {
                 )
             })
             .collect();
-        let assemblies = assembly::evaluate(recipe, &hashes, &evaluated, tolerance)?;
-        let selection_graph = selection::SelectionGraph::new(recipe, order, evaluated);
+        let selection_graph = selection::SelectionGraph::new(recipe, order, evaluated.clone());
         let mut result = BuildResult {
             outputs,
-            assemblies,
+            assemblies: BTreeMap::new(),
             feature_hashes: hashes,
             stats,
             face_assertions: BTreeMap::new(),
+            face_datums: BTreeMap::new(),
             selection_graph,
         };
         let mut assertion_work_remaining = MAX_FACE_ASSERTION_WORK;
@@ -1036,6 +1076,20 @@ impl BuildEngine {
                 .face_assertions
                 .insert(assertion.id.clone(), resolution);
         }
+        result.face_datums = face_datums::resolve(
+            recipe,
+            &result,
+            &evaluated,
+            tolerance,
+            &mut assertion_work_remaining,
+        )?;
+        result.assemblies = assembly::evaluate(
+            recipe,
+            &result.feature_hashes,
+            &evaluated,
+            tolerance,
+            &result.face_datums,
+        )?;
         Ok(result)
     }
 }

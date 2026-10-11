@@ -35,6 +35,7 @@ struct GraphStore {
     assemblies: RefCell<Vec<serde_json::Value>>,
     assembly_outputs: RefCell<Vec<serde_json::Value>>,
     face_assertions: RefCell<Vec<serde_json::Value>>,
+    face_datums: RefCell<Vec<serde_json::Value>>,
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
     parameters: RefCell<BTreeMap<String, f64>>,
@@ -331,6 +332,38 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(heap.alloc(serde_json::to_value(frame(offset, rotation)?)?))
     }
 
+    /// A semantic face reference, resolved against the owning part's solid.
+    fn face_datum<'v>(
+        from_feature: &str,
+        role: &str,
+        x_direction: Value<'v>,
+        offset: Option<Value<'v>>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        let x_direction: [f64; 3] = serde_json::from_str(&x_direction.to_json()?)
+            .map_err(|_| anyhow::anyhow!("x_direction must contain three finite numbers"))?;
+        let offset: [f64; 3] = match offset {
+            Some(value) => serde_json::from_str(&value.to_json()?)?,
+            None => [0.0; 3],
+        };
+        anyhow::ensure!(
+            x_direction.iter().all(|v| v.is_finite()) && x_direction.iter().any(|v| *v != 0.0),
+            "x_direction must be finite and nonzero"
+        );
+        anyhow::ensure!(
+            offset.iter().all(|v| v.is_finite()),
+            "offset must be finite"
+        );
+        anyhow::ensure!(
+            !from_feature.is_empty()
+                && from_feature.trim() == from_feature
+                && !role.is_empty()
+                && role.trim() == role,
+            "feature and role must be nonempty identifiers"
+        );
+        Ok(heap.alloc(serde_json::json!({"kind":"face_datum","anchor_feature":from_feature,"role":role,"x_direction":x_direction,"offset":offset})))
+    }
+
     /// Give a solid feature a reusable part-definition identity.
     #[allow(clippy::too_many_arguments)]
     fn part(
@@ -363,15 +396,41 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         metadata
             .validate()
             .map_err(|error| anyhow::anyhow!("part '{id}': {error}"))?;
-        let datums: BTreeMap<String, cad_build::RigidTransform> = match datums {
+        let values: BTreeMap<String, serde_json::Value> = match datums {
             Some(value) => serde_json::from_str(&value.to_json()?).map_err(|error| {
-                anyhow::anyhow!("part '{id}' datums must map names to rigid frames: {error}")
+                anyhow::anyhow!("part '{id}' datums must map names to frames: {error}")
             })?,
             None => BTreeMap::new(),
         };
+        anyhow::ensure!(values.len() <= 1024, "part exceeds 1024 datum frames");
+        let mut datums = BTreeMap::new();
+        let graph = store(eval)?;
+        for (name, mut value) in values {
+            anyhow::ensure!(
+                !name.is_empty() && name.trim() == name,
+                "datum names must be nonempty without surrounding whitespace"
+            );
+            if value.get("kind").and_then(serde_json::Value::as_str) == Some("face_datum") {
+                let object = value.as_object_mut().unwrap();
+                object.remove("kind");
+                object.insert("part".into(), id.into());
+                object.insert("name".into(), name.into());
+                let definition: cad_build::FaceDatumDefinition = serde_json::from_value(value)?;
+                let mut references = graph.face_datums.borrow_mut();
+                anyhow::ensure!(
+                    references.len() < cad_build::MAX_FACE_DATUMS,
+                    "recipe exceeds face datum limit"
+                );
+                references.push(serde_json::to_value(definition)?);
+            } else {
+                datums.insert(
+                    name,
+                    serde_json::from_value::<cad_build::RigidTransform>(value)?,
+                );
+            }
+        }
         cad_build::validate_datums(&datums)
             .map_err(|error| anyhow::anyhow!("part '{id}': {error}"))?;
-        let graph = store(eval)?;
         let mut parts = graph.parts.borrow_mut();
         anyhow::ensure!(parts.len() < MAX_PARTS, "recipe exceeds {MAX_PARTS} parts");
         let mut definition = serde_json::json!({"id":id,"feature":body});
@@ -560,10 +619,11 @@ pub fn from_starlark_with_params(
     let assemblies = graph.assemblies.into_inner();
     let assembly_outputs = graph.assembly_outputs.into_inner();
     let face_assertions = graph.face_assertions.into_inner();
+    let face_datums = graph.face_datums.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if assembly_schema || !face_assertions.is_empty() { 2 } else { 1 },
+        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -575,6 +635,9 @@ pub fn from_starlark_with_params(
     }
     if !face_assertions.is_empty() {
         value["face_assertions"] = serde_json::json!(face_assertions);
+    }
+    if !face_datums.is_empty() {
+        value["face_datums"] = serde_json::json!(face_datums);
     }
     Ok(serde_json::from_value(value)?)
 }
@@ -1241,5 +1304,55 @@ mod convex_intersection_tests {
             changed.face_assertions["a_cap"].witnesses[0].target_face,
             changed.face_assertions["b_cap"].witnesses[0].target_face
         );
+    }
+}
+
+#[cfg(test)]
+mod face_datum_tests {
+    use super::*;
+    #[test]
+    fn inline_face_datums_preserve_recipe_intent_and_resolve_after_geometry() {
+        let source="h=param(name='height',default=4)\nb=extrude(id='b',profile=rectangle(id='p',width=8,depth=6),height=h)\np=part(id='part',body=b,datums={'fixed':datum(),'seat':face_datum(from_feature=b,role='end_cap',x_direction=[1,0,0])})\na=assembly(id='a',instances=[instance(id='i',part=p)])\nassembly_output(name='a',assembly=a)";
+        let recipe = from_starlark("seat.star", source).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        assert_eq!(recipe.face_datums.len(), 1);
+        assert_eq!(recipe.parts[0].datums.len(), 1);
+        let encoded = serde_json::to_string(&recipe).unwrap();
+        let restored: Recipe = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(encoded, serde_json::to_string(&restored).unwrap());
+        let built = cad_build::build(&restored).unwrap();
+        assert_eq!(
+            built.face_datums["part"]["seat"].frame.translation,
+            [4.0, 3.0, 4.0]
+        );
+        let edited = from_starlark_with_params(
+            "seat.star",
+            source,
+            &BTreeMap::from([("height".into(), 7.0)]),
+        )
+        .unwrap();
+        assert_eq!(
+            cad_build::build(&edited).unwrap().face_datums["part"]["seat"]
+                .frame
+                .translation,
+            [4.0, 3.0, 7.0]
+        );
+    }
+    #[test]
+    fn face_datum_helpers_reject_malformed_or_nonfinite_frame_inputs() {
+        for args in [
+            "x_direction=[0,0,0]",
+            "x_direction=[1,True,0]",
+            "x_direction=[1,0]",
+            "x_direction=[1,0,0],offset=[1,2]",
+            "x_direction=[1,0,0],typo=2",
+        ] {
+            assert!(from_starlark(
+                "bad.star",
+                &format!("face_datum(from_feature='b',role='end_cap',{args})")
+            )
+            .is_err());
+        }
+        assert!(from_starlark("bad.star","part(id='p',body='b',datums={'x':{'kind':'face_datum','anchor_feature':'b','role':'end_cap','x_direction':[1,0,0],'typo':1}})").is_err());
     }
 }

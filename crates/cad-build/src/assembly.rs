@@ -115,11 +115,12 @@ pub(super) fn validate<'a>(
     let part_ids = recipe.parts.iter().map(|part| part.id.clone()).collect();
     cad_assembly::validate_definitions(&part_ids, &definitions)
         .map_err(|error| BuildError::AssemblyGraph(error.to_string()))?;
-    let part_definitions = recipe
+    let mut part_definitions = recipe
         .parts
         .iter()
         .map(|part| (part.id.clone(), part.clone()))
         .collect();
+    face_datums::add_placeholders(recipe, &mut part_definitions);
     cad_assembly::validate_attachment_definitions(&part_definitions, &definitions)
         .map_err(|error| BuildError::AssemblyGraph(error.to_string()))?;
     let mut exported_leaves = 0usize;
@@ -175,6 +176,7 @@ pub(super) fn evaluate(
     hashes: &BTreeMap<String, String>,
     evaluated: &HashMap<String, Arc<OperationResult>>,
     tolerance: Tolerance,
+    face_datums: &ResolvedFaceDatums,
 ) -> Result<BTreeMap<String, BuiltAssembly>, BuildError> {
     let parts: BTreeMap<_, _> = recipe
         .parts
@@ -185,7 +187,21 @@ pub(super) fn evaluate(
                 BuiltPart {
                     feature_id: definition.feature.clone(),
                     metadata: definition.metadata.clone(),
-                    datums: definition.datums.clone(),
+                    datums: definition
+                        .datums
+                        .iter()
+                        .map(|(k, v)| (k.clone(), *v))
+                        .chain(
+                            face_datums
+                                .get(&definition.id)
+                                .into_iter()
+                                .flat_map(|frames| {
+                                    frames
+                                        .iter()
+                                        .map(|(name, resolution)| (name.clone(), resolution.frame))
+                                }),
+                        )
+                        .collect(),
                     content_hash: hashes[&definition.feature].clone(),
                     result: Arc::clone(&evaluated[&definition.feature]),
                 },

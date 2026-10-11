@@ -15,6 +15,7 @@
 //! There is no external CAD kernel, mesh approximation, or stored volume shortcut.
 
 mod convex_intersection;
+mod face_frame;
 mod mass_properties;
 mod math;
 mod orthogonal;
@@ -22,6 +23,7 @@ mod polygon;
 mod transform;
 mod validation;
 
+pub use face_frame::FaceFrame;
 pub use mass_properties::MassProperties;
 pub use math::Tolerance;
 use math::{cross, dot, sub};
@@ -230,6 +232,8 @@ pub struct OperationResult {
 
 #[derive(Debug, Error)]
 pub enum KernelError {
+    #[error("invalid planar face frame: {0}")]
+    InvalidFaceFrame(String),
     #[error("invalid rigid transform: {0}")]
     InvalidTransform(String),
     #[error("linear tolerance must be finite and positive")]

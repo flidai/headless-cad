@@ -205,6 +205,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "stats": build.stats,
         "feature_hashes": build.feature_hashes,
         "face_assertions": build.face_assertions,
+        "face_datums": build.face_datums,
         "outputs": outputs,
     }))
 }
@@ -412,7 +413,42 @@ fn difference(before: &Value, after: &Value) -> Value {
             (name.clone(), json!({"status":status,"before":a,"after":b}))
         })
         .collect();
-    json!({"outputs":changes,"face_assertions":assertions,"comparison":"build hashes, measured properties and assertion witnesses; not a proof of geometric equivalence"})
+    let before_datums = before["face_datums"]
+        .as_object()
+        .expect("build face datums");
+    let after_datums = after["face_datums"].as_object().expect("build face datums");
+    let parts: BTreeSet<_> = before_datums.keys().chain(after_datums.keys()).collect();
+    let datums: serde_json::Map<String, Value> = parts
+        .into_iter()
+        .map(|part| {
+            let a = before_datums.get(part).and_then(Value::as_object);
+            let b = after_datums.get(part).and_then(Value::as_object);
+            let names: BTreeSet<_> = a
+                .into_iter()
+                .flat_map(|v| v.keys())
+                .chain(b.into_iter().flat_map(|v| v.keys()))
+                .collect();
+            let changes: serde_json::Map<String, Value> = names
+                .into_iter()
+                .map(|name| {
+                    let old = a.and_then(|v| v.get(name));
+                    let new = b.and_then(|v| v.get(name));
+                    let status = match (old, new) {
+                        (None, Some(_)) => "added",
+                        (Some(_), None) => "removed",
+                        (Some(a), Some(b)) if a == b => "unchanged",
+                        _ => "changed",
+                    };
+                    (
+                        name.clone(),
+                        json!({"status":status,"before":old,"after":new}),
+                    )
+                })
+                .collect();
+            (part.clone(), json!(changes))
+        })
+        .collect();
+    json!({"outputs":changes,"face_assertions":assertions,"face_datums":datums,"comparison":"build hashes, measured properties, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -1134,6 +1170,34 @@ fn main() {
                             "anchor_content_hash": anchor_content_hash,
                             "target_content_hash": target_content_hash,
                         });
+                    }
+                    cad_build::BuildError::FaceDatumFailed {
+                        part,
+                        name,
+                        resolution,
+                        anchor_content_hash,
+                        target_content_hash,
+                    } => {
+                        report["code"] = json!("face_datum_failed");
+                        report["part"] = json!(part);
+                        report["datum"] = json!(name);
+                        report["selection"] = json!(resolution);
+                        report["snapshot"] = json!({
+                            "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
+                            "executor_build_id": cad_build::executor_build_id(),
+                            "anchor_content_hash": anchor_content_hash,
+                            "target_content_hash": target_content_hash,
+                        });
+                    }
+                    cad_build::BuildError::FaceDatumFrame { part, name, .. } => {
+                        report["code"] = json!("face_datum_frame_failed");
+                        report["part"] = json!(part);
+                        report["datum"] = json!(name);
+                    }
+                    cad_build::BuildError::InvalidFaceDatum { part, name, .. } => {
+                        report["code"] = json!("invalid_face_datum");
+                        report["part"] = json!(part);
+                        report["datum"] = json!(name);
                     }
                     cad_build::BuildError::Kernel { feature, .. } => {
                         report["code"] = json!("kernel_operation_failed");

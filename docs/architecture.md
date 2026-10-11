@@ -13,7 +13,7 @@ not a single release criterion.
 
 Engineering reliability, large-assembly performance, automation, reproducibility,
 and manufacturing interoperability are the competitive measures. The current
-rectangular-solid implementation is an executable starting point. Its limits do
+orthogonal and convex-planar implementation is an executable starting point. Its limits do
 not define the target product. Feature development must expand the example and
 regression corpus toward increasingly demanding real engineering work.
 
@@ -255,8 +255,8 @@ rigid-transform lineage to a target feature, and require one, N, or all nonempty
 descendants. Reports distinguish resolved, deleted, ambiguous, and unsupported,
 with snapshot fingerprints and face/operation witnesses. This is recomputed from
 source intent on each build; it is not persistent numbering. General geometric
-predicates, edge/vertex selectors, topology-associated datums, instance paths, and consumption by
-downstream modeling operations remain work to implement.
+predicates, edge/vertex selectors, instance-path selectors, and consumption by
+downstream solid-modeling operations remain work to implement.
 
 Starlark `assert_faces` persists this selector intent in schema-2 recipes. The
 build resolves each assertion before artifact publication, including on cached
@@ -289,7 +289,17 @@ compares derived placements. STEP exports placements, not the named datum or
 attachment semantics. Datum-only edits change assembly identity and reuse exact
 part geometry. `examples/datum_gantry.star` demonstrates attached posts, bridge,
 clamps, and a rotated tool datum, then reuses the gantry in an inspection line.
-These frames are not associated with evolving faces. Cross-level mating, joints,
+Schema-2 face datums now associate a named frame with exactly one descendant of
+an anchored feature role on the owning part's body. `face_datum` retains selector
+intent, an explicit X-direction hint and a local offset in source. The kernel
+uses the face's area centroid, outward Z normal and projected X hint to construct
+a right-handed frame. A deleted/split face or ill-conditioned hint fails before
+publication; no nearest-face or fallback-axis guess is made. Build reports retain
+selection witnesses, source/target content hashes and the resolved frame. Existing
+attachments consume these resolved frames without requiring a nonlinear solver.
+`surface_mount.star` changes a ramp slope and moves/turns an attached plate;
+independent slope equations check the plate's placement across parameter edits.
+Cross-level mating, joints,
 multiple constraints, and DOF/residual solving remain separate future work.
 
 Build a constraint service separately from geometric construction. The 2D sketch
@@ -316,6 +326,24 @@ sections/drawings, or export. Track independent budgets and eviction for exact
 bodies, CPU display assets, GPU residency, and queued work. A many-part assembly
 must be useful with zero resident exact B-reps during graphics-only inspection.
 
+### Demand-driven regeneration and configurations
+
+Graphics-only loading and selective regeneration are separate requirements.
+The target builder evaluates the dependency closure of requested outputs and
+validation policies, reuses verified immutable results, and loads exact bodies
+only for operations that require them. Bound exact-body residency separately
+from display caches; allow eviction and recomputation without losing provenance.
+The present eager local evaluation is not this demand-driven build service.
+Benchmark a one-part edit inside a large assembly as well as opening its viewer.
+
+A configuration identity must include the pinned definition revision, resolved
+parameters, suppression rules and material overrides. Specify whether a
+suppressed occurrence contributes to geometry queries, BOM and manufacturing
+outputs; visibility alone must never change those engineering results.
+Cross-level references use explicit instance paths and revision scope. Their
+dependency cycles are checked independently of cyclic mechanical constraints:
+a nonlinear solver is not a way to resolve a cyclic feature build.
+
 ## Display assets, streaming, and GPU responsibilities
 
 ### Independent display build
@@ -325,7 +353,10 @@ content, mesher implementation, chordal/angular error, edge policy, coordinate
 quantization, and display-format version. Preserve shared boundaries, normals,
 sharp feature edges, and triangle-to-semantic-face mappings during tessellation.
 Record measured or conservative error bounds; do not assume a simplifier's
-heuristic score is automatically a certified distance bound.
+heuristic score is automatically a certified distance bound. Specify the metric
+and direction (for example, a conservative symmetric surface-distance bound),
+including tessellation, simplification and quantization contributions. Test thin
+features and boundary preservation separately from a scalar distance metric.
 
 First implement cached meshes, instancing, frustum culling, coarse part LODs, and
 explicit residency budgets. Then add bounded clusters/meshlets, hierarchy
@@ -339,6 +370,43 @@ and critical edges require refinement or a separate precise overlay. A coarse
 cluster can represent several faces: coarse picking returns an instance/region
 candidate and refines before claiming a particular semantic face.
 
+### Target display hierarchy contract
+
+The planned hierarchy is a derived, independently versioned artifact. It must
+not become the design database or introduce a dependency from the kernel to a
+particular renderer. Its minimum records are:
+
+| Record | Required fields and contract |
+| --- | --- |
+| Part display manifest | Exact geometry hash, mesher/version and tolerance policy, local coordinate frame, root page references, semantic mapping version |
+| Cluster/page descriptor | Content digest and encoded/decoded sizes, conservative bounds, object-space geometric error, refinement dependencies and required boundary data |
+| Assembly spatial node | Conservative occurrence bounds, child nodes, instance paths and transforms; reusable part hierarchies remain shared |
+| Selection mapping | Source generation, occurrence path and candidate semantic face set; a coarse triangle is not necessarily one exact face |
+| Residency record | Requested/resident/failed state, reserved bytes, last use, fallback dependencies and cancellation generation |
+
+Convert conservative object-space error to a screen-space bound using the
+camera and occurrence transform. Refine when that bound exceeds the configured
+pixel budget, with hysteresis to avoid repeated swaps around a threshold.
+Near-plane cases require conservative treatment. A parent remains visible until
+all children needed for a crack-safe replacement are ready. If residency limits
+prevent refinement, expose the reduced detail rather than claiming the error
+target was met. Small screen coverage alone cannot justify dropping a thin part
+or an engineering-critical overlay.
+
+Maintain separate occurrence and part-level spatial hierarchies. Start with
+frustum traversal; add conservative occlusion only after tests cover disocclusion,
+camera changes, selected objects and stale depth. Unique geometry, depth
+complexity and request latency still affect cost: this architecture does not
+promise constant work for arbitrary assemblies.
+
+Benchmark a fixed camera trace with repeated parts, many unique parts, thin
+features, deeply nested instances, rapid camera reversals and a constrained
+network. Record first coarse coverage, time to requested detail, frame-time
+percentiles, page churn, transferred bytes, separate CPU/GPU memory accounting,
+and picking correctness during refinement. Include context loss, corrupt pages,
+out-of-order delivery and budget exhaustion. Hardware and error budgets belong
+in each result, alongside the workload and implementation revision.
+
 ### Streaming and cache contract
 
 An immutable assembly manifest references versioned part manifests and display
@@ -351,7 +419,11 @@ and keep parent LODs resident until complete replacements arrive.
 Each response and displayed generation carries its own identity. Never combine
 new metadata with old geometry or accept an A→B→A interleaving as a consistent
 snapshot. Missing assets produce a visible loading/proxy state; they do not mean
-empty geometry. Cache eviction must not discard the only visible fallback.
+empty geometry. Cache eviction must not discard the only visible fallback. Reserve decoded CPU
+bytes, upload staging and resident GPU allocations separately; release them only
+when decoding work and GPU use have completed. A digest validates bytes, not the
+allocation sizes claimed by an untrusted descriptor: validate decoded counts and
+indices before allocating or uploading.
 
 ### GPU and portability
 
@@ -449,11 +521,20 @@ claims of symbolic precision. Independent box/prism formulas, mixed-material
 balance-arm fixtures and optional OCCT centroid/tensor comparisons verify them.
 Principal axes, uncertainty propagation and dynamics remain future work.
 
+Introduce a versioned drawing/annotation IR containing view definitions,
+projection/section intent, semantic references, dimensions, tolerance standards,
+units and revision identity. Rendering consumes that IR; it does not infer
+manufacturing intent from mesh edges. Annotation regeneration must preserve its
+reference or report deletion/ambiguity, and stale drawings cannot be presented as
+current released deliverables. Import validation and round-trip loss reporting
+need an adversarial corpus before broad format support is declared.
+
 Treat manufacturing output as a first-class domain: associated orthographic and
 section views, hidden-line removal, dimensions and datums, GD&T/PMI intent,
 materials/density, mass properties and inertia, BOM, part/revision numbers, and
 configuration-aware quantities. Drawings and annotations have stable design
-references and testable revision behavior, not screenshot-only geometry.
+references and testable revision behavior, not screenshot-only geometry. Manufacturing datum systems and tolerance semantics
+are distinct from the rigid attachment frames currently named `datums`.
 
 Evolve today's planar STEP/STL export toward analytic STEP import/export and
 assembly/PMI-capable AP242 subsets, with a published support matrix and round-trip
@@ -574,7 +655,7 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation and scoped exact rigid transforms and bounded convex intersection; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
-| References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Topology-associated datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
+| References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and sibling attachment DAGs, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Cross-level attachments, joints/constraints and configurations |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, frustum culling, bounded geometry cache and proxy fallback | Spatial BVHs, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |

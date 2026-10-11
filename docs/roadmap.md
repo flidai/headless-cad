@@ -7,12 +7,19 @@ of completion dates or an assertion that the present implementation has parity.
 
 Every milestone requires a documented capability envelope, independent expected
 results, deterministic failure behavior, source-visible examples, and measured
-regression performance. A green test count alone does not close a milestone.
+regression performance. A green test count alone does not close a milestone. The reference/edit corpus
+must record expected intent across feature insertion/reordering, split/merge
+histories, patterned-instance replacement, suppression and imported geometry;
+repeatable selection alone is insufficient. Large-assembly gates include a
+one-component edit with bounded rebuild count and peak exact-body memory, not
+only opening the viewer. A manufacturing gate includes a complete revised
+release pack with associated views, dimensions, datum references, BOM and an
+explicit exchange-loss report.
 
 | Milestone | Deliverable and example progression | Acceptance evidence | Status |
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
-| M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums/sibling attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associated datums, broader selectors and downstream modeling consumers remain |
+| M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums/sibling attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
 | M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: strict convex CCW polygon extrusion (3–256 vertices), polygon caps and single-convex-solid planar validation implemented; scoped exact rigid transforms and bounded convex intersection with face lineage implemented; holes, curves, general nonconvex transforms/Booleans and trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, frustum culling and bounded cache implemented; LOD, spatial hierarchy and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
@@ -37,7 +44,7 @@ contain their transformed native coordinates.
 ## Next concrete implementation increments
 
 1. Extend implemented schema-2 nested assemblies and named part datums with
-   topology-associated frames, cross-level attachment semantics and explicit
+   cross-level attachment semantics and explicit
    configuration identity. Sibling rigid attachments now evaluate a bounded DAG
    using target placement × target datum × local offset × inverse own datum;
    they are not a nonlinear mate solver. Preserve the source intent/resolved
@@ -47,7 +54,8 @@ contain their transformed native coordinates.
    resulting placements but not the datum/attachment semantics.
 2. Extend implemented face-role selector results (`resolved`, `deleted`,
    `ambiguous`, `unsupported`) and orthogonal face lineage to richer predicates,
-   topology-associated datums and downstream modeling consumers. Recipe `assert_faces` now enforces
+   richer downstream modeling consumers. Associative planar face datums now drive
+   existing attachments with an area-centroid frame and explicit orientation hint. Recipe `assert_faces` now enforces
    these references before publication and preserves reports for review.
    Expand the generated edit corpus beyond orthogonal cuts and translations
    before claiming general persistent naming reliability.
@@ -56,7 +64,10 @@ contain their transformed native coordinates.
    bounded-error LOD. Verified asset fetching, frustum culling, request limits,
    stale-response rejection and a bounded geometry cache are implemented. Its
    workload limits are not interactive performance guarantees. Preserve
-   occurrence/face identity through refinement.
+   occurrence/face identity through refinement. Follow the target display hierarchy
+   contract: versioned page descriptors, conservative error bounds, complete
+   replacement dependencies, separate assembly/part spatial indexes and visible
+   degraded-detail status when a budget prevents the requested refinement.
 4. Expand the converted fixture/enclosure and repeated mounting-array examples
    into measured benchmarks varying unique-part count as well as repetition.
    `display_rack.star` now varies rows, columns and unique geometry independently;
@@ -82,6 +93,13 @@ change the material center and inertia while reusing part geometry. Independent
 box-moment expectations distinguish volume centroid from center of mass and
 check the full tensor at three counterweight positions. Missing densities and
 numerical limitations remain explicit; this is not a dynamics or joint solver.
+
+The M1 associative-datum increment uses `surface_mount.star`: editing the ramp's
+rise changes both the attached plate's position and angle through a semantic
+face reference. Independent plane equations and STEP placement checks cover the
+successful case; split/deleted faces and parallel orientation hints must fail
+without replacing the last valid artifacts. This is a scoped reference consumer,
+not a general sketch-on-face tool or a nonlinear assembly solver.
 
 ## Example policy
 

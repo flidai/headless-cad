@@ -1416,3 +1416,189 @@ fn convex_intersection_lineage_distinguishes_deleted_tool_walls_and_empty_overla
         assert!(deleted.witnesses.is_empty());
     }
 }
+
+fn face_datum_recipe(height: f64, cut_x: f64, cut_width: f64) -> Recipe {
+    serde_json::from_value(serde_json::json!({"schema_version":2,"units":"mm","features":[
+        {"op":"rectangle","id":"p","width":10,"depth":8},
+        {"op":"extrude","id":"base","profile":"p","height":height},
+        {"op":"rectangle","id":"cp","width":cut_width,"depth":10},
+        {"op":"extrude","id":"c","profile":"cp","height":height+2.0},
+        {"op":"translate","id":"tool","body":"c","offset":[cut_x,-1,-1]},
+        {"op":"cut","id":"trimmed","left":"base","right":"tool"},
+        {"op":"rectangle","id":"bp","width":2,"depth":2},
+        {"op":"extrude","id":"block","profile":"bp","height":2}
+    ],"outputs":[],"parts":[{"id":"basepart","feature":"trimmed"},{"id":"blockpart","feature":"block","datums":{"foot":{"translation":[1,1,0]}}}],
+    "face_datums":[{"part":"basepart","name":"seat","anchor_feature":"base","role":"end_cap","x_direction":[1,0,0],"offset":[1,2,3]}],
+    "assemblies":[{"id":"assembly","instances":[{"id":"base","part":"basepart"},{"id":"block","part":"blockpart","attachment":{"instance":"base","datum":"foot","target_datum":"seat"}}]}],
+    "assembly_outputs":[{"name":"assembly","assembly":"assembly"}]})).unwrap()
+}
+
+#[test]
+fn associative_datums_follow_edited_face_centroids_and_drive_attachments_without_geometry_edits() {
+    let mut engine = BuildEngine::default();
+    for height in [4.0, 6.0] {
+        let mut recipe = face_datum_recipe(height, -1.0, 3.0);
+        let built = engine.build(&recipe).unwrap();
+        let report = &built.face_datums["basepart"]["seat"];
+        assert_eq!(report.selection.status, FaceResolutionStatus::Resolved);
+        assert_eq!(report.frame.translation, [7.0, 6.0, height + 3.0]);
+        assert_eq!(report.frame.rotation, [0.0, 0.0, 0.0, 1.0]);
+        let child = built.assemblies["assembly"]
+            .instances
+            .iter()
+            .find(|i| i.id == "block")
+            .unwrap();
+        assert_eq!(child.transform.translation, [6.0, 5.0, height + 3.0]);
+        assert!(
+            recipe.parts[0].datums.is_empty(),
+            "resolved frames must not overwrite author intent"
+        );
+        recipe.face_datums[0].x_direction = [2.0, 0.0, 0.0];
+        let equivalent = engine.build(&recipe).unwrap();
+        assert_eq!(equivalent.stats.computed_solids, 0);
+        assert_eq!(
+            equivalent.face_datums["basepart"]["seat"].frame,
+            report.frame
+        );
+        assert_eq!(
+            equivalent.assemblies["assembly"].content_hash,
+            built.assemblies["assembly"].content_hash
+        );
+        assert_ne!(
+            equivalent.face_datums["basepart"]["seat"].definition,
+            report.definition
+        );
+        recipe.face_datums[0].offset[2] += 2.0;
+        let moved = engine.build(&recipe).unwrap();
+        assert_eq!(moved.stats.computed_solids, 0);
+        assert_eq!(moved.feature_hashes, built.feature_hashes);
+        assert_ne!(
+            moved.assemblies["assembly"].content_hash,
+            built.assemblies["assembly"].content_hash
+        );
+    }
+}
+#[test]
+fn associative_datums_reject_split_deleted_unknown_roles_and_parallel_hint() {
+    for (x, width, status) in [
+        (4.0, 2.0, FaceResolutionStatus::Ambiguous),
+        (-1.0, 12.0, FaceResolutionStatus::Deleted),
+    ] {
+        match build(&face_datum_recipe(4.0, x, width)) {
+            Err(BuildError::FaceDatumFailed {
+                part,
+                name,
+                resolution,
+                ..
+            }) => {
+                assert_eq!(part, "basepart");
+                assert_eq!(name, "seat");
+                assert_eq!(resolution.status, status);
+            }
+            result => panic!("unexpected result: {result:?}"),
+        }
+    }
+    let mut recipe = face_datum_recipe(4.0, -1.0, 3.0);
+    recipe.face_datums[0].role = "misspelled".into();
+    assert!(
+        matches!(build(&recipe),Err(BuildError::FaceDatumFailed{resolution,..}) if resolution.status==FaceResolutionStatus::Unsupported)
+    );
+    recipe.face_datums[0].role = "end_cap".into();
+    recipe.face_datums[0].x_direction = [0.0, 0.0, 1.0];
+    assert!(matches!(
+        build(&recipe),
+        Err(BuildError::FaceDatumFrame { .. })
+    ));
+}
+#[test]
+fn face_datum_schema_names_limits_and_coordinate_fields_are_strict() {
+    let mut recipe = face_datum_recipe(4.0, -1.0, 3.0);
+    recipe.parts[0]
+        .datums
+        .insert("seat".into(), RigidTransform::default());
+    assert!(matches!(
+        build(&recipe),
+        Err(BuildError::InvalidFaceDatum { .. })
+    ));
+    recipe.parts[0].datums.clear();
+    recipe.face_datums.push(recipe.face_datums[0].clone());
+    assert!(matches!(
+        build(&recipe),
+        Err(BuildError::InvalidFaceDatum { .. })
+    ));
+    recipe.face_datums = vec![recipe.face_datums[0].clone(); MAX_FACE_DATUMS + 1];
+    assert!(matches!(
+        build(&recipe),
+        Err(BuildError::ResourceLimit {
+            resource: "face datums",
+            ..
+        })
+    ));
+    let mut json = serde_json::to_value(face_datum_recipe(4.0, -1.0, 3.0)).unwrap();
+    json["face_datums"][0]["typo"] = 1.into();
+    assert!(serde_json::from_value::<Recipe>(json).is_err());
+    assert!(serde_json::from_str::<Recipe>(
+        r#"{"schema_version":1,"units":"mm","features":[],"face_datums":[]}"#
+    )
+    .is_err());
+}
+#[test]
+fn associative_face_datums_resolve_through_convex_intersections_and_rigid_transform_chains() {
+    let mut recipe = convex_intersection_recipe(3.0);
+    recipe.parts.push(PartDefinition {
+        id: "part".into(),
+        feature: "overlap".into(),
+        metadata: Default::default(),
+        datums: BTreeMap::new(),
+    });
+    recipe.face_datums.push(FaceDatumDefinition {
+        part: "part".into(),
+        name: "top".into(),
+        anchor_feature: "tool".into(),
+        role: "end_cap".into(),
+        x_direction: [1.0, 0.0, 0.0],
+        offset: [0.0; 3],
+    });
+    let result = build(&recipe).unwrap();
+    for (a, b) in result.face_datums["part"]["top"]
+        .frame
+        .translation
+        .into_iter()
+        .zip([2.0, 2.0, 2.0])
+    {
+        assert!((a - b).abs() < 1e-9);
+    }
+    let mut recipe = transformed_recipe();
+    recipe.parts.push(PartDefinition {
+        id: "part".into(),
+        feature: "tilt".into(),
+        metadata: Default::default(),
+        datums: BTreeMap::new(),
+    });
+    recipe.face_datums.push(FaceDatumDefinition {
+        part: "part".into(),
+        name: "top".into(),
+        anchor_feature: "b".into(),
+        role: "end_cap".into(),
+        x_direction: [1.0, 0.0, 0.0],
+        offset: [0.0; 3],
+    });
+    let result = build(&recipe).unwrap();
+    let frame = result.face_datums["part"]["top"].frame;
+    let a = 2.0_f64.sqrt() + 3.0;
+    let expected = [
+        a * 3.0_f64.sqrt() / 2.0 + 4.5 + 11.0,
+        3.0 * 2.0_f64.sqrt() + 5.0 + 13.0,
+        -0.5 * a + 9.0 * 3.0_f64.sqrt() / 2.0 + 17.0,
+    ];
+    for (a, b) in frame.translation.into_iter().zip(expected) {
+        assert!((a - b).abs() < 1e-9);
+    }
+    for (a, b) in frame
+        .vector([0.0, 0.0, 1.0])
+        .into_iter()
+        .zip([0.5, 0.0, 3.0_f64.sqrt() / 2.0])
+    {
+        assert!((a - b).abs() < 1e-12);
+    }
+}

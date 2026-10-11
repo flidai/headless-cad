@@ -1721,3 +1721,169 @@ fn empty_body_properties_have_zero_mass_and_no_fabricated_centroid() {
     }
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
 }
+
+const FACE_DATUM_RECIPE: &str = r#"
+h = param(name="height", default=4)
+x = param(name="cut_x", default=-1)
+w = param(name="cut_width", default=3)
+def box(id, width, depth, height):
+    return extrude(id=id,profile=rectangle(id=id+"_p",width=width,depth=depth),height=height)
+blank = box("blank",10,10,h)
+tool = translate(id="tool_at",body=box("tool",w,12,h+2),offset=[x,-1,-1])
+shaped = cut(id="shaped",left=blank,right=tool)
+base = part(id="base",body=shaped,datums={"top":face_datum(from_feature=blank,role="end_cap",x_direction=[1,0,0])})
+block = part(id="block",body=box("block_body",2,2,2),datums={"foot":datum(offset=[1,1,0])})
+b = instance(id="base",part=base)
+c = instance(id="mounted",part=block,attach_to=b,datum="foot",target_datum="top")
+assembly_output(name="mounted",assembly=assembly(id="mounted",instances=[b,c]))
+output(name="base_body",feature=shaped)
+"#;
+
+#[test]
+fn associative_datums_publish_witnesses_reposition_and_preserve_failed_generations() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("face.star");
+    let out = directory.path().join("out");
+    let cache = directory.path().join("cache");
+    fs::write(&path, FACE_DATUM_RECIPE).unwrap();
+    let args = [
+        "build",
+        path.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ];
+    let first = successful_json(cli(&args));
+    let datum = &first["face_datums"]["base"]["top"];
+    assert_eq!(datum["selection"]["status"], "resolved");
+    assert_eq!(datum["selection"]["witnesses"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        datum["frame"]["translation"],
+        serde_json::json!([6., 5., 4.])
+    );
+    assert_eq!(datum["definition"]["anchor_feature"], "blank");
+    assert_eq!(
+        datum["target_content_hash"],
+        first["feature_hashes"]["shaped"]
+    );
+    let assembled: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("mounted.assembly.json")).unwrap()).unwrap();
+    assert_eq!(
+        assembled["definitions"]["base"]["datums"]["top"],
+        datum["frame"]
+    );
+    let attached = assembled["instances"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "mounted")
+        .unwrap();
+    assert_eq!(
+        attached["transform"]["translation"],
+        serde_json::json!([5., 4., 4.])
+    );
+    let compiled: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("recipe.json")).unwrap()).unwrap();
+    assert_eq!(compiled["face_datums"][0]["part"], "base");
+    assert!(compiled["parts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == "base")
+        .unwrap()["datums"]["top"]
+        .is_null());
+    let checked = successful_json(cli(&[
+        "inspect",
+        out.join("recipe.json").to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ]));
+    assert_eq!(checked["face_datums"], first["face_datums"]);
+    assert!(checked["stats"]["disk_cache_hits"].as_u64().unwrap() > 0);
+    let mut raised = args.to_vec();
+    raised.extend(["--param", "height=7"]);
+    let changed = successful_json(cli(&raised));
+    assert_eq!(
+        changed["face_datums"]["base"]["top"]["frame"]["translation"],
+        serde_json::json!([6., 5., 7.])
+    );
+    assert_ne!(
+        changed["outputs"]["mounted"]["content_hash"],
+        first["outputs"]["mounted"]["content_hash"]
+    );
+    assert_eq!(
+        changed["feature_hashes"]["block_body"],
+        first["feature_hashes"]["block_body"]
+    );
+    assert!(changed["stats"]["disk_cache_hits"].as_u64().unwrap() > 0);
+    let original = artifact_bytes(&out);
+    for (parameters, status) in [
+        (
+            vec!["--param", "cut_x=4", "--param", "cut_width=2"],
+            "ambiguous",
+        ),
+        (vec!["--param", "cut_width=12"], "deleted"),
+    ] {
+        for _ in 0..2 {
+            let mut failed = args.to_vec();
+            failed.extend(&parameters);
+            let failed = cli(&failed);
+            assert!(!failed.status.success());
+            let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+            assert_eq!(error["code"], "face_datum_failed", "{error}");
+            assert_eq!(error["part"], "base");
+            assert_eq!(error["datum"], "top");
+            assert_eq!(error["selection"]["status"], status);
+            assert_eq!(
+                error["snapshot"]["anchor_content_hash"]
+                    .as_str()
+                    .unwrap()
+                    .len(),
+                64
+            );
+            assert_eq!(
+                error["snapshot"]["target_content_hash"]
+                    .as_str()
+                    .unwrap()
+                    .len(),
+                64
+            );
+            assert_eq!(artifact_bytes(&out), original);
+        }
+    }
+    fs::write(
+        &path,
+        FACE_DATUM_RECIPE.replace("x_direction=[1,0,0]", "x_direction=[0,0,1]"),
+    )
+    .unwrap();
+    let parallel = cli(&args);
+    assert!(!parallel.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&parallel.stderr).unwrap();
+    assert_eq!(error["code"], "face_datum_frame_failed", "{error}");
+    assert_eq!(artifact_bytes(&out), original);
+}
+
+#[test]
+fn semantic_datum_diff_tracks_intent_even_when_resolved_frame_is_unchanged() {
+    let directory = tempfile::tempdir().unwrap();
+    let before = directory.path().join("before.star");
+    let after = directory.path().join("after.star");
+    fs::write(&before, FACE_DATUM_RECIPE).unwrap();
+    fs::write(
+        &after,
+        FACE_DATUM_RECIPE.replace("x_direction=[1,0,0]", "x_direction=[2,0,0]"),
+    )
+    .unwrap();
+    let diff = successful_json(cli(&[
+        "diff",
+        before.to_str().unwrap(),
+        after.to_str().unwrap(),
+    ]));
+    assert_eq!(diff["outputs"]["base_body"]["status"], "unchanged");
+    assert_eq!(diff["outputs"]["mounted"]["status"], "unchanged");
+    let datum = &diff["face_datums"]["base"]["top"];
+    assert_eq!(datum["status"], "changed");
+    assert_eq!(datum["before"]["frame"], datum["after"]["frame"]);
+    assert_ne!(datum["before"]["definition"], datum["after"]["definition"]);
+}
