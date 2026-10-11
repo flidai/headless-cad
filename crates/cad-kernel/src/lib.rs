@@ -1,6 +1,7 @@
 //! A deliberately narrow, native Rust boundary-representation kernel.
 //!
-//! Supports rectangular extrusions, translations, and orthogonal solid Booleans.
+//! Supports rectangular and strictly convex polygon extrusions, translations,
+//! and orthogonal solid Booleans. Polygon caps remain analytic planar faces.
 //! Boolean faces stay rectangular and share explicit edges and vertices; open
 //! pockets, through-holes, empty results, and disconnected solids are supported.
 //! Enclosed cavities, curved surfaces, and nonmanifold contacts are unsupported.
@@ -10,11 +11,13 @@
 
 mod math;
 mod orthogonal;
+mod polygon;
 mod validation;
 
 pub use math::Tolerance;
 use math::{cross, dot, sub};
 pub use orthogonal::{boolean, translate, BooleanOp};
+pub use polygon::{extrude_polygon, validate_polygon, MAX_POLYGON_POINTS};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use thiserror::Error;

@@ -453,3 +453,6 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod prism_tests;

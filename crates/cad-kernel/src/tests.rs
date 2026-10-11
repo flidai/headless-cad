@@ -750,3 +750,250 @@ fn intersection_lineage_preserves_tool_orientation_and_empty_inputs() {
         .values()
         .all(|ids| ids.len() == 1));
 }
+
+#[test]
+fn polygon_extrusions_have_authoritative_caps_and_analytic_volumes() {
+    for (points, height, volume) in [
+        (vec![[0.0, 0.0], [8.0, 0.0], [0.0, 6.0]], 5.0, 120.0),
+        (
+            vec![[0.0, 0.0], [10.0, 0.0], [8.0, 4.0], [2.0, 4.0]],
+            3.0,
+            96.0,
+        ),
+        (
+            vec![[0.0, 0.0], [6.0, 0.0], [6.0, 4.0], [3.0, 7.0], [0.0, 4.0]],
+            2.0,
+            66.0,
+        ),
+    ] {
+        let result = extrude_polygon(&points, height, Tolerance::default()).unwrap();
+        let n = points.len();
+        assert_eq!(result.model.vertices.len(), 2 * n);
+        assert_eq!(result.model.edges.len(), 3 * n);
+        assert_eq!(result.model.faces.len(), n + 2);
+        assert_eq!(
+            result.model.loops[0].edges.len(),
+            n,
+            "bottom cap must remain one analytic polygon"
+        );
+        assert_eq!(
+            result.model.loops[1].edges.len(),
+            n,
+            "top cap must remain one analytic polygon"
+        );
+        assert!((result.model.volume() - volume).abs() < 1e-12);
+        assert_eq!(result.history.generated_faces["end_cap"], vec![FaceId(1)]);
+        assert_eq!(result.history.generated_faces["walls"].len(), n);
+        for i in 0..n {
+            assert_eq!(
+                result.history.generated_faces[&format!("wall_{i}")],
+                vec![FaceId(i + 2)]
+            );
+        }
+        let shifted = translate(&result.model, [20.0, -15.0, 7.0], Tolerance::default()).unwrap();
+        assert!((shifted.model.volume() - volume).abs() < 1e-12);
+        assert!(shifted.model.validate(Tolerance::default()).valid);
+        let serialized = serde_json::to_vec(&result).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<OperationResult>(&serialized).unwrap(),
+            result
+        );
+        assert!(matches!(
+            boolean(
+                &result.model,
+                &result.model,
+                BooleanOp::Union,
+                Tolerance::default()
+            ),
+            Err(KernelError::Unsupported(_))
+        ));
+    }
+}
+
+#[test]
+fn polygon_profiles_reject_bad_loops_instead_of_repairing_them() {
+    for points in [
+        vec![[0.0, 0.0], [1.0, 0.0]],
+        vec![[0.0, 0.0], [0.0, 2.0], [2.0, 0.0]], // clockwise
+        vec![[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 0.0]], // closing repetition
+        vec![[0.0, 0.0], [1.0, 0.0], [2.0, 0.0], [0.0, 2.0]], // collinear
+        vec![[0.0, 0.0], [2.0, 0.0], [1.0, 0.5], [2.0, 2.0], [0.0, 2.0]], // concave
+        vec![[0.0, 0.0], [2.0, 2.0], [0.0, 2.0], [2.0, 0.0]], // crossed
+        vec![[0.0, 0.0], [1e-10, 0.0], [0.0, 1.0]], // tiny edge
+        vec![[0.0, 0.0], [2.0, 0.0], [1.0, 1e-10]], // uncertain almostcollinear
+        vec![[0.0, 0.0], [f64::NAN, 0.0], [0.0, 1.0]],
+        vec![[0.0, 0.0], [f64::MAX, 0.0], [0.0, f64::MAX]],
+        vec![[0.0, 0.0]; 257],
+    ] {
+        assert!(
+            validate_polygon(&points, Tolerance::default()).is_err(),
+            "accepted{points:?}"
+        );
+    }
+    let triangle = [[0.0, 0.0], [2.0, 0.0], [0.0, 3.0]];
+    for height in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        assert!(extrude_polygon(&triangle, height, Tolerance::default()).is_err());
+    }
+    assert!(validate_polygon(&triangle, Tolerance { linear: 0.0 }).is_err());
+    assert!(extrude_polygon(
+        &[[0.0, 0.0], [1e-160, 0.0], [0.0, 1e-160]],
+        1.0,
+        Tolerance { linear: 1e-170 }
+    )
+    .is_err());
+}
+
+fn repair_polygon_supports(model: &mut ModelSnapshot) {
+    for edge in &mut model.edges {
+        let a = model.vertices[edge.vertices[0].0].position;
+        let b = model.vertices[edge.vertices[1].0].position;
+        let delta = sub(b, a);
+        let length = math::norm(delta);
+        edge.line = Line {
+            origin: a,
+            direction: delta.map(|v| v / length),
+        };
+    }
+    for i in 0..model.faces.len() {
+        let points = model.loop_points(model.faces[i].loops[0]).unwrap();
+        let normal = cross(sub(points[1], points[0]), sub(points[2], points[0]));
+        let length = math::norm(normal);
+        model.faces[i].plane = Plane {
+            origin: points[0],
+            normal: normal.map(|v| v / length),
+        };
+    }
+}
+
+#[test]
+fn general_validator_rejects_tampered_nonconvex_folded_and_reversed_boundaries() {
+    let original = extrude_polygon(
+        &[[0.0, 0.0], [6.0, 0.0], [6.0, 4.0], [3.0, 7.0], [0.0, 4.0]],
+        2.0,
+        Tolerance::default(),
+    )
+    .unwrap()
+    .model;
+    for position in [[3.0, 1.0], [-2.0, -1.0]] {
+        let mut malformed = original.clone();
+        for id in [3, 8] {
+            malformed.vertices[id].position[0] = position[0];
+            malformed.vertices[id].position[1] = position[1];
+        }
+        repair_polygon_supports(&mut malformed);
+        assert!(!malformed.validate(Tolerance::default()).valid);
+    }
+    let mut reversed = original.clone();
+    let ring = &mut reversed.loops[1].edges;
+    ring.reverse();
+    for edge in ring {
+        edge.reversed = !edge.reversed;
+    }
+    reversed.faces[1].plane.normal = [0.0, 0.0, -1.0];
+    assert!(!reversed.validate(Tolerance::default()).valid);
+    let mut folded = original;
+    folded.vertices[8].position[2] = -1.0;
+    repair_polygon_supports(&mut folded);
+    assert!(!folded.validate(Tolerance::default()).valid);
+}
+
+#[test]
+fn general_multiple_solids_are_explicitly_unsupported_even_when_disjoint() {
+    let one = extrude_polygon(
+        &[[0.0, 0.0], [8.0, 0.0], [0.0, 6.0]],
+        5.0,
+        Tolerance::default(),
+    )
+    .unwrap()
+    .model;
+    for offset in [[0.0; 3], [1.0, 0.0, 0.0], [20.0, 0.0, 0.0]] {
+        let other = translate(&one, offset, Tolerance::default()).unwrap().model;
+        let mut model = one.clone();
+        let (v, e, l, f, s) = (
+            model.vertices.len(),
+            model.edges.len(),
+            model.loops.len(),
+            model.faces.len(),
+            model.shells.len(),
+        );
+        model.vertices.extend(other.vertices);
+        model.edges.extend(other.edges.into_iter().map(|mut edge| {
+            edge.vertices = edge.vertices.map(|id| VertexId(id.0 + v));
+            edge
+        }));
+        model.loops.extend(other.loops.into_iter().map(|mut ring| {
+            for use_ in &mut ring.edges {
+                use_.edge.0 += e;
+            }
+            ring
+        }));
+        model.faces.extend(other.faces.into_iter().map(|mut face| {
+            for id in &mut face.loops {
+                id.0 += l;
+            }
+            face
+        }));
+        model
+            .shells
+            .extend(other.shells.into_iter().map(|mut shell| {
+                for id in &mut shell.faces {
+                    id.0 += f;
+                }
+                shell
+            }));
+        model
+            .solids
+            .extend(other.solids.into_iter().map(|mut solid| {
+                for id in &mut solid.shells {
+                    id.0 += s;
+                }
+                solid
+            }));
+        let report = model.validate(Tolerance::default());
+        assert!(!report.valid);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| issue.code == "unsupported_geometry"),
+            "{report:?}"
+        );
+    }
+}
+
+#[test]
+fn malformed_repeated_polygon_caps_stop_before_incidence_graph_expansion() {
+    let points: Vec<_> = (0..MAX_POLYGON_POINTS)
+        .map(|i| {
+            let angle = i as f64 * std::f64::consts::TAU / MAX_POLYGON_POINTS as f64;
+            [100.0 * angle.cos(), 100.0 * angle.sin()]
+        })
+        .collect();
+    let model = extrude_polygon(&points, 5.0, Tolerance::default())
+        .unwrap()
+        .model;
+    // This input formerly multiplied 100 face owners through every cap edge,
+    // constructing millions of adjacency entries after ownership was invalid.
+    let mut repeated = model.clone();
+    repeated.faces = vec![model.faces[0].clone(); 100];
+    let report = repeated.validate(Tolerance::default());
+    assert!(!report.valid);
+    assert!(report
+        .issues
+        .iter()
+        .any(|issue| issue.code == "loop_ownership"));
+    assert!(
+        !report.issues.iter().any(|issue| matches!(
+            issue.code.as_str(),
+            "disconnected_shell" | "euler_characteristic" | "invalid_volume"
+        )),
+        "invalid ownership should stop before downstream shell analysis"
+    );
+    // The local convexity pass also has an aggregate budget; merely bounding
+    // each polygon to 256 points would still allow unbounded quadratic scans.
+    repeated.faces = vec![model.faces[0].clone(); 512];
+    let report = repeated.validate(Tolerance::default());
+    assert!(!report.valid);
+    assert_eq!(report.issues.len(), 1);
+    assert_eq!(report.issues[0].code, "resource_limit");
+}

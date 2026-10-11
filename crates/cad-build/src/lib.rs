@@ -3,9 +3,10 @@
 //! Logical identity belongs to the recipe. Kernel results and their topology
 //! history are independent of recipe IDs, so identical features can share them.
 
+pub use cad_kernel::MAX_POLYGON_POINTS;
 use cad_kernel::{
-    boolean, extrude_rectangle, translate, BooleanOp, OperationResult, Tolerance, KERNEL_BUILD_ID,
-    KERNEL_VERSION,
+    boolean, extrude_polygon, extrude_rectangle, translate, validate_polygon, BooleanOp,
+    OperationResult, Tolerance, KERNEL_BUILD_ID, KERNEL_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -149,6 +150,11 @@ pub enum Feature {
         depth: f64,
         op_version: u32,
     },
+    Polygon {
+        id: String,
+        points: Vec<[f64; 2]>,
+        op_version: u32,
+    },
     Extrude {
         id: String,
         profile: String,
@@ -202,6 +208,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut width = None;
                 let mut depth = None;
                 let mut profile = None;
+                let mut points = None;
                 let mut height = None;
                 let mut body = None;
                 let mut offset = None;
@@ -224,6 +231,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "width" => read_field!(width, f64),
                         "depth" => read_field!(depth, f64),
                         "profile" => read_field!(profile, String),
+                        "points" => read_field!(points, Vec<[f64; 2]>),
                         "height" => read_field!(height, f64),
                         "body" => read_field!(body, String),
                         "offset" => read_field!(offset, [f64; 3]),
@@ -239,6 +247,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "width",
                                     "depth",
                                     "profile",
+                                    "points",
                                     "height",
                                     "body",
                                     "offset",
@@ -255,6 +264,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let op_version = op_version.unwrap_or_else(operation_version);
                 let allowed: &[&str] = match op.as_str() {
                     "rectangle" => &["op", "id", "op_version", "width", "depth"],
+                    "polygon" => &["op", "id", "op_version", "points"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
                     "union" => &["op", "id", "op_version", "left", "right"],
@@ -265,6 +275,7 @@ impl<'de> Deserialize<'de> for Feature {
                             &op,
                             &[
                                 "rectangle",
+                                "polygon",
                                 "extrude",
                                 "translate",
                                 "union",
@@ -285,6 +296,11 @@ impl<'de> Deserialize<'de> for Feature {
                         op_version,
                         width: width.ok_or_else(|| M::Error::missing_field("width"))?,
                         depth: depth.ok_or_else(|| M::Error::missing_field("depth"))?,
+                    },
+                    "polygon" => Feature::Polygon {
+                        id,
+                        op_version,
+                        points: points.ok_or_else(|| M::Error::missing_field("points"))?,
                     },
                     "extrude" => Feature::Extrude {
                         id,
@@ -328,6 +344,7 @@ impl Feature {
     pub fn id(&self) -> &str {
         match self {
             Self::Rectangle { id, .. }
+            | Self::Polygon { id, .. }
             | Self::Extrude { id, .. }
             | Self::Translate { id, .. }
             | Self::Union { id, .. }
@@ -337,7 +354,7 @@ impl Feature {
     }
     pub fn dependencies(&self) -> Vec<&str> {
         match self {
-            Self::Rectangle { .. } => vec![],
+            Self::Rectangle { .. } | Self::Polygon { .. } => vec![],
             Self::Extrude { profile, .. } => vec![profile],
             Self::Translate { body, .. } => vec![body],
             Self::Union { left, right, .. }
@@ -346,11 +363,12 @@ impl Feature {
         }
     }
     pub fn is_solid(&self) -> bool {
-        !matches!(self, Self::Rectangle { .. })
+        !matches!(self, Self::Rectangle { .. } | Self::Polygon { .. })
     }
     fn version(&self) -> u32 {
         match self {
             Self::Rectangle { op_version, .. }
+            | Self::Polygon { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Translate { op_version, .. }
             | Self::Union { op_version, .. }
@@ -361,6 +379,7 @@ impl Feature {
     fn operation(&self) -> &'static str {
         match self {
             Self::Rectangle { .. } => "rectangle",
+            Self::Polygon { .. } => "polygon",
             Self::Extrude { .. } => "extrude",
             Self::Translate { .. } => "translate",
             Self::Union { .. } => "union",
@@ -411,6 +430,8 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("invalid polygon profile '{feature}': {message}")]
+    PolygonProfile { feature: String, message: String },
     #[error("face assertions require recipe schema version 2")]
     FaceAssertionSchema,
     #[error("invalid face assertion '{id}': {message}")]
@@ -584,6 +605,14 @@ fn hash_feature(
         Feature::Rectangle { width, depth, .. } => {
             hash.update(&width.to_le_bytes());
             hash.update(&depth.to_le_bytes());
+        }
+        Feature::Polygon { points, .. } => {
+            hash.update(&(points.len() as u64).to_le_bytes());
+            for point in points {
+                for value in point {
+                    hash.update(&value.to_le_bytes());
+                }
+            }
         }
         Feature::Extrude { height, .. } => {
             hash.update(&height.to_le_bytes());
@@ -790,6 +819,11 @@ impl BuildEngine {
                     dimension(id, "width", *width)?;
                     dimension(id, "depth", *depth)?;
                 }
+                Feature::Polygon { id, points, .. } => validate_polygon(points, tolerance)
+                    .map_err(|error| BuildError::PolygonProfile {
+                        feature: id.clone(),
+                        message: error.to_string(),
+                    })?,
                 Feature::Extrude { id, height, .. } => dimension(id, "height", *height)?,
                 Feature::Translate { id, offset, .. } if offset.iter().any(|x| !x.is_finite()) => {
                     return Err(BuildError::Offset {
@@ -804,11 +838,7 @@ impl BuildEngine {
                     return Err(BuildError::InputType {
                         feature: feature.id().into(),
                         dependency: dependency.into(),
-                        expected: if needs_profile {
-                            "rectangle profile"
-                        } else {
-                            "solid"
-                        },
+                        expected: if needs_profile { "profile" } else { "solid" },
                     });
                 }
             }
@@ -854,14 +884,15 @@ impl BuildEngine {
                     let operation = match feature {
                         Feature::Extrude {
                             profile, height, ..
-                        } => {
-                            let Feature::Rectangle { width, depth, .. } =
-                                &recipe.features[indices[profile.as_str()]]
-                            else {
-                                unreachable!()
-                            };
-                            extrude_rectangle(*width, *depth, *height, tolerance)
-                        }
+                        } => match &recipe.features[indices[profile.as_str()]] {
+                            Feature::Rectangle { width, depth, .. } => {
+                                extrude_rectangle(*width, *depth, *height, tolerance)
+                            }
+                            Feature::Polygon { points, .. } => {
+                                extrude_polygon(points, *height, tolerance)
+                            }
+                            _ => unreachable!("profile types validated before execution"),
+                        },
                         Feature::Translate { body, offset, .. } => {
                             translate(&evaluated[body].model, *offset, tolerance)
                         }
@@ -880,7 +911,7 @@ impl BuildEngine {
                                 tolerance,
                             )
                         }
-                        Feature::Rectangle { .. } => unreachable!(),
+                        Feature::Rectangle { .. } | Feature::Polygon { .. } => unreachable!(),
                     };
                     let result = operation.map_err(|e| BuildError::Kernel {
                         feature: feature.id().into(),

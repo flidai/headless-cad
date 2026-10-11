@@ -1,4 +1,4 @@
-//! Geometric validity for the supported orthogonal domain. Topology checks run
+//! Geometric validity for orthogonal solids and single convex polyhedra. Topology checks run
 //! first; all indexed references here have already been checked by the caller.
 use super::ValidationIssue;
 use crate::*;
@@ -21,7 +21,78 @@ fn issue(code: &str, message: impl Into<String>) -> Vec<ValidationIssue> {
     }]
 }
 
-pub(super) fn validate(model: &ModelSnapshot) -> Vec<ValidationIssue> {
+pub(super) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
+    let orthogonal = model.faces.iter().all(|face| {
+        model.loops[face.loops[0].0].edges.len() == 4
+            && (0..3).any(|axis| {
+                face.plane.normal[axis].abs() == 1.0
+                    && (0..3)
+                        .filter(|&i| i != axis)
+                        .all(|i| face.plane.normal[i] == 0.0)
+            })
+    }) && model.edges.iter().all(|edge| {
+        let a = model.vertices[edge.vertices[0].0].position;
+        let b = model.vertices[edge.vertices[1].0].position;
+        (0..3).filter(|&i| a[i] != b[i]).count() == 1
+    });
+    if !orthogonal {
+        return validate_convex(model, tolerance);
+    }
+    validate_orthogonal(model)
+}
+
+// Topological closure and per-face convexity have already been verified. Every
+// face must be a strict supporting plane of the common convex vertex hull.
+// This excludes crossing/folded shells, coincident subdivisions, duplicate
+// geometric vertices, and inward surfaces; no generic intersection claim is made.
+fn validate_convex(model: &ModelSnapshot, tolerance: Tolerance) -> Vec<ValidationIssue> {
+    if model.solids.len() != 1 || model.shells.len() != 1 {
+        return issue("unsupported_geometry", "general planar geometry currently requires one convex solid; multiple general solids are unsupported");
+    }
+    if model
+        .faces
+        .len()
+        .checked_mul(model.vertices.len())
+        .is_none_or(|work| work > MAX_FACE_PAIRS)
+    {
+        return issue(
+            "resource_limit",
+            "convex supporting-plane checks exceed operation budget",
+        );
+    }
+    for (index, face) in model.faces.iter().enumerate() {
+        let vertices: std::collections::BTreeSet<_> = model.loops[face.loops[0].0]
+            .edges
+            .iter()
+            .map(|edge| model.endpoints(*edge).unwrap()[0])
+            .collect();
+        for (id, vertex) in model.vertices.iter().enumerate() {
+            if vertices.contains(&VertexId(id)) {
+                continue;
+            }
+            let delta = crate::math::sub(vertex.position, face.plane.origin);
+            let products: [f64; 3] =
+                std::array::from_fn(|axis| delta[axis] * face.plane.normal[axis]);
+            let distance: f64 = products.into_iter().sum();
+            let uncertainty =
+                products.into_iter().map(f64::abs).sum::<f64>() * (16.0 * f64::EPSILON);
+            if !distance.is_finite()
+                || !uncertainty.is_finite()
+                || distance >= -tolerance.linear - uncertainty
+            {
+                return issue(
+                    "unsupported_geometry",
+                    format!(
+                        "Face {index} is not a strict supporting plane of a single convex solid"
+                    ),
+                );
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn validate_orthogonal(model: &ModelSnapshot) -> Vec<ValidationIssue> {
     let mut rectangles = Vec::with_capacity(model.faces.len());
     for (index, face) in model.faces.iter().enumerate() {
         let boundary = &model.loops[face.loops[0].0];

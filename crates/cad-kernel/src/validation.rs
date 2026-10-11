@@ -1,5 +1,6 @@
-//! Validation for closed orientable orthogonal B-reps with rectangular faces.
-//! Nonconvex solids, handles, and disconnected solids are supported. Each solid
+//! Validation for closed orientable planar B-reps. In the orthogonal domain,
+//! nonconvex solids, handles, and disconnected solids are supported. General
+//! planar geometry is restricted to a single strictly convex solid. Each solid
 //! currently requires one connected shell; enclosed cavities are unsupported.
 //! Geometric intersection and containment checks follow the topology checks.
 use crate::math::{cross, dot, finite, norm, sub};
@@ -9,6 +10,10 @@ use std::collections::BTreeSet;
 
 #[path = "geometric_validation.rs"]
 mod geometry;
+
+// Bound aggregate quadratic face-orientation work before following topology.
+// A per-face vertex cap alone does not bound repeated/malformed face references.
+const MAX_FACE_CONVEXITY_WORK: usize = 20_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidationIssue {
@@ -61,6 +66,32 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             "unsupported_topology",
             "Expected a complete closed solid or a completely empty model".into(),
         );
+    }
+    let mut face_work = 0usize;
+    for face in &model.faces {
+        for loop_id in &face.loops {
+            let Some(boundary) = model.loops.get(loop_id.0) else {
+                continue;
+            };
+            let vertices = boundary.edges.len();
+            let work = vertices
+                .checked_mul(vertices)
+                .and_then(|work| face_work.checked_add(work));
+            if vertices > crate::MAX_POLYGON_POINTS
+                || work.is_none_or(|work| work > MAX_FACE_CONVEXITY_WORK)
+            {
+                issue(
+                    "resource_limit",
+                    "Convex face checks exceed the per-face vertex or aggregate operation budget"
+                        .into(),
+                );
+                return ValidationReport {
+                    valid: false,
+                    issues,
+                };
+            }
+            face_work = work.expect("bounded work checked above");
+        }
     }
     let mut vertex_owners = vec![0usize; model.vertices.len()];
     for (index, vertex) in model.vertices.iter().enumerate() {
@@ -215,6 +246,13 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             if points.len() < 3 {
                 continue;
             }
+            if points.len() > crate::MAX_POLYGON_POINTS {
+                issue(
+                    "resource_limit",
+                    format!("Face {index} exceeds the convex polygon vertex limit"),
+                );
+                continue;
+            }
             // For a convex face, every other boundary vertex must lie on the
             // interior side of every oriented edge. This also rejects star rings.
             for i in 0..points.len() {
@@ -310,6 +348,21 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             "Every shell must belong to exactly one solid".into(),
         );
     }
+    // The incidence graph is meaningful only after references, ownership and
+    // local geometry pass. In particular, a reused loop could otherwise expand
+    // one edge's incident-face list quadratically despite already being invalid.
+    if !issues.is_empty() {
+        return ValidationReport {
+            valid: false,
+            issues,
+        };
+    }
+    let mut issue = |code: &str, message: String| {
+        issues.push(ValidationIssue {
+            code: code.into(),
+            message,
+        });
+    };
     let mut adjacency = vec![BTreeSet::new(); model.faces.len()];
     let mut vertex_faces = vec![BTreeSet::new(); model.vertices.len()];
     let mut vertex_links = vec![Vec::new(); model.vertices.len()];
@@ -434,7 +487,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
         );
     }
     if issues.is_empty() {
-        issues.extend(geometry::validate(model));
+        issues.extend(geometry::validate(model, tolerance));
     }
     ValidationReport {
         valid: issues.is_empty(),

@@ -7,7 +7,8 @@
     "test:depth": "node ../../crates/cad-preview/tests/depth-check.cjs",
     "test:refresh": "node refresh-check.cjs",
     "test:assembly": "node ../../crates/cad-preview/tests/assembly-check.cjs",
-    "test:nested": "node nested-check.cjs"
+    "test:nested": "node nested-check.cjs",
+    "test:polygon": "node polygon-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

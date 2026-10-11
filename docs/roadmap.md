@@ -13,7 +13,7 @@ regression performance. A green test count alone does not close a milestone.
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; broader selectors, datums and downstream modeling consumers remain |
-| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | Planned |
+| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: strict convex CCW polygon extrusion (3–256 vertices), polygon caps and single-convex-solid planar validation implemented; holes, curves, general transforms/Booleans and trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | Planned; independent of curved-kernel completion |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
@@ -47,8 +47,14 @@ operations are already supported.
    and residency budgets. Preserve occurrence/face identity through refinement.
 4. Expand the converted fixture/enclosure and repeated mounting-array examples
    into measured benchmarks varying unique-part count as well as repetition.
-5. Establish the general geometry/trim contract and analytic primitive tests
-   before adding curved Boolean claims or a production constraint solver.
+5. Extend the implemented convex polygon extrusion with a general geometry/trim
+   contract and profiles with holes before curved Boolean claims. Preserve the
+   current explicit limits: strict CCW 3–256-vertex profiles, one general convex
+   solid per kernel snapshot, and orthogonal-only Booleans. Polygon `wall_i`
+   roles follow input edge order; translation has lineage, general polygon
+   Booleans do not. Retain triangle/trapezoid/pentagon analytic and STEP oracles,
+   plus `angled_fixture.star` and the browser `test:polygon` silhouette/picking
+   regression as curved primitives and trim handling are introduced.
 
 ## Example policy
 
@@ -65,7 +71,7 @@ both instance count and unique-definition count.
 
 ## Meaning of completion
 
-The current working orthogonal product closes neither the commercial-platform
+The current orthogonal product and convex polygon increment close neither the commercial-platform
 goal nor the kernel roadmap. A credible commercial-competition release requires
 a published supported-workflow matrix, measured assembly and regeneration
 behavior, reliable manufacturing exchange/deliverables, reproducible source-driven

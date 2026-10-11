@@ -5,7 +5,7 @@
 Our goal is an **Apache-2.0-licensed, headless, AI-native CAD system with an
 original Rust kernel**, targeting commercial engineering workflows served by
 Autodesk-class platforms. This repository is the initial working foundation;
-its current orthogonal geometry limits are not the product's target scope.
+its current bounded geometry support is not the product's target scope.
 
 Read the [target architecture](docs/architecture.md) and
 [milestone roadmap](docs/roadmap.md). First-party code is licensed under
@@ -14,8 +14,10 @@ See the [dependency license inventory](docs/dependency-licenses.md).
 
 A local, CLI-first CAD product built around our own Rust B-rep kernel. Recipes
 are plain text suitable for Git, results are inspectable JSON, and exports are
-STEP and STL. The current modeling domain is **axis-aligned parts made from
-rectangular solids**: brackets, fixtures, open trays, and simple assemblies.
+STEP and STL. Modeling currently supports **orthogonal solids and strictly convex
+polygon extrusions**: slotted brackets, open trays, triangular ramps, and polygonal
+seating blocks. Reusable assemblies can place these parts with rigid rotations;
+Boolean modeling remains restricted to orthogonal geometry.
 
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
 optional independent interoperability oracle in development.
@@ -99,6 +101,7 @@ cad build examples/enclosure.star --out-dir out/enclosure
 cad build examples/mounting_array.star --out-dir out/mounting_array
 cad build examples/reference_fixture.star --out-dir out/reference_fixture
 cad build examples/modular_rack.star --out-dir out/modular_rack
+cad build examples/angled_fixture.star --out-dir out/angled_fixture
 ```
 
 | Example | What it exercises | Independently calculated result |
@@ -112,6 +115,7 @@ cad build examples/modular_rack.star --out-dir out/modular_rack
 | Mounting array | One slotted part, 24 instances with alternate rows rotated | 4,992 mm³ summed material, one stored part definition |
 | Reference fixture | Three grooves and raised stops; ancestral top-face selection | 23,296 mm³, one solid, 80 × 40 × 20 mm |
 | Modular rack | Reused rows and carriages, nested rotations and occurrence paths | 63,648 mm³ summed material, 17 component occurrences, four part definitions |
+| Angled fixture | Two rotated triangular-prism ramps, four hexagonal seats, and an orthogonal slotted base | 47,346.83063257983 mm³ summed material, seven occurrences; each ramp is 12,000 mm³ |
 
 The examples progress from single-part modeling to reusable functions, repeated
 features, and assemblies. The fixture and enclosure recipes expose named
@@ -267,13 +271,27 @@ output(name = "bracket", feature = finished)
 | Function | Meaning |
 | --- | --- |
 | `rectangle(id, width, depth)` | Profile on XY, starting at the origin |
-| `extrude(id, profile, height)` | Extrude a rectangle along positive Z |
+| `polygon(id, points)` | Strictly convex CCW XY profile with 3–256 `[x, y]` vertices |
+| `extrude(id, profile, height)` | Extrude a rectangle or convex polygon along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
-| `union(id, left, right)` | Combine material |
-| `cut(id, left, right)` | Remove right-hand material from the left |
-| `intersect(id, left, right)` | Keep common material |
+| `union(id, left, right)` | Combine orthogonal material |
+| `cut(id, left, right)` | Remove right-hand orthogonal material from the left |
+| `intersect(id, left, right)` | Keep common orthogonal material |
 | `param(name, default)` | Declare a numeric parameter the CLI may override |
 | `output(name, feature)` | Declare a solid result to inspect or export |
+
+Polygon vertices must be finite, strictly convex, and counterclockwise. Do not
+repeat the first point at the end. Repeated points, crossings, collinear turns,
+edges at/below tolerance, and numerically uncertain turns are rejected rather
+than repaired. The exact B-rep retains one planar polygon face per cap and one
+quadrilateral per side; display and STL triangles are derived from those faces.
+Profiles with holes and nonconvex profiles remain unsupported.
+
+```python
+profile = polygon(id = "ramp_profile", points = [[0, 0], [40, 0], [0, 20]])
+ramp = extrude(id = "ramp", profile = profile, height = 30)
+output(name = "ramp", feature = ramp)
+```
 
 All lengths are millimetres. `mm(value)` is a numeric annotation, not
 dimension-aware arithmetic. Feature references are strings; the graph builder
@@ -339,7 +357,12 @@ and `--cache-dir`, without publishing geometry or modifying the recipe.
 Selection has a one-million-unit traversal/copy budget, including copied identifier bytes; exhaustion reports
 `unsupported` and returns no certified partial witnesses.
 
-This is the initial orthogonal face-reference contract. It does not yet provide
+Polygon extrusions generate `start_cap`, `end_cap`, `walls`, and `wall_0` through
+`wall_<n-1>`. `wall_i` comes from the input edge from vertex `i` to vertex
+`(i + 1) % n`; reordering the profile changes this role intent. Translation
+preserves those roles through lineage. Polygon Boolean lineage is unsupported.
+
+This is the initial scoped face-reference contract. It does not yet provide
 edge/vertex selectors, adjacency predicates, datums, assembly-instance selectors,
 or references consumed by downstream sketch/fillet operations. Keep semantic
 intent in source; numeric face IDs in witnesses belong only to the reported
@@ -451,30 +474,37 @@ precision. Distinct coordinate planes at/below tolerance separation are rejected
 instead of silently snapped. Default tolerance is `1e-7` mm. Arrangement limits
 bound memory and classification work.
 
-History currently contains generated face roles; Boolean outputs use a boundary
-role. General persistent face selection and split/merge/deletion history remain
-future work. Public snapshots must be revalidated after external editing or
+History contains generated roles and explicit input-face descendants for
+translations and orthogonal Booleans, including splits and deletions. Boolean
+outputs also expose a `boundary` role. General persistent naming remains future
+work. Public snapshots must be revalidated after external editing or
 deserialization. STEP/STL exporters validate inputs.
 
 ## Supported domain and current limits
 
-- Axis-aligned rectangular profiles and planar rectangular B-rep faces.
-- Translation, unions, cuts, intersections, open pockets, through-slots, and
-  separated multiple solids.
+- Rectangle profiles and strict CCW convex polygon profiles with 3–256 vertices.
+- Native positive-Z extrusion with authoritative polygonal caps and planar walls.
+- Translation of supported solids. Unions, cuts, intersections, open pockets,
+  through-slots, and separated multiple solids in the orthogonal domain only.
+- General planar validation restricted to one strictly convex solid with
+  supporting outward face planes. Multiple general solids are explicitly
+  unsupported in one kernel snapshot; assemblies retain separate definitions.
 - Closed orientable shells, including through-hole topology.
 - Explicit rejection of enclosed cavities, nonmanifold contacts, unsupported
   geometry, and computations outside the numerical/resource envelope.
 
 Round holes, circles/cylinders, rotated-solid modeling, sketch constraints, general
-polygon profiles, curved surfaces, fillets, offsets, NURBS, STEP import, and GPU
+polygon Booleans, profiles with holes, nonconvex profiles, curved surfaces,
+fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
 boundaries and millimetre units, with occurrence relationships for assemblies; it does not preserve the executable recipe.
 STL is unitless by specification, with coordinates written in millimetres.
 
-The working orthogonal baseline is the first milestone toward the commercial
-CAD goal. Nested assemblies, scoped face references and shared display assets are implemented.
+The orthogonal baseline and first convex planar extension are bounded increments
+toward the commercial CAD goal. Nested assemblies, scoped face references and
+shared display assets are implemented.
 Next come named datums, reference-driven modeling, streamed display assets,
-general planar/analytic geometry, and trim/seam correctness.
+profiles with holes, curved analytic geometry, and trim/seam correctness.
 The [roadmap](docs/roadmap.md) defines release evidence
 for curved modeling, constraints, large assemblies, and manufacturing workflows.
 
@@ -512,9 +542,14 @@ npm run test:refresh
 npm run test:depth
 npm run test:assembly
 npm run test:nested
+npm run test:polygon
 ```
 
 Build the bracket first and run `cargo build -p cad-cli` before the hosted test.
+For `test:polygon`, build `examples/angled_fixture.star` into `out/angled_fixture`
+using the command above; the test checks the triangular ramp silhouette and
+picking against an independent XY half-plane oracle, including empty corners
+of its bounding rectangle. Set `CAD_POLYGON_PREVIEW` to override that preview path.
 The hosted test starts temporary server/watch processes and checks live recipe
 edits, automatic refresh, failed-build preservation, recovery, and STEP download.
 The refresh regression simulates interleaved generations during edit/revert so

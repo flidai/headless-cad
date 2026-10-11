@@ -238,5 +238,39 @@
         ]
       ]
     }
+  },
+  "angled_fixture.star": {
+    "angled_fixture": {
+      "volume_mm3": 47346.83063257983,
+      "solids": 7,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          60,
+          24
+        ]
+      ]
+    },
+    "ramp_definition": {
+      "volume_mm3": 12000,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          40,
+          20,
+          30
+        ]
+      ]
+    }
   }
 }

@@ -909,3 +909,125 @@ fn invalid_metadata_on_unused_parts_is_rejected_before_geometry() {
         serde_json::json!({"material":{"name":"Steel","density_kg_per_m3":7850,"density":7850}});
     assert!(serde_json::from_value::<Recipe>(raw).is_err());
 }
+
+fn polygon_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({
+        "schema_version":1,"units":"mm",
+        "features":[
+            {"op":"polygon","id":"triangle","points":[[0,0],[4,0],[1,3]]},
+            {"op":"extrude","id":"prism","profile":"triangle","height":2},
+            {"op":"translate","id":"moved","body":"prism","offset":[10,-2,5]},
+            {"op":"rectangle","id":"square","width":1,"depth":1},
+            {"op":"extrude","id":"other","profile":"square","height":1}
+        ],"outputs":[{"name":"prism","feature":"prism"},{"name":"moved","feature":"moved"},{"name":"other","feature":"other"}]
+    })).unwrap()
+}
+
+#[test]
+fn polygon_profiles_extrude_translate_and_resolve_wall_roles_with_incremental_cache() {
+    let mut recipe = polygon_recipe();
+    recipe.schema_version = 2;
+    recipe.face_assertions.push(FaceAssertion {
+        id: "side".into(),
+        selector: FaceSelector {
+            anchor_feature: "prism".into(),
+            role: "wall_0".into(),
+            target_feature: "moved".into(),
+            cardinality: FaceCardinality::Exactly { count: 1 },
+        },
+    });
+    let mut engine = BuildEngine::default();
+    let initial = engine.build(&recipe).unwrap();
+    assert_eq!(initial.stats.computed_solids, 3);
+    assert!((initial.outputs["prism"].result.model.volume() - 12.0).abs() < 1e-12);
+    assert_eq!(initial.outputs["prism"].result.model.faces.len(), 5);
+    let bounds = initial.outputs["moved"].result.model.bounds();
+    assert_eq!(bounds.min, [10.0, -2.0, 5.0]);
+    assert_eq!(bounds.max, [14.0, 1.0, 7.0]);
+    assert_eq!(
+        initial.face_assertions["side"].status,
+        FaceResolutionStatus::Resolved
+    );
+    assert_eq!(engine.build(&recipe).unwrap().stats.computed_solids, 0);
+    if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
+        points[1][0] = 6.0;
+    }
+    let changed = engine.build(&recipe).unwrap();
+    assert_eq!(changed.stats.computed_solids, 2);
+    assert_eq!(changed.stats.cache_hits, 1);
+    assert!((changed.outputs["prism"].result.model.volume() - 18.0).abs() < 1e-12);
+    assert_eq!(
+        initial.feature_hashes["other"],
+        changed.feature_hashes["other"]
+    );
+    assert_ne!(
+        initial.feature_hashes["triangle"],
+        changed.feature_hashes["triangle"]
+    );
+    recipe.features.reverse();
+    assert_eq!(
+        engine.build(&recipe).unwrap().feature_hashes,
+        changed.feature_hashes
+    );
+}
+
+#[test]
+fn polygon_json_has_strict_fields_coordinate_pairs_and_arbitrary_precision_roundtrip() {
+    for raw in [
+        r#"{"op":"polygon","id":"p","points":[[0,0],[1,0],[0,1]],"width":1}"#,
+        r#"{"op":"polygon","id":"p","points":[[0,0],[1,0],[0,1]],"points":[]}"#,
+        r#"{"op":"polygon","id":"p","points":[[0,0,0],[1,0],[0,1]]}"#,
+        r#"{"op":"polygon","id":"p","points":[[0,0],[true,0],[0,1]]}"#,
+    ] {
+        assert!(serde_json::from_str::<Feature>(raw).is_err());
+    }
+    let mut recipe = polygon_recipe();
+    recipe.features[0] = serde_json::from_str(
+        r#"{"op":"polygon","id":"triangle","points":[[0.5,1e-3],[4.5,1e-3],[1.5,3.001]]}"#,
+    )
+    .unwrap();
+    let decoded: Recipe = serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+    assert_eq!(
+        build(&recipe).unwrap().feature_hashes,
+        build(&decoded).unwrap().feature_hashes
+    );
+}
+
+#[test]
+fn invalid_unused_polygons_and_unsupported_booleans_fail_explicitly() {
+    for points in [
+        vec![],
+        vec![[0.0, 0.0]; 3],
+        vec![[0.0, 0.0], [0.0, 1.0], [1.0, 0.0]],
+        vec![[0.0, 0.0], [2.0, 0.0], [1.0, 0.5], [2.0, 2.0], [0.0, 2.0]],
+        vec![[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]],
+        vec![[0.0, 0.0], [f64::NAN, 0.0], [0.0, 1.0]],
+        vec![[0.0, 0.0]; MAX_POLYGON_POINTS + 1],
+    ] {
+        let mut recipe = recipe();
+        recipe.features.push(Feature::Polygon {
+            id: "unused".into(),
+            points,
+            op_version: 1,
+        });
+        assert!(
+            matches!(build(&recipe),Err(BuildError::PolygonProfile{feature,..}) if feature=="unused")
+        );
+    }
+    let mut recipe = polygon_recipe();
+    recipe.features.push(Feature::Union {
+        id: "unsupported".into(),
+        left: "prism".into(),
+        right: "other".into(),
+        op_version: 1,
+    });
+    assert!(matches!(build(&recipe),Err(BuildError::Kernel{feature,..}) if feature=="unsupported"));
+    let mut recipe = polygon_recipe();
+    if let Feature::Polygon { op_version, .. } = &mut recipe.features[0] {
+        *op_version = 2;
+    }
+    assert!(matches!(
+        build(&recipe),
+        Err(BuildError::OperationVersion { .. })
+    ));
+}

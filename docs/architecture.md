@@ -174,6 +174,25 @@ region selection, sewing/reconstruction, history propagation, and validation.
 The current coordinate arrangement remains useful for the supported orthogonal
 subset and as a test oracle; it is not the general curved-solid algorithm.
 
+The first general planar increment is implemented: a native +Z extrusion of a
+strictly convex CCW XY polygon with 3–256 vertices. Its authoritative caps remain
+single planar polygons, with one quadrilateral side per input edge. Repeated,
+collinear, crossed, nonconvex, and tolerance-uncertain profiles are rejected.
+`start_cap`, `end_cap`, and `walls` roles accompany `wall_i`, which identifies
+input edge `i → (i + 1) % n`; source vertex ordering is part of that role intent.
+
+General planar validation currently accepts one strictly convex solid: closed
+oriented topology, convex planar faces, positive volume, and strict supporting
+face half-spaces must agree. Multiple general solids in one snapshot are
+explicitly unsupported. The existing orthogonal validator still handles its
+nonconvex and disconnected domain; the Boolean engine remains orthogonal-only.
+Assembly placement can rotate and reuse polygon solids without baking those
+rotations into Boolean operands. `examples/angled_fixture.star` exercises this
+boundary with triangular ramps, hexagonal seats, and an orthogonally cut base.
+Independent analytic and OCCT checks cover triangle/trapezoid/pentagon measures;
+`npm run test:polygon` checks the ramp silhouette and picking in the browser.
+This is an M2 increment, not completion of general planar or analytic modeling.
+
 Progress through rigid transforms, planar profiles with holes, curved extrusion,
 revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,
 and controlled import repair. Include open shells and cavity orientation in the
@@ -379,9 +398,9 @@ reviewed decision based on evidence, not by relabeling missed targets.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Validated orthogonal B-rep; rectangular extrusion; translation; Booleans | General geometry, robust intersections, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native convex polygon extrusion; translation; single-convex-solid general planar validation | Profiles with holes, curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal face lineage, cardinality diagnostics, recipe assertions and snapshot witnesses | Datums, instance paths, edge/vertex and predicate selectors, downstream reference consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, nested rigid instances, explicit paths, shared assets and hierarchical STEP | Datums, constraints, configurations, BOM |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Datums, constraints and configurations |
 | Builds | Local DAG/cache, captured source, atomic artifact generations, watch | Parallel jobs, isolated workers, distributed content store, semantic diffs |
 | Viewer | HTTP gallery, depth-buffer Canvas inspection, compact instanced display assets, occurrence picking, recipe panel, live refresh | GPU instancing, lazy assets, bounded LOD streaming, sections/overlays |
 | Exchange | Planar AP214 STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |

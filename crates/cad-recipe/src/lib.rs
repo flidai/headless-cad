@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cad_build::{
     Recipe, MAX_ASSEMBLIES, MAX_FACE_ASSERTIONS, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS,
-    MAX_PARTS,
+    MAX_PARTS, MAX_POLYGON_POINTS,
 };
 use starlark::any::ProvidesStaticType;
 use starlark::environment::{GlobalsBuilder, Module};
@@ -126,6 +126,23 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
     }
 
     /// Declare a named numeric parameter. Repeated declarations must agree on
+    /// A strictly convex counter-clockwise profile, without repeated closing point.
+    fn polygon(id: &str, points: Value, eval: &mut Evaluator) -> anyhow::Result<String> {
+        let points: Vec<[f64; 2]> = serde_json::from_str(&points.to_json()?)
+            .map_err(|_| anyhow::anyhow!("polygon points must be pairs of finite coordinates"))?;
+        anyhow::ensure!(
+            (3..=MAX_POLYGON_POINTS).contains(&points.len()),
+            "polygon requires 3 to {MAX_POLYGON_POINTS} points"
+        );
+        anyhow::ensure!(
+            points.iter().flatten().all(|value| value.is_finite()),
+            "polygon coordinates must be finite"
+        );
+        store(eval)?
+            .feature(serde_json::json!({"op":"polygon","id":id,"points":points,"op_version":1}))?;
+        Ok(id.to_owned())
+    }
+
     /// their default. CLI overrides are applied before dimensions are computed.
     fn param(name: &str, default: Value, eval: &mut Evaluator) -> anyhow::Result<f64> {
         anyhow::ensure!(
@@ -968,5 +985,65 @@ mod metadata_tests {
                 "accepted {args}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod polygon_tests {
+    use super::*;
+    #[test]
+    fn parameterized_polygon_recipe_builds_and_keeps_semantic_roles() {
+        let source="w=param(name='width',default=4)\np=polygon(id='p',points=[[0,0],[w,0],[1,3]])\nb=extrude(id='b',profile=p,height=2)\nm=translate(id='m',body=b,offset=[0.5,1e-3,1])\nassert_faces(id='wall',from_feature=b,role='wall_0',in_feature=m)\noutput(name='prism',feature=m)";
+        let recipe = from_starlark("triangle.star", source).unwrap();
+        let first = cad_build::build(&recipe).unwrap();
+        assert!((first.outputs["prism"].result.model.volume() - 12.0).abs() < 1e-10);
+        assert_eq!(first.face_assertions["wall"].witnesses.len(), 1);
+        let decoded: Recipe =
+            serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+        assert_eq!(
+            first.feature_hashes,
+            cad_build::build(&decoded).unwrap().feature_hashes
+        );
+        let wider = from_starlark_with_params(
+            "triangle.star",
+            source,
+            &BTreeMap::from([("width".into(), 6.0)]),
+        )
+        .unwrap();
+        assert!(
+            (cad_build::build(&wider).unwrap().outputs["prism"]
+                .result
+                .model
+                .volume()
+                - 18.0)
+                .abs()
+                < 1e-10
+        );
+    }
+    #[test]
+    fn polygon_frontend_rejects_malformed_or_unbounded_coordinate_lists() {
+        for points in [
+            "[]",
+            "[[0,0],[1,0]]",
+            "[[0,0,0],[1,0],[0,1]]",
+            "[[0,0],[True,0],[0,1]]",
+            "[[0,0],['x',0],[0,1]]",
+            "[[0,0]]*257",
+        ] {
+            let source = format!("polygon(id='p',points={points})");
+            assert!(
+                from_starlark("bad.star", &source).is_err(),
+                "accepted {points}"
+            );
+        }
+        let clockwise = from_starlark(
+            "clockwise.star",
+            "polygon(id='p',points=[[0,0],[0,1],[1,0]])",
+        )
+        .unwrap();
+        assert!(matches!(
+            cad_build::build(&clockwise),
+            Err(cad_build::BuildError::PolygonProfile { .. })
+        ));
     }
 }
