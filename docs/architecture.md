@@ -728,6 +728,16 @@ and direction (for example, a conservative symmetric surface-distance bound),
 including tessellation, simplification and quantization contributions. Test thin
 features and boundary preservation separately from a scalar distance metric.
 
+The error ledger must also include any accepted discrepancy between native
+vertices and their supporting curves/surfaces, shared-boundary reconciliation,
+coordinate rebasing/conversion, and GPU arithmetic. Distinguish an asset's
+object-space bound from the additional error of placing and displaying it.
+Reserve these contributions before spending the remaining tessellation budget;
+if that budget is exhausted, report an unattainable policy rather than claiming
+the requested accuracy. Acceptance includes small features at large offsets and
+valid native endpoint/support discrepancies. Retaining native endpoints must
+not silently invalidate a chord-error bound.
+
 First implement cached meshes, instancing, frustum culling, coarse part LODs, and
 explicit residency budgets. Then add bounded clusters/meshlets, hierarchy
 construction, crack-safe transitions, compression, spatial indexing, and
@@ -802,6 +812,16 @@ including cancellation and eviction halfway through a replacement. This is a
 derived display graph, separate from the feature, topology and assembly graphs.
 Validate acyclic, bounded refinement dependencies before traversal; malformed
 cycles or shared-child ownership cannot cause unbounded work or duplicate picks.
+
+Refinement demand belongs to an occurrence and inspection view, while page
+storage belongs to the shared part asset. The target scheduler permits different
+active frontiers for near and distant occurrences without duplicating immutable
+pages. Combine all live demands when prioritizing requests and retaining fallback
+dependencies: cancelling one demand must not cancel or evict a page still needed
+by another. Test two instances of the same part at different projected scales,
+selection changes, multiple views, and cancellation during shared fetches.
+Today's whole-part LOD shares one level across a part's occurrences; it does not
+yet implement this finer-grained demand ownership contract.
 
 Maintain separate occurrence and part-level spatial hierarchies. Start with
 frustum traversal; add conservative occlusion only after tests cover disocclusion,
@@ -1100,6 +1120,30 @@ Keep property fuzzing, minimization, numerical-policy boundary tests, mutation
 validation, cancellation/resource tests, and source/manifest publication races
 in the test strategy. Benchmark both cold and warm caches, many repeated parts
 and many unique parts, malformed imports, slow networks, and device loss.
+
+### Commercial workflow benchmark protocol
+
+Maintain versioned engineering tasks for modeling, revision/regeneration,
+assembly solving, inspection, exact queries and manufacturing release. Record
+successful obligations, unsupported operations, incorrect results and resource
+failures separately before comparing latency. A fast failed operation or a
+coarse preview is not a completed engineering task. Pin source, configuration,
+input geometry, numerical policy and expected design intent for each task;
+record cold/warm timings and peak resources for each stage independently.
+Retain every task in the reported corpus denominator, including unsupported and
+failed runs; report timeout and resource exhaustion explicitly.
+
+Any comparison with a commercial product must identify its version and use the
+same engineering task, output fidelity and comparable hardware. Document needed
+manual repairs, altered tolerances and unavailable capabilities, and check
+outputs against the same independent acceptance oracle. Proprietary
+baseline runs are optional external evidence; neither the product nor the open
+acceptance corpus may require a commercial license. Publish only conclusions
+supported by that workload, rather than infer platform parity from a favorable
+operation or assembly frame rate. These are target benchmark requirements, not
+completed comparative measurements.
+
+### Proposed release thresholds
 
 Initial **aspirational gates**, not measured product claims:
 

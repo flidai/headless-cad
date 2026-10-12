@@ -24,6 +24,12 @@ Track planned, experimental and validated capabilities with their supported
 domains and reproducible evidence. Pair this modeling workflow with a separate
 large workcell benchmark; neither substitutes for the other's release gates.
 
+Use the architecture's [commercial workflow benchmark protocol](architecture.md#commercial-workflow-benchmark-protocol)
+to judge progress toward Autodesk-class workflows. Track supported task outcomes,
+revision reliability and manufacturing fidelity before comparing speed. Keep
+commercial baseline evidence optional so the Apache-licensed product and its
+open acceptance corpus remain independently usable.
+
 | Milestone | Deliverable and example progression | Acceptance evidence | Status |
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
@@ -73,6 +79,11 @@ and hide/isolate/section changes must preserve correct coverage. Track display
 preprocessing time, temporary disk, hierarchy storage amplification and
 single-definition invalidation alongside viewer memory and frame times. These
 are planned acceptance obligations, not capabilities of today's whole-part LOD.
+The display error ledger must include native endpoint/support discrepancies and
+coordinate/precision effects. Cluster refinement must track demand per occurrence
+and view while deduplicating shared pages; cancellation cannot remove another
+occurrence's required coverage. Gate both contracts with adversarial fixtures
+before declaring M3c complete.
 In parallel, measure exact-body residency during a
 one-part edit and full release generation so viewer progress does not conceal
 headless build costs. Keep M2 geometry reliability, M4 constraints and M6
