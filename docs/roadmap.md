@@ -769,3 +769,12 @@ and an SVG arrow on the real arc. Complete-circle behavior stays the default.
 Parameter edits and failed design bounds exercise source-authoritative revision
 and manufacturing inspection; nominal radius annotations do not close GD&T,
 physical tolerance certification, projected drawings or the R4 release gate.
+
+
+Rounded geometry now participates in mechanical checks through bounded convex
+line/arc support queries. The rounded-rotor fixture requires a native full-turn
+clearance proof and catches an interior-only failure under a corner-radius edit.
+Exact sample formulas, independent STEP witness checks and complete native
+interval coverage accompany the source-owned read-only motion inspector.
+Holed/nonconvex curved clearance and general contact remain open; this increment
+does not close the R3 mechanical-intent gate.

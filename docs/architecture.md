@@ -3062,3 +3062,35 @@ Its radial arrow reaches the arc midpoint, with a leader to the authored label;
 following an arbitrary label ray could point to a missing portion of the circle.
 Drawing bounds include the annotation. Independent STEP-radius and SVG-tip checks
 cover parameter edits and source replay in the rounded bearing-cover acceptance.
+
+
+### Convex line/arc supports in clearance proofs
+
+Bounded convex line/arc right prisms without holes participate in the existing
+analytic convex clearance solver. Native line endpoints and trimmed circular-arc
+extrema define the planar support; the appropriate axial endpoint completes the
+prism support. The independent support-value calculation supplies a conservative
+separating bound, while native support points and their convex combinations
+supply the opposing distance witness. A support search alone is insufficient:
+only the existing positive, tolerance-bounded interval permits acceptance.
+
+Admission requires a validated simple convex profile, counterclockwise arcs no
+greater than a semicircle, and agreement of recovered canonical supports with
+raw vertices, curves and faces at the query's arithmetic scale. A separate
+join-roundoff allowance bounds possible tiny reflex departures using the admitted
+join count and analytic diameter bound, and is charged for both operands in the
+material-witness certificate. Resolved concavity is not normalized away. Circular holes,
+clockwise arcs, resolved concavity, contact and unresolved computations reject.
+Filling a hole would change the admissible material witness and is not part of
+this increment. No rotational-symmetry shortcut applies to an ordinary rounded
+rectangle; continuous queries use bounded Lipschitz subdivision.
+
+The rounded-rotor fixture couples native fillets, semantic radius annotations,
+assembly occurrence identity and a full-turn clearance group. Independent
+acceptance compares STEP against an OCCT-filleted prism, checks each native sample
+against exact rounded-rectangle distance and independent boundary witnesses,
+and validates the complete interval partition. An R2→R1 edit creates a real
+interior violation while endpoint/midpoint samples remain clear; global native
+failure must preserve the accepted output, including selected-output builds.
+This advances mechanical revision coverage without claiming general nonconvex
+clearance, dynamics, contact or all-pairs motion certification.

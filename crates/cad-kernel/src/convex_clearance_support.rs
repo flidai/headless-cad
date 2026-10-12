@@ -1,7 +1,10 @@
 //! Analytic support search; only an independent positive interval certifies success.
 use super::*;
+#[path = "convex_clearance_arc.rs"]
+mod arc;
 #[derive(Clone)]
 enum Shape {
+    ArcPrism(arc::ArcShape),
     Revolution {
         origin: [f64; 3],
         axis: [f64; 3],
@@ -18,6 +21,7 @@ enum Shape {
 impl Shape {
     fn support(&self, d: [f64; 3]) -> [f64; 3] {
         match self {
+            Self::ArcPrism(g) => g.support(d),
             Self::Revolution {
                 origin,
                 axis,
@@ -70,6 +74,7 @@ impl Shape {
     }
     fn support_value(&self, d: [f64; 3]) -> f64 {
         match self {
+            Self::ArcPrism(g) => g.support_value(d),
             Self::Revolution {
                 origin,
                 axis,
@@ -209,18 +214,21 @@ fn reduce(simplex: &[Pair]) -> Option<(Vec<Pair>, Pair)> {
     best.map(|(_, s, p)| (s, p))
 }
 enum Geometry {
+    ArcPrism(ArcPrismGeometry),
     Cylinder(CylinderGeometry),
     Revolution(RevolveGeometry),
 }
 impl Geometry {
     fn origin(&self) -> [f64; 3] {
         match self {
+            Self::ArcPrism(g) => g.origin,
             Self::Cylinder(g) => g.origin,
             Self::Revolution(g) => g.origin,
         }
     }
     fn extent(&self) -> f64 {
         match self {
+            Self::ArcPrism(g) => arc::extent(g),
             Self::Cylinder(g) => g.radius + g.height,
             Self::Revolution(g) => g
                 .profile
@@ -261,6 +269,10 @@ fn validate(m: &ModelSnapshot, t: Tolerance) -> Result<Option<Geometry>, KernelE
                 return Err(unsupported());
             }
             return Ok(Some(Geometry::Cylinder(g)));
+        }
+        if let Ok(g) = crate::arc_prism::recognize(m, t) {
+            arc::convex(&g)?;
+            return Ok(Some(Geometry::ArcPrism(g)));
         }
         let g = m.revolve_geometry(t)?.ok_or_else(unsupported)?;
         // A convex half-meridian, with its axis edge spanning every axial level,
@@ -366,7 +378,15 @@ pub(crate) fn revolution_consistency(
     }
     Ok(())
 }
-fn consistency(m: &ModelSnapshot, g: Option<&Geometry>, error: f64) -> Result<(), KernelError> {
+fn consistency(
+    m: &ModelSnapshot,
+    g: Option<&Geometry>,
+    error: f64,
+    tolerance: Tolerance,
+) -> Result<(), KernelError> {
+    if let Some(Geometry::ArcPrism(g)) = g {
+        return arc::consistency(m, g, error, tolerance);
+    }
     if let Some(Geometry::Revolution(g)) = g {
         return revolution_consistency(m, g, error);
     }
@@ -487,10 +507,12 @@ fn query_bounded(
         return Err(KernelError::NumericRange);
     }
     for (m, g) in [a, b].into_iter().zip(&geometries) {
-        consistency(m, g.as_ref(), error)?;
+        consistency(m, g.as_ref(), error, t)?;
     }
     let shapes: [Shape; 2] = std::array::from_fn(|i| {
-        if let Some(Geometry::Revolution(g)) = &geometries[i] {
+        if let Some(Geometry::ArcPrism(g)) = &geometries[i] {
+            Shape::ArcPrism(arc::ArcShape::new(g, reference, scale))
+        } else if let Some(Geometry::Revolution(g)) = &geometries[i] {
             Shape::Revolution {
                 origin: mul(sub(g.origin, reference), 1. / scale),
                 axis: mul(g.axis, 1. / norm(g.axis)),
@@ -519,12 +541,31 @@ fn query_bounded(
     });
     let padding = if geometries
         .iter()
+        .any(|g| matches!(g, Some(Geometry::ArcPrism(_))))
+    {
+        32. * error
+    } else if geometries
+        .iter()
         .any(|g| matches!(g, Some(Geometry::Revolution(_))))
     {
         16. * error
     } else {
         8. * error
     };
+    // Rounded tangent joins can carry arithmetic-size negative turning after
+    // native frame reconstruction. Charge its explicit geometric allowance,
+    // rather than assuming every computed convex combination lies in material.
+    let join_allowance: f64 = geometries
+        .iter()
+        .filter_map(|g| match g {
+            Some(Geometry::ArcPrism(g)) => Some(arc::join_allowance(g)),
+            _ => None,
+        })
+        .sum();
+    let padding = (padding + join_allowance).next_up();
+    if !padding.is_finite() || 2. * padding >= t.linear {
+        return Err(KernelError::NumericRange);
+    }
     let mut simplex = vec![support(&shapes[0], &shapes[1], [1., 0., 0.])];
     for _ in 0..iterations {
         let (retained, p) = reduce(&simplex).ok_or(KernelError::NumericRange)?;
@@ -594,13 +635,23 @@ pub(crate) fn circular_consistency(
         }
     }
     if g.inner_radius == 0. {
-        return consistency(m, Some(&Geometry::Cylinder(g.clone())), error);
+        return consistency(
+            m,
+            Some(&Geometry::Cylinder(g.clone())),
+            error,
+            Tolerance::default(),
+        );
     }
     let mut outer = m.clone();
     outer.vertices.truncate(2);
     outer.edges.truncate(3);
     outer.faces.truncate(3);
-    consistency(&outer, Some(&Geometry::Cylinder(g.clone())), error)?;
+    consistency(
+        &outer,
+        Some(&Geometry::Cylinder(g.clone())),
+        error,
+        Tolerance::default(),
+    )?;
     let mut inner = outer;
     inner.vertices = m.vertices[2..].to_vec();
     inner.edges = m.edges[3..].to_vec();
@@ -610,12 +661,18 @@ pub(crate) fn circular_consistency(
     inner.faces[2] = m.faces[3].clone();
     let mut bore = g.clone();
     bore.radius = g.inner_radius;
-    consistency(&inner, Some(&Geometry::Cylinder(bore)), error)
+    consistency(
+        &inner,
+        Some(&Geometry::Cylinder(bore)),
+        error,
+        Tolerance::default(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     fn cylinder() -> ModelSnapshot {
         extrude_circle(1., 4., Tolerance::default()).unwrap().model
     }

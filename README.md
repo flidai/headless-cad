@@ -2867,3 +2867,25 @@ angular span and arrow-point witness alongside source and occurrence identity.
 These are nominal analytic support measurements, not manufactured tolerance or
 physical uncertainty certificates. `tools/check-fillet-dimensions.py` independently
 checks the imported STEP radius, native witness, SVG arrow and captured replay.
+
+
+### Continuous clearance for rounded solids
+
+The bounded native convex clearance solver now supports hole-free convex line/arc
+right prisms. It evaluates trimmed arcs directly, using analytic support bounds
+and native material witnesses. Admitted arcs are counterclockwise and no greater
+than a semicircle; clockwise, concave, holed and unresolved supports reject.
+This expands clearance queries without introducing a mesh-based distance proxy.
+
+`rounded_rotor_fixture.star` places a 20×12×6 mm rounded rotor beside an R2
+reference roller. A source-owned rotation group certifies its entire signed turn
+for one named pair. The default R2 corners give an exact minimum gap of about
+5.055728 mm against a 5 mm requirement. Editing the corners to R1 fails at an
+interior orientation, despite 6 mm clearance at the start, midpoint and end.
+The failed build preserves the prior accepted generation.
+
+The inspector's phase slider moves display geometry; recipes and native checks
+remain authoritative. `tools/check-rounded-rotor.py` compares every reported sample
+with a closed-form distance and independent STEP geometry, checks witness
+membership, and verifies the whole-path interval coverage. This fixture proves
+clearance for the named pair; it does not model a contacting transmission.

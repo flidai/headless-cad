@@ -1,5 +1,5 @@
 use cad_build::{BuildEngine, BuildError, Recipe};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 fn value() -> Value {
     json!({"schema_version":2,"units":"mm","features":[{"op":"rectangle","id":"p","width":20,"depth":12},{"op":"extrude","id":"stock","profile":"p","height":10},{"op":"fillet","id":"rounded","body":"stock","faces":[{"from_feature":"stock","role":"wall_x_min"},{"from_feature":"stock","role":"wall_y_min"}],"radius":2}],"outputs":[{"name":"finished","feature":"rounded"},{"name":"stock","feature":"stock"}],"section_views":[{"id":"mid","output":"finished","origin":[0,0,5],"circle_dimensions":[{"id":"corner","anchor_feature":"rounded","role":"fillet_wall","kind":"radius","coverage":"single_arc","label_offset":[-4,-4],"min":1.9,"max":2.1}]}]})
 }

@@ -19,7 +19,7 @@ pub struct ConvexClearance {
     pub axis: [f64; 3],
 }
 fn unsupported() -> KernelError {
-    KernelError::Unsupported("convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders/convex axis-closed linear-meridian revolutions with a resolved support certificate".into())
+    KernelError::Unsupported("convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders, hole-free convex line/arc right prisms, or convex axis-closed linear-meridian revolutions with a resolved support certificate".into())
 }
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     std::array::from_fn(|i| a[i] + b[i])
@@ -120,7 +120,9 @@ impl ModelSnapshot {
 
     /// Certify strictly positive Euclidean clearance for native convex planar solids
     /// and finite solid circular cylinders or convex full-turn linear-meridian
-    /// revolutions in arbitrary rigid orientations. Revolution meridians must be
+    /// revolutions, and hole-free convex line/arc right prisms in arbitrary rigid
+    /// orientations. Arc supports use their trimmed native angular domains, not
+    /// complete supporting circles. Revolution meridians must be
     /// strictly convex with a full-height axis closure; collinear or unresolved
     /// near-collinear breaks, hollow sections and waists are unsupported.
     /// Other curves, nonconvexity, contact/intersection and unresolved precision fail;
