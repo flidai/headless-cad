@@ -3039,3 +3039,26 @@ exact cylinder radii, oriented closed meshes and source replay. Closed-form
 rectangle/quarter-disk integrals provide an additional independent moment check.
 The bearing-cover acceptance includes four rounds followed by five real bores.
 This is a first curved edge treatment, not general rolling-ball fillet closure.
+
+
+### Partial-arc radius evidence
+
+Section circle dimensions retain full-circle coverage by default. Explicit
+`single_arc` coverage is radius-only and resolves exactly one semantic descendant
+face and exactly one matching native section arc across all loops of the chosen
+body or occurrence. It never fits mesh vertices or combines ambiguous arc pieces.
+The report includes face and loop/segment identity, start and sweep angles, the
+actual arc midpoint, and source/target hashes and occurrence provenance.
+
+Finite support-scale and angular-resolution checks bound numerical admission.
+The arithmetic estimate describes evaluating the nominal analytic support; it
+is not a manufacturing tolerance or certified physical measurement interval.
+Existing section-dimension tolerance stacks retain their existing uncertified
+measurement-interval status. Design bounds remain global obligations on cache
+hits and selected-output builds.
+
+SVG export validates the arc witness against the actual referenced section curve.
+Its radial arrow reaches the arc midpoint, with a leader to the authored label;
+following an arbitrary label ray could point to a missing portion of the circle.
+Drawing bounds include the annotation. Independent STEP-radius and SVG-tip checks
+cover parameter edits and source replay in the rounded bearing-cover acceptance.

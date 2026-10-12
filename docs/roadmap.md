@@ -761,3 +761,11 @@ independent OCCT edge-filleting comparisons are acceptance obligations.
 This advances M5 without closing it. Cap-edge/general rolling-ball fillets, curved
 corner selection, topology transitions, sweeps/lofts, shelling, and general curved
 Booleans remain open. All five commercial release gates remain open.
+
+
+The first fillet workflow also gains opt-in partial-arc radius dimensions: one
+semantic face and one exact section arc, with native angular/midpoint evidence
+and an SVG arrow on the real arc. Complete-circle behavior stays the default.
+Parameter edits and failed design bounds exercise source-authoritative revision
+and manufacturing inspection; nominal radius annotations do not close GD&T,
+physical tolerance certification, projected drawings or the R4 release gate.

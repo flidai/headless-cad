@@ -2849,3 +2849,21 @@ It does not clamp the requested radius. General rolling-ball fillets remain open
 The independent `tools/check-longitudinal-fillet.py` acceptance uses OCCT's real
 edge-filleting operation, closed-form box/quarter-disk moments, STEP material
 differences, exact cylindrical radii, closed STL and captured-recipe replay.
+
+
+### Measuring a fillet's native radius
+
+`section_circle_dimension(..., kind = "radius", coverage = "single_arc")`
+measures one partial native section arc selected through a semantic face role.
+The rounded bearing cover uses its original `front_left` feature's `fillet_wall`
+role after three further fillets and five drilled holes. Its radius bound follows
+`corner_radius`; the annotation arrow touches the selected arc's midpoint.
+
+The default `coverage = "full_circle"` keeps the existing complete-circle rule
+for radius and diameter dimensions. Partial coverage rejects diameter requests,
+multiple descendants or matching segments, lines, complete circles and unresolved
+or numerically unsupported arcs. Reports retain the actual face, loop/segment,
+angular span and arrow-point witness alongside source and occurrence identity.
+These are nominal analytic support measurements, not manufactured tolerance or
+physical uncertainty certificates. `tools/check-fillet-dimensions.py` independently
+checks the imported STEP radius, native witness, SVG arrow and captured replay.

@@ -107,3 +107,96 @@ fn rounded_cover_publishes_exact_native_geometry_source_and_failure_atomicity() 
     let caps = success(&["capabilities", "--operation", "feature.fillet"]);
     assert!(caps.to_string().contains("solid.longitudinal_fillet"));
 }
+
+#[test]
+fn rounded_cover_radius_annotations_bind_native_arcs_and_remain_global_obligations() {
+    let source_text = include_str!("../../../examples/rounded_bearing_cover.star");
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source.star");
+    let out = dir.path().join("generation");
+    let cache = dir.path().join("cache");
+    fs::write(&source, source_text).unwrap();
+    let args = [
+        "build",
+        source.to_str().unwrap(),
+        "--out-dir",
+        out.to_str().unwrap(),
+        "--cache-dir",
+        cache.to_str().unwrap(),
+    ];
+    let built = success(&args);
+    let report: Value =
+        serde_json::from_slice(&fs::read(out.join("section-cover_midsection.json")).unwrap())
+            .unwrap();
+    let dimensions = report["section_view"]["circle_dimensions"]
+        .as_array()
+        .unwrap();
+    assert_eq!(dimensions.len(), 5);
+    for dimension in dimensions
+        .iter()
+        .filter(|d| d["declaration"]["coverage"] == "single_arc")
+    {
+        assert_eq!(dimension["value_mm"], 4.);
+        assert_eq!(dimension["selection"]["status"], "resolved");
+        assert_eq!(
+            dimension["selection"]["witnesses"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            dimension["arc"]["target_face"],
+            dimension["selection"]["witnesses"][0]["target_face"]
+        );
+        let loop_index = dimension["arc"]["loop_index"].as_u64().unwrap() as usize;
+        let segment_index = dimension["arc"]["segment_index"].as_u64().unwrap() as usize;
+        let segment = &report["section"]["loops"][loop_index]["segments"][segment_index];
+        assert_eq!(segment["face"], dimension["arc"]["target_face"]);
+        assert_eq!(segment["curve"]["kind"], "arc");
+        assert_eq!(segment["curve"]["radius"], dimension["radius"]);
+        assert_eq!(
+            dimension["target_content_hash"],
+            built["outputs"]["bearing_cover"]["content_hash"]
+        );
+    }
+    let svg = fs::read_to_string(out.join("section-cover_midsection.svg")).unwrap();
+    assert_eq!(svg.matches("class=\"section-circle-dimension\"").count(), 5);
+    for dimension in dimensions
+        .iter()
+        .filter(|d| d["declaration"]["coverage"] == "single_arc")
+    {
+        let tip_x = dimension["arc"]["tip"][0].as_f64().unwrap();
+        let tip_y = dimension["arc"]["tip"][1].as_f64().unwrap();
+        assert!(svg.contains(&format!("x2=\"{}\" y2=\"{}\"", tip_x, -tip_y)));
+    }
+    let warm = success(&args);
+    assert_eq!(warm["stats"]["computed_solids"], 0);
+    let prior_manifest = fs::read(out.join("manifest.json")).unwrap();
+    fs::write(
+        &source,
+        source_text.replace(
+            "max = corner_radius+0.000001",
+            "max = corner_radius-0.000001",
+        ),
+    )
+    .unwrap();
+    let failed = Command::new(env!("CARGO_BIN_EXE_cad"))
+        .args([
+            "build",
+            source.to_str().unwrap(),
+            "--out-dir",
+            out.to_str().unwrap(),
+            "--cache-dir",
+            cache.to_str().unwrap(),
+            "--output",
+            "rounded_blank",
+            "--display-only",
+        ])
+        .output()
+        .unwrap();
+    assert!(!failed.status.success());
+    let error: Value = serde_json::from_slice(&failed.stderr).unwrap();
+    assert_eq!(error["code"], "section_dimension_failed");
+    assert_eq!(prior_manifest, fs::read(out.join("manifest.json")).unwrap());
+}

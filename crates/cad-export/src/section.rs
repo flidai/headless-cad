@@ -1,6 +1,6 @@
 //! Deterministic, true-scale millimetre SVG for exact native section curves.
 use crate::ExportError;
-use cad_kernel::{PlanarSection, SectionCurve};
+use cad_kernel::{FaceId, PlanarSection, SectionCurve};
 use std::fmt::Write;
 
 fn number(v: f64) -> String {
@@ -129,6 +129,109 @@ pub struct SectionCircleDimensionAnnotation {
     pub kind: SectionCircleDimensionKind,
     pub label_offset: [f64; 2],
     pub value_mm: f64,
+    /// Exact selected partial arc. Absent for the existing complete-circle mode.
+    pub arc: Option<SectionArcWitnessAnnotation>,
+}
+
+/// A source-bound section arc used to place a radial arrow on actual geometry.
+#[derive(Debug, Clone)]
+pub struct SectionArcWitnessAnnotation {
+    /// Index into the source occurrence sections (zero for a body section).
+    pub occurrence_index: usize,
+    pub target_face: FaceId,
+    pub loop_index: usize,
+    pub segment_index: usize,
+    pub start_angle: f64,
+    pub sweep_angle: f64,
+    pub tip: [f64; 2],
+    pub arithmetic_uncertainty_mm: f64,
+}
+
+fn validate_arc_annotations(
+    sections: &[PlanarSection],
+    circles: &[SectionCircleDimensionAnnotation],
+) -> Result<(), ExportError> {
+    for annotation in circles {
+        let Some(arc) = &annotation.arc else { continue };
+        if annotation.kind != SectionCircleDimensionKind::Radius {
+            return Err(ExportError::InvalidModel(
+                "partial arc requires a radius dimension".into(),
+            ));
+        }
+        let section = sections.get(arc.occurrence_index).ok_or_else(invalid)?;
+        let segment = section
+            .loops
+            .get(arc.loop_index)
+            .and_then(|l| l.segments.get(arc.segment_index))
+            .ok_or_else(invalid)?;
+        let SectionCurve::Arc {
+            center,
+            radius,
+            start_angle,
+            sweep_angle,
+        } = segment.curve
+        else {
+            return Err(ExportError::InvalidModel(
+                "selected radius witness is not a native arc".into(),
+            ));
+        };
+        let scale = annotation
+            .center
+            .into_iter()
+            .chain(center)
+            .chain([annotation.radius, radius, arc.tip[0], arc.tip[1]])
+            .map(f64::abs)
+            .fold(1., f64::max);
+        let angular = 256. * f64::EPSILON * (1. + start_angle.abs() + sweep_angle.abs());
+        let error = scale * 512. * f64::EPSILON + radius.abs() * angular;
+        let expected_tip = [
+            center[0] + radius * (start_angle + sweep_angle / 2.).cos(),
+            center[1] + radius * (start_angle + sweep_angle / 2.).sin(),
+        ];
+        let count = section
+            .loops
+            .iter()
+            .flat_map(|l| &l.segments)
+            .filter(|s| s.face == arc.target_face)
+            .count();
+        if [
+            arc.start_angle,
+            arc.sweep_angle,
+            arc.tip[0],
+            arc.tip[1],
+            start_angle,
+            sweep_angle,
+            center[0],
+            center[1],
+            radius,
+        ]
+        .iter()
+        .any(|v| !v.is_finite())
+            || !scale.is_finite()
+            || !error.is_finite()
+            || !angular.is_finite()
+            || segment.face != arc.target_face
+            || count != 1
+            || !radius.is_normal()
+            || radius <= 0.
+            || !sweep_angle.is_finite()
+            || sweep_angle.abs() <= angular
+            || sweep_angle.abs() >= std::f64::consts::TAU - angular
+            || radius * sweep_angle.abs() <= error
+            || !arc.arithmetic_uncertainty_mm.is_finite()
+            || arc.arithmetic_uncertainty_mm < 0.
+            || (annotation.center[0] - center[0]).hypot(annotation.center[1] - center[1]) > error
+            || (annotation.radius - radius).abs() > error
+            || (arc.start_angle - start_angle).abs() > 512. * f64::EPSILON
+            || (arc.sweep_angle - sweep_angle).abs() > 512. * f64::EPSILON
+            || (arc.tip[0] - expected_tip[0]).hypot(arc.tip[1] - expected_tip[1]) > error
+        {
+            return Err(ExportError::InvalidModel(
+                "partial radius annotation does not match its native section arc".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Render native section geometry with projected and circular inspection dimensions.
@@ -138,6 +241,7 @@ pub fn dimensioned_section_to_svg(
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
 ) -> Result<String, ExportError> {
+    validate_arc_annotations(std::slice::from_ref(section), circles)?;
     Ok(section_layout(section, label, dimensions, circles)?.svg)
 }
 pub(crate) struct SectionLayout {
@@ -339,6 +443,7 @@ pub(crate) fn sections_layout(
     circles: &[SectionCircleDimensionAnnotation],
 ) -> Result<SectionLayout, ExportError> {
     let first = sections.first().ok_or_else(invalid)?;
+    validate_arc_annotations(sections, circles)?;
     if sections.iter().any(|section| section.plane != first.plane) {
         return Err(ExportError::InvalidModel(
             "section SVG occurrences require a common plane frame".into(),
@@ -543,6 +648,7 @@ fn circle_dimension_svg(
             label_offset,
             value_mm,
             tolerance: manufacturing_tolerance,
+            arc,
         } = circle;
         if id.is_empty()
             || center
@@ -577,16 +683,35 @@ fn circle_dimension_svg(
                 "invalid or unresolved circular section dimension".into(),
             ));
         }
-        let direction = [label_offset[0] / distance, label_offset[1] / distance];
-        let near = [
-            center[0] + direction[0] * radius,
-            center[1] + direction[1] * radius,
-        ];
+        let label_direction = [label_offset[0] / distance, label_offset[1] / distance];
+        let near = arc.as_ref().map_or_else(
+            || {
+                [
+                    center[0] + label_direction[0] * radius,
+                    center[1] + label_direction[1] * radius,
+                ]
+            },
+            |arc| arc.tip,
+        );
+        let direction = if arc.is_some() {
+            [
+                (near[0] - center[0]) / radius,
+                (near[1] - center[1]) / radius,
+            ]
+        } else {
+            label_direction
+        };
         let far = [
             center[0] - direction[0] * radius,
             center[1] - direction[1] * radius,
         ];
         let leader = [center[0] + label_offset[0], center[1] + label_offset[1]];
+        let elbow = arc.as_ref().map(|_| {
+            [
+                near[0] + direction[0] * font * 1.5,
+                near[1] + direction[1] * font * 1.5,
+            ]
+        });
         let start = if *kind == SectionCircleDimensionKind::Diameter {
             far
         } else {
@@ -631,7 +756,7 @@ fn circle_dimension_svg(
             .replace('\r', "&#13;")
             .replace('\t', "&#9;");
         let width = font * 0.7 * label.chars().count() as f64;
-        let right = direction[0] >= 0.;
+        let right = label_direction[0] >= 0.;
         let text_x = leader[0] + if right { font } else { -font - width };
         let baseline = leader[1] + font;
         for p in [
@@ -642,6 +767,7 @@ fn circle_dimension_svg(
             [text_x + width, baseline + font * 1.2],
         ]
         .into_iter()
+        .chain(elbow)
         .chain(arrows.iter().flatten().copied())
         {
             if p.iter().any(|v| !v.is_finite()) {
@@ -653,7 +779,12 @@ fn circle_dimension_svg(
             bounds[3] = bounds[3].max(p[1]);
         }
         writeln!(out,"<g class=\"section-circle-dimension\" data-id=\"{escaped_id}\" data-value-mm=\"{}\" data-kind=\"{kind_name}\" fill=\"#334155\" stroke=\"#334155\" stroke-width=\"{}\">",number(*value_mm),number(font*0.05)).unwrap();
-        for (a, b) in [(start, near), (near, leader)] {
+        let segments = if let Some(elbow) = elbow {
+            vec![(start, near), (near, elbow), (elbow, leader)]
+        } else {
+            vec![(start, near), (near, leader)]
+        };
+        for (a, b) in segments {
             writeln!(
                 out,
                 "  <line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"/>",

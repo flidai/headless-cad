@@ -1,4 +1,6 @@
-use cad_kernel::{extrude_annulus, extrude_rectangle, SectionPlane, Tolerance};
+use cad_kernel::{
+    extrude_annulus, extrude_rectangle, FaceId, SectionCurve, SectionPlane, Tolerance,
+};
 fn plane() -> SectionPlane {
     SectionPlane {
         origin: [0., 0., 5.],
@@ -329,6 +331,7 @@ fn circular_dimensions_preserve_native_paths_and_bound_leaders_and_labels() {
             kind: Kind::Diameter,
             label_offset: [-100., -60.],
             value_mm: 16.,
+            arc: None,
         },
         Circle {
             tolerance: None,
@@ -338,6 +341,7 @@ fn circular_dimensions_preserve_native_paths_and_bound_leaders_and_labels() {
             kind: Kind::Radius,
             label_offset: [80., 110.],
             value_mm: 20.,
+            arc: None,
         },
     ];
     let svg = cad_export::dimensioned_sections_to_svg(
@@ -424,6 +428,7 @@ fn circular_dimension_validation_covers_precision_and_shared_ids() {
         kind: Kind::Radius,
         label_offset: [20., 0.],
         value_mm: 8.,
+        arc: None,
     };
     for invalid in [
         Circle {
@@ -540,4 +545,96 @@ fn circular_dimension_validation_covers_precision_and_shared_ids() {
         cad_export::dimensioned_section_to_svg(&section, "test", &[], &[base.clone(), base])
             .is_err()
     );
+}
+
+#[test]
+fn partial_radius_arrow_uses_exact_arc_and_rejects_tampered_evidence() {
+    use cad_export::{
+        SectionArcWitnessAnnotation as ArcWitness, SectionCircleDimensionAnnotation as Circle,
+        SectionCircleDimensionKind as Kind,
+    };
+    let t = Tolerance::default();
+    let stock = extrude_rectangle(20., 12., 10., t).unwrap().model;
+    let rounded = cad_kernel::fillet_longitudinal(&stock, [FaceId(2), FaceId(3)], 2., t)
+        .unwrap()
+        .model;
+    let section = rounded.section(plane(), t).unwrap();
+    let (loop_index, segment_index, segment) = section
+        .loops
+        .iter()
+        .enumerate()
+        .flat_map(|(i, l)| l.segments.iter().enumerate().map(move |(j, s)| (i, j, s)))
+        .find(|(_, _, s)| matches!(s.curve, SectionCurve::Arc { .. }))
+        .unwrap();
+    let SectionCurve::Arc {
+        center,
+        radius,
+        start_angle,
+        sweep_angle,
+    } = segment.curve
+    else {
+        unreachable!()
+    };
+    let tip = [
+        center[0] + radius * (start_angle + sweep_angle / 2.).cos(),
+        center[1] + radius * (start_angle + sweep_angle / 2.).sin(),
+    ];
+    let dimension = Circle {
+        tolerance: None,
+        id: "corner_radius".into(),
+        center,
+        radius,
+        kind: Kind::Radius,
+        label_offset: [-10., -9.],
+        value_mm: radius,
+        arc: Some(ArcWitness {
+            occurrence_index: 0,
+            target_face: segment.face,
+            loop_index,
+            segment_index,
+            start_angle,
+            sweep_angle,
+            tip,
+            arithmetic_uncertainty_mm: 0.,
+        }),
+    };
+    let svg = cad_export::dimensioned_section_to_svg(
+        &section,
+        "rounded",
+        &[],
+        std::slice::from_ref(&dimension),
+    )
+    .unwrap();
+    assert!(svg.contains(&format!("x2=\"{}\" y2=\"{}\"", tip[0], -tip[1])));
+    assert_eq!(svg.matches("class=\"section-circle-dimension\"").count(), 1);
+    assert!(svg.contains("corner_radius: 2 mm radius"));
+    let mut bad = dimension.clone();
+    bad.arc.as_mut().unwrap().tip[0] += 0.1;
+    assert!(cad_export::dimensioned_section_to_svg(&section, "rounded", &[], &[bad]).is_err());
+    let mut bad = dimension.clone();
+    bad.arc.as_mut().unwrap().start_angle += 0.1;
+    assert!(cad_export::dimensioned_section_to_svg(&section, "rounded", &[], &[bad]).is_err());
+    let mut bad = dimension.clone();
+    bad.arc.as_mut().unwrap().target_face = FaceId(0);
+    assert!(cad_export::dimensioned_section_to_svg(&section, "rounded", &[], &[bad]).is_err());
+    let mut bad = dimension.clone();
+    bad.arc.as_mut().unwrap().occurrence_index = 1;
+    assert!(cad_export::dimensioned_section_to_svg(&section, "rounded", &[], &[bad]).is_err());
+    let mut bad = dimension.clone();
+    bad.kind = Kind::Diameter;
+    bad.value_mm *= 2.;
+    assert!(cad_export::dimensioned_section_to_svg(&section, "rounded", &[], &[bad]).is_err());
+    let plain = stock.section(plane(), t).unwrap();
+    let mut second = dimension.clone();
+    second.arc.as_mut().unwrap().occurrence_index = 1;
+    assert!(cad_export::dimensioned_sections_to_svg(
+        &[plain.clone(), section.clone()],
+        "two",
+        &[],
+        &[dimension]
+    )
+    .is_err());
+    let svg =
+        cad_export::dimensioned_sections_to_svg(&[plain, section], "two", &[], &[second]).unwrap();
+    assert!(svg.contains("corner_radius: 2 mm radius"));
 }

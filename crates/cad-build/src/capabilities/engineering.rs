@@ -245,7 +245,17 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             ),
         ],
     );
-    circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "nonempty semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "selected descendants must cover exactly one complete native circular section loop; consistent center/radius/orientation, continuous full turn; no partial coverage, multiple loops, duplicate winding, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
+    circle_dimension.arguments.push(optional(
+        arg(
+            "coverage",
+            T::Enum {
+                values: vec!["full_circle", "single_arc"],
+            },
+        ),
+        json!("full_circle"),
+    ));
+    circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "nonempty semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "default full_circle coverage requires selected descendants cover exactly one complete native circular section loop; consistent center/radius/orientation, continuous full turn; no partial coverage, multiple loops, duplicate winding, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
+    circle_dimension.obligations.extend(["explicit coverage single_arc requires kind radius, exactly one selected native face descendant and exactly one native Arc segment across all loops of the exact body or occurrence", "single_arc refuses zero, full-turn, duplicate, noncircular or unresolved angular extents; report arc retains face, loop/segment indices, angular span and midpoint tip; arithmetic_uncertainty_mm bounds support evaluation only, not physical geometry or manufacturing tolerance", "radius remains the native nominal analytic support value; world/native origins and occurrence placement enter arithmetic admission; existing native dimension bounds, tolerance and stack scalar semantics remain unchanged"]);
     let mut clearance = object_spec(
         "clearance_check",
         vec![

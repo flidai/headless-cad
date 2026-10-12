@@ -40,3 +40,16 @@ fn journal_dimension_keeps_all_split_face_provenance_and_global_obligations() {
         Err(BuildError::SectionDimensionFailed { .. })
     ));
 }
+
+#[test]
+fn partial_arc_cannot_silently_choose_one_intersecting_descendant() {
+    let mut r = recipe(5.);
+    let d = &mut r.section_views[0].circle_dimensions[0];
+    d.kind = cad_build::SectionCircleDimensionKind::Radius;
+    d.coverage = cad_build::SectionCircleCoverage::SingleArc;
+    d.min = Some(5.99);
+    d.max = Some(6.01);
+    let error = cad_build::build(&r).unwrap_err();
+    assert!(matches!(error, BuildError::SectionDimensionFailed { .. }));
+    assert!(error.to_string().contains("exactly one"), "{error}");
+}

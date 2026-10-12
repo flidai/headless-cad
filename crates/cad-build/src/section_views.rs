@@ -51,6 +51,29 @@ pub enum SectionCircleDimensionKind {
     Radius,
     Diameter,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SectionCircleCoverage {
+    #[default]
+    FullCircle,
+    SingleArc,
+}
+impl SectionCircleCoverage {
+    fn is_full_circle(&self) -> bool {
+        *self == Self::FullCircle
+    }
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct SectionArcWitness {
+    pub target_face: cad_kernel::FaceId,
+    pub loop_index: usize,
+    pub segment_index: usize,
+    pub start_angle: f64,
+    pub sweep_angle: f64,
+    pub tip: [f64; 2],
+    /// Arithmetic support evaluation only, not a physical or manufacturing interval.
+    pub arithmetic_uncertainty_mm: f64,
+}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SectionCircleDimension {
@@ -60,6 +83,8 @@ pub struct SectionCircleDimension {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instance_path: Option<Vec<String>>,
     pub kind: SectionCircleDimensionKind,
+    #[serde(default, skip_serializing_if = "SectionCircleCoverage::is_full_circle")]
+    pub coverage: SectionCircleCoverage,
     pub label_offset: [f64; 2],
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min: Option<f64>,
@@ -75,6 +100,8 @@ pub struct SectionCircleDimensionReport {
     pub value_mm: f64,
     pub center: [f64; 2],
     pub radius: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arc: Option<SectionArcWitness>,
     pub selection: FaceResolution,
     pub anchor_content_hash: Option<String>,
     pub target_content_hash: String,
@@ -87,6 +114,11 @@ pub struct SectionCircleDimensionReport {
 }
 impl SectionCircleDimension {
     pub fn validate(&self) -> Result<(), String> {
+        if self.coverage == SectionCircleCoverage::SingleArc
+            && self.kind != SectionCircleDimensionKind::Radius
+        {
+            return Err("single_arc coverage requires radius kind".into());
+        }
         if !safe_id(&self.id)
             || self.anchor_feature.is_empty()
             || self.anchor_feature.trim() != self.anchor_feature
@@ -751,15 +783,89 @@ fn selected_complete_circle(
     complete_circle(&curves, tolerance)
 }
 
+fn selected_single_arc(
+    loops: &[SectionLoop],
+    face: cad_kernel::FaceId,
+    tolerance: Tolerance,
+    source_scale: f64,
+) -> Result<([f64; 2], f64, SectionArcWitness), String> {
+    let mut found = None;
+    for (loop_index, boundary) in loops.iter().enumerate() {
+        for (segment_index, segment) in boundary.segments.iter().enumerate() {
+            if segment.face == face {
+                if found.is_some() {
+                    return Err("selected face has multiple native section segments".into());
+                }
+                found = Some((loop_index, segment_index, &segment.curve));
+            }
+        }
+    }
+    let (loop_index, segment_index, curve) =
+        found.ok_or("selected face has no native section arc")?;
+    let cad_kernel::SectionCurve::Arc {
+        center,
+        radius,
+        start_angle,
+        sweep_angle,
+    } = *curve
+    else {
+        return Err("selected native section segment is not circular".into());
+    };
+    let scale = source_scale + center.into_iter().map(f64::abs).sum::<f64>() + radius.abs();
+    let angular = 256. * f64::EPSILON * (1. + start_angle.abs() + sweep_angle.abs());
+    let error = (scale.max(1.) * 512. * f64::EPSILON + radius.abs() * angular).next_up();
+    if center
+        .into_iter()
+        .chain([
+            radius,
+            start_angle,
+            sweep_angle,
+            source_scale,
+            error,
+            angular,
+        ])
+        .any(|v| !v.is_finite())
+        || !radius.is_normal()
+        || radius <= tolerance.linear
+        || error > tolerance.linear / 16.
+        || sweep_angle.abs() <= angular
+        || sweep_angle.abs() >= std::f64::consts::TAU - angular
+        || radius * sweep_angle.abs() <= tolerance.linear + error
+    {
+        return Err("single_arc radius or angular extent exceeds native support precision".into());
+    }
+    let angle = start_angle + sweep_angle / 2.;
+    let tip = [
+        center[0] + radius * angle.cos(),
+        center[1] + radius * angle.sin(),
+    ];
+    if tip.iter().any(|v| !v.is_finite()) {
+        return Err("single_arc midpoint is nonfinite".into());
+    }
+    Ok((
+        center,
+        radius,
+        SectionArcWitness {
+            target_face: face,
+            loop_index,
+            segment_index,
+            start_angle,
+            sweep_angle,
+            tip,
+            arithmetic_uncertainty_mm: error,
+        },
+    ))
+}
 fn circle_dimensions(
     view: &SectionView,
     query: &SectionQuery,
-    build: &BuildResult,
+    context: (&BuildResult, &HashMap<String, Arc<OperationResult>>),
     assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
     tolerance: Tolerance,
     selection_work: &mut usize,
     work: &mut usize,
 ) -> Result<Vec<SectionCircleDimensionReport>, BuildError> {
+    let (build, models) = context;
     let mut reports = vec![];
     for d in &view.circle_dimensions {
         let fail = |message: String, actual_value| BuildError::SectionDimensionFailed {
@@ -849,8 +955,66 @@ fn circle_dimensions(
             ));
         }
         let faces = selection.witnesses.iter().map(|w| w.target_face).collect();
-        let (center, radius) =
-            selected_complete_circle(loops, &faces, tolerance).map_err(|e| fail(e, None))?;
+        let (center, radius, arc) = match d.coverage {
+            SectionCircleCoverage::FullCircle => {
+                let (c, r) = selected_complete_circle(loops, &faces, tolerance)
+                    .map_err(|e| fail(e, None))?;
+                (c, r, None)
+            }
+            SectionCircleCoverage::SingleArc => {
+                if selection.witnesses.len() != 1 {
+                    return Err(fail(
+                        "single_arc requires exactly one selected face descendant".into(),
+                        None,
+                    ));
+                }
+                let face = selection.witnesses[0].target_face;
+                let model = if let Some(part) = &part_id {
+                    &assemblies[&view.output].parts[part].result.model
+                } else {
+                    &models[target].model
+                };
+                let support = model
+                    .faces
+                    .get(face.0)
+                    .ok_or_else(|| fail("missing native arc support face".into(), None))?;
+                let raw_scale = match &support.surface {
+                    cad_kernel::Surface::Cylinder(c) => {
+                        c.origin.into_iter().map(f64::abs).sum::<f64>() + c.radius
+                    }
+                    cad_kernel::Surface::Cone(c) => {
+                        c.origin.into_iter().map(f64::abs).sum::<f64>() + c.radius
+                    }
+                    cad_kernel::Surface::Plane(_) => {
+                        return Err(fail(
+                            "single_arc requires analytic circular surface support".into(),
+                            None,
+                        ))
+                    }
+                };
+                let world_scale = query
+                    .section
+                    .plane
+                    .origin
+                    .into_iter()
+                    .map(f64::abs)
+                    .sum::<f64>()
+                    + occurrence_frame
+                        .map_or(0., |f| f.translation.into_iter().map(f64::abs).sum::<f64>());
+                let conditioning = match &support.surface {
+                    cad_kernel::Surface::Cone(c) => 1. + c.slope.abs(),
+                    _ => 1.,
+                };
+                let (c, r, a) = selected_single_arc(
+                    loops,
+                    face,
+                    tolerance,
+                    (raw_scale + world_scale) * conditioning,
+                )
+                .map_err(|e| fail(e, None))?;
+                (c, r, Some(a))
+            }
+        };
         let label_distance = d.label_offset[0].hypot(d.label_offset[1]);
         if !label_distance.is_finite()
             || label_distance <= radius + tolerance.linear
@@ -890,6 +1054,7 @@ fn circle_dimensions(
             value_mm,
             center,
             radius,
+            arc,
             selection,
             anchor_content_hash: build.feature_hashes.get(&d.anchor_feature).cloned(),
             target_content_hash: hash.clone(),
@@ -986,7 +1151,7 @@ pub(super) fn evaluate(
         let circle_dimensions = circle_dimensions(
             v,
             &query,
-            build,
+            (build, models),
             assemblies,
             tolerance,
             selection_work,
@@ -1293,6 +1458,7 @@ mod tests {
             role: "wall".into(),
             instance_path: None,
             kind: SectionCircleDimensionKind::Diameter,
+            coverage: SectionCircleCoverage::FullCircle,
             label_offset: [10., 10.],
             min: None,
             max: None,
@@ -1602,5 +1768,46 @@ mod split_circle_selection_tests {
         .is_err());
         boundary.segments.extend(boundary.segments.clone());
         assert!(selected_complete_circle(&[boundary], &faces, Tolerance::default()).is_err());
+    }
+}
+
+#[cfg(test)]
+mod partial_arc_tests {
+    use super::*;
+    fn loops(sweep: f64) -> Vec<SectionLoop> {
+        vec![SectionLoop {
+            segments: vec![cad_kernel::SectionSegment {
+                face: cad_kernel::FaceId(3),
+                curve: cad_kernel::SectionCurve::Arc {
+                    center: [2., 2.],
+                    radius: 2.,
+                    start_angle: std::f64::consts::PI,
+                    sweep_angle: sweep,
+                },
+            }],
+        }]
+    }
+    #[test]
+    fn one_arc_cannot_hide_duplicate_segments_full_turns_or_unresolved_angles() {
+        let t = Tolerance::default();
+        let face = cad_kernel::FaceId(3);
+        for sweep in [
+            0.,
+            1e-12,
+            std::f64::consts::TAU,
+            std::f64::consts::TAU + 0.1,
+            f64::NAN,
+        ] {
+            assert!(selected_single_arc(&loops(sweep), face, t, 0.).is_err());
+        }
+        let mut duplicate = loops(1.);
+        duplicate.push(duplicate[0].clone());
+        assert!(selected_single_arc(&duplicate, face, t, 0.).is_err());
+        let mut duplicate = loops(1.);
+        let segment = duplicate[0].segments[0].clone();
+        duplicate[0].segments.push(segment);
+        assert!(selected_single_arc(&duplicate, face, t, 0.).is_err());
+        assert!(selected_single_arc(&loops(1.), face, t, 1e9).is_err());
+        assert!(selected_single_arc(&loops(-1.), face, t, 0.).is_ok());
     }
 }

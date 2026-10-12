@@ -1046,7 +1046,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Measure a complete native circle selected by feature-role lineage.
+    /// Measure a native full circle, or explicitly one partial arc radius, by feature-role lineage.
     fn section_circle_dimension(
         view: &str,
         id: &str,
@@ -1054,6 +1054,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         role: &str,
         label_offset: Value,
         kind: Option<&str>,
+        coverage: Option<&str>,
         instance_path: Option<Value>,
         min: Option<Value>,
         max: Option<Value>,
@@ -1061,6 +1062,11 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let dimension = cad_build::SectionCircleDimension {
+            coverage: match coverage.unwrap_or("full_circle") {
+                "full_circle" => cad_build::SectionCircleCoverage::FullCircle,
+                "single_arc" => cad_build::SectionCircleCoverage::SingleArc,
+                _ => anyhow::bail!("coverage must be full_circle or single_arc"),
+            },
             tolerance: tolerance
                 .filter(|v| !v.is_none())
                 .map(|v| -> anyhow::Result<cad_build::DimensionTolerance> {

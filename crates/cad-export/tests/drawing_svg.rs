@@ -126,6 +126,7 @@ fn signed_manufacturing_labels_preserve_native_paths_and_fit_bounds() {
         label_offset: [8., 8.],
         value_mm: 4.,
         tolerance: None,
+        arc: None,
     });
     let baseline = drawing_sheet_to_svg(&s).unwrap();
     s.views[0].dimensions[0].tolerance = Some(Limits {

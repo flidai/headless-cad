@@ -27,4 +27,6 @@ def model():
     assert_property(id = "cover_volume", output = "bearing_cover", property = "volume_mm3", min = area*height-0.00001, max = area*height+0.00001)
     section_view(id = "cover_midsection", output = "bearing_cover", origin = [0,0,height/2], min_area = area-0.000001, max_area = area+0.000001)
     section_circle_dimension(view = "cover_midsection", id = "bearing_diameter", from_feature = bearing_feature, role = "bore_wall", kind = "diameter", label_offset = [16,0], min = 2*bore_radius-0.000001, max = 2*bore_radius+0.000001)
+    for feature, offset in [(front_left,[-12,-12]),(front_right,[12,-12]),(back_right,[12,12]),(rounded,[-12,12])]:
+        section_circle_dimension(view = "cover_midsection", id = feature+"_radius", from_feature = feature, role = "fillet_wall", kind = "radius", coverage = "single_arc", label_offset = offset, min = corner_radius-0.000001, max = corner_radius+0.000001)
 model()

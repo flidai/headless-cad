@@ -59,11 +59,12 @@ pub use drawing_sheets::{
 };
 mod section_views;
 pub use section_views::{
-    query_section, SectionAnchor, SectionAnchorWitness, SectionCircleDimension,
-    SectionCircleDimensionKind, SectionCircleDimensionReport, SectionDimension,
-    SectionDimensionAxis, SectionDimensionReport, SectionOccurrence, SectionQuery, SectionSource,
-    SectionSummary, SectionView, SectionViewReport, MAX_SECTION_DIMENSIONS,
-    MAX_SECTION_DIMENSIONS_PER_VIEW, MAX_SECTION_VIEWS, MAX_SECTION_VIEW_WORK,
+    query_section, SectionAnchor, SectionAnchorWitness, SectionArcWitness, SectionCircleCoverage,
+    SectionCircleDimension, SectionCircleDimensionKind, SectionCircleDimensionReport,
+    SectionDimension, SectionDimensionAxis, SectionDimensionReport, SectionOccurrence,
+    SectionQuery, SectionSource, SectionSummary, SectionView, SectionViewReport,
+    MAX_SECTION_DIMENSIONS, MAX_SECTION_DIMENSIONS_PER_VIEW, MAX_SECTION_VIEWS,
+    MAX_SECTION_VIEW_WORK,
 };
 mod property_assertions;
 pub use demand::{BuildMode, BuildScope};

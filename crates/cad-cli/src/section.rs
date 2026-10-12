@@ -253,6 +253,77 @@ pub(super) fn drawing_geometry(report: &Value) -> Result<DrawingGeometry, Box<dy
         .into_iter()
         .flatten()
         .map(|d| {
+            let single_arc = match d["declaration"]["coverage"].as_str() {
+                None | Some("full_circle") => false,
+                Some("single_arc") => true,
+                _ => return Err("invalid circle coverage".into()),
+            };
+            let arc = if single_arc {
+                let witness = d
+                    .get("arc")
+                    .filter(|v| !v.is_null())
+                    .ok_or("missing partial arc witness")?;
+                let occurrence_index = if report["kind"] == "assembly" {
+                    let instance_id = d["instance_id"]
+                        .as_str()
+                        .ok_or("partial arc missing source occurrence")?;
+                    let occurrences = report["occurrences"]
+                        .as_array()
+                        .ok_or("missing section occurrences")?;
+                    let index = occurrences
+                        .iter()
+                        .position(|occurrence| occurrence["instance_id"] == instance_id)
+                        .ok_or("partial arc source occurrence is absent")?;
+                    if occurrences[index]["instance_path"] != d["instance_path"]
+                        || occurrences[index]["part_id"] != d["part_id"]
+                        || occurrences[index]["content_hash"] != d["target_content_hash"]
+                    {
+                        return Err("partial arc occurrence identity mismatch".into());
+                    }
+                    index
+                } else {
+                    if !d["instance_id"].is_null() || !d["instance_path"].is_null() {
+                        return Err("body partial arc has occurrence witness".into());
+                    }
+                    if d["target_content_hash"] != report["snapshot"]["content_hash"] {
+                        return Err("body partial arc target hash mismatch".into());
+                    }
+                    0
+                };
+                let witnesses = d["selection"]["witnesses"]
+                    .as_array()
+                    .ok_or("partial arc missing face selection")?;
+                if witnesses.len() != 1 || witnesses[0]["target_face"] != witness["target_face"] {
+                    return Err("partial arc face selection mismatch".into());
+                }
+                Some(cad_export::SectionArcWitnessAnnotation {
+                    occurrence_index,
+                    target_face: serde_json::from_value(witness["target_face"].clone())?,
+                    loop_index: witness["loop_index"]
+                        .as_u64()
+                        .ok_or("missing partial arc loop index")?
+                        as usize,
+                    segment_index: witness["segment_index"]
+                        .as_u64()
+                        .ok_or("missing partial arc segment index")?
+                        as usize,
+                    start_angle: witness["start_angle"]
+                        .as_f64()
+                        .ok_or("missing partial arc start angle")?,
+                    sweep_angle: witness["sweep_angle"]
+                        .as_f64()
+                        .ok_or("missing partial arc sweep angle")?,
+                    tip: serde_json::from_value(witness["tip"].clone())?,
+                    arithmetic_uncertainty_mm: witness["arithmetic_uncertainty_mm"]
+                        .as_f64()
+                        .ok_or("missing partial arc arithmetic uncertainty")?,
+                })
+            } else {
+                if !d["arc"].is_null() {
+                    return Err("complete circle carries partial arc evidence".into());
+                }
+                None
+            };
             Ok(cad_export::SectionCircleDimensionAnnotation {
                 id: d["declaration"]["id"]
                     .as_str()
@@ -270,6 +341,7 @@ pub(super) fn drawing_geometry(report: &Value) -> Result<DrawingGeometry, Box<dy
                     .as_f64()
                     .ok_or("missing circle dimension value")?,
                 tolerance: dimension_tolerance(d)?,
+                arc,
             })
         })
         .collect::<Result<_, Box<dyn Error>>>()?;

@@ -20,6 +20,18 @@ const assert=require('node:assert/strict');
    await page.mouse.click(rect.x+rect.width*.5,rect.y+rect.height*.5);
   }
   await page.screenshot({path:'/tmp/cad-longitudinal-fillet.png',fullPage:true});
+  assert.ok((await page.goto(`${base}/section-cover_midsection.svg`)).ok());
+  assert.equal(await page.locator('g.section-circle-dimension').count(),5);
+  for (const id of ['front_left_radius','front_right_radius','back_right_radius','back_left_radius']) {
+   const group=page.locator(`[data-id="${id}"]`);
+   assert.equal(await group.getAttribute('data-kind'),'radius');
+   assert.equal(Number(await group.getAttribute('data-value-mm')),4);
+   assert.equal(await group.locator('polygon').count(),1);
+  }
+  await page.goto(`${base}/bearing_cover.preview.html`);
+  await page.setContent(`<html><body style="margin:0;background:white"><img src="${base}/section-cover_midsection.svg" style="width:1400px;height:960px;object-fit:contain"></body></html>`);
+  await page.locator('img').evaluate(img=>img.decode());
+  await page.screenshot({path:'/tmp/cad-fillet-dimensions.png',fullPage:false,timeout:15000});
   assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
   console.log(JSON.stringify({valid:true,volume_mm3:expected,read_only:true,errors},null,2));
  } finally {await browser.close();}
