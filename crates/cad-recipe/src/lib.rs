@@ -151,7 +151,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         number(value)
     }
 
-    /// Simple counter-clockwise outer ring and optional clockwise convex holes.
+    /// Simple counter-clockwise outer ring and optional clockwise simple holes.
     /// Rings omit their repeated closing point; hole order is semantic.
     fn polygon(
         id: &str,

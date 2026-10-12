@@ -367,10 +367,19 @@ the native result. Browser depth/picking checks use independent analytic faces.
 
 The right-prism increment supports simple nonconvex outer profiles as well as
 convex ones, with optional polygonal through-holes. A simple CCW outer ring
-encloses disjoint convex CW holes, with at
+encloses disjoint simple CW holes, with at
 most 256 total vertices and 32 holes. Multi-loop cap faces remain authoritative;
 wall faces preserve source-ring roles. Validation recognizes a matched-cap,
 straight-wall prism and rejects unsupported general nonconvex geometry.
+Concave hole rings use adaptive segment intersection and bounded-distance tests
+against every other boundary, followed by winding checks in both directions to
+reject nesting. This admits disjoint holes with overlapping convex hulls; convex
+pairs retain their established separating-axis validation and numerical domain.
+Clockwise winding, simplicity, strict separation and resolved turns remain
+mandatory; there is no repair, snapping or tolerance welding. The existing total
+vertex and hole bounds also bound the pairwise validation work. Mixed circular
+holes use winding and distance to every polygon segment, including reentrant
+bays. Native prism recognition revalidates this contract after rigid placement.
 Signed boundary integration subtracts holes from volume, centroid, inertia and
 face-frame centroids. STEP retains inner face bounds; derived display/STL
 triangles preserve the openings and semantic face identity. The pinned ISC
@@ -532,6 +541,17 @@ tip depth. Changing only tip depth rebuilds two native definitions and conserves
 total material volume while changing density-weighted mass. Recipe assertions
 check native volume, mass budget and longitudinal balance. The viewer continues
 to inspect captured source and validated evidence without running modeling tools.
+
+`serpentine_manifold.star` advances profile extrusion with a nonconvex inner
+channel boundary beside circular fastener bores. Its covered assembly has nine
+occurrences and five part definitions; an `open_channel` configuration exposes
+the passage for inspection. Width and depth edits each change two definitions.
+Independent rectangle/cylinder subtraction checks volume, centroid and the full
+inertia tensor; kernel tests additionally cover holes with overlapping convex
+hulls, forbidden nesting/contact, bay circles, cyclic source starts and oblique
+transforms. Channel dimensions and datum seating remain prescribed design intent,
+not pressure/sealing or collision certification. The operation remains a native
+right prism with through-holes, not a general curved Boolean operation.
 
 ## Constraints and assemblies
 
@@ -1229,7 +1249,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

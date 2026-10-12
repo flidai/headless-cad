@@ -15,7 +15,7 @@ See the [dependency license inventory](docs/dependency-licenses.md).
 A local, CLI-first CAD product built around our own Rust B-rep kernel. Recipes
 are plain text suitable for Git, results are inspectable JSON, and exports are
 STEP and STL. Modeling currently supports **orthogonal solids and simple polygon extrusions, including nonconvex
-outlines and convex polygonal through-holes, plus true circular extrusions and stepped/tapered revolutions**: slotted brackets, open trays, triangular ramps, and polygonal
+outlines and simple polygonal through-holes, plus true circular extrusions and stepped/tapered revolutions**: slotted brackets, open trays, triangular ramps, and polygonal
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union and cut remain orthogonal-only; intersection also supports bounded,
@@ -451,7 +451,7 @@ output(name = "bracket", feature = finished)
 | Function | Meaning |
 | --- | --- |
 | `rectangle(id, width, depth)` | Profile on XY, starting at the origin |
-| `polygon(id, points, holes=[])` | Simple CCW outer XY ring (convex or nonconvex) with optional convex CW holes; 256 total vertices, at most 32 holes |
+| `polygon(id, points, holes=[])` | Simple CCW outer XY ring (convex or nonconvex) with optional simple CW holes; 256 total vertices, at most 32 holes |
 | `extrude(id, profile, height)` | Extrude a rectangle or supported polygon profile along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
 | `transform(id, body, offset, rotation)` | Rotate exact geometry using unit quaternion `[x,y,z,w]`, then translate; both default to identity |
@@ -467,13 +467,13 @@ repeat the first point at the end. Repeated points, crossings, collinear turns,
 edges at/below tolerance, and numerically uncertain turns are rejected rather
 than repaired. The exact B-rep retains one planar polygon face per cap and one
 quadrilateral per side; display and STL triangles are derived from those faces.
-Optional `holes` are convex **clockwise** rings strictly inside the outer
+Optional `holes` are simple **clockwise** rings strictly inside the outer
 boundary. Holes must be disjoint, nonnested and separated by more than the
 numerical/tolerance envelope; touching or uncertain arrangements fail explicitly.
 There are at most 32 holes and 256 total profile vertices. Caps retain their
 inner loops in the exact B-rep and STEP; derived STL/display triangles leave
 openings empty. Self-crossings, nonadjacent edges within the numerical/tolerance envelope,
-and holes that cross a concave bay are rejected. Inner hole rings remain convex.
+and holes that cross a concave bay are rejected. Both outer and inner rings may be nonconvex.
 
 ```python
 profile = polygon(id = "frame_profile",
@@ -491,6 +491,15 @@ See `perforated_mount.star` for two openings and an attached centroid locator.
 its locator uses an explicit datum offset to remain on the front web even when
 the remaining cap's area centroid lies in the empty notch. Unsplit caps remain
 native faces; triangulation does not introduce feature edges or new face IDs.
+[serpentine_manifold.star](examples/serpentine_manifold.star) combines a nonconvex
+clockwise channel opening with four circular fastener bores, a floor, ported
+cover, two shared fittings and four shared bolts: nine occurrences from five
+part definitions. The `open_channel` inspection configuration exposes the passage.
+`channel_width` and `channel_depth` edits each rebuild two definitions; volume
+and mass assertions remain headless build gates. Independent rectangle/cylinder
+subtraction checks volume and the full inertia tensor. The example expresses
+channel and seating intent without a pressure, seal or interference rating.
+
 Holed prisms do not support the general convex Boolean intersection path.
 All build renderers use the recipe's tolerance. Holed preview scenes use a
 versioned embedded marker; older already-open Canvas clients retain their last
@@ -902,7 +911,7 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
   Unions, cuts, intersections, open pockets,
   through-slots, and separated multiple solids in the orthogonal domain only.
 - General planar validation supports one strictly convex solid with supporting
-  outward face planes, or one matched-cap right prism with a simple outer ring and convex holes.
+  outward face planes, or one matched-cap right prism with a simple outer ring and simple holes.
   Multiple general solids are explicitly
   unsupported in one kernel snapshot; assemblies retain separate definitions.
 - Closed orientable shells, including through-hole topology.
@@ -910,7 +919,7 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
   geometry, and computations outside the numerical/resource envelope.
 
 Round-hole cutting in arbitrary solids, general rotated nonconvex modeling, sketch constraints, general
-polygon union/cut and nonconvex polygon Booleans, nonconvex hole rings, general trimmed curved surfaces,
+polygon union/cut and nonconvex polygon Booleans, general trimmed curved surfaces,
 fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
 boundaries and millimetre units, with occurrence relationships for assemblies; it does not preserve the executable recipe.
@@ -1099,6 +1108,7 @@ npm run test:bvh:numeric
 npm run test:bvh
 npm run test:revolve
 npm run test:apex
+npm run test:serpentine
 npm run test:counts
 npm run test:cone
 ```

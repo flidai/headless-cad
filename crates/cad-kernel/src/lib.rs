@@ -1,6 +1,6 @@
 //! A deliberately narrow, native Rust boundary-representation kernel.
 //!
-//! Supports rectangular and simple polygon extrusions, including disjoint convex
+//! Supports rectangular and simple polygon extrusions, including disjoint simple
 //! through holes, rigid placements, orthogonal solid Booleans, and bounded convex
 //! planar intersection. Polygon caps remain analytic planar faces with explicit
 //! inner loops where needed. Orthogonal Boolean faces stay rectangular and share
@@ -13,7 +13,7 @@
 //! Enclosed cavities, general curved Booleans, and nonmanifold contacts remain
 //! unsupported.
 //! General rigid rotations support a single strictly convex solid or a validated
-//! right prism with a simple outer boundary and convex disjoint through holes. Exactly represented axis
+//! right prism with a simple outer boundary and simple disjoint through holes. Exactly represented axis
 //! permutations also retain the orthogonal solid domain. Multi-loop prism caps
 //! support signed-loop properties; Boolean operations on these prisms are not yet
 //! supported.

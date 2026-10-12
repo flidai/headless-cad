@@ -1,7 +1,7 @@
 //! Validation for closed orientable planar B-reps. In the orthogonal domain,
 //! nonconvex solids, handles, and disconnected solids are supported. General
 //! planar geometry is restricted to a single strictly convex solid or a validated
-//! right prism with a simple outer profile and disjoint convex through holes.
+//! right prism with a simple outer profile and disjoint simple through holes.
 //! Each solid currently requires one connected shell; enclosed cavities are
 //! unsupported.
 //! Geometric intersection and containment checks follow the topology checks.

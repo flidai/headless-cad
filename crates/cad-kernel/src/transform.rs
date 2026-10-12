@@ -21,7 +21,7 @@ pub fn validate_transform(offset: [f64; 3], rotation: [f64; 4]) -> Result<(), Ke
 
 /// Apply `R(rotation) * point + offset` to native curves and surfaces.
 /// General rotations require one strictly convex solid, a validated right prism
-/// with a simple outer ring and convex through-hole rings, a validated analytic
+/// with a simple outer ring and simple through-hole rings, a validated analytic
 /// circular extrusion, a piecewise-linear meridian revolution, or an empty model.
 /// Exactly represented signed-permutation rotations additionally support the
 /// existing orthogonal nonconvex/multiple-solid domain. Near-axis rotations are
@@ -87,7 +87,7 @@ pub fn transform(
             return Err(if issue.code == "resource_limit" {
                 KernelError::ResourceLimit(issue.message.clone())
             } else {
-                KernelError::Unsupported("general rigid rotation requires a single strictly convex solid or a validated right prism with a simple outer ring and convex through holes; other nonconvex and multiple solids need an exact axis permutation".into())
+                KernelError::Unsupported("general rigid rotation requires a single strictly convex solid or a validated right prism with a simple outer ring and simple through holes; other nonconvex and multiple solids need an exact axis permutation".into())
             });
         }
     }

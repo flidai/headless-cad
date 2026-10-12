@@ -4,7 +4,7 @@
 //! STEP retains planar faceted B-reps and analytic circular extrusions, with explicit surfaces,
 //! polygon boundaries, product context, and millimetre units. This is not an
 //! general trimmed-surface/NURBS STEP translator. Both exporters reject invalid
-//! models. Simple nonconvex cap boundaries and disjoint convex holes are retained
+//! models. Simple nonconvex cap boundaries and disjoint simple holes are retained
 //! in STEP and explicitly triangulated for STL.
 
 use cad_kernel::{ModelSnapshot, Tolerance};

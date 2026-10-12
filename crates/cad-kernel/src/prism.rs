@@ -1,10 +1,10 @@
-//! Simple-profile right prisms with disjoint convex through holes.
+//! Simple-profile right prisms with disjoint simple through holes.
 use crate::math::{cross, dot, norm, sub};
 use crate::*;
 use std::collections::BTreeSet;
 pub const MAX_POLYGON_HOLES: usize = 32;
 
-/// Simple CCW outer ring, convex CW disjoint strictly interior holes, in mm.
+/// Simple CCW outer ring, simple CW disjoint strictly interior holes, in mm.
 /// No ring reordering, repair, tangent contacts, nested holes, or touching edges.
 pub fn validate_polygon_with_holes(
     outer: &[[f64; 2]],
@@ -26,7 +26,9 @@ pub fn validate_polygon_with_holes(
     }
     for hole in holes {
         let reverse: Vec<_> = hole.iter().rev().copied().collect();
-        validate_polygon(&reverse, tol)?;
+        if validate_polygon(&reverse, tol).is_err() {
+            crate::simple_polygon::validate_ring(&reverse, tol)?;
+        }
         let scale = outer
             .iter()
             .chain(hole)
@@ -58,41 +60,80 @@ pub fn validate_polygon_with_holes(
 
     for i in 0..holes.len() {
         for j in i + 1..holes.len() {
-            let mut separated = false;
-            for ring in [&holes[i], &holes[j]] {
-                for k in 0..ring.len() {
-                    let a = ring[k];
-                    let b = ring[(k + 1) % ring.len()];
-                    let e = [b[0] - a[0], b[1] - a[1]];
-                    let length = e[0].hypot(e[1]);
-                    let n = [-e[1] / length, e[0] / length];
-                    let range = |points: &Vec<[f64; 2]>| {
-                        points
-                            .iter()
-                            .map(|p| {
-                                let v = (p[0] - a[0]) * n[0] + (p[1] - a[1]) * n[1];
-                                let uncertainty = ((p[0].abs() + a[0].abs()) * n[0].abs()
-                                    + (p[1].abs() + a[1].abs()) * n[1].abs())
-                                    * 64.
-                                    * f64::EPSILON;
-                                [v - uncertainty, v + uncertainty]
-                            })
-                            .fold([f64::INFINITY, f64::NEG_INFINITY], |r, v| {
-                                [r[0].min(v[0]), r[1].max(v[1])]
-                            })
-                    };
-                    let x = range(&holes[i]);
-                    let y = range(&holes[j]);
-                    let scale = x.into_iter().chain(y).map(f64::abs).fold(0., f64::max);
-                    let margin = tol.linear + scale * 64. * f64::EPSILON;
-                    if x[0] - y[1] > margin || y[0] - x[1] > margin {
-                        separated = true;
+            // Retain the established convex numerical domain and SAT path.
+            // Concave pairs instead require complete boundary and winding tests.
+            let convex = |ring: &Vec<[f64; 2]>| {
+                validate_polygon(&ring.iter().rev().copied().collect::<Vec<_>>(), tol).is_ok()
+            };
+            if convex(&holes[i]) && convex(&holes[j]) {
+                let mut separated = false;
+                for ring in [&holes[i], &holes[j]] {
+                    for k in 0..ring.len() {
+                        let a = ring[k];
+                        let b = ring[(k + 1) % ring.len()];
+                        let e = [b[0] - a[0], b[1] - a[1]];
+                        let length = e[0].hypot(e[1]);
+                        let n = [-e[1] / length, e[0] / length];
+                        let range = |points: &Vec<[f64; 2]>| {
+                            points
+                                .iter()
+                                .map(|p| {
+                                    let v = (p[0] - a[0]) * n[0] + (p[1] - a[1]) * n[1];
+                                    let uncertainty = ((p[0].abs() + a[0].abs()) * n[0].abs()
+                                        + (p[1].abs() + a[1].abs()) * n[1].abs())
+                                        * 64.
+                                        * f64::EPSILON;
+                                    [v - uncertainty, v + uncertainty]
+                                })
+                                .fold([f64::INFINITY, f64::NEG_INFINITY], |r, v| {
+                                    [r[0].min(v[0]), r[1].max(v[1])]
+                                })
+                        };
+                        let x = range(&holes[i]);
+                        let y = range(&holes[j]);
+                        let scale = x.into_iter().chain(y).map(f64::abs).fold(0., f64::max);
+                        let margin = tol.linear + scale * 64. * f64::EPSILON;
+                        if x[0] - y[1] > margin || y[0] - x[1] > margin {
+                            separated = true;
+                        }
+                    }
+                }
+                if !separated {
+                    return Err(KernelError::Unsupported(
+                        "holes overlap, nest, touch, or have unresolved separation".into(),
+                    ));
+                }
+                continue;
+            }
+            let a = &holes[i];
+            let b = &holes[j];
+            let scale = a
+                .iter()
+                .chain(b)
+                .flatten()
+                .map(|v| v.abs())
+                .fold(0., f64::max);
+            let margin = tol.linear + scale * 256. * f64::EPSILON;
+            for k in 0..a.len() {
+                for l in 0..b.len() {
+                    if !crate::simple_polygon::separated(
+                        a[k],
+                        a[(k + 1) % a.len()],
+                        b[l],
+                        b[(l + 1) % b.len()],
+                        margin,
+                    ) {
+                        return Err(KernelError::Unsupported(
+                            "hole boundaries cross, touch, or have unresolved separation".into(),
+                        ));
                     }
                 }
             }
-            if !separated {
+            // Boundary disjointness alone permits nesting. Once all segments
+            // are separated, one point from each connected ring is sufficient.
+            if crate::simple_polygon::inside(a[0], b) || crate::simple_polygon::inside(b[0], a) {
                 return Err(KernelError::Unsupported(
-                    "holes overlap, nest, touch, or have unresolved separation".into(),
+                    "holes must not overlap or nest".into(),
                 ));
             }
         }
@@ -779,5 +820,219 @@ mod concave_tests {
             });
         }
         assert!(!m.validate(t).valid);
+    }
+}
+
+#[cfg(test)]
+mod concave_hole_tests {
+    use super::*;
+    fn outer() -> Vec<[f64; 2]> {
+        vec![[-2., -2.], [12., -2.], [12., 12.], [-2., 12.]]
+    }
+    fn u_hole() -> Vec<[f64; 2]> {
+        vec![
+            [0., 0.],
+            [0., 10.],
+            [2., 10.],
+            [2., 2.],
+            [8., 2.],
+            [8., 10.],
+            [10., 10.],
+            [10., 0.],
+        ]
+    }
+    fn square(x: f64, y: f64, w: f64) -> Vec<[f64; 2]> {
+        vec![[x, y], [x, y + w], [x + w, y + w], [x + w, y]]
+    }
+    fn near(a: f64, b: f64) {
+        assert!((a - b).abs() < 1e-9 * b.abs().max(1.), "{a} != {b}");
+    }
+    #[test]
+    fn hull_overlapping_disjoint_holes_have_composite_box_moments() {
+        let t = Tolerance::default();
+        let op =
+            extrude_polygon_with_holes(&outer(), &[u_hole(), square(4., 4., 2.)], 3., t).unwrap();
+        assert_eq!(op.history.generated_faces["hole_walls"].len(), 12);
+        let model = op.model;
+        let p = model.mass_properties(t).unwrap();
+        // Outer box minus three disjoint rectangles making the U and bay square.
+        let boxes = [
+            (1., [14., 14., 3.], [5., 5., 1.5]),
+            (-1., [10., 2., 3.], [5., 1., 1.5]),
+            (-1., [2., 8., 3.], [1., 6., 1.5]),
+            (-1., [2., 8., 3.], [9., 6., 1.5]),
+            (-1., [2., 2., 3.], [5., 5., 1.5]),
+        ];
+        let volume: f64 = boxes
+            .iter()
+            .map(|(sign, d, _)| sign * d[0] * d[1] * d[2])
+            .sum();
+        let center: [f64; 3] = std::array::from_fn(|i| {
+            boxes
+                .iter()
+                .map(|(sign, d, c)| sign * d[0] * d[1] * d[2] * c[i])
+                .sum::<f64>()
+                / volume
+        });
+        let tensor: [[f64; 3]; 3] = std::array::from_fn(|i| {
+            std::array::from_fn(|j| {
+                boxes
+                    .iter()
+                    .map(|(sign, d, c)| {
+                        let v = sign * d[0] * d[1] * d[2];
+                        let delta = sub(*c, center);
+                        v * ((if i == j {
+                            (d[(i + 1) % 3].powi(2) + d[(i + 2) % 3].powi(2)) / 12.
+                                + dot(delta, delta)
+                        } else {
+                            0.
+                        }) - delta[i] * delta[j])
+                    })
+                    .sum()
+            })
+        });
+        near(p.volume, volume);
+        for i in 0..3 {
+            near(p.centroid.unwrap()[i], center[i]);
+            for (j, expected) in tensor[i].iter().enumerate() {
+                near(p.central_inertia.unwrap()[i][j], *expected);
+            }
+        }
+        for f in [FaceId(0), FaceId(1)] {
+            assert_eq!(triangulate_face(&model, f, t).unwrap().len(), 18);
+        }
+        for angle in [0.17_f64, 0.71, 1.4] {
+            let rotation = [
+                [angle.cos(), 0., angle.sin()],
+                [0., 1., 0.],
+                [-angle.sin(), 0., angle.cos()],
+            ];
+            let moved = transform(
+                &model,
+                [12., -7., 4.],
+                [0., (angle / 2.).sin(), 0., (angle / 2.).cos()],
+                t,
+            )
+            .unwrap()
+            .model;
+            let q = moved.mass_properties(t).unwrap();
+            near(q.volume, volume);
+            for i in 0..3 {
+                near(
+                    q.centroid.unwrap()[i],
+                    [12., -7., 4.][i] + (0..3).map(|k| rotation[i][k] * center[k]).sum::<f64>(),
+                );
+                for j in 0..3 {
+                    near(
+                        q.central_inertia.unwrap()[i][j],
+                        (0..3)
+                            .flat_map(|k| {
+                                (0..3).map(move |l| rotation[i][k] * tensor[k][l] * rotation[j][l])
+                            })
+                            .sum(),
+                    );
+                }
+            }
+            for f in [FaceId(0), FaceId(1)] {
+                triangulate_face(&moved, f, t).unwrap();
+            }
+        }
+    }
+    #[test]
+    fn concave_holes_reject_nesting_crossing_tangency_and_wrong_winding() {
+        let t = Tolerance::default();
+        for hole in [
+            square(0.5, 3., 0.5),
+            square(1., 4., 2.),
+            square(2., 4., 2.),
+            square(2. + t.linear / 2., 4., 2.),
+            square(-1., -1., 12.),
+        ] {
+            for holes in [vec![u_hole(), hole.clone()], vec![hole, u_hole()]] {
+                assert!(validate_polygon_with_holes(&outer(), &holes, t).is_err());
+            }
+        }
+        let mut reverse = u_hole();
+        reverse.reverse();
+        assert!(validate_polygon_with_holes(&outer(), &[reverse], t).is_err());
+        let mut crossed = u_hole();
+        crossed.swap(2, 5);
+        assert!(validate_polygon_with_holes(&outer(), &[crossed], t).is_err());
+        // Concave hole reaching outside the outer ring remains rejected.
+        assert!(validate_polygon_with_holes(
+            &square(-1., -1., 8.).into_iter().rev().collect::<Vec<_>>(),
+            &[u_hole()],
+            t
+        )
+        .is_err());
+    }
+    #[test]
+    fn concave_holes_preserve_scale_and_source_vertex_roles() {
+        for scale in [1e-6, 1., 1e3] {
+            let t = Tolerance {
+                linear: scale * 1e-8,
+            };
+            let outer: Vec<_> = outer().iter().map(|p| p.map(|v| v * scale)).collect();
+            let mut hole: Vec<_> = u_hole().iter().map(|p| p.map(|v| v * scale)).collect();
+            for _ in 0..hole.len() {
+                hole.rotate_left(1);
+                let op =
+                    extrude_polygon_with_holes(&outer, &[hole.clone()], 3. * scale, t).unwrap();
+                near(
+                    op.model.mass_properties(t).unwrap().volume / scale.powi(3),
+                    432.,
+                );
+                let wall = op.history.generated_faces["hole_0_wall_0"][0];
+                let points = op
+                    .model
+                    .loop_points(op.model.faces[wall.0].loops[0])
+                    .unwrap();
+                assert!(points
+                    .iter()
+                    .any(|p| p[0] == hole[0][0] && p[1] == hole[0][1]));
+                for f in [FaceId(0), FaceId(1)] {
+                    triangulate_face(&op.model, f, t).unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn circular_holes_in_concave_bays_require_full_boundary_clearance() {
+        let t = Tolerance::default();
+        let circle = CircleHole {
+            center: [5., 6.],
+            radius: 1.,
+        };
+        let m = extrude_polygon_with_circular_holes(&outer(), &[u_hole()], &[circle], 3., t)
+            .unwrap()
+            .model;
+        near(m.volume(), (144. - std::f64::consts::PI) * 3.);
+        assert!(tessellate_analytic(&m, t, TessellationPolicy::default()).is_ok());
+        for c in [
+            CircleHole {
+                center: [1., 6.],
+                radius: 0.2,
+            },
+            CircleHole {
+                center: [3., 6.],
+                radius: 1.,
+            },
+            CircleHole {
+                center: [3., 6.],
+                radius: 1.1,
+            },
+            CircleHole {
+                center: [5., 5.],
+                radius: 7.2,
+            },
+        ] {
+            assert!(validate_polygon_with_circular_holes(&outer(), &[u_hole()], &[c], t).is_err());
+        }
+        let moved = transform(&m, [2., 3., 4.], [0., 0.3, 0., (1. - 0.09_f64).sqrt()], t)
+            .unwrap()
+            .model;
+        near(moved.mass_properties(t).unwrap().volume, m.volume());
+        assert!(tessellate_analytic(&moved, t, TessellationPolicy::default()).is_ok());
     }
 }

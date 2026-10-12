@@ -280,3 +280,39 @@ fn nonconvex_caps_preserve_unsplit_step_faces_and_closed_stl_material() {
         28,
     );
 }
+
+#[test]
+fn concave_holes_preserve_material_in_their_bays() {
+    let t = Tolerance::default();
+    let outer = [[0., 0.], [40., 0.], [40., 30.], [0., 30.]];
+    let hole = vec![
+        [5., 5.],
+        [5., 23.],
+        [9., 23.],
+        [9., 9.],
+        [25., 9.],
+        [25., 23.],
+        [29., 23.],
+        [29., 5.],
+    ];
+    let model = cad_kernel::extrude_polygon_with_holes(
+        &outer,
+        &[hole, vec![[13., 13.], [13., 21.], [21., 21.], [21., 13.]]],
+        6.,
+        t,
+    )
+    .unwrap()
+    .model;
+    for model in [
+        model.clone(),
+        cad_kernel::transform(&model, [12., -7., 4.], [0.5, 0.5, 0., 0.5_f64.sqrt()], t)
+            .unwrap()
+            .model,
+    ] {
+        let step = to_step(&model, t).unwrap();
+        assert_eq!(step.matches("FACE_BOUND(").count(), 4);
+        assert_eq!(step.matches("FACE_OUTER_BOUND(").count(), 18);
+        // 16 boundary vertices, two holes: 18 triangles per cap and 32 walls.
+        check_mesh(&to_stl(&model, t).unwrap(), 5568., 68);
+    }
+}
