@@ -24,19 +24,21 @@ fn bad() -> KernelError {
     KernelError::Unsupported("trim-witness clearance requires separated arithmetic-coaxial circular stock envelopes, at least one canonical keyed shaft/hub, and certified surviving native boundary witnesses".into())
 }
 pub(crate) fn is_keyed(m: &ModelSnapshot, t: Tolerance) -> bool {
-    crate::keyseat::recognize(m, t).is_ok() || crate::hub_keyway::recognize(m, t).is_ok()
+    crate::keyseat::recognize(m, t).is_ok()
+        || crate::hub_keyway::recognize(m, t).is_ok()
+        || crate::stepped_keyseat::recognize(m, t).is_ok()
 }
 pub(crate) fn admit(m: &ModelSnapshot, t: Tolerance) -> Result<Envelope, KernelError> {
     if !t.is_valid() {
         return Err(KernelError::InvalidTolerance);
     }
-    if m.vertices.len() > 32
-        || m.edges.len() > 48
-        || m.faces.len() > 16
-        || m.loops.len() > 32
+    if m.vertices.len() > 64
+        || m.edges.len() > 96
+        || m.faces.len() > 48
+        || m.loops.len() > 96
         || m.shells.len() != 1
         || m.solids.len() != 1
-        || m.shells[0].faces.len() > 16
+        || m.shells[0].faces.len() > 48
         || m.solids[0].shells.len() != 1
         || m.loops.iter().any(|l| l.edges.len() > 32)
         || m.faces.iter().any(|f| f.loops.len() > 2)
@@ -47,6 +49,25 @@ pub(crate) fn admit(m: &ModelSnapshot, t: Tolerance) -> Result<Envelope, KernelE
         (g.clearance_envelope(), None)
     } else if let Ok(g) = crate::hub_keyway::recognize(m, t) {
         (g.clearance_envelope(), None)
+    } else if let Ok(g) = crate::stepped_keyseat::recognize(m, t) {
+        (g.clearance_envelope(), None)
+    } else if let Ok(g) = crate::revolve::recognize(m, t) {
+        let outer = g.profile.iter().map(|p| p[0]).fold(0., f64::max);
+        let height = g.profile.iter().map(|p| p[1].abs()).fold(0., f64::max);
+        let error = 4096. * f64::EPSILON * (norm(g.origin) + outer + height);
+        crate::convex_clearance::support::revolution_consistency(m, &g, error)?;
+        (
+            Envelope {
+                origin: g.origin,
+                axis: g.axis,
+                radial: g.x_direction,
+                outer,
+                inner: g.profile.iter().map(|p| p[0]).fold(f64::INFINITY, f64::min),
+                height,
+                untouched_limit: None,
+            },
+            None,
+        )
     } else {
         let g = crate::analytic::recognize(m, Some(t))?;
         (
@@ -95,6 +116,13 @@ pub(crate) fn query(
     b: &ModelSnapshot,
     t: Tolerance,
 ) -> Result<SolidClearance, KernelError> {
+    if crate::stepped_keyseat::recognize(a, t).is_ok()
+        || crate::stepped_keyseat::recognize(b, t).is_ok()
+        || crate::revolve::recognize(a, t).is_ok()
+        || crate::revolve::recognize(b, t).is_ok()
+    {
+        return meridian_query(a, b, t);
+    }
     let l = admit(a, t)?;
     let r = admit(b, t)?;
     if l.untouched_limit.is_none() && r.untouched_limit.is_none() {
@@ -182,6 +210,128 @@ pub(crate) fn query(
             left_point,
             right_point,
             axis: mul(d, 1. / witness),
+        });
+    }
+    Err(bad())
+}
+
+fn original_stock(
+    m: &ModelSnapshot,
+    g: &Envelope,
+    t: Tolerance,
+) -> Result<ModelSnapshot, KernelError> {
+    if let Ok(s) = crate::stepped_keyseat::recognize(m, t) {
+        return Ok(crate::revolve::construct(RevolveGeometry {
+            segments: vec![],
+            ..s.stock
+        })
+        .0);
+    }
+    if crate::revolve::recognize(m, t).is_ok() {
+        return Ok(m.clone());
+    }
+    let mut stock = extrude_annulus(g.outer, g.inner, g.height, t)?.model;
+    let y = cross(g.axis, g.radial);
+    let vector = |v: [f64; 3]| add(mul(g.radial, v[0]), add(mul(y, v[1]), mul(g.axis, v[2])));
+    let point = |p| add(g.origin, vector(p));
+    for v in &mut stock.vertices {
+        v.position = point(v.position);
+    }
+    for e in &mut stock.edges {
+        match &mut e.curve {
+            Curve::Circle(c) => {
+                c.origin = point(c.origin);
+                c.axis = vector(c.axis);
+                c.x_direction = vector(c.x_direction);
+            }
+            Curve::Line(l) => {
+                l.origin = point(l.origin);
+                l.direction = vector(l.direction);
+            }
+            _ => return Err(bad()),
+        }
+    }
+    for f in &mut stock.faces {
+        match &mut f.surface {
+            Surface::Plane(p) => {
+                p.origin = point(p.origin);
+                p.normal = vector(p.normal);
+            }
+            Surface::Cylinder(c) => {
+                c.origin = point(c.origin);
+                c.axis = vector(c.axis);
+                c.x_direction = vector(c.x_direction);
+            }
+            _ => return Err(bad()),
+        }
+    }
+    Ok(stock)
+}
+fn meridian_query(
+    a: &ModelSnapshot,
+    b: &ModelSnapshot,
+    t: Tolerance,
+) -> Result<SolidClearance, KernelError> {
+    let l = admit(a, t)?;
+    let r = admit(b, t)?;
+    let left = original_stock(a, &l, t)?;
+    let right = original_stock(b, &r, t)?;
+    // The actual stepped filled meridian retains shoulders and recessed groove
+    // radii. A maximum-radius cylindrical hull is deliberately not queried.
+    let q = crate::solid_clearance::coaxial(&left, &right, t)?;
+    let error = 4096.
+        * f64::EPSILON
+        * (norm(l.origin) + norm(r.origin) + l.outer + l.height + r.outer + r.height);
+    if !error.is_normal() || error > t.linear / 80. {
+        return Err(KernelError::NumericRange);
+    }
+    let axis = mul(l.axis, 1. / norm(l.axis));
+    let ra = mul(r.axis, 1. / norm(r.axis));
+    let lp = sub(q.left_point, l.origin);
+    let rp = sub(q.right_point, r.origin);
+    let lr = norm(cross(axis, lp));
+    let rr = norm(cross(ra, rp));
+    let lz = dot(lp, axis);
+    let rz = dot(rp, ra);
+    let candidates = [
+        mul(l.radial, -1.),
+        mul(r.radial, -1.),
+        mul(add(l.radial, r.radial), -1.),
+        cross(axis, l.radial),
+        mul(cross(axis, l.radial), -1.),
+        cross(axis, r.radial),
+        mul(cross(axis, r.radial), -1.),
+    ];
+    for c in candidates {
+        let Some(u) = radial(axis, c) else { continue };
+        let Some(v) = radial(ra, u) else { continue };
+        if [&l, &r].iter().zip([u, v]).any(|(g, d)| {
+            g.untouched_limit
+                .is_some_and(|limit| g.outer * dot(d, g.radial).max(0.) + 8. * error >= limit)
+        }) {
+            continue;
+        }
+        let left_point = add(l.origin, add(mul(axis, lz), mul(u, lr)));
+        let right_point = add(r.origin, add(mul(ra, rz), mul(v, rr)));
+        let delta = sub(right_point, left_point);
+        let distance = norm(delta);
+        let lower = (q.lower_bound_mm - 16. * error).next_down();
+        let upper = (distance + 16. * error + (q.upper_bound_mm - q.lower_bound_mm)).next_up();
+        if !lower.is_finite()
+            || !upper.is_finite()
+            || lower <= t.linear
+            || upper < lower
+            || upper - lower > t.linear
+        {
+            return Err(KernelError::NumericRange);
+        }
+        return Ok(SolidClearance {
+            method: ClearanceMethod::NativeTrimWitness,
+            lower_bound_mm: lower,
+            upper_bound_mm: upper,
+            left_point,
+            right_point,
+            axis: mul(delta, 1. / distance),
         });
     }
     Err(bad())

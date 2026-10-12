@@ -184,6 +184,9 @@ pub fn tessellate_analytic(
     if let Ok(g) = crate::hub_keyway::recognize(model, tolerance) {
         return crate::hub_keyway::tessellate(model, &g, tolerance, policy);
     }
+    if let Ok(g) = crate::stepped_keyseat::recognize(model, tolerance) {
+        return crate::stepped_keyseat::tessellate(model, &g, tolerance, policy);
+    }
     if let Ok(g) = crate::keyseat::recognize(model, tolerance) {
         return crate::keyseat::tessellate(model, &g, tolerance, policy);
     }

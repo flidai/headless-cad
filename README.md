@@ -38,6 +38,9 @@ Union, cut and intersection support orthogonal solids and a bounded analytic
 branch for two parallel solid cylinders. Right prisms and circular/annular stock
 also accept contained through/blind drilling, counterbores and conical countersinks. Intersection supports bounded,
 well-conditioned convex planar solids, including rotated inputs.
+Finite external shaft keyseats and internal hub through-keyways retain exact
+cylindrical surfaces. Their bounded coaxial clearance queries certify actual
+surviving surface witnesses, with independently validated STEP exchange.
 
 Native equal-distance `chamfer` also trims a selected straight edge of a strictly
 convex planar solid, retaining original face lineage and a named generated face.
@@ -86,18 +89,19 @@ captured recipe without the working source or geometry cache.
 
 ```sh
 cargo build --release --locked -p cad-cli
-python3 scripts/drive_module_demo.py --out-dir out/drive_module_demo
+python3 scripts/drive_module_demo.py --recipe examples/drive_module_keyed.star --out-dir out/keyed_drive_demo
 ./target/release/cad serve out --port 8080
 ```
 
-Open `http://localhost:8080/drive_module_demo/index.html`. Select a shaft occurrence
+Open `http://localhost:8080/keyed_drive_demo/index.html`. Select a shaft or key occurrence
 in either assembly preview to inspect that revision's actual Starlark source.
 The walkthrough is a scripted source edit, not an autonomous AI demo. It shows
 the reproducible workflow an agent can use. Its no-replace publication currently
 requires Linux; use a new output directory for every run.
 
-The assembly includes simplified fastener envelopes and a drive-disc blank.
-Axial retention, torque transfer, load ratings, threads and complete manufacturing
+The assembly includes a cut shaft, keyed disc and separate key, with simplified
+fastener envelopes. Nominal geometric engagement is independently checked.
+Axial retention, rated torque, load ratings, threads and complete manufacturing
 specification remain design work. Native size and clearance checks cover their
 named obligations, not whole-assembly certification. The five commercial release
 gates remain open.
@@ -2490,8 +2494,8 @@ remain native analytic geometry, with derived STEP/STL and preview artifacts.
 The example exposes width, depth, axial position/length, shaft dimensions, scale
 and output pose. Semantic assertions retain the pocket floor/end walls and both
 journal caps through placement. This domain has flat pocket ends and sharp
-corners; rounded milling ends, repeated seats and stepped/annular stock require
-additional operations. Matching internal hub keyways have the separate bounded
+corners; rounded milling ends, repeated seats and annular stock require
+additional operations. Stepped solid stock has the separate bounded domain below. Matching internal hub keyways have the separate bounded
 domain below. Native properties and transverse
 sections are supported. Bounded coaxial keyed-body clearance uses certified surviving
 native witnesses; general keyed-body distance queries remain unsupported.
@@ -2503,6 +2507,34 @@ cases. It checks native and STEP volume, centroid and inertia, both directed sol
 differences against an independently constructed cylinder-minus-box, and oriented
 watertight STL within its declared chordal error bound. The browser regression
 checks native floor-face picking and captured recipe source.
+
+### Stepped shafts and nominal retention
+
+```sh
+cad build examples/retained_shaft.star --out-dir out/retained_shaft
+```
+
+A finite keyseat can now be cut into one constant-radius segment of a solid,
+orthogonal revolved shaft while preserving its shoulders and retaining groove.
+Seats crossing a radial transition, tapered or hollow stock, and repeated seats
+are rejected. Native face lineage, full mass properties, sections, STEP geometry
+and shared mesh boundaries follow the stepped shape.
+
+The example assembles the shaft, two opposed flanged bushes, a washer and an
+open C-ring. Native clearance checks use the actual stock meridians and surviving
+boundary witnesses. Parameter revisions preserve the intended 0.20 mm nominal
+axial endplay. Tests measure that endplay from native semantic face datums;
+source-authored axial stack certification is the next increment.
+
+`tools/check-retained-shaft.py` checks three installed configurations and six
+isolated scale/pose cases against independent moments and imported STEP geometry,
+including both directed solid differences, all installed part intersections,
+thrust gaps, ring/groove contacts and oriented watertight STL. The viewer exposes
+the captured recipe when any occurrence is selected.
+
+This isolates nominal shaft retention assuming fixed bush seats. It does not
+establish hub retention, housing anchorage, ring installation or elasticity,
+standardized fits, or load capacity.
 
 ### Through-keyways in annular hubs
 

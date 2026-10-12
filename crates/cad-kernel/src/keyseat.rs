@@ -4,15 +4,15 @@ use crate::*;
 use std::collections::BTreeMap;
 #[derive(Clone, Debug)]
 pub(crate) struct Geometry {
-    origin: [f64; 3],
-    axis: [f64; 3],
-    x: [f64; 3],
-    r: f64,
-    h: f64,
-    a: f64,
-    b: f64,
-    c: f64,
-    d: f64,
+    pub(crate) origin: [f64; 3],
+    pub(crate) axis: [f64; 3],
+    pub(crate) x: [f64; 3],
+    pub(crate) r: f64,
+    pub(crate) h: f64,
+    pub(crate) a: f64,
+    pub(crate) b: f64,
+    pub(crate) c: f64,
+    pub(crate) d: f64,
 }
 fn bad() -> KernelError {
     KernelError::Unsupported("keyseat requires a solid circular shaft and an arithmetic-aligned rectangular cutter crossing only its positive radial exterior, with centered width, positive floor radius and two intact end journals".into())
@@ -120,7 +120,7 @@ impl Geometry {
             _ => Err(bad()),
         }
     }
-    fn slot(&self) -> ArcPrismGeometry {
+    pub(crate) fn slot(&self) -> ArcPrismGeometry {
         ArcPrismGeometry {
             path: PlanarPath {
                 start: [self.a, -self.b],
@@ -164,38 +164,10 @@ impl Geometry {
         }
         .properties()?;
         let removed = self.slot().properties(t)?;
-        let volume = base.volume - removed.volume;
-        if !volume.is_normal() || volume <= base.volume * 4096. * f64::EPSILON {
-            return Err(KernelError::NumericRange);
-        }
-        let reference = base.centroid.unwrap();
-        let displacement = sub(removed.centroid.unwrap(), reference);
-        let center = mul(displacement, -removed.volume / volume);
-        let mut tensor = base.central_inertia.unwrap();
-        for i in 0..3 {
-            for j in 0..3 {
-                tensor[i][j] -= removed.central_inertia.unwrap()[i][j]
-                    + removed.volume
-                        * ((if i == j {
-                            dot(displacement, displacement)
-                        } else {
-                            0.
-                        }) - displacement[i] * displacement[j]);
-                tensor[i][j] -= volume
-                    * ((if i == j { dot(center, center) } else { 0. }) - center[i] * center[j]);
-            }
-        }
-        if tensor.iter().flatten().any(|v| !v.is_finite()) || (0..3).any(|i| tensor[i][i] <= 0.) {
-            return Err(KernelError::NumericRange);
-        }
-        Ok(MassProperties {
-            volume,
-            centroid: Some(add(reference, center)),
-            central_inertia: Some(tensor),
-        })
+        subtract_properties(base, removed)
     }
 }
-fn construct(g: &Geometry) -> ModelSnapshot {
+pub(crate) fn construct(g: &Geometry) -> ModelSnapshot {
     let q = g.q();
     let b = g.b;
     let a = g.a;
@@ -414,8 +386,16 @@ pub(crate) fn recognize(m: &ModelSnapshot, t: Tolerance) -> Result<Geometry, Ker
                     && dir(a.circle.x_direction, b.circle.x_direction)
                     && (a.sweep_radians - b.sweep_radians).abs() * g.r <= error
             }
-            (Curve::Line(a), Curve::Line(b)) => {
-                near(a.origin, b.origin) && dir(a.direction, b.direction)
+            (Curve::Line(line), Curve::Line(expected)) => {
+                // Certify physical departure over the trimmed edge. Endpoint
+                // subtraction on a short placed edge amplifies angular roundoff.
+                let length = norm(sub(
+                    m.vertices[a.vertices[1].0].position,
+                    m.vertices[a.vertices[0].0].position,
+                ));
+                near(line.origin, expected.origin)
+                    && (norm(line.direction) - 1.).abs() <= 64. * f64::EPSILON
+                    && norm(sub(line.direction, expected.direction)) * length <= error
             }
             _ => false,
         };
@@ -850,6 +830,41 @@ pub(crate) fn tessellate(
         patches,
         segments,
         chordal_error_bound: bound + reserve,
+    })
+}
+
+pub(crate) fn subtract_properties(
+    base: MassProperties,
+    removed: MassProperties,
+) -> Result<MassProperties, KernelError> {
+    let volume = base.volume - removed.volume;
+    if !volume.is_normal() || volume <= base.volume * 4096. * f64::EPSILON {
+        return Err(KernelError::NumericRange);
+    }
+    let reference = base.centroid.unwrap();
+    let displacement = sub(removed.centroid.unwrap(), reference);
+    let center = mul(displacement, -removed.volume / volume);
+    let mut tensor = base.central_inertia.unwrap();
+    for i in 0..3 {
+        for j in 0..3 {
+            tensor[i][j] -= removed.central_inertia.unwrap()[i][j]
+                + removed.volume
+                    * ((if i == j {
+                        dot(displacement, displacement)
+                    } else {
+                        0.
+                    }) - displacement[i] * displacement[j]);
+            tensor[i][j] -=
+                volume * ((if i == j { dot(center, center) } else { 0. }) - center[i] * center[j]);
+        }
+    }
+    if tensor.iter().flatten().any(|v| !v.is_finite()) || (0..3).any(|i| tensor[i][i] <= 0.) {
+        return Err(KernelError::NumericRange);
+    }
+    Ok(MassProperties {
+        volume,
+        centroid: Some(add(reference, center)),
+        central_inertia: Some(tensor),
     })
 }
 

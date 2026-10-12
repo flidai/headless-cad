@@ -38,6 +38,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
         let result = crate::hub_keyway::recognize(model, tolerance)
             .map(|_| ())
             .or_else(|_| crate::keyseat::recognize(model, tolerance).map(|_| ()))
+            .or_else(|_| crate::stepped_keyseat::recognize(model, tolerance).map(|_| ()))
             .map(|_| ())
             .or_else(|_| crate::arc_prism::recognize(model, tolerance).map(|_| ()))
             .map(|_| ())

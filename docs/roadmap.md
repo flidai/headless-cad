@@ -644,6 +644,21 @@ acceptance cover this boundary. Native operation failures identify the failing
 feature as structured data. This advances automation infrastructure; it does not
 close hosted M7 services, release-evidence policies or actual AI design acceptance.
 
+## Current mechanical increment: shaft retention
+
+The keyed-drive workflow now has a separate `retained_shaft.star` fixture with
+native stepped-shaft shoulders, a retaining groove, a finite keyseat, opposed
+flanged bushes, a washer and an open C-ring. Native clearance preserves the
+actual stock meridian. Independent exchange checks cover three installed
+configurations and six isolated scale/pose cases, full moments, native topology,
+mesh closure, part interference and nominal axial endplay.
+
+Next, make axial endplay a source-authored obligation measured from semantic
+native datums, then integrate shaft and hub retention into the drive module.
+Bush anchorage, ring installation, standardized fits and load capacity remain
+explicit engineering obligations. These increments advance M2/M4/M6; all five
+commercial release gates remain open.
+
 ## Example policy
 
 Every new modeling tool must have a small isolating recipe and at least one

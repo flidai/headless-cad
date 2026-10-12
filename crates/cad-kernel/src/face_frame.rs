@@ -123,6 +123,8 @@ impl ModelSnapshot {
             // the supporting plane origin, independent of tessellation.
             if let Ok(g) = crate::hub_keyway::recognize(self, tolerance) {
                 g.face_centroid(face_id, tolerance)?
+            } else if let Ok(g) = crate::stepped_keyseat::recognize(self, tolerance) {
+                g.face_centroid(face_id, tolerance)?
             } else if let Ok(g) = crate::keyseat::recognize(self, tolerance) {
                 g.face_centroid(face_id, tolerance)?
             } else if let Ok(g) = crate::stepped_bore::recognize(self, tolerance) {

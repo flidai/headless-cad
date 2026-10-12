@@ -37,6 +37,7 @@ mod hub_keyway;
 mod keyseat;
 mod rotation_clearance;
 mod solid_clearance;
+mod stepped_keyseat;
 mod trim_clearance;
 pub use rotation_clearance::{
     RotationClearance, RotationInterval, RotationSample, MAX_ROTATION_DEPTH, MAX_ROTATION_QUERIES,
@@ -304,6 +305,9 @@ impl ModelSnapshot {
         if let Ok(b) = hub_keyway::bounds(self) {
             return b;
         }
+        if let Ok(bounds) = stepped_keyseat::bounds(self) {
+            return bounds;
+        }
         if let Ok(bounds) = keyseat::bounds(self) {
             return bounds;
         }
@@ -374,6 +378,9 @@ impl ModelSnapshot {
     /// first: invalid references or unsupported integration terms yield NaN.
     pub fn volume(&self) -> f64 {
         if let Ok(v) = hub_keyway::volume(self) {
+            return v;
+        }
+        if let Ok(v) = stepped_keyseat::volume(self) {
             return v;
         }
         if let Ok(v) = keyseat::volume(self) {

@@ -234,7 +234,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             ),
         ],
     );
-    circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "Exactly1 semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "only one complete native circular section on the selected face; consistent center/radius/orientation, continuous full turn; no lines, partial arcs, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
+    circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "nonempty semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "selected descendants must cover exactly one complete native circular section loop; consistent center/radius/orientation, continuous full turn; no partial coverage, multiple loops, duplicate winding, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
     let mut clearance = object_spec(
         "clearance_check",
         vec![
@@ -254,7 +254,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
                 serde_json::Value::Null,
             ),
             optional(
-                arg("right_rotation", reference("clearance_rotation_path")),
+                arg("right_rotation", object("clearance_rotation_path")),
                 serde_json::Value::Null,
             ),
         ],

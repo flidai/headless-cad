@@ -109,6 +109,9 @@ impl ModelSnapshot {
         if let Ok(g) = crate::hub_keyway::recognize(self, tolerance) {
             return g.properties(tolerance);
         }
+        if let Ok(g) = crate::stepped_keyseat::recognize(self, tolerance) {
+            return g.properties(tolerance);
+        }
         if let Ok(g) = crate::keyseat::recognize(self, tolerance) {
             return g.properties(tolerance);
         }

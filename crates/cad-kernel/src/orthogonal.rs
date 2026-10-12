@@ -364,6 +364,7 @@ pub fn boolean(
             result
                 .or_else(|_| crate::round_stock::cut(a, b, tolerance))
                 .or_else(|_| crate::keyseat::cut(a, b, tolerance))
+                .or_else(|_| crate::stepped_keyseat::cut(a, b, tolerance))
                 .or_else(|_| crate::hub_keyway::cut(a, b, tolerance))
         } else {
             result

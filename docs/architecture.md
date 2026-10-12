@@ -1182,6 +1182,29 @@ multiple candidate loops, inconsistent circle supports and duplicate winding
 fail instead of selecting a convenient descendant. Reports preserve the complete
 semantic selection alongside the measured circle.
 
+### Bounded shaft-retention geometry
+
+The bounded shaft-retention domain composes a finite external keyseat with a native
+stepped solid revolution. The pocket must remain strictly inside one constant-radius
+axial segment. Preserve the other native shoulders, journals and groove walls;
+reject cuts crossing a radial transition. Canonical recognition must recover and
+certify the complete boundary rather than trust a retained construction recipe.
+Mass properties subtract the exact removed strip from the stock revolution.
+
+For this family, a single enclosing cylinder is generally too loose to certify
+running fits around shoulders. A stock-meridian lower bound must be paired with
+points certified to survive the actual keyseat, retaining the native trim-witness
+contract. Mesh interfaces must share boundary samples across replaced and untouched
+faces, including adjacent annular shoulders.
+
+The isolating retention fixture places an integral shaft shoulder opposite an open
+ring in an actual groove, with flanged bushes and a thrust washer. Native semantic
+face datums identify the thrust planes. Independent signed face measurements
+establish nominal endplay; transverse section dimensions cannot represent this
+axial stack. A source-certified native axial dimension/stack remains a separate
+requirement. The fixture does not certify hub retention, ring installation
+elasticity, standardized fits or load capacity.
+
 ## Constraints and assemblies
 
 Stage assembly-solver acceptance separately from today's attachment DAG: first a grounded

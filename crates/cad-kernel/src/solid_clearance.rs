@@ -122,7 +122,7 @@ fn nearest(p: [f64; 2], a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
     let t = ((p[0] - a[0]) * u[0] + (p[1] - a[1]) * u[1]).clamp(0., len);
     [a[0] + t * u[0], a[1] + t * u[1]]
 }
-fn coaxial(
+pub(crate) fn coaxial(
     a: &ModelSnapshot,
     b: &ModelSnapshot,
     t: Tolerance,
