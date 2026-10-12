@@ -270,6 +270,24 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             ),
         ],
     );
+    clearance.arguments.push(optional(
+        arg("rotation_group", reference("rigid_rotation_group")),
+        json!(null),
+    ));
+    clearance.obligations.extend(["rotation_group is mutually exclusive with individual right_translation/right_rotation; group and check must name the same output and at least one endpoint must be a member", "both group members use the initial native distance under exact common-rigid-map invariance, counted once; one moving endpoint uses the group's single reference-resolved world arc, counts actual kernel samples, and preserves authored left/right initial-query witnesses", "rotation proof_kind is lipschitz_subdivision with complete intervals or rotational_symmetry with a separate full [0,1] certificate and three real samples; symmetry admits canonical circular extrusions and orthogonal-meridian stationary full-turn bodies only, including flanged bushes; empty subdivision intervals alone are not coverage"]);
+    let mut rotation_group = object_spec(
+        "rigid_rotation_group",
+        vec![
+            arg("id", T::String),
+            arg("output", reference("assembly_output")),
+            arg("instance_paths", array(array(T::String, None), None)),
+            arg("reference_instance_path", array(T::String, None)),
+            arg("pivot", numbers(3)),
+            arg("axis", numbers(3)),
+            arg("angle_radians", T::Number),
+        ],
+    );
+    rotation_group.obligations.extend(["schema-2 source-owned common rigid group: pivot and unit axis are in one declared reference member's initial body frame; every member receives the same world rigid map, not a rotation about its own origin", "at most 16 groups, 64 exact leaf paths per group and 256 members total; duplicate paths and overlapping groups on the same output rejected; reference must be a member; finite signed nonzero angle abs<=2pi and finite pivot length<=1000000 mm", "every group must have explicit clearance_check references; only these named pairs are certified, never all group or assembly collisions; all members and native bounds resolve globally even for selected outputs and cache hits", "group checks share the 16 motion-check and 4096 native-query budget; internal common-motion pair consumes one initial query; one-moving symmetry consumes three queries with initial query reused", "reports retain exact member paths/native hashes/initial frames and resolved common world path; inspector animation is illustrative and cannot author or certify motion"]);
     clearance.arguments[4].units = Some("mm");
     clearance.arguments[5].units = Some("mm");
     clearance.obligations.extend(["schema-2 recipe.clearance_checks; Starlark clearance_check(id,output,left_instance_path,right_instance_path,min_clearance,right_translation=None,right_rotation=None); strict object, unknown fields rejected", "at most 64 checks; case-insensitive unique ASCII letters/digits/underscore/hyphen IDs of length 1..128; finite strictly positive minimum", "two distinct exact leaf paths of length 1..64, nonempty trimmed components at most 1024 bytes; bounded 10000000 aggregate path-component resolution work", "assembly output only; global native dependency and check even on selected builds and cache hits; not a viewer or display-mesh query", "validated single strictly convex planar solids, finite solid cylinders and convex full-turn linear-meridian revolutions (cones, frusta and convex external multisegments), including mixed pairs; coaxial recognized cylinders/annuli and full-turn linear-meridian solids also support hollow and stepped nonconvex profiles by filled-meridian distance; parallel or opposed-axis recognized cylinder/annulus pairs additionally admit lateral displacement using analytic radial/axial interval distance; unsupported noncoaxial nonconvex families beyond these circular extrusions or other curved, multiple/empty/contact/overlap or unresolved inputs fail explicitly; no convex-hull substitution", "before placement, each operand is capped at 128 vertices, 256 edges, 128 faces and 512 loop-edge references; convex admission allows 128 loops with one per face, while coaxial meridian admission allows 256 loops with two per face; kernel planar candidate limit is 200000 and analytic support refinement limit is 256 iterations", "method-labelled native closest-witness bounds from convex support certification or coaxial filled-meridian region distance or parallel annular radial/axial distance, widened by explicit occurrence-placement arithmetic envelope using full native analytic bounds; lower bound must meet minimum without tolerance slack", "report retains assembly/part/feature identity, exact paths and frames, raw kernel query and placement-adjusted bounds; query axis is a witness direction, not necessarily a separating plane for nested coaxial bodies; no penetration depth, general collision or manufacturing-tolerance inference"]);
@@ -457,6 +475,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         datum_dimension,
         clearance,
         rotation_path,
+        rotation_group,
         cardinality,
         selector,
         assertion,

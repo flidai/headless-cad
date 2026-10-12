@@ -49,7 +49,7 @@ fn continuous_rotation_publication_covers_paths_replays_and_preserves_failed_gen
     let manifest: Value = serde_json::from_slice(&first.stdout).unwrap();
     let report: Value =
         serde_json::from_slice(&fs::read(out.join("clearance-checks.json")).unwrap()).unwrap();
-    assert_eq!(report["schema_version"], 3);
+    assert_eq!(report["schema_version"], 4);
     assert_eq!(report["checks"], manifest["clearance_checks"]);
     assert_eq!(
         report["recipe_context_hash"],

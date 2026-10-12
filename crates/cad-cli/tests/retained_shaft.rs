@@ -59,7 +59,7 @@ fn analytic_retained_shaft_replays_reuses_and_preserves_failures() {
     }
     let report: Value =
         serde_json::from_slice(&fs::read(out.join("clearance-checks.json")).unwrap()).unwrap();
-    assert_eq!(report["schema_version"], 3);
+    assert_eq!(report["schema_version"], 4);
     assert_eq!(report["kind"], "native_geometric_clearance");
     let stable = files(&out);
     for parameters in [

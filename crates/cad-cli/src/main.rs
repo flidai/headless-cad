@@ -15,6 +15,8 @@ mod datum_dimensions;
 mod drawing;
 mod exchange;
 mod integrity;
+mod report_numbers;
+mod rigid_rotation;
 mod section;
 mod server;
 mod tolerance_stacks;
@@ -248,6 +250,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "drawing_sheets": build.drawing_sheets,
         "tolerance_stacks": build.tolerance_stacks,
         "datum_dimensions": build.datum_dimensions,
+        "rigid_rotation_groups": build.rigid_rotation_groups,
         "clearance_checks": build.clearance_checks,
         "exchange_requirements": exchange::pending(&recipe.exchange_requirements),
         "exchange_policy_status": if recipe.exchange_requirements.is_empty() { "not_requested" } else { "pending_publication" },
@@ -606,7 +609,7 @@ fn difference(before: &Value, after: &Value) -> Value {
         "before_bindings": before["mechanism_bindings"], "after_bindings": after["mechanism_bindings"],
         "before_context_hash": before["mechanism_context_hash"], "after_context_hash": after["mechanism_context_hash"],
     });
-    json!({"outputs":changes,"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"rigid_rotation_groups":{"before":before["rigid_rotation_groups"],"after":after["rigid_rotation_groups"]},"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -1615,6 +1618,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         datum_dimensions::publish(&build, &summary, &mut artifacts)?;
         tolerance_stacks::publish(&build, &summary, &mut artifacts)?;
         clearance::publish(&build, &summary, &mut artifacts)?;
+        rigid_rotation::publish(&build, &summary, &mut artifacts)?;
         summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
         let mut artifact_names = BTreeSet::new();
         for (name, _) in &artifacts {
@@ -1792,6 +1796,26 @@ fn main() {
                         report["diagnostic"] = json!(message);
                         report["lower_bound_mm"] = json!(lower_bound_mm);
                         report["upper_bound_mm"] = json!(upper_bound_mm);
+                    }
+                    cad_build::BuildError::InvalidRotationGroup {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("invalid_rotation_group");
+                        report["group_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::RotationGroupFailed {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("rotation_group_failed");
+                        report["group_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
                     }
                     cad_build::BuildError::InvalidDatumDimension {
                         id,

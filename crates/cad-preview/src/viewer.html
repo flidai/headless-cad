@@ -225,7 +225,7 @@ document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener
 // Only HTTP(S) artifacts participate in live refresh; local files make no requests.
 // Fetch and validate replacements before switching scenes, preserving the camera
 // and last good geometry throughout failed or interrupted builds.
-if(location.protocol==='http:'||location.protocol==='https:'){
+if(!document.getElementById('cad-rigid-rotation-data')&&(location.protocol==='http:'||location.protocol==='https:')){
  const manifestURL=new URL('manifest.json',location.href),previewURL=new URL(location.href);
  const outputName=decodeURIComponent(previewURL.pathname.split('/').pop()).replace(/\.preview\.html$/, '');
  const badge=document.querySelector('.badge');let baseline=null,stopped=false;

@@ -89,12 +89,15 @@ captured recipe without the working source or geometry cache.
 
 ```sh
 cargo build --release --locked -p cad-cli
-python3 scripts/drive_module_demo.py --recipe examples/drive_module_retained.star --out-dir out/retained_drive_demo
+python3 scripts/drive_module_demo.py --recipe examples/drive_module_rotation.star --out-dir out/rotating_drive_demo
 ./target/release/cad serve out --port 8080
 ```
 
-Open `http://localhost:8080/retained_drive_demo/index.html`. Select a shaft or key occurrence
+Open `http://localhost:8080/rotating_drive_demo/index.html`. Select a shaft or key occurrence
 in either assembly preview to inspect that revision's actual Starlark source.
+The phase slider moves nine rotor occurrences together without editing or
+rebuilding the model. Eleven named clearance pairs have native full-path
+certificates; the display is an inspection aid, not the proof.
 The walkthrough is a scripted source edit, not an autonomous AI demo. It shows
 the reproducible workflow an agent can use. Its no-replace publication currently
 requires Linux; use a new output directory for every run.
@@ -2477,6 +2480,53 @@ and at most one full turn in magnitude. Rotation shares the translation work
 budgets. Unsupported intermediate geometry or a path that cannot be certified
 within its budget fails without replacing the last valid generation. Combined
 screw motion, coupled moving bodies and arbitrary trajectories remain unsupported.
+
+### Prescribed rigid rotation groups
+
+`examples/drive_module_rotation.star` extends the retained drive with one full
+turn of its shaft, keyed disc, key, three washers and three open rings. The
+source fixes the remaining fifteen occurrences. `rigid_rotation_group` declares
+exact leaf paths, a reference occurrence, and pivot/axis coordinates in that
+reference body's frame; the builder resolves one shared world rotation.
+A `clearance_check` can reference `rotation_group = "rotor"` instead of a
+single-body translation or rotation.
+
+The eleven named positive-clearance pairs use 21 native distance queries.
+Six pairs have both endpoints in the group, so common rigid motion preserves
+their initial distance. Five pairs use a new rotational-symmetry certificate
+against a stationary native circular extrusion or orthogonal full-turn
+revolution. Complete boundary consistency, axis alignment and arithmetic
+allowances certify the full path. Three actual native queries accompany each
+symmetry proof; they are independent checks, not the continuous proof itself.
+Stationary conical or generally trimmed solids retain generic subdivision.
+
+Clearance report schema 4 distinguishes `common_rigid_motion`, native rotational
+symmetry and Lipschitz subdivision. A symmetry proof carries explicit `[0,1]`
+coverage and no subdivision intervals; physical radius and speed remain nonzero.
+The group report binds exact members, source/assembly identities, the shared path
+and named check IDs. Unqueried members get bounded point-trajectory admission;
+that does not certify their geometry contacts or clearance.
+
+At most 16 groups, 64 members per group and 256 member paths per recipe are
+admitted. Paths must resolve uniquely, group memberships cannot overlap on one
+output, and each group requires a referencing check. Existing native query and
+motion budgets remain enforced. Unsupported or uncertifiable paths fail globally,
+including cache hits and selected outputs, without replacing valid artifacts.
+
+Builds publish `rigid-rotation-groups.json`, its read-only report, and a
+`rotation-<id>.html` inspector when a portable assembly preview is available.
+The phase slider transforms only derived display points and normals. Captured
+source, native dimensions and exported solids remain at the authored pose.
+The inspector uses the captured generation instead of combining motion evidence
+with live updates from another revision.
+
+`tools/check-drive-rotation.py` independently checks both signed full turns on
+two parameter configurations, native proof identities, actual STEP sample
+witnesses, eleven distances at nine phases per case, all 276 occurrence pairs
+at each phase, and failed-publication preservation. Sampled STEP observations
+support the native continuous proof; sampling alone does not close collision
+or mechanical-release gates. Group membership does not certify ring installation,
+strength, preload or unlisted contacts.
 
 ### Finite keyseats in round shafts
 

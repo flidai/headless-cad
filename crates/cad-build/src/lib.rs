@@ -33,6 +33,11 @@ pub use tolerance_stacks::{
     ToleranceStack, ToleranceStackReport, ToleranceStackTerm, ToleranceStackTermReport,
     MAX_TOLERANCE_STACKS, MAX_TOLERANCE_STACK_TERMS, MAX_TOLERANCE_STACK_TERMS_TOTAL,
 };
+mod rotation_groups;
+pub use rotation_groups::{
+    RigidRotationGroup, RigidRotationGroupReport, MAX_ROTATION_GROUPS, MAX_ROTATION_GROUP_MEMBERS,
+    MAX_ROTATION_GROUP_MEMBERS_TOTAL,
+};
 mod datum_dimensions;
 pub use datum_dimensions::{
     DatumDimension, DatumDimensionEndpoint, DatumDimensionReport, DatumDimensionWitness,
@@ -123,6 +128,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("tolerance_stacks.rs").as_slice(),
             include_bytes!("clearance_checks.rs").as_slice(),
             include_bytes!("datum_dimensions.rs").as_slice(),
+            include_bytes!("rotation_groups.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -179,6 +185,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub datum_dimensions: Vec<DatumDimension>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub rigid_rotation_groups: Vec<RigidRotationGroup>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanisms: Vec<MechanismDefinition>,
@@ -230,6 +238,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             datum_dimensions: Option<Vec<DatumDimension>>,
             #[serde(default, deserialize_with = "present_vec")]
+            rigid_rotation_groups: Option<Vec<RigidRotationGroup>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             mechanisms: Option<Vec<MechanismDefinition>>,
@@ -248,6 +258,11 @@ impl<'de> Deserialize<'de> for Recipe {
         {
             return Err(serde::de::Error::custom(
                 "mechanisms require schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.rigid_rotation_groups.is_some() {
+            return Err(serde::de::Error::custom(
+                "rigid rotation groups require schema2",
             ));
         }
         if raw.schema_version == 1 && raw.datum_dimensions.is_some() {
@@ -319,6 +334,7 @@ impl<'de> Deserialize<'de> for Recipe {
             tolerance_stacks: raw.tolerance_stacks.unwrap_or_default(),
             clearance_checks: raw.clearance_checks.unwrap_or_default(),
             datum_dimensions: raw.datum_dimensions.unwrap_or_default(),
+            rigid_rotation_groups: raw.rigid_rotation_groups.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
             mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
@@ -906,6 +922,7 @@ pub struct BuildResult {
     pub tolerance_stacks: BTreeMap<String, ToleranceStackReport>,
     pub clearance_checks: BTreeMap<String, ClearanceCheckReport>,
     pub datum_dimensions: BTreeMap<String, DatumDimensionReport>,
+    pub rigid_rotation_groups: BTreeMap<String, RigidRotationGroupReport>,
     pub face_datums: ResolvedFaceDatums,
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
     pub mechanism_bindings: Vec<MechanismBindingReport>,
@@ -916,6 +933,18 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("invalid rotation group '{id}' on '{output}': {message}")]
+    InvalidRotationGroup {
+        id: String,
+        output: String,
+        message: String,
+    },
+    #[error("rotation group '{id}' on '{output}' failed: {message}")]
+    RotationGroupFailed {
+        id: String,
+        output: String,
+        message: String,
+    },
     #[error("invalid datum dimension '{id}' on '{output}': {message}")]
     InvalidDatumDimension {
         id: String,
@@ -1508,6 +1537,7 @@ impl BuildEngine {
         datum_dimensions::preflight(recipe)?;
         tolerance_stacks::preflight(recipe)?;
         clearance_checks::preflight(recipe)?;
+        rotation_groups::preflight(recipe)?;
         face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
@@ -2006,6 +2036,7 @@ impl BuildEngine {
             tolerance_stacks: BTreeMap::new(),
             clearance_checks: BTreeMap::new(),
             datum_dimensions: BTreeMap::new(),
+            rigid_rotation_groups: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             motion_studies: mechanism_evaluation.motion_studies,
             mechanism_reports: mechanism_evaluation.reports,
@@ -2050,6 +2081,12 @@ impl BuildEngine {
             .chain(recipe.section_views.iter().map(|a| a.output.clone()))
             .chain(recipe.clearance_checks.iter().map(|a| a.output.clone()))
             .chain(recipe.datum_dimensions.iter().map(|a| a.output.clone()))
+            .chain(
+                recipe
+                    .rigid_rotation_groups
+                    .iter()
+                    .map(|a| a.output.clone()),
+            )
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -2076,8 +2113,14 @@ impl BuildEngine {
             tolerance,
             &mut assertion_work_remaining,
         )?;
-        result.clearance_checks =
-            clearance_checks::evaluate(recipe, &assertion_assemblies, tolerance)?;
+        result.rigid_rotation_groups =
+            rotation_groups::evaluate(recipe, &assertion_assemblies, tolerance)?;
+        result.clearance_checks = clearance_checks::evaluate(
+            recipe,
+            &assertion_assemblies,
+            &result.rigid_rotation_groups,
+            tolerance,
+        )?;
         result.datum_dimensions = datum_dimensions::evaluate(
             recipe,
             &assertion_assemblies,

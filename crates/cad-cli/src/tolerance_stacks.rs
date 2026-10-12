@@ -58,7 +58,7 @@ pub(super) fn publish(
             .as_str()
             .ok_or("missing captured stack source")?
     };
-    let mut html = String::from("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Dimensional stacks · Headless CAD</title><style>body{font:16px system-ui;margin:0;padding:32px;background:#101a28;color:#e6edf5}main{max-width:1100px;margin:auto}a{color:#91d1ff}table{width:100%;border-collapse:collapse;margin:24px 0}th,td{text-align:left;padding:12px;border-bottom:1px solid #40546a}code,pre{font:13px monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}section{overflow-x:auto}small{overflow-wrap:anywhere}</style></head><body><main><h1>Worst-case dimensional stacks</h1><p>Source-authored size requirements evaluated against native dimensions. All values are millimetres.</p><p>Independent size intervals; this report does not establish alignment, collision clearance, fit class or manufactured-part conformance.</p><nav><a href=\"tolerance-stacks.json\">Report JSON</a> · <a href=\"recipe.bundle.json\">Captured recipe bundle</a></nav><section><table><thead><tr><th>Stack</th><th>Status</th><th>Nominal</th><th>Measured arithmetic interval</th><th>Measurement evidence</th><th>Worst-case design interval</th><th>Required interval</th></tr></thead><tbody>");
+    let mut html = String::from("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Dimensional stacks · Headless CAD</title><style>body{font:16px system-ui;margin:0;padding:32px;background:#101a28;color:#e6edf5}main{max-width:1100px;margin:auto}a{color:#91d1ff}table{width:100%;border-collapse:collapse;margin:24px 0}th,td{text-align:left;padding:12px;border-bottom:1px solid #40546a}code,pre{font:13px monospace}pre{white-space:pre-wrap;overflow-wrap:anywhere}section{overflow-x:auto}small{overflow-wrap:anywhere}</style></head><body><main><h1>Worst-case dimensional stacks</h1><p>Source-authored size requirements evaluated against native dimensions. All values are millimetres. Display values are rounded; JSON retains full precision.</p><p>Independent size intervals; this report does not establish alignment, collision clearance, fit class or manufactured-part conformance.</p><nav><a href=\"tolerance-stacks.json\">Report JSON</a> · <a href=\"recipe.bundle.json\">Captured recipe bundle</a></nav><section><table><thead><tr><th>Stack</th><th>Status</th><th>Nominal</th><th>Measured arithmetic interval</th><th>Measurement evidence</th><th>Worst-case design interval</th><th>Required interval</th></tr></thead><tbody>");
     html = html.replace(
         "href=\"recipe.bundle.json\">Captured recipe bundle",
         &format!("href=\"{}\">Captured recipe", escape(source_artifact)),
@@ -67,23 +67,22 @@ pub(super) fn publish(
         let lower = stack
             .declaration
             .min
-            .map(|v| v.to_string())
+            .map(report_numbers::number)
             .unwrap_or_else(|| "unbounded".into());
         let upper = stack
             .declaration
             .max
-            .map(|v| v.to_string())
+            .map(report_numbers::number)
             .unwrap_or_else(|| "unbounded".into());
         html.push_str(&format!(
-            "<tr><td>{}</td><td>{}</td><td>{}</td><td>[{}, {}]</td><td>{}</td><td>[{}, {}]</td><td>[{}, {}]</td></tr>",
+            "<tr><td>{}</td><td>{}</td><td>≈ {}</td><td>{}</td><td>{}</td><td>≈ [{}, {}]</td><td>[{}, {}]</td></tr>",
             escape(id),
             escape(&stack.status),
-            stack.nominal_mm,
-            stack.measured_lower_bound_mm,
-            stack.measured_upper_bound_mm,
+            report_numbers::number(stack.nominal_mm),
+            report_numbers::measured(stack.measured_lower_bound_mm, stack.measured_upper_bound_mm),
             if stack.measurement_interval_certified { "Certified native bounds" } else { "Scalar arithmetic only" },
-            stack.lower_limit_mm,
-            stack.upper_limit_mm,
+            report_numbers::number(stack.lower_limit_mm),
+            report_numbers::number(stack.upper_limit_mm),
             lower,
             upper
         ));

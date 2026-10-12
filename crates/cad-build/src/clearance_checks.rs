@@ -43,6 +43,8 @@ pub struct ClearanceCheck {
     pub right_translation: Option<[f64; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub right_rotation: Option<RotationPath>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotation_group: Option<String>,
 }
 impl<'de> Deserialize<'de> for ClearanceCheck {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -58,6 +60,8 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             right_translation: Option<[f64; 3]>,
             #[serde(default)]
             right_rotation: Option<RotationPath>,
+            #[serde(default)]
+            rotation_group: Option<String>,
         }
         let v = serde_json::Value::deserialize(d)?;
         if !v.is_object() {
@@ -74,6 +78,7 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             min_clearance: r.min_clearance,
             right_translation: r.right_translation,
             right_rotation: r.right_rotation,
+            rotation_group: r.rotation_group,
         })
     }
 }
@@ -89,6 +94,14 @@ pub struct ClearanceOccurrenceWitness {
 #[derive(Debug, Clone, Serialize)]
 pub struct ClearanceCheckReport {
     pub declaration: ClearanceCheck,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotation_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub motion_proof: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moving_endpoint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_rotation_world: Option<RotationPath>,
     pub status: String,
     pub assembly_content_hash: String,
     pub left: ClearanceOccurrenceWitness,
@@ -143,10 +156,23 @@ impl ClearanceCheck {
                 "minimum clearance must be finite and strictly positive millimetres",
             ));
         }
-        if self.right_translation.is_some() && self.right_rotation.is_some() {
+        if usize::from(self.right_translation.is_some())
+            + usize::from(self.right_rotation.is_some())
+            + usize::from(self.rotation_group.is_some())
+            > 1
+        {
             return Err(fail(
-                "right_translation and right_rotation are mutually exclusive",
+                "right_translation, right_rotation and rotation_group are mutually exclusive",
             ));
+        }
+        if self.rotation_group.as_ref().is_some_and(|id| {
+            id.is_empty()
+                || id.len() > 128
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        }) {
+            return Err(fail("rotation_group requires a portable group ID"));
         }
         if let Some(r) = &self.right_rotation {
             let norm = r.axis[0].hypot(r.axis[1]).hypot(r.axis[2]);
@@ -183,7 +209,11 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     if recipe
         .clearance_checks
         .iter()
-        .filter(|c| c.right_translation.is_some() || c.right_rotation.is_some())
+        .filter(|c| {
+            c.right_translation.is_some()
+                || c.right_rotation.is_some()
+                || c.rotation_group.is_some()
+        })
         .count()
         > MAX_CLEARANCE_SWEEPS
     {
@@ -215,6 +245,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
 pub(super) fn evaluate(
     recipe: &Recipe,
     assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
+    groups: &BTreeMap<String, RigidRotationGroupReport>,
     tolerance: cad_kernel::Tolerance,
 ) -> Result<BTreeMap<String, ClearanceCheckReport>, BuildError> {
     let mut work = 0usize;
@@ -351,7 +382,127 @@ pub(super) fn evaluate(
         let mut rotation_sweep = None;
         let mut right_rotation_world = None;
         let mut path_uncertainty_mm = None;
-        let (query, lower, upper) = if let Some(local) = c.right_translation {
+        let mut motion_proof = None;
+        let mut moving_endpoint = None;
+        let mut group_rotation_world = None;
+        let (query, lower, upper) = if let Some(group_id) = &c.rotation_group {
+            let group = groups
+                .get(group_id)
+                .ok_or_else(|| fail("rotation group was not resolved".into(), None, None))?;
+            let left_moves = group
+                .members
+                .iter()
+                .any(|m| m.instance_path == c.left_instance_path);
+            let right_moves = group
+                .members
+                .iter()
+                .any(|m| m.instance_path == c.right_instance_path);
+            group_rotation_world = Some(group.rotation_world.clone());
+            if left_moves && right_moves {
+                if sweep_queries >= MAX_CLEARANCE_SWEEP_QUERIES {
+                    return Err(BuildError::ResourceLimit {
+                        resource: "clearance sweep queries",
+                        limit: MAX_CLEARANCE_SWEEP_QUERIES,
+                    });
+                }
+                let query = left_model
+                    .clearance(&right_model, tolerance)
+                    .map_err(|e| fail(e.to_string(), None, None))?;
+                sweep_queries += 1;
+                motion_proof = Some("common_rigid_motion".into());
+                moving_endpoint = Some("both".into());
+                // Exactly the same ideal rigid map acts on both placed snapshots;
+                // Euclidean material distance is invariant for every path time.
+                let lo = (query.lower_bound_mm - uncertainty).next_down();
+                let hi = (query.upper_bound_mm + uncertainty).next_up();
+                if hi - lo > tolerance.linear {
+                    return Err(fail(
+                        "common rigid pair initial clearance unresolved".into(),
+                        Some(lo),
+                        Some(hi),
+                    ));
+                }
+                (query, lo, hi)
+            } else if left_moves || right_moves {
+                let (stationary, moving) = if right_moves {
+                    (&left_model, &right_model)
+                } else {
+                    (&right_model, &left_model)
+                };
+                let world = &group.rotation_world;
+                let b = moving.bounds();
+                let radius = (0..3)
+                    .map(|i| {
+                        (b.min[i] - world.pivot[i])
+                            .abs()
+                            .max((b.max[i] - world.pivot[i]).abs())
+                    })
+                    .fold(0_f64, f64::hypot)
+                    .next_up();
+                let error = (uncertainty
+                    + 2. * group.pivot_uncertainty_mm
+                    + 4. * world.angle_radians.abs() * radius * group.axis_uncertainty)
+                    .next_up();
+                if !error.is_finite() || error > tolerance.linear / 8. {
+                    return Err(fail(
+                        "group path mapping exceeds precision budget".into(),
+                        None,
+                        None,
+                    ));
+                }
+                let budget = cad_kernel::MAX_ROTATION_QUERIES
+                    .min(MAX_CLEARANCE_SWEEP_QUERIES - sweep_queries);
+                if budget < 3 {
+                    return Err(BuildError::ResourceLimit {
+                        resource: "clearance sweep queries",
+                        limit: MAX_CLEARANCE_SWEEP_QUERIES,
+                    });
+                }
+                let required = (c.min_clearance + error).next_up();
+                if !required.is_finite() {
+                    return Err(fail("group threshold overflow".into(), None, None));
+                }
+                let result = stationary
+                    .rotation_clearance(
+                        moving,
+                        world.pivot,
+                        world.axis,
+                        world.angle_radians,
+                        required,
+                        tolerance,
+                        budget,
+                    )
+                    .map_err(|e| fail(e.to_string(), None, None))?;
+                sweep_queries += result.query_count;
+                let mut query = result
+                    .samples
+                    .iter()
+                    .find(|s| s.time == 0.)
+                    .ok_or_else(|| fail("group rotation missing initial query".into(), None, None))?
+                    .query
+                    .clone();
+                if left_moves {
+                    std::mem::swap(&mut query.left_point, &mut query.right_point);
+                    query.axis = query.axis.map(|v| -v);
+                }
+                let lower = (result.lower_bound_mm - error).next_down();
+                let upper = (result.upper_bound_mm + error).next_up();
+                motion_proof = Some("continuous_rotation".into());
+                moving_endpoint = Some(if left_moves { "left" } else { "right" }.into());
+                if right_moves {
+                    right_rotation_world = Some(world.clone());
+                }
+                path_uncertainty_mm = Some(error);
+                rotation_sweep = Some(result);
+                (query, lower, upper)
+            } else {
+                return Err(fail(
+                    "clearance pair has no group member".into(),
+                    None,
+                    None,
+                ));
+            }
+        } else if let Some(local) = c.right_translation {
             let world = right.transform.vector(local);
             let rotation_error =
                 (local.into_iter().map(f64::abs).sum::<f64>() * (1024. * f64::EPSILON)).next_up();
@@ -523,6 +674,10 @@ pub(super) fn evaluate(
             c.id.clone(),
             ClearanceCheckReport {
                 declaration: c.clone(),
+                rotation_group: c.rotation_group.clone(),
+                motion_proof,
+                moving_endpoint,
+                group_rotation_world,
                 status: "passed".into(),
                 assembly_content_hash: assembly.content_hash.clone(),
                 left: left_witness,

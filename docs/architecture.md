@@ -1211,6 +1211,30 @@ stacks explicitly mark measurement arithmetic as uncertified; mixed families
 are rejected until their evidence contracts align. The fixture does not certify hub retention, ring installation
 elasticity, standardized fits or load capacity.
 
+### Source-owned rigid rotation and continuous certificates
+
+A prescribed rigid rotation group resolves one reference-local pivot/axis into
+one world path shared by exact member occurrences. It is source intent, not an
+interactive viewer edit or a general mechanism constraint solution. Every group
+requires explicitly named clearance obligations; reports claim
+`named_pairs_passed`, never whole-assembly collision freedom.
+
+For two moving endpoints, one initial native separation certificate is invariant
+under the common rigid map. For one moving endpoint, the kernel keeps the
+stationary solid first internally, while reports preserve authored pair order
+and identify the moving endpoint. Whole native circular/orthogonal revolved
+stationary boundaries can supply rotational symmetry, with canonical-boundary,
+axis-offset and axis-direction allowances. Arbitrary cone slopes and trimmed
+stationary bodies do not enter this fast path. Other motion retains the bounded
+Lipschitz subdivision algorithm.
+
+Symmetry coverage is an explicit full-path certificate with actual native sample
+witnesses and nonzero physical speed/radius; an empty subdivision list does not
+mean zero motion. All member point trajectories receive source/frame arithmetic
+admission, including unqueried members, without implying native support, contact
+or collision certification for them. The read-only phase inspector stays bound
+to its captured source/geometry/evidence generation and performs no modeling calls.
+
 ## Constraints and assemblies
 
 Stage assembly-solver acceptance separately from today's attachment DAG: first a grounded

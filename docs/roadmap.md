@@ -659,8 +659,11 @@ obligation, with numerical bounds separate from authored size tolerances.
 24 occurrences, 11 part definitions, ten native axial dimensions and two endplay
 stacks. The revision walkthrough rejects excessive clearance and endplay,
 preserves the valid generation, and replays captured source without a cache.
-Next, advance from nominal installed geometry toward installation/motion checks
-and engineering load assumptions, alongside the open drawing and scale gates.
+The rotating-drive extension now prescribes nine co-moving occurrences and
+certifies eleven named separation pairs for a complete signed turn using common
+rigid-motion invariance and native stationary symmetry. Its phase inspector is
+source-bound and read-only. Installation paths, unlisted contacts and engineering
+load assumptions remain open, alongside the drawing and scale gates.
 Bush anchorage, ring installation, standardized fits and load capacity remain
 explicit engineering obligations. These increments advance M2/M4/M6; all five
 commercial release gates remain open.
