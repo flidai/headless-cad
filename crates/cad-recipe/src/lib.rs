@@ -49,6 +49,7 @@ struct GraphStore {
     drawing_sheets: RefCell<Vec<serde_json::Value>>,
     tolerance_stacks: RefCell<Vec<serde_json::Value>>,
     clearance_checks: RefCell<Vec<serde_json::Value>>,
+    datum_dimensions: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     mechanisms: RefCell<Vec<serde_json::Value>>,
     motion_studies: RefCell<Vec<serde_json::Value>>,
@@ -694,6 +695,58 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "duplicate clearance check ID"
         );
         checks.push(serde_json::to_value(check)?);
+        Ok(NoneType)
+    }
+
+    /// Directed distance between native planar semantic datum supports.
+    fn datum_dimension(
+        id: &str,
+        output: &str,
+        from_instance_path: Value,
+        from_datum: &str,
+        to_instance_path: Value,
+        to_datum: &str,
+        direction: Option<i32>,
+        min: Option<Value>,
+        max: Option<Value>,
+        tolerance: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let d = cad_build::DatumDimension {
+            id: id.into(),
+            output: output.into(),
+            from: cad_build::DatumDimensionEndpoint {
+                instance_path: occurrence_path(from_instance_path, "from_instance_path")?,
+                datum: from_datum.into(),
+            },
+            to: cad_build::DatumDimensionEndpoint {
+                instance_path: occurrence_path(to_instance_path, "to_instance_path")?,
+                datum: to_datum.into(),
+            },
+            direction: i8::try_from(direction.unwrap_or(1))?,
+            min: min.filter(|v| !v.is_none()).map(number).transpose()?,
+            max: max.filter(|v| !v.is_none()).map(number).transpose()?,
+            tolerance: tolerance
+                .filter(|v| !v.is_none())
+                .map(|v| -> anyhow::Result<cad_build::DimensionTolerance> {
+                    Ok(serde_json::from_str(&v.to_json()?)?)
+                })
+                .transpose()?,
+        };
+        d.validate()?;
+        let graph = store(eval)?;
+        let mut dimensions = graph.datum_dimensions.borrow_mut();
+        anyhow::ensure!(
+            dimensions.len() < cad_build::MAX_DATUM_DIMENSIONS,
+            "too many datum dimensions"
+        );
+        anyhow::ensure!(
+            !dimensions.iter().any(|old| old["id"]
+                .as_str()
+                .is_some_and(|v| v.eq_ignore_ascii_case(id))),
+            "duplicate datum dimension ID"
+        );
+        dimensions.push(serde_json::to_value(d)?);
         Ok(NoneType)
     }
 
@@ -1507,6 +1560,7 @@ pub fn from_starlark_with_modules(
     let drawing_sheets = graph.drawing_sheets.into_inner();
     let tolerance_stacks = graph.tolerance_stacks.into_inner();
     let clearance_checks = graph.clearance_checks.into_inner();
+    let datum_dimensions = graph.datum_dimensions.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let mechanisms = graph.mechanisms.into_inner();
     let motion_studies = graph.motion_studies.into_inner();
@@ -1514,7 +1568,7 @@ pub fn from_starlark_with_modules(
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() { 2 } else { 1 },
+        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -1532,6 +1586,9 @@ pub fn from_starlark_with_modules(
     }
     if !mechanism_bindings.is_empty() {
         value["mechanism_bindings"] = serde_json::json!(mechanism_bindings);
+    }
+    if !datum_dimensions.is_empty() {
+        value["datum_dimensions"] = serde_json::json!(datum_dimensions);
     }
     if !clearance_checks.is_empty() {
         value["clearance_checks"] = serde_json::json!(clearance_checks);

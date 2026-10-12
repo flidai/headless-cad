@@ -7,8 +7,12 @@ pub const MAX_TOLERANCE_STACK_TERMS_TOTAL: usize = 1024;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ToleranceStackTerm {
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub view: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub dimension: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub datum_dimension: Option<String>,
     pub coefficient: f64,
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -36,14 +40,19 @@ impl<'de> Deserialize<'de> for ToleranceStackTerm {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Raw {
+            #[serde(default)]
             view: String,
+            #[serde(default)]
             dimension: String,
+            #[serde(default)]
+            datum_dimension: Option<String>,
             coefficient: f64,
         }
         let r: Raw = object(d)?;
         Ok(Self {
             view: r.view,
             dimension: r.dimension,
+            datum_dimension: r.datum_dimension,
             coefficient: r.coefficient,
         })
     }
@@ -71,10 +80,17 @@ impl<'de> Deserialize<'de> for ToleranceStack {
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct ToleranceStackTermReport {
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub view: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub dimension: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub datum_dimension: Option<String>,
     pub coefficient: f64,
     pub native_value_mm: f64,
+    pub measurement_interval_certified: bool,
+    pub measurement_lower_bound_mm: f64,
+    pub measurement_upper_bound_mm: f64,
     pub tolerance: DimensionToleranceReport,
     pub lower_limit_mm: f64,
     pub upper_limit_mm: f64,
@@ -84,6 +100,9 @@ pub struct ToleranceStackReport {
     pub declaration: ToleranceStack,
     pub status: String,
     pub nominal_mm: f64,
+    pub measurement_interval_certified: bool,
+    pub measured_lower_bound_mm: f64,
+    pub measured_upper_bound_mm: f64,
     pub lower_limit_mm: f64,
     pub upper_limit_mm: f64,
     pub terms: Vec<ToleranceStackTermReport>,
@@ -119,17 +138,25 @@ impl ToleranceStack {
                 "at least one finite bound required; min <= max; signed bounds allowed",
             ));
         }
+        if self.terms.iter().any(|t| t.datum_dimension.is_some())
+            && self.terms.iter().any(|t| t.datum_dimension.is_none())
+        {
+            return Err(fail("mixing datum dimensions and section dimensions in one stack is unsupported: section arithmetic uncertainty is not certified"));
+        }
         let mut refs = BTreeSet::new();
         for t in &self.terms {
-            if !safe_id(&t.view)
-                || !safe_id(&t.dimension)
+            let valid_reference = match &t.datum_dimension {
+                Some(id) => safe_id(id) && t.view.is_empty() && t.dimension.is_empty(),
+                None => safe_id(&t.view) && safe_id(&t.dimension),
+            };
+            if !valid_reference
                 || !t.coefficient.is_finite()
                 || t.coefficient == 0.
                 || t.coefficient.abs() > 1e6
             {
                 return Err(fail("terms require exact view/dimension IDs and finite nonzero coefficient of magnitude at most 1000000"));
             }
-            if !refs.insert((&t.view, &t.dimension)) {
+            if !refs.insert((&t.view, &t.dimension, &t.datum_dimension)) {
                 return Err(fail("duplicate view/dimension pair in stack"));
             }
         }
@@ -167,6 +194,21 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
             });
         }
         for t in &s.terms {
+            if let Some(id) = &t.datum_dimension {
+                if !recipe
+                    .datum_dimensions
+                    .iter()
+                    .any(|d| d.id == *id && d.tolerance.is_some())
+                {
+                    return Err(BuildError::InvalidToleranceStack {
+                        id: s.id.clone(),
+                        message: format!(
+                            "datum dimension {id} requires an existing authored tolerance"
+                        ),
+                    });
+                }
+                continue;
+            }
             let view = recipe.section_views.iter().find(|v| v.id == t.view);
             let tolerance = view.and_then(|v| {
                 v.dimensions
@@ -217,6 +259,7 @@ fn interval(t: &DimensionToleranceReport, coefficient: f64) -> Result<[f64; 2], 
 pub(super) fn evaluate(
     recipe: &Recipe,
     sections: &BTreeMap<String, SectionViewReport>,
+    datum_dimensions: &BTreeMap<String, DatumDimensionReport>,
 ) -> Result<BTreeMap<String, ToleranceStackReport>, BuildError> {
     let mut reports = BTreeMap::new();
     for s in &recipe.tolerance_stacks {
@@ -231,31 +274,80 @@ pub(super) fn evaluate(
         let mut lower = 0.;
         let mut upper = 0.;
         let mut nominal = 0.;
+        let mut measured_lower = 0.;
+        let mut measured_upper = 0.;
         let mut terms = Vec::new();
         for t in &s.terms {
-            let view = sections
-                .get(&t.view)
-                .ok_or_else(|| fail("referenced section report missing".into(), None, None))?;
-            let resolved = view
-                .dimensions
-                .iter()
-                .find(|d| d.declaration.id == t.dimension)
-                .map(|d| (d.value_mm, d.tolerance.as_ref()))
-                .or_else(|| {
-                    view.circle_dimensions
-                        .iter()
-                        .find(|d| d.declaration.id == t.dimension)
-                        .map(|d| (d.value_mm, d.tolerance.as_ref()))
-                });
-            let (native_value_mm, tolerance) = resolved
-                .and_then(|(value, tol)| tol.map(|t| (value, t)))
-                .ok_or_else(|| {
+            let (
+                native_value_mm,
+                tolerance,
+                measurement_lower_bound_mm,
+                measurement_upper_bound_mm,
+            ) = if let Some(id) = &t.datum_dimension {
+                let d = datum_dimensions.get(id).ok_or_else(|| {
                     fail(
-                        "referenced native dimension tolerance witness missing".into(),
+                        "referenced datum dimension report missing".into(),
                         None,
                         None,
                     )
                 })?;
+                (
+                    d.value_mm,
+                    d.tolerance.as_ref().ok_or_else(|| {
+                        fail(
+                            "referenced datum dimension tolerance missing".into(),
+                            None,
+                            None,
+                        )
+                    })?,
+                    d.lower_bound_mm,
+                    d.upper_bound_mm,
+                )
+            } else {
+                let view = sections
+                    .get(&t.view)
+                    .ok_or_else(|| fail("referenced section report missing".into(), None, None))?;
+                let resolved = view
+                    .dimensions
+                    .iter()
+                    .find(|d| d.declaration.id == t.dimension)
+                    .map(|d| (d.value_mm, d.tolerance.as_ref()))
+                    .or_else(|| {
+                        view.circle_dimensions
+                            .iter()
+                            .find(|d| d.declaration.id == t.dimension)
+                            .map(|d| (d.value_mm, d.tolerance.as_ref()))
+                    });
+                let (native_value_mm, tolerance) = resolved
+                    .and_then(|(value, tol)| tol.map(|t| (value, t)))
+                    .ok_or_else(|| {
+                        fail(
+                            "referenced native dimension tolerance witness missing".into(),
+                            None,
+                            None,
+                        )
+                    })?;
+                (
+                    native_value_mm,
+                    tolerance,
+                    native_value_mm.next_down(),
+                    native_value_mm.next_up(),
+                )
+            };
+            let (ml, mh) = if t.coefficient > 0. {
+                (measurement_lower_bound_mm, measurement_upper_bound_mm)
+            } else {
+                (measurement_upper_bound_mm, measurement_lower_bound_mm)
+            };
+            measured_lower = (measured_lower + (ml * t.coefficient).next_down()).next_down();
+            measured_upper = (measured_upper + (mh * t.coefficient).next_up()).next_up();
+            if !measured_lower.is_finite() || !measured_upper.is_finite() {
+                return Err(fail(
+                    "measured stack arithmetic exceeds finite range".into(),
+                    None,
+                    None,
+                ));
+            }
             let [lo, hi] = interval(tolerance, t.coefficient).map_err(|e| fail(e, None, None))?;
             let next_lower = (lower + lo).next_down();
             let next_upper = (upper + hi).next_up();
@@ -277,8 +369,12 @@ pub(super) fn evaluate(
             terms.push(ToleranceStackTermReport {
                 view: t.view.clone(),
                 dimension: t.dimension.clone(),
+                datum_dimension: t.datum_dimension.clone(),
+                measurement_lower_bound_mm,
+                measurement_upper_bound_mm,
                 coefficient: t.coefficient,
                 native_value_mm,
+                measurement_interval_certified: t.datum_dimension.is_some(),
                 tolerance: tolerance.clone(),
                 lower_limit_mm: lo,
                 upper_limit_mm: hi,
@@ -287,12 +383,25 @@ pub(super) fn evaluate(
         if s.min.is_some_and(|v| lower < v) || s.max.is_some_and(|v| upper > v) {
             return Err(fail("outward worst-case interval exceeds required bounds; no modeling-tolerance slack applies".into(),Some(lower),Some(upper)));
         }
+        if s.terms.iter().all(|t| t.datum_dimension.is_some())
+            && (s.min.is_some_and(|v| measured_lower < v)
+                || s.max.is_some_and(|v| measured_upper > v))
+        {
+            return Err(fail(
+                "native measured stack interval exceeds required bounds".into(),
+                Some(measured_lower),
+                Some(measured_upper),
+            ));
+        }
         reports.insert(
             s.id.clone(),
             ToleranceStackReport {
                 declaration: s.clone(),
                 status: "passed".into(),
                 nominal_mm: nominal,
+                measurement_interval_certified: s.terms.iter().all(|t| t.datum_dimension.is_some()),
+                measured_lower_bound_mm: measured_lower,
+                measured_upper_bound_mm: measured_upper,
                 lower_limit_mm: lower,
                 upper_limit_mm: upper,
                 terms,

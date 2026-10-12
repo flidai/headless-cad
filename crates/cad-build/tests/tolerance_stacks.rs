@@ -148,6 +148,7 @@ fn declaration_resource_limits_are_checked() {
         .collect();
     let terms = (0..32)
         .map(|i| cad_build::ToleranceStackTerm {
+            datum_dimension: None,
             view: "av".into(),
             dimension: format!("d{i}"),
             coefficient: 1.,

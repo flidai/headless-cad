@@ -88,6 +88,7 @@ pub(super) fn scope(
         .map(|a| a.output.as_str())
         .chain(recipe.section_views.iter().map(|a| a.output.as_str()))
         .chain(recipe.clearance_checks.iter().map(|a| a.output.as_str()))
+        .chain(recipe.datum_dimensions.iter().map(|a| a.output.as_str()))
         .collect();
     for output in recipe
         .outputs

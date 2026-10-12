@@ -3,6 +3,17 @@ use super::*;
 
 pub(super) fn objects() -> Vec<ObjectSpec> {
     use ArgumentType as T;
+    let optional_null = |name, kind| {
+        optional(
+            arg(
+                name,
+                T::Nullable {
+                    value: Box::new(kind),
+                },
+            ),
+            json!(null),
+        )
+    };
     let mut count = arg("count", T::Integer);
     count
         .constraints
@@ -272,20 +283,36 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             arg("angle_radians", T::Number),
         ],
     );
+    let mut datum_dimension = object_spec(
+        "datum_dimension",
+        vec![
+            arg("id", T::String),
+            arg("output", T::String),
+            arg("from", object("section_anchor")),
+            arg("to", object("section_anchor")),
+            optional(arg("direction", T::Integer), json!(1)),
+            optional_null("min", T::Number),
+            optional_null("max", T::Number),
+            optional_null("tolerance", object("dimension_tolerance")),
+        ],
+    );
+    datum_dimension.obligations.extend(["schema 2 datum_dimensions; at most 128 globally unique portable IDs; bounded 10000000 aggregate path-component/byte comparison and native geometry work; exact leaf paths only",
+        "Starlark datum_dimension(id,output,from_instance_path,from_datum,to_instance_path,to_datum,direction=1,min=None,max=None,tolerance=None)",
+        "both datums must resolve uniquely to current native planar faces with zero authored offset; transformed native support-plane origins and normals are measured, not section projections or display geometry",
+        "direction must be exactly -1 or 1; signed dot(to_origin-from_origin,direction*from_normal), no absolute value; nonpositive or unresolved measurements fail; normals must be arithmetic-parallel or opposed",
+        "report retains native and world support planes, conservative native extents, semantic face selections, datum and occurrence frames, part hashes, value and explicit arithmetic bounds including admitted angular departure over native extents; global selected-output and warm-cache obligation",
+        "native measurement bounds must entirely satisfy min/max without tolerance slack; authored manufacturing tolerance is separately nominal-checked and is not measurement arithmetic uncertainty"]);
     let mut stack_term = object_spec(
         "tolerance_stack_term",
         vec![
-            arg(
-                "view",
-                T::Reference {
-                    target: "section_view",
-                },
-            ),
-            arg("dimension", T::String),
+            optional(arg("view", T::String), json!("")),
+            optional(arg("dimension", T::String), json!("")),
+            optional_null("datum_dimension", T::String),
             arg("coefficient", T::Number),
         ],
     );
-    stack_term.obligations.extend(["exact view/dimension IDs referencing a native linear/radius/diameter dimension with authored tolerance; no duplicate pair in a stack", "finite nonzero coefficient with absolute value <= 1000000; signed coefficient reverses bounds when negative"]);
+    stack_term.obligations.extend(["exactly one reference form: nonempty view and dimension, or datum_dimension ID; referenced native dimension requires authored tolerance; duplicate references rejected",
+        "finite nonzero coefficient with absolute value <=1000000; negative coefficients reverse interval bounds"]);
     let mut stack = object_spec(
         "tolerance_stack",
         vec![
@@ -312,6 +339,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     stack.obligations.extend(["schema-2 recipe.tolerance_stacks; Starlark tolerance_stack(id,terms,min=None,max=None); strict objects and unknown-field rejection", "case-insensitive unique ASCII identifiers of length 1..128; 64 stacks, 1..32 terms each and 1024 terms total", "at least one finite required bound; signed min/max permitted and min<=max", "independent bounded interval arithmetic: recompute nominal plus signed deviations with outward rounding, outward multiply and accumulate; never reuse rounded absolute report limits as exact inputs", "all resulting bounds must fit required envelope without modeling-tolerance slack; overflow/nonfinite intermediates fail explicitly; global obligation on cache hits and selected builds", "source owns relationships; not root-sum-square statistics, correlation inference, GD&T, fit classes or geometric collision certification", "reports contain declaration, passed status, nominal_mm, lower_limit_mm, upper_limit_mm and native source/tolerance witnesses for every term"]);
+    stack.obligations.extend(["datum-only stacks propagate outward native measurement intervals separately from authored design intervals; both must satisfy required bounds, measurement_interval_certified=true", "section-only stacks preserve prior design-interval checks; measured fields represent outward scalar arithmetic only, measurement_interval_certified=false; mixed datum/section stacks are unsupported"]);
     let mut dimensional_tolerance = object_spec(
         "dimension_tolerance",
         vec![
@@ -426,6 +454,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         dimensional_tolerance,
         stack,
         stack_term,
+        datum_dimension,
         clearance,
         rotation_path,
         cardinality,

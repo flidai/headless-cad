@@ -33,6 +33,11 @@ pub use tolerance_stacks::{
     ToleranceStack, ToleranceStackReport, ToleranceStackTerm, ToleranceStackTermReport,
     MAX_TOLERANCE_STACKS, MAX_TOLERANCE_STACK_TERMS, MAX_TOLERANCE_STACK_TERMS_TOTAL,
 };
+mod datum_dimensions;
+pub use datum_dimensions::{
+    DatumDimension, DatumDimensionEndpoint, DatumDimensionReport, DatumDimensionWitness,
+    MAX_DATUM_DIMENSIONS, MAX_DATUM_DIMENSION_WORK,
+};
 mod clearance_checks;
 pub use clearance_checks::{
     ClearanceCheck, ClearanceCheckReport, ClearanceOccurrenceWitness, RotationPath,
@@ -117,6 +122,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("dimension_tolerance.rs").as_slice(),
             include_bytes!("tolerance_stacks.rs").as_slice(),
             include_bytes!("clearance_checks.rs").as_slice(),
+            include_bytes!("datum_dimensions.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -171,6 +177,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub clearance_checks: Vec<ClearanceCheck>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub datum_dimensions: Vec<DatumDimension>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanisms: Vec<MechanismDefinition>,
@@ -220,6 +228,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             clearance_checks: Option<Vec<ClearanceCheck>>,
             #[serde(default, deserialize_with = "present_vec")]
+            datum_dimensions: Option<Vec<DatumDimension>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             mechanisms: Option<Vec<MechanismDefinition>>,
@@ -238,6 +248,11 @@ impl<'de> Deserialize<'de> for Recipe {
         {
             return Err(serde::de::Error::custom(
                 "mechanisms require schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.datum_dimensions.is_some() {
+            return Err(serde::de::Error::custom(
+                "datum dimensions require schema version 2",
             ));
         }
         if raw.schema_version == 1 && raw.clearance_checks.is_some() {
@@ -303,6 +318,7 @@ impl<'de> Deserialize<'de> for Recipe {
             drawing_sheets: raw.drawing_sheets.unwrap_or_default(),
             tolerance_stacks: raw.tolerance_stacks.unwrap_or_default(),
             clearance_checks: raw.clearance_checks.unwrap_or_default(),
+            datum_dimensions: raw.datum_dimensions.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
             mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
@@ -889,6 +905,7 @@ pub struct BuildResult {
     pub drawing_sheets: BTreeMap<String, DrawingSheetReport>,
     pub tolerance_stacks: BTreeMap<String, ToleranceStackReport>,
     pub clearance_checks: BTreeMap<String, ClearanceCheckReport>,
+    pub datum_dimensions: BTreeMap<String, DatumDimensionReport>,
     pub face_datums: ResolvedFaceDatums,
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
     pub mechanism_bindings: Vec<MechanismBindingReport>,
@@ -899,6 +916,19 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("invalid datum dimension '{id}' on '{output}': {message}")]
+    InvalidDatumDimension {
+        id: String,
+        output: String,
+        message: String,
+    },
+    #[error("datum dimension '{id}' on '{output}' failed: {message}")]
+    DatumDimensionFailed {
+        id: String,
+        output: String,
+        message: String,
+        actual_value: Option<f64>,
+    },
     #[error("motion study '{id}' failed: {message}")]
     MotionStudyFailed {
         id: String,
@@ -1475,6 +1505,7 @@ impl BuildEngine {
         exchange_requirements::preflight(recipe)?;
         section_views::preflight(recipe)?;
         drawing_sheets::preflight(recipe)?;
+        datum_dimensions::preflight(recipe)?;
         tolerance_stacks::preflight(recipe)?;
         clearance_checks::preflight(recipe)?;
         face_datums::preflight(recipe)?;
@@ -1974,6 +2005,7 @@ impl BuildEngine {
             drawing_sheets: BTreeMap::new(),
             tolerance_stacks: BTreeMap::new(),
             clearance_checks: BTreeMap::new(),
+            datum_dimensions: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             motion_studies: mechanism_evaluation.motion_studies,
             mechanism_reports: mechanism_evaluation.reports,
@@ -2017,6 +2049,7 @@ impl BuildEngine {
             .chain(recipe.property_assertions.iter().map(|a| a.output.clone()))
             .chain(recipe.section_views.iter().map(|a| a.output.clone()))
             .chain(recipe.clearance_checks.iter().map(|a| a.output.clone()))
+            .chain(recipe.datum_dimensions.iter().map(|a| a.output.clone()))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -2045,7 +2078,14 @@ impl BuildEngine {
         )?;
         result.clearance_checks =
             clearance_checks::evaluate(recipe, &assertion_assemblies, tolerance)?;
-        result.tolerance_stacks = tolerance_stacks::evaluate(recipe, &result.section_views)?;
+        result.datum_dimensions = datum_dimensions::evaluate(
+            recipe,
+            &assertion_assemblies,
+            &result.face_datums,
+            tolerance,
+        )?;
+        result.tolerance_stacks =
+            tolerance_stacks::evaluate(recipe, &result.section_views, &result.datum_dimensions)?;
         result.drawing_sheets = drawing_sheets::evaluate(recipe, &result.section_views)?;
         result.assemblies = assertion_assemblies
             .into_iter()

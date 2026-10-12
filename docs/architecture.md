@@ -1200,9 +1200,15 @@ faces, including adjacent annular shoulders.
 The isolating retention fixture places an integral shaft shoulder opposite an open
 ring in an actual groove, with flanged bushes and a thrust washer. Native semantic
 face datums identify the thrust planes. Independent signed face measurements
-establish nominal endplay; transverse section dimensions cannot represent this
-axial stack. A source-certified native axial dimension/stack remains a separate
-requirement. The fixture does not certify hub retention, ring installation
+establish nominal endplay. Source-authored directed datum dimensions now measure
+parallel native face support planes independently of drawing projection. Both
+endpoints require unique semantic planar face datums with zero authored offset;
+reversed ordering, tilt and unresolved arithmetic reject. Reports retain native
+supports, occurrence frames, semantic selections, content hashes and numerical
+intervals. Datum-only linear stacks propagate those intervals separately from
+authored manufacturing-size limits and enforce both globally. Existing section
+stacks explicitly mark measurement arithmetic as uncertified; mixed families
+are rejected until their evidence contracts align. The fixture does not certify hub retention, ring installation
 elasticity, standardized fits or load capacity.
 
 ## Constraints and assemblies

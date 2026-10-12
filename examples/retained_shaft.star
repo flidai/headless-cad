@@ -70,12 +70,37 @@ clearance_check(id = "right_bearing", output = "retained_shaft", left_instance_p
 clearance_check(id = "washer_bearing", output = "retained_shaft", left_instance_path = ["washer"], right_instance_path = ["right_bush"], min_clearance = required_clearance)
 # Intentional washer/ring and ring/groove-wall contacts are not positive-gap
 # queries. Native semantic face datums retain the stop planes for independent
-# measurement: (p+22.9) - (p+20) - 1.5 - 1.2 = 0.20 mm total nominal endplay.
-# Native transverse section dimensions cannot currently measure this axial stack.
-nominal_endplay = (p+22.9)-(p+20)-1.5-1.2
+# measurement. The directed native dimensions and stack below certify the
+# 0.20 mm nominal endplay and separate authored worst-case design interval.
 pi = 3.141592653589793
 b = 2.02
 removed_area = b*sqrt(r*r-b*b)+r*r*asin(b/r)-2*(r-2)*b
 shaft_volume = pi*((r+2)*(r+2)*12.9+r*r*(p+70-12.9)-1.25*(r*r-(r-0.6)*(r-0.6)))-13.5*removed_area
 assert_property(id = "native_shaft_volume", output = "shaft", property = "volume_mm3", min = shaft_volume-0.000001, max = shaft_volume+0.000001)
 assert_faces(id = "seat_floor", from_feature = shaft_body, role = "keyseat_floor", in_feature = shaft_body, count = 1)
+
+# Native directed support-plane dimensions, independent of section projection.
+# Bounds certify nominal geometry; authored +/-0.01 deviations describe design
+# manufacturing limits, not manufactured-part conformance or GD&T.
+datum_dimension(id = "shaft_stop_span", output = "retained_shaft",
+    from_instance_path = ["shaft"], from_datum = "shoulder",
+    to_instance_path = ["shaft"], to_datum = "loaded_groove_wall", direction = 1,
+    tolerance = {"nominal":p+22.9,"lower":-0.01,"upper":0.01})
+datum_dimension(id = "bush_stop_span", output = "retained_shaft",
+    from_instance_path = ["left_bush"], from_datum = "outer_thrust",
+    to_instance_path = ["right_bush"], to_datum = "outer_thrust", direction = -1,
+    tolerance = {"nominal":p+20,"lower":-0.01,"upper":0.01})
+datum_dimension(id = "washer_thickness", output = "retained_shaft",
+    from_instance_path = ["washer"], from_datum = "start",
+    to_instance_path = ["washer"], to_datum = "end", direction = -1,
+    tolerance = {"nominal":1.5,"lower":-0.01,"upper":0.01})
+datum_dimension(id = "ring_thickness", output = "retained_shaft",
+    from_instance_path = ["retaining_ring"], from_datum = "start",
+    to_instance_path = ["retaining_ring"], to_datum = "end", direction = -1,
+    tolerance = {"nominal":1.2,"lower":-0.01,"upper":0.01})
+tolerance_stack(id = "shaft_endplay", terms = [
+    {"datum_dimension":"shaft_stop_span","coefficient":1},
+    {"datum_dimension":"bush_stop_span","coefficient":-1},
+    {"datum_dimension":"washer_thickness","coefficient":-1},
+    {"datum_dimension":"ring_thickness","coefficient":-1},
+], min = 0.1, max = 0.3)

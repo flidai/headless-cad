@@ -6,6 +6,15 @@ fn retention_source_keeps_actual_stop_datums_clearances_and_replay() {
     let replay: cad_build::Recipe = serde_json::from_str(&json).unwrap();
     assert_eq!(json, serde_json::to_string(&replay).unwrap());
     let built = cad_build::build(&replay).unwrap();
+    assert_eq!(built.datum_dimensions.len(), 4);
+    let endplay = &built.tolerance_stacks["shaft_endplay"];
+    assert!(endplay.measurement_interval_certified);
+    assert!(endplay.measured_lower_bound_mm < 0.2 && endplay.measured_upper_bound_mm > 0.2);
+    assert!(endplay.lower_limit_mm < 0.16 && endplay.upper_limit_mm > 0.24);
+    assert!(endplay.terms.iter().all(|t| t.datum_dimension.is_some()
+        && t.view.is_empty()
+        && t.dimension.is_empty()
+        && t.measurement_interval_certified));
     let stop = &built.face_datums["shaft"];
     assert_eq!(
         stop["shoulder"].selection.status,
@@ -59,4 +68,22 @@ fn retention_selected_outputs_keep_global_checks_and_threshold_only_reuses_geome
     let cached = engine.build_outputs(&recipe, &["washer".into()]).unwrap();
     assert_eq!(cached.stats.computed_solids, 0);
     assert_eq!(cached.feature_hashes, first.feature_hashes);
+}
+
+#[test]
+fn retained_source_directed_measurements_reject_reversed_order_and_invalid_direction() {
+    let reversed = SOURCE.replace(
+        "to_datum = \"loaded_groove_wall\", direction = 1",
+        "to_datum = \"loaded_groove_wall\", direction = -1",
+    );
+    let r = cad_recipe::from_starlark("reversed.star", &reversed).unwrap();
+    assert!(matches!(
+        cad_build::build(&r),
+        Err(cad_build::BuildError::DatumDimensionFailed { .. })
+    ));
+    let malformed = SOURCE.replace(
+        "to_datum = \"loaded_groove_wall\", direction = 1",
+        "to_datum = \"loaded_groove_wall\", direction = 0",
+    );
+    assert!(cad_recipe::from_starlark("invalid.star", &malformed).is_err());
 }

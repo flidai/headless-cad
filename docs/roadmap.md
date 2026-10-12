@@ -653,8 +653,14 @@ actual stock meridian. Independent exchange checks cover three installed
 configurations and six isolated scale/pose cases, full moments, native topology,
 mesh closure, part interference and nominal axial endplay.
 
-Next, make axial endplay a source-authored obligation measured from semantic
-native datums, then integrate shaft and hub retention into the drive module.
+Directed native datum dimensions now make axial endplay a source-authored
+obligation, with numerical bounds separate from authored size tolerances.
+`drive_module_retained.star` integrates both shaft and hub nominal retention:
+24 occurrences, 11 part definitions, ten native axial dimensions and two endplay
+stacks. The revision walkthrough rejects excessive clearance and endplay,
+preserves the valid generation, and replays captured source without a cache.
+Next, advance from nominal installed geometry toward installation/motion checks
+and engineering load assumptions, alongside the open drawing and scale gates.
 Bush anchorage, ring installation, standardized fits and load capacity remain
 explicit engineering obligations. These increments advance M2/M4/M6; all five
 commercial release gates remain open.

@@ -76,11 +76,20 @@ def main():
         if baseline != inventory(stage / 'after'):
             raise ValueError('rejected revision changed published artifacts')
         save('rejected-edit.json', failure)
+        endplay_failure = None
+        if 'param(name = "minimum_endplay"' in source:
+            endplay_failure = run('build', stage / 'after.star', '--out-dir', stage / 'after',
+                                  '--cache-dir', stage / 'cache', '--param', 'minimum_endplay=0.3', failure=True)
+            if endplay_failure.get('code') != 'tolerance_stack_failed':
+                raise ValueError(f'expected native endplay stack rejection: {endplay_failure}')
+            if baseline != inventory(stage / 'after'):
+                raise ValueError('rejected endplay revision changed published artifacts')
+            save('rejected-endplay-edit.json', endplay_failure)
         # Rebuild captured source after removing the working copy: a release must
         # not depend on mutable authoring files or a warm geometry cache.
         (stage / 'after.star').unlink()
         replay = run('build', stage / 'after/recipe.star', '--out-dir', stage / 'replay')
-        for key in ['recipe_source_hash', 'feature_hashes', 'clearance_checks']:
+        for key in ['recipe_source_hash', 'feature_hashes', 'clearance_checks', 'datum_dimensions', 'tolerance_stacks']:
             if after[key] != replay[key]:
                 raise ValueError(f'offline source replay differs: {key}')
         if (stage / 'replay/recipe.star').read_text() != revised:
@@ -98,15 +107,17 @@ def main():
             'after_recipe_context_hash': after['recipe_context_hash'],
             'changes': {'design_revision': ['A', 'B'], 'shaft_diameter_mm': [12, 14], 'mounting_pitch_mm': [60, 72]},
             'rejected_edit_preserved_generation': True, 'captured_source_replayed': True,
+            'rejected_endplay_preserved_generation': endplay_failure is not None,
             'commands': commands,
-            'scope': 'Supported geometry demonstration; nominal fits and hardware envelopes do not establish rated torque, axial retention or manufacturing certification.'})
+            'scope': 'Supported geometry demonstration; nominal fits and hardware envelopes do not establish rated torque, load-bearing retention or manufacturing certification.'})
         links = []
         for name, label in [('before', 'Original design'), ('after', 'Revised design')]:
             files = sorted((stage / name).glob('*'))
             artifact_links = ' · '.join(f'<a href="{name}/{html.escape(p.name, quote=True)}">{html.escape(p.name)}</a>'
-                                      for p in files if p.suffix in ['.step', '.svg', '.csv'] or p.name in ['clearance-checks.html', 'manifest.json'])
+                                      for p in files if p.suffix in ['.step', '.svg', '.csv'] or p.name in ['clearance-checks.html', 'datum-dimensions.html', 'tolerance-stacks.html', 'manifest.json'])
             links.append(f'<section><h2>{label}</h2><p><a href="{name}/drive_module_release.preview.html">Inspect assembly and captured recipe</a></p><p>{artifact_links}</p></section>')
-        (stage / 'index.html').write_text('''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Drive module · Review a design revision</title><style>body{font:17px system-ui;background:#101a28;color:#e6edf5;max-width:1000px;margin:48px auto;padding:0 24px;line-height:1.6}a{color:#91d1ff}section{border-top:1px solid #40546a;margin-top:24px}p{overflow-wrap:anywhere}</style><h1>Review a drive-module revision</h1><p>Experimental, scripted source workflow. Shaft diameter changes from 12 to 14 mm; mounting pitch changes from 60 to 72 mm.</p><p><a href="revision.patch">Review source patch</a> · <a href="semantic-diff.json">Geometry and engineering diff</a> · <a href="walkthrough.json">Execution record</a></p>''' + ''.join(links) + '''<section><h2>Rejected edit and replay</h2><p>A 0.3 mm clearance requirement fails. Every byte of the last valid revised generation is preserved. The captured recipe also rebuilds without the working source or geometry cache.</p><p><a href="rejected-edit.json">Failure diagnostic</a> · <a href="replay-verification.json">Replay integrity</a></p></section><p>Component geometry and hardware envelopes remain experimental. Nominal fits do not certify rated torque, axial retention, manufacturing readiness, or general CAD support.</p></html>''')
+        endplay_link = '<p>A 0.3 mm minimum endplay also fails the native dimensional stack, preserving every published byte. <a href="rejected-endplay-edit.json">Endplay failure diagnostic</a></p>' if endplay_failure else ''
+        (stage / 'index.html').write_text('''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Drive module · Review a design revision</title><style>body{font:17px system-ui;background:#101a28;color:#e6edf5;max-width:1000px;margin:48px auto;padding:0 24px;line-height:1.6}a{color:#91d1ff}section{border-top:1px solid #40546a;margin-top:24px}p{overflow-wrap:anywhere}</style><h1>Review a drive-module revision</h1><p>Experimental, scripted source workflow. Shaft diameter changes from 12 to 14 mm; mounting pitch changes from 60 to 72 mm.</p><p><a href="revision.patch">Review source patch</a> · <a href="semantic-diff.json">Geometry and engineering diff</a> · <a href="walkthrough.json">Execution record</a></p>''' + ''.join(links) + '''<section><h2>Rejected edit and replay</h2><p>A 0.3 mm clearance requirement fails. Every byte of the last valid revised generation is preserved. The captured recipe also rebuilds without the working source or geometry cache.</p><p><a href="rejected-edit.json">Failure diagnostic</a> · <a href="replay-verification.json">Replay integrity</a></p>''' + endplay_link + '''</section><p>Component geometry and hardware envelopes remain experimental. Nominal fits do not certify rated torque, load-bearing retention, manufacturing readiness, or general CAD support.</p></html>''')
         # Publish only after the complete walkthrough succeeds. Refuse to replace
         # another evidence run, including one created while this run was building.
         if destination.exists():

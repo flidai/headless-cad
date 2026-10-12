@@ -83,26 +83,26 @@ portable route across operating systems.
 The experimental bearing-drive walkthrough changes shaft diameter from 12 to
 14 mm and mounting pitch from 60 to 72 mm. It builds both revisions, records a
 source patch and semantic diff, publishes native engineering checks and section
-sheets with STEP/BOM artifacts, then rejects an excessive clearance requirement
+sheets with STEP/BOM artifacts, then rejects excessive clearance and endplay requirements
 without changing the last valid generation. Finally it rebuilds the revised
 captured recipe without the working source or geometry cache.
 
 ```sh
 cargo build --release --locked -p cad-cli
-python3 scripts/drive_module_demo.py --recipe examples/drive_module_keyed.star --out-dir out/keyed_drive_demo
+python3 scripts/drive_module_demo.py --recipe examples/drive_module_retained.star --out-dir out/retained_drive_demo
 ./target/release/cad serve out --port 8080
 ```
 
-Open `http://localhost:8080/keyed_drive_demo/index.html`. Select a shaft or key occurrence
+Open `http://localhost:8080/retained_drive_demo/index.html`. Select a shaft or key occurrence
 in either assembly preview to inspect that revision's actual Starlark source.
 The walkthrough is a scripted source edit, not an autonomous AI demo. It shows
 the reproducible workflow an agent can use. Its no-replace publication currently
 requires Linux; use a new output directory for every run.
 
-The assembly includes a cut shaft, keyed disc and separate key, with simplified
-fastener envelopes. Nominal geometric engagement is independently checked.
-Axial retention, rated torque, load ratings, threads and complete manufacturing
-specification remain design work. Native size and clearance checks cover their
+The assembly includes a stepped keyed shaft, keyed disc, separate key, flanged
+bushes and actual retaining rings, grooves and washers. Native dimensions enforce
+separate shaft and hub endplay stacks. Ring installation, rated torque, load
+ratings, threads and complete manufacturing specification remain design work. Native size and clearance checks cover their
 named obligations, not whole-assembly certification. The five commercial release
 gates remain open.
 
@@ -2523,8 +2523,9 @@ and shared mesh boundaries follow the stepped shape.
 The example assembles the shaft, two opposed flanged bushes, a washer and an
 open C-ring. Native clearance checks use the actual stock meridians and surviving
 boundary witnesses. Parameter revisions preserve the intended 0.20 mm nominal
-axial endplay. Tests measure that endplay from native semantic face datums;
-source-authored axial stack certification is the next increment.
+axial endplay. Source-authored directed dimensions measure native semantic face planes, and a
+worst-case dimensional stack enforces endplay globally, including cached and
+selected-output builds.
 
 `tools/check-retained-shaft.py` checks three installed configurations and six
 isolated scale/pose cases against independent moments and imported STEP geometry,
@@ -2535,6 +2536,60 @@ the captured recipe when any occurrence is selected.
 This isolates nominal shaft retention assuming fixed bush seats. It does not
 establish hub retention, housing anchorage, ring installation or elasticity,
 standardized fits, or load capacity.
+
+### Native axial dimensions and retained drive module
+
+`datum_dimension` measures directed separation between parallel native planar
+faces, selected through semantic datums and exact assembly occurrence paths.
+Use `direction = 1` along the first face's outward normal or `-1` against it.
+Reversed stops, tilted planes, plain coordinate datums and offset face datums
+are rejected. Numerical bounds and authored size tolerances remain distinct.
+
+```python
+datum_dimension(
+    id = "washer_width", output = "assembly",
+    from_instance_path = ["washer"], from_datum = "start",
+    to_instance_path = ["washer"], to_datum = "end", direction = -1,
+    tolerance = {"nominal": 1.5, "lower": -0.01, "upper": 0.01},
+)
+```
+
+A tolerance-stack term may reference `{"datum_dimension":"washer_width",
+"coefficient":-1}`. Datum-only stacks enforce both the outward-rounded design
+interval and the independently propagated native measurement interval.
+Existing section-dimension stacks retain their design-interval semantics and
+mark their measurement arithmetic as uncertified; mixing the two term families
+in one stack is currently rejected. Builds publish `datum-dimensions.json` and
+a read-only HTML report, with native face, placement and source witnesses.
+Stack report schema 2 links the dimension evidence by digest.
+
+`examples/drive_module_retained.star` composes the keyed drive with flanged bushes,
+a stepped shaft, three actual retaining grooves, three open rings and three
+washers. Its 24 occurrences use 11 part definitions. Ten native axial dimensions
+feed separate shaft and hub endplay stacks: each has 0.20 mm nominal endplay,
+with illustrative worst-case design intervals of 0.13–0.27 mm and 0.115–0.285 mm.
+These are authored design limits, not supplier-certified fits or ring properties.
+
+```sh
+python3 scripts/drive_module_demo.py --recipe examples/drive_module_retained.star --out-dir out/retained_drive_demo
+cad serve out --port 8080
+```
+
+Open `/retained_drive_demo/index.html` on the server. Review a source revision
+from 12 to 14 mm shaft diameter and 60 to 72 mm mounting pitch, inspect the captured
+recipe, and open axial-dimension and endplay reports. Both an excessive clearance
+requirement and an excessive endplay requirement preserve the previous generation.
+Captured source replays without the authoring file or geometry cache.
+
+`tools/check-retained-drive-module.py` independently reconstructs three parameter
+configurations, compares every exported STEP leaf in both directions, checks all
+276 occurrence pairs for unintended solid overlap, and measures actual retention
+contacts and gaps. Full assembly and material moments, BOM, native axial
+dimensions and endplay intervals have separate expected results.
+
+The installed geometry has explicit nominal shaft and hub retention. Ring spring
+installation, rated axial/torque loads, thread engagement/preload, standardized
+fits and manufacturing release remain open engineering work.
 
 ### Through-keyways in annular hubs
 

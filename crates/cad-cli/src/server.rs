@@ -493,6 +493,20 @@ fn gallery(directory: &Dir) -> String {
                 url(&stack_report)
             ));
         }
+        let datum_report = if folder.is_empty() {
+            "datum-dimensions.html".to_owned()
+        } else {
+            format!("{folder}/datum-dimensions.html")
+        };
+        if directory
+            .metadata(&datum_report)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!(
+                "<a href=\"{}\">Axial dimensions</a>",
+                url(&datum_report)
+            ));
+        }
         let clearance_report = if folder.is_empty() {
             "clearance-checks.html".to_owned()
         } else {
