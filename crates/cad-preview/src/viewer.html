@@ -6,9 +6,11 @@
 <style>
 :root{color-scheme:light;font-family:system-ui,sans-serif;color:#243a34;background:#f5f6f4}*{box-sizing:border-box}body{margin:0}header{height:72px;border-bottom:1px solid #dbe1dc;display:flex;align-items:center;padding:0 28px;gap:16px;background:#fff}header b{font-size:15px;letter-spacing:.08em}header span{color:#7d8b83;font-size:13px}.badge{margin-left:auto;border:1px solid #d4ded7;padding:6px 10px;border-radius:16px;font-size:11px;letter-spacing:.07em}main{display:grid;grid-template-columns:minmax(0,1fr) 290px;height:calc(100dvh - 72px)}.viewport{position:relative;min-height:350px;overflow:hidden}canvas{width:100%;height:100%;display:block;touch-action:none;cursor:grab}canvas:active{cursor:grabbing}.toolbar{position:absolute;top:20px;left:24px;display:flex;gap:5px;flex-wrap:wrap;right:20px}button{border:1px solid #d7dfd8;background:#fff;color:#35554a;padding:8px 12px;border-radius:6px;font:inherit;font-size:12px;cursor:pointer;box-shadow:0 2px 4px #1231}button:hover,button[aria-pressed=true]{background:#e0ebe4;border-color:#8cac97}button:focus-visible{outline:3px solid #328469;outline-offset:2px}.hint{position:absolute;bottom:20px;left:24px;font-size:12px;color:#73847a;pointer-events:none}aside{min-width:0;padding:28px 24px;background:#fff;border-left:1px solid #dbe1dc;overflow:auto}h1{font-size:22px;letter-spacing:-.04em;font-weight:550;margin:0 0 6px}.muted{font-size:12px;color:#79867d;line-height:1.6}.section{margin-top:30px}h2{text-transform:uppercase;font-size:10px;letter-spacing:.12em;color:#7d8b83;margin:0 0 12px}dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:12px;font-size:12px}dt{color:#708076}dd{margin:0;font-family:ui-monospace,monospace;font-size:12px}#selection{border:1px dashed #d5e0d7;border-radius:8px;padding:16px;font-size:12px;line-height:1.8;color:#607469}footer{margin-top:28px;font-size:11px;color:#8b958f;line-height:1.6}@media(max-width:700px){main{grid-template-columns:1fr;height:auto}.viewport{height:65dvh}aside{border-left:0;border-top:1px solid #dbe1dc}.badge{display:none}header{padding:0 18px}.toolbar{left:12px}}
 main.recipe-open{grid-template-columns:minmax(0,1fr) minmax(340px,440px)}#recipe-panel[hidden]{display:none}#recipe-source{max-width:100%;margin:14px 0 0;padding:14px;background:#f5f7f4;border:1px solid #dce4dc;border-radius:6px;overflow:auto;max-height:45dvh;white-space:pre;font:12px/1.65 ui-monospace,monospace;tab-size:4}#recipe-summary{overflow-wrap:anywhere}#recipe-parameters{margin-top:14px}#recipe-parameters dd{overflow-wrap:anywhere}#recipe-heading{margin-bottom:8px}@media(max-width:700px){main.recipe-open{grid-template-columns:1fr}#recipe-source{max-height:55dvh}}
+
+.engineering-check{border:1px solid #dce4dc;border-radius:5px;padding:9px 11px;margin-top:8px;overflow-wrap:anywhere}.engineering-check summary{cursor:pointer;font-weight:600}.engineering-check p{font-size:12px;margin:7px 0 0}.engineering-check-actual{font-variant-numeric:tabular-nums}.engineering-check-hash{font-family:ui-monospace,monospace}
 </style>
 <header><b>HEADLESS CAD</b><span>/ model inspector</span><span class="badge">LOCAL ARTIFACT</span></header>
-<main><div class="viewport"><canvas id="view" tabindex="0" aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, click a face to inspect. Use view buttons for keyboard access."></canvas><div class="toolbar"><button data-view="iso">Isometric</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Right</button><button id="fit">Fit</button><button id="edges" aria-pressed="true">Edges</button><button id="recipe-toggle" aria-expanded="false" aria-controls="recipe-panel">Recipe</button></div><div class="hint">Drag to orbit · Scroll to zoom · Click to inspect a face</div></div><aside><h1>Model overview</h1><div class="muted">Boundary representation<br>All dimensions in millimetres</div><section id="recipe-panel" class="section" aria-labelledby="recipe-heading" hidden><h2 id="recipe-heading">Recipe source</h2><div id="recipe-summary" class="muted"></div><dl id="recipe-parameters"></dl><pre id="recipe-source" tabindex="0" aria-label="Read-only recipe source"></pre></section><div id="occurrences-section" class="section" hidden><h2>Assembly occurrences</h2><select id="occurrence-select" aria-label="Select assembly occurrence" style="width:100%;padding:8px;border:1px solid #d7dfd8;border-radius:6px;background:white"></select><p class="muted">Material volume sums occurrences, including overlaps. Bounds conservatively enclose transformed local bounds. Software display expands shared meshes only while drawing.</p></div><div class="section"><h2>Geometry</h2><dl id="geometry"></dl></div><div class="section"><h2>Dimensions</h2><dl id="dimensions"></dl></div><div class="section"><h2>Face inspector</h2><div id="selection" aria-live="polite">Select a face in the viewport.</div></div><footer>This preview is generated from the model's face boundaries. Use the build manifest for validation results and STEP for CAD interchange.</footer></aside></main>
+<main><div class="viewport"><canvas id="view" tabindex="0" aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, click a face to inspect. Use view buttons for keyboard access."></canvas><div class="toolbar"><button data-view="iso">Isometric</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Right</button><button id="fit">Fit</button><button id="edges" aria-pressed="true">Edges</button><button id="recipe-toggle" aria-expanded="false" aria-controls="recipe-panel">Recipe</button></div><div class="hint">Drag to orbit · Scroll to zoom · Click to inspect a face</div></div><aside><h1>Model overview</h1><div class="muted">Boundary representation<br>All dimensions in millimetres</div><section id="recipe-panel" class="section" aria-labelledby="recipe-heading" hidden><h2 id="recipe-heading">Recipe source</h2><div id="recipe-summary" class="muted"></div><dl id="recipe-parameters"></dl><pre id="recipe-source" tabindex="0" aria-label="Read-only recipe source"></pre></section><section class="section" aria-labelledby="engineering-checks-heading"><h2 id="engineering-checks-heading">Engineering checks</h2><p id="engineering-checks-summary" class="muted"></p><div id="engineering-checks"></div></section><div id="occurrences-section" class="section" hidden><h2>Assembly occurrences</h2><select id="occurrence-select" aria-label="Select assembly occurrence" style="width:100%;padding:8px;border:1px solid #d7dfd8;border-radius:6px;background:white"></select><p class="muted">Material volume sums occurrences, including overlaps. Bounds conservatively enclose transformed local bounds. Software display expands shared meshes only while drawing.</p></div><div class="section"><h2>Geometry</h2><dl id="geometry"></dl></div><div class="section"><h2>Dimensions</h2><dl id="dimensions"></dl></div><div class="section"><h2>Face inspector</h2><div id="selection" aria-live="polite">Select a face in the viewport.</div></div><footer>This preview is generated from the model's face boundaries. Use the build manifest for validation results and STEP for CAD interchange.</footer></aside></main>
 <script id="cad-scene-data" type="application/json">/*SCENE_DATA*/null</script>
 <script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
 <script>
@@ -71,7 +73,48 @@ function overview(){
  bounds=scene.bounds||[[0,0,0],[0,0,0]];size=bounds[1].map((n,i)=>n-bounds[0][i]);center=bounds[0].map((n,i)=>n/2+bounds[1][i]/2);
  rows('dimensions',[['Width / X',fmt(size[0])],['Depth / Y',fmt(size[1])],['Height / Z',fmt(size[2])]]);
 }
+function renderEngineeringChecks(context) {
+ const container=document.getElementById('engineering-checks'),summary=document.getElementById('engineering-checks-summary');
+ container.replaceChildren();
+ const reports=context?.property_assertions;
+ const entries=reports&&typeof reports==='object'&&!Array.isArray(reports)?Object.entries(reports):[];
+ summary.textContent=entries.length
+  ? 'Captured native build results. Checks apply to named outputs, regardless of the selected occurrence. Bounds are inclusive.'
+  : 'No engineering checks included in this artifact.';
+ const text=(tag,value,className)=>{const element=document.createElement(tag);element.textContent=value;if(className)element.className=className;return element};
+ for(const [id,check] of entries){
+  const card=document.createElement('details');card.className='engineering-check';card.dataset.assertionId=id;card.dataset.checkId=id;
+  const finite=value=>value==null||typeof value==='number'&&Number.isFinite(value);
+  const knownProperty=check&&typeof check.property==='string'&&(/^(volume_mm3|mass_kg)$/.test(check.property)||/^(volume_centroid_[xyz]_mm|mass_centroid_[xyz]_mm|volume_inertia_(xx|yy|zz|xy|xz|yz)_mm5|mass_inertia_(xx|yy|zz|xy|xz|yz)_kg_mm2)$/.test(check.property));
+  const valid=check&&typeof check==='object'&&knownProperty&&typeof check.output==='string'&&check.output.length>0&&typeof check.target_content_hash==='string'&&check.target_content_hash.length>0
+   &&['passed','out_of_range','unavailable'].includes(check.status)&&finite(check.actual)&&finite(check.min)&&finite(check.max)
+   &&(check.min!=null||check.max!=null)&&(check.min==null||check.max==null||check.min<=check.max)
+   &&(check.status!=='passed'||check.actual!=null&&(check.min==null||check.actual>=check.min)&&(check.max==null||check.actual<=check.max));
+  const mismatch=valid&&check.output===context.output_name&&check.target_content_hash!==context.content_hash;
+  if(!valid||mismatch){
+   card.dataset.status='unavailable';card.append(text('summary',id+' · Evidence unavailable'));
+   card.append(text('p',mismatch?'Target content hash does not match the displayed output.':'Captured check evidence is malformed or unrecognized.'));
+   container.append(card);continue;
+  }
+  card.dataset.status=check.status;card.dataset.output=check.output;
+  const suffixes=[['_kg_mm2','kg·mm²'],['_mm5','mm⁵'],['_mm3','mm³'],['_mm','mm'],['_kg','kg']];
+  const suffix=suffixes.find(([ending])=>check.property.endsWith(ending));
+  const unit=suffix?suffix[1]:'',property=(suffix?check.property.slice(0,-suffix[0].length):check.property).replaceAll('_',' ');
+  const number=value=>value==null?'Unavailable':String(value)+(unit?' '+unit:'');
+  const status={passed:'Passed',out_of_range:'Out of range',unavailable:'Unavailable'}[check.status]||String(check.status);
+  card.append(text('summary',id+' · '+status+' · '+number(check.actual)));
+  card.append(text('p',property+': '+number(check.actual),'engineering-check-actual'));
+  const range=check.min!=null&&check.max!=null?number(check.min)+' ≤ value ≤ '+number(check.max)
+   :check.min!=null?'value ≥ '+number(check.min):check.max!=null?'value ≤ '+number(check.max):'No bounds';
+  card.append(text('p','Required: '+range));
+  card.append(text('p','Output: '+check.output+(check.output===context.output_name?' · displayed output':' · other build output')));
+  if(check.message)card.append(text('p',check.message));
+  card.append(text('p','Target content hash: '+check.target_content_hash,'muted engineering-check-hash'));
+  container.append(card);
+ }
+}
 function recipeOverview(){
+ renderEngineeringChecks(recipeContext);
  const context=recipeContext,summary=document.getElementById('recipe-summary'),source=document.getElementById('recipe-source'),parameters=document.getElementById('recipe-parameters');
  parameters.replaceChildren();
  document.querySelector('h1').textContent=context?context.output_name:'Model overview';

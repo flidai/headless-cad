@@ -1003,9 +1003,14 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             "source": summary["recipe_source"],
             "generation_mode": summary["generation_mode"],
             "scope": summary["scope"],
+            "property_assertions": summary["property_assertions"],
+            "kernel_build_id": summary["kernel_build_id"],
+            "executor_build_id": summary["executor_build_id"],
         }))?)
         .to_hex()
         .to_string());
+        let property_assertions: BTreeMap<String, cad_preview::EngineeringCheck> =
+            serde_json::from_value(summary["property_assertions"].clone())?;
         let mut names = BTreeSet::new();
         for (name, output) in &build.outputs {
             filename(name)?;
@@ -1043,6 +1048,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 output_name: name.clone(),
                 feature_id: output.feature_id.clone(),
                 parameters: parameters.clone(),
+                property_assertions: property_assertions.clone(),
                 content_hash: output.content_hash.clone(),
                 recipe_context_hash: summary["recipe_context_hash"]
                     .as_str()
@@ -1155,6 +1161,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 output_name: name.clone(),
                 feature_id: assembly.assembly_id.clone(),
                 parameters: parameters.clone(),
+                property_assertions: property_assertions.clone(),
                 content_hash: assembly.content_hash.clone(),
                 recipe_context_hash: summary["recipe_context_hash"].as_str().unwrap().to_owned(),
             };

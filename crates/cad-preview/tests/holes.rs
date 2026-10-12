@@ -75,6 +75,7 @@ fn streamed_hole_triangle_counts_force_legacy_fan_clients_to_fail_closed() {
         parameters: Default::default(),
         content_hash: assembly.content_hash.clone(),
         recipe_context_hash: "context".into(),
+        property_assertions: Default::default(),
     };
     let bundle = cad_preview::to_assembly_stream_bundle(assembly, &context, true).unwrap();
     let metadata: Value = serde_json::from_str(&bundle.scene_json).unwrap();
@@ -152,6 +153,7 @@ fn custom_tolerance_flows_through_body_and_all_assembly_renderers() {
         parameters: Default::default(),
         content_hash: assembly.content_hash.clone(),
         recipe_context_hash: "small-context".into(),
+        property_assertions: Default::default(),
     };
     assert!(cad_preview::to_assembly_html_with_tolerance(&assembly, &context, tolerance).is_ok());
     assert!(cad_preview::to_assembly_svg_with_tolerance(&assembly, tolerance).is_ok());

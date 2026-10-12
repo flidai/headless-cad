@@ -43,6 +43,25 @@ pub struct RecipeContext {
     pub content_hash: String,
     /// Identity of source bytes and metadata in that same build manifest.
     pub recipe_context_hash: String,
+    /// Captured native build obligations, including targets outside this output.
+    /// The publisher binds these reports into `recipe_context_hash`.
+    #[serde(default)]
+    pub property_assertions: BTreeMap<String, EngineeringCheck>,
+}
+
+/// Read-only evidence supplied by the headless builder, never measured from a mesh.
+/// This display DTO keeps the preview independent of the build executor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EngineeringCheck {
+    pub output: String,
+    pub property: String,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+    pub actual: Option<f64>,
+    pub status: String,
+    pub target_content_hash: String,
+    pub message: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -329,6 +348,35 @@ fn render_html_template(
         if recipe.parameters.values().any(|value| !value.is_finite()) {
             return Err(PreviewError::Recipe("parameter overrides must be finite"));
         }
+        for check in recipe.property_assertions.values() {
+            if check
+                .min
+                .into_iter()
+                .chain(check.max)
+                .chain(check.actual)
+                .any(|v| !v.is_finite())
+                || (check.min.is_none() && check.max.is_none())
+                || matches!((check.min, check.max), (Some(min), Some(max)) if min > max)
+                || !matches!(
+                    check.status.as_str(),
+                    "passed" | "out_of_range" | "unavailable"
+                )
+                || check.output.is_empty()
+                || check.property.is_empty()
+                || check.target_content_hash.is_empty()
+                || (check.output == recipe.output_name
+                    && check.target_content_hash != recipe.content_hash)
+                || (check.status == "passed"
+                    && !check.actual.is_some_and(|value| {
+                        check.min.is_none_or(|min| value >= min)
+                            && check.max.is_none_or(|max| value <= max)
+                    }))
+            {
+                return Err(PreviewError::Recipe(
+                    "invalid or mismatched engineering check evidence",
+                ));
+            }
+        }
     }
     let value = serde_json::to_value(data)?;
     let has_holes = |body: &serde_json::Value| {
@@ -568,6 +616,7 @@ mod tests {
             parameters: BTreeMap::from([("width".into(), 12.5)]),
             content_hash: "geometry-test".into(),
             recipe_context_hash: "recipe-test".into(),
+            property_assertions: Default::default(),
         };
         let html = to_html_with_recipe(&model, &recipe).unwrap();
         assert_eq!(html.matches("<script>").count(), 1);
@@ -604,9 +653,73 @@ mod tests {
             parameters: BTreeMap::from([("width".into(), f64::NAN)]),
             content_hash: "geometry-test".into(),
             recipe_context_hash: "recipe-test".into(),
+            property_assertions: Default::default(),
         };
         assert!(matches!(
             to_html_with_recipe(&model, &recipe),
+            Err(PreviewError::Recipe(_))
+        ));
+    }
+
+    #[test]
+    fn engineering_evidence_is_captured_safely_and_rejects_invalid_success() {
+        let model = extrude_rectangle(1.0, 2.0, 3.0, Tolerance::default())
+            .unwrap()
+            .model;
+        let mut context = RecipeContext {
+            language: "starlark".into(),
+            source: String::new(),
+            source_name: "part.star".into(),
+            output_name: "part".into(),
+            feature_id: "body".into(),
+            parameters: BTreeMap::new(),
+            content_hash: "body-hash".into(),
+            recipe_context_hash: "context-hash".into(),
+            property_assertions: BTreeMap::from([(
+                "</script><img src=x>".into(),
+                EngineeringCheck {
+                    output: "part".into(),
+                    property: "volume_mm3".into(),
+                    min: Some(5.),
+                    max: Some(7.),
+                    actual: Some(6.),
+                    status: "passed".into(),
+                    target_content_hash: "body-hash".into(),
+                    message: Some("</script><script>globalThis.pwned=true</script>".into()),
+                },
+            )]),
+        };
+        let html = to_html_with_recipe(&model, &context).unwrap();
+        assert!(!html.contains("<img src=x>"));
+        assert!(!html.contains("<script>globalThis.pwned"));
+        let json = serde_json::to_value(&context).unwrap();
+        let mut old = json.clone();
+        old.as_object_mut().unwrap().remove("property_assertions");
+        assert!(serde_json::from_value::<RecipeContext>(old)
+            .unwrap()
+            .property_assertions
+            .is_empty());
+        for invalid in [f64::NAN, f64::INFINITY, 8.] {
+            context
+                .property_assertions
+                .values_mut()
+                .next()
+                .unwrap()
+                .actual = Some(invalid);
+            assert!(matches!(
+                to_html_with_recipe(&model, &context),
+                Err(PreviewError::Recipe(_))
+            ));
+        }
+        context = serde_json::from_value(json).unwrap();
+        context
+            .property_assertions
+            .values_mut()
+            .next()
+            .unwrap()
+            .target_content_hash = "stale-body".into();
+        assert!(matches!(
+            to_html_with_recipe(&model, &context),
             Err(PreviewError::Recipe(_))
         ));
     }

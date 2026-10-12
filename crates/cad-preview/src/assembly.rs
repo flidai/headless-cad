@@ -516,6 +516,7 @@ mod tests {
             parameters: BTreeMap::new(),
             content_hash: assembly.content_hash.clone(),
             recipe_context_hash: "source".into(),
+            property_assertions: Default::default(),
         };
         let bundle = to_assembly_stream_bundle(&assembly, &recipe, true).unwrap();
         assert_eq!(bundle.assets.len(), 1);
@@ -640,6 +641,7 @@ mod tests {
             parameters: BTreeMap::new(),
             content_hash: assembly.content_hash.clone(),
             recipe_context_hash: "source-hash".into(),
+            property_assertions: Default::default(),
         };
         let html = to_assembly_html(&assembly, &context).unwrap();
         let mut hostile = context.clone();

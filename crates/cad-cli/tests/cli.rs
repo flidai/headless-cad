@@ -1095,6 +1095,31 @@ assert_property(id='inertia',output='balanced',property='mass_inertia_zz_kg_mm2'
         manifest["property_assertions"],
         initial["property_assertions"]
     );
+    let embedded_context = |path: &std::path::Path| -> serde_json::Value {
+        let html = fs::read_to_string(path).unwrap();
+        let json = html
+            .split("<script id=\"cad-recipe-data\" type=\"application/json\">")
+            .nth(1)
+            .unwrap()
+            .split("</script>")
+            .next()
+            .unwrap();
+        serde_json::from_str(json).unwrap()
+    };
+    let context = embedded_context(&out.join("block.preview.html"));
+    assert_eq!(
+        context["property_assertions"],
+        manifest["property_assertions"]
+    );
+    assert_eq!(
+        context["recipe_context_hash"],
+        manifest["recipe_context_hash"]
+    );
+    assert_eq!(context["output_name"], "block");
+    assert_ne!(
+        context["property_assertions"]["balance"]["target_content_hash"],
+        context["content_hash"]
+    );
     let checked = successful_json(cli(&[
         "check",
         out.join("recipe.json").to_str().unwrap(),
@@ -1166,6 +1191,33 @@ assert_property(id='inertia',output='balanced',property='mass_inertia_zz_kg_mm2'
         difference["property_assertions"]["balance"]["before"]["actual"],
         difference["property_assertions"]["balance"]["after"]["actual"]
     );
+    fs::write(&source, recipe.replace("max=21)", "max=22)")).unwrap();
+    let rebuilt = successful_json(cli(&args));
+    assert_eq!(
+        rebuilt["outputs"]["block"]["content_hash"],
+        initial["outputs"]["block"]["content_hash"]
+    );
+    assert_ne!(
+        rebuilt["recipe_context_hash"],
+        initial["recipe_context_hash"]
+    );
+    let refreshed = embedded_context(&out.join("block.preview.html"));
+    assert_eq!(refreshed["property_assertions"]["balance"]["max"], 22.);
+    assert_eq!(
+        refreshed["property_assertions"],
+        rebuilt["property_assertions"]
+    );
+
+    let all = successful_json(cli(&args[..args.len() - 2]));
+    for suffix in ["preview.html", "gpu.html", "stream.html"] {
+        let context = embedded_context(&out.join(format!("balanced.{suffix}")));
+        assert_eq!(context["property_assertions"], all["property_assertions"]);
+        assert_eq!(context["recipe_context_hash"], all["recipe_context_hash"]);
+        assert_eq!(
+            context["content_hash"],
+            context["property_assertions"]["balance"]["target_content_hash"]
+        );
+    }
 }
 
 #[test]

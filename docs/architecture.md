@@ -263,6 +263,16 @@ value and target content hash. Build manifests retain these reports alongside
 source and build identity; failure preserves the preceding artifact generation.
 Semantic diff includes changed assertion limits independently of geometry edits.
 
+Canvas, embedded GPU and streamed GPU previews carry these captured reports in
+their recipe context. The context identity includes all property reports and
+kernel/executor identities, so an unchanged selected body cannot retain stale
+assembly evidence after another target changes. The read-only checks panel
+distinguishes the displayed output from other named build outputs, shows exact
+serialized measured values and inclusive bounds, and exposes target hashes.
+Malformed or mismatched displayed-output evidence cannot render as passed.
+Canvas refresh replaces checks with the generation; GPU views require reload.
+Inspection never evaluates an assertion or fetches exact bodies to measure it.
+
 The mounted drive module now has fixed material-volume, mass-budget and balance
 limits. Its tests use independent density-weighted formulas across docking edits
 and reject overweight/unbalanced variants during body-only builds. A separate

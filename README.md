@@ -92,6 +92,14 @@ it is not a reconstructed recipe inferred from geometry. Starlark builds also
 export `recipe.star`; `recipe.json` remains the resolved graph. Source-only edits
 refresh the recipe panel even when the geometry is unchanged.
 
+The **Engineering checks** panel shows captured native property assertions,
+including measured values, inclusive bounds and the output each check applies
+to. Expand a check for its target content hash. Checks on other build outputs
+remain labeled as such when inspecting a selected part. These are published
+build results, not measurements of the display mesh; picking never runs a query.
+Canvas refreshes the checks with the published generation. GPU views require
+a reload after rebuilding.
+
 ## Build useful examples
 
 ```sh

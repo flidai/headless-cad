@@ -81,6 +81,7 @@ assembly_output(name="assembly",assembly=s)
         parameters: Default::default(),
         content_hash: assembly.content_hash.clone(),
         recipe_context_hash: "context".into(),
+        property_assertions: Default::default(),
     };
     let bundle = cad_preview::to_assembly_stream_bundle(assembly, &context, true).unwrap();
     let metadata: Value = serde_json::from_str(&bundle.scene_json).unwrap();
