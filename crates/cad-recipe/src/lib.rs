@@ -36,6 +36,7 @@ struct GraphStore {
     assembly_outputs: RefCell<Vec<serde_json::Value>>,
     face_assertions: RefCell<Vec<serde_json::Value>>,
     property_assertions: RefCell<Vec<serde_json::Value>>,
+    exchange_requirements: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
@@ -486,6 +487,36 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// Declare a publication requirement; native builds leave it pending.
+    fn require_exchange(
+        id: &str,
+        output: &str,
+        format: &str,
+        aspect: &str,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let requirement = cad_build::ExchangeRequirement {
+            id: id.into(),
+            output: output.into(),
+            format: format.into(),
+            aspect: aspect.into(),
+        };
+        requirement.validate()?;
+        let graph = store(eval)?;
+        let mut requirements = graph.exchange_requirements.borrow_mut();
+        anyhow::ensure!(
+            requirements.len() < cad_build::MAX_EXCHANGE_REQUIREMENTS,
+            "recipe exceeds {} exchange requirements",
+            cad_build::MAX_EXCHANGE_REQUIREMENTS
+        );
+        anyhow::ensure!(
+            !requirements.iter().any(|a| a["id"].as_str() == Some(id)),
+            "duplicate exchange requirement ID '{id}'"
+        );
+        requirements.push(serde_json::to_value(requirement)?);
+        Ok(NoneType)
+    }
+
     /// Gate publication on native engineering properties of a named output.
     fn assert_property(
         id: &str,
@@ -914,11 +945,12 @@ pub fn from_starlark_with_params(
     let assembly_outputs = graph.assembly_outputs.into_inner();
     let face_assertions = graph.face_assertions.into_inner();
     let property_assertions = graph.property_assertions.into_inner();
+    let exchange_requirements = graph.exchange_requirements.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() { 2 } else { 1 },
+        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -927,6 +959,9 @@ pub fn from_starlark_with_params(
         value["parts"] = serde_json::json!(parts);
         value["assemblies"] = serde_json::json!(assemblies);
         value["assembly_outputs"] = serde_json::json!(assembly_outputs);
+    }
+    if !exchange_requirements.is_empty() {
+        value["exchange_requirements"] = serde_json::json!(exchange_requirements);
     }
     if !property_assertions.is_empty() {
         value["property_assertions"] = serde_json::json!(property_assertions);
@@ -2217,5 +2252,56 @@ output(name='triangle',feature=extrude(id='body',profile=p,height=2.5))
                 from_starlark("bad.star", &TRIANGLE.replace("'value':8.25", replacement)).is_err()
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod exchange_requirement_tests {
+    use super::*;
+    const BODY: &str = "b=extrude(id='b',profile=rectangle(id='p',width=2,depth=3),height=4)\noutput(name='body',feature=b)\n";
+    #[test]
+    fn exchange_dsl_promotes_schema_and_remains_pending_in_native_build() {
+        let source =
+            format!("{BODY}require_exchange(id='units',output='body',format='stl',aspect='units')");
+        let recipe = from_starlark("exchange.star", &source).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        assert_eq!(recipe.exchange_requirements.len(), 1);
+        let built = cad_build::build(&recipe).unwrap();
+        assert_eq!(
+            built.pending_exchange_requirements,
+            recipe.exchange_requirements
+        );
+        assert!(built.property_assertions.is_empty());
+        let again = from_starlark("exchange.star", &source).unwrap();
+        assert_eq!(again.exchange_requirements, recipe.exchange_requirements);
+    }
+    #[test]
+    fn malformed_exchange_declarations_and_overflow_are_rejected() {
+        for args in [
+            "id='',output='body',format='step',aspect='units'",
+            "id='x',output=' body',format='step',aspect='units'",
+            "id='x',output='body',format='obj',aspect='units'",
+            "id='x',output='body',format='step',aspect='mystery'",
+        ] {
+            assert!(from_starlark("bad.star", &format!("{BODY}require_exchange({args})")).is_err());
+        }
+        let declaration = "require_exchange(id='x',output='body',format='step',aspect='units')\n";
+        assert!(from_starlark("bad.star", &format!("{BODY}{declaration}{declaration}")).is_err());
+        let many = format!("{BODY}def many():\n    for i in range(257):\n        require_exchange(id=str(i),output='body',format='step',aspect='units')\nmany()");
+        assert!(from_starlark("overflow.star", &many)
+            .unwrap_err()
+            .to_string()
+            .contains("256 exchange requirements"));
+        let unknown = from_starlark(
+            "unknown.star",
+            &format!(
+                "{BODY}require_exchange(id='x',output='missing',format='step',aspect='units')"
+            ),
+        )
+        .unwrap();
+        assert!(matches!(
+            cad_build::build(&unknown),
+            Err(cad_build::BuildError::InvalidExchangeRequirement { .. })
+        ));
     }
 }

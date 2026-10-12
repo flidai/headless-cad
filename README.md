@@ -771,8 +771,40 @@ STL do not carry the same units, assembly structure or source intent. A native
 attachment datum is not manufacturing GD&T, and a modeling uncertainty value is
 not a dimensional tolerance. Unknown source provenance is reported explicitly.
 These are exporter declarations with source inspection, not an independent
-round-trip certificate. Required-field release policies and manufacturing PMI
-remain future work; `cad verify` checks bytes, not engineering completeness.
+round-trip certificate. Source requirements can gate publication as described below; manufacturing PMI
+remains future work. `cad verify` checks bytes, not engineering completeness.
+
+### Require exchange semantics before publication
+
+Declare the handoff contract in Starlark (or schema-2 JSON IR):
+
+```python
+require_exchange(id = "units", output = "plate", format = "step", aspect = "units")
+require_exchange(id = "solid", output = "plate", format = "step", aspect = "geometry")
+```
+
+See [exchange_contract.star](examples/exchange_contract.star) and the nine STEP
+requirements in [round_bearing_cartridge.star](examples/round_bearing_cartridge.star).
+`cad capabilities --type exchange_requirement` lists the accepted formats and
+aspects. A requirement passes only when the exporter declares the aspect
+`supported` and its inspected source count is positive. Approximate, omitted,
+absent and unknown values fail; requiring STL units or manufacturing PMI therefore
+fails with the current exporters.
+
+Full `cad build` evaluates every declaration before atomic publication, including
+cache hits. Every required output must be selected. Display-only publication
+cannot satisfy these obligations. A failure returns `exchange_requirement_failed`
+with the requirement and observed status/count, preserving the previous complete
+generation. Successful manifest records bind each requirement to its source
+output and fidelity-report digest. The captured recipe and context retain policy
+intent independently of geometry identity. `cad diff` reports added, changed and
+removed requirements even when output geometry stays unchanged.
+
+`check`, `inspect`, `properties`, `bom`, `select`, and native SDK builds leave
+publication requirements pending; successful geometry validation does not establish a released
+exchange. This policy enforces current exporter declarations, not downstream
+importer behavior or manufacturing certification. Drawings, GD&T and independent
+semantic round trips remain separate release obligations.
 
 ### Verify a published generation
 

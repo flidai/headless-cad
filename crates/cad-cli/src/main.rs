@@ -238,6 +238,8 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "feature_hashes": build.feature_hashes,
         "face_assertions": build.face_assertions,
         "property_assertions": build.property_assertions,
+        "exchange_requirements": exchange::pending(&recipe.exchange_requirements),
+        "exchange_policy_status": if recipe.exchange_requirements.is_empty() { "not_requested" } else { "pending_publication" },
         "sketch_reports": build.sketch_reports,
         "face_datums": build.face_datums,
         "outputs": outputs,
@@ -470,6 +472,29 @@ fn difference(before: &Value, after: &Value) -> Value {
             (name.clone(), json!({"status":status,"before":a,"after":b}))
         })
         .collect();
+    let before_exchange = before["exchange_requirements"]
+        .as_object()
+        .expect("exchange requirements");
+    let after_exchange = after["exchange_requirements"]
+        .as_object()
+        .expect("exchange requirements");
+    let exchange_changes: serde_json::Map<String, Value> = before_exchange
+        .keys()
+        .chain(after_exchange.keys())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|id| {
+            let a = before_exchange.get(id);
+            let b = after_exchange.get(id);
+            let status = match (a, b) {
+                (None, Some(_)) => "added",
+                (Some(_), None) => "removed",
+                (Some(a), Some(b)) if a == b => "unchanged",
+                _ => "changed",
+            };
+            (id.clone(), json!({"status":status,"before":a,"after":b}))
+        })
+        .collect();
     let before_datums = before["face_datums"]
         .as_object()
         .expect("build face datums");
@@ -523,7 +548,7 @@ fn difference(before: &Value, after: &Value) -> Value {
             };
             (id.clone(),json!({"status":status,"before":a,"after":b,"before_hash":old_hash,"after_hash":new_hash}))
         }).collect();
-    json!({"outputs":changes,"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -840,7 +865,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 },
                 "recipe_commands": [
                     {"name":"compile", "publishes_artifacts":false, "evaluates_geometry":false, "purpose":"Compile authoring syntax to recipe IR; this alone does not validate geometry."},
-                    {"name":"check", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Evaluate all outputs and validation obligations."},
+                    {"name":"check", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Evaluate all outputs and native geometry/engineering validation; exchange obligations remain pending until full publication."},
                     {"name":"inspect", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Report output geometry, provenance, scope and checks; optional --output selects the demanded closure."},
                     {"name":"select", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Resolve a source face role through feature history; deletion and ambiguity are explicit."},
                     {"name":"properties", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Measure a named output independently of display LOD; assemblies sum occurrences."},
@@ -885,6 +910,12 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             result["build_scope"] = json!(built.scope);
             result["property_assertions"] = json!(built.property_assertions);
             result["sketch_reports"] = json!(built.sketch_reports);
+            result["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
+            result["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
+                "not_requested"
+            } else {
+                "pending_publication"
+            });
             return Ok(result);
         }
         Command::Select {
@@ -916,6 +947,12 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             report["stats"] = json!(build.stats);
             report["property_assertions"] = json!(build.property_assertions);
             report["sketch_reports"] = json!(build.sketch_reports);
+            report["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
+            report["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
+                "not_requested"
+            } else {
+                "pending_publication"
+            });
             report["snapshot"] = json!({
                 "recipe_source_hash": blake3::hash(&source_bytes).to_hex().to_string(),
                 "parameter_overrides": parameters,
@@ -1049,6 +1086,12 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         )?;
         result["property_assertions"] = json!(build.property_assertions);
         result["sketch_reports"] = json!(build.sketch_reports);
+        result["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
+        result["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
+            "not_requested"
+        } else {
+            "pending_publication"
+        });
         return Ok(result);
     }
     let mut summary = report(&recipe, &build)?;
@@ -1112,6 +1155,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             "generation_mode": summary["generation_mode"],
             "scope": summary["scope"],
             "property_assertions": summary["property_assertions"],
+            "exchange_requirements": recipe.exchange_requirements,
             "sketch_reports": summary["sketch_reports"],
             "solver_build_id": summary["solver_build_id"],
             "kernel_build_id": summary["kernel_build_id"],
@@ -1359,6 +1403,13 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             );
             summary["outputs"][name]["available_files"] = json!(dependencies);
         }
+        summary["exchange_requirements"] =
+            exchange::enforce(&recipe.exchange_requirements, &artifacts, *display_only)?;
+        summary["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
+            "not_requested"
+        } else {
+            "passed"
+        });
         summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
         let mut artifact_names = BTreeSet::new();
         for (name, _) in &artifacts {
@@ -1398,7 +1449,13 @@ fn main() {
             }
             let mut report =
                 json!({ "error": error.to_string(), "code": "invalid_request", "causes": causes });
-            if let Some(integrity) = error.downcast_ref::<integrity::IntegrityError>() {
+            if let Some(requirement) = error.downcast_ref::<exchange::RequirementFailure>() {
+                report["code"] = json!("exchange_requirement_failed");
+                report["requirement"] = json!(requirement.requirement);
+                report["reason"] = json!(requirement.reason);
+                report["observed_status"] = json!(requirement.observed_status);
+                report["source_count"] = json!(requirement.source_count);
+            } else if let Some(integrity) = error.downcast_ref::<integrity::IntegrityError>() {
                 report["code"] = json!("artifact_integrity_failed");
                 report["diagnostic"] = json!(integrity.to_string());
             } else if let Some(selection) = error.downcast_ref::<UnresolvedSelection>() {

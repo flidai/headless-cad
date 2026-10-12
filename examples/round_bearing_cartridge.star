@@ -77,3 +77,13 @@ steel_v = pi*(12*(5.7*5.7-3.1*3.1)+12*(9*length+5.3*5.3*3)+2*(19.8*19.8-100)*(d-
 assert_property(id = "flange_volume", output = "flange", property = "volume_mm3", min = flange_v-0.0001, max = flange_v+0.0001)
 assert_property(id = "assembly_volume", output = "round_bearing_cartridge", property = "volume_mm3", min = 2*flange_v+steel_v-0.0001, max = 2*flange_v+steel_v+0.0001)
 assert_property(id = "assembly_mass", output = "round_bearing_cartridge", property = "mass_kg", min = 2*flange_v*2700e-9+steel_v*7800e-9-0.000001, max = 2*flange_v*2700e-9+steel_v*7800e-9+0.000001)
+
+# Engineering handoff contract: these semantics must survive STEP publication.
+# This does not claim drawings, PMI, fits, loads, or downstream importer fidelity.
+def require_handoff():
+    for aspect in ["geometry", "units", "modeling_tolerance"]:
+        require_exchange(id = "flange_step_" + aspect, output = "flange", format = "step", aspect = aspect)
+    for aspect in ["geometry", "units", "assembly_definitions", "assembly_hierarchy", "occurrence_paths", "occurrence_placements"]:
+        require_exchange(id = "cartridge_step_" + aspect, output = "round_bearing_cartridge", format = "step", aspect = aspect)
+
+require_handoff()

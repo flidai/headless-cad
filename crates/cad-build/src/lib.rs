@@ -28,8 +28,10 @@ pub fn solver_build_id() -> &'static str {
 
 mod assembly;
 mod demand;
+mod exchange_requirements;
 mod property_assertions;
 pub use demand::{BuildMode, BuildScope};
+pub use exchange_requirements::{ExchangeRequirement, EXCHANGE_ASPECTS, MAX_EXCHANGE_REQUIREMENTS};
 pub use property_assertions::{
     EngineeringProperty, PropertyAssertion, PropertyAssertionReport, PropertyAssertionStatus,
     MAX_PROPERTY_ASSERTIONS, MAX_PROPERTY_ASSERTION_WORK,
@@ -71,6 +73,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
             include_bytes!("property_assertions.rs").as_slice(),
+            include_bytes!("exchange_requirements.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -115,6 +118,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub property_assertions: Vec<PropertyAssertion>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub exchange_requirements: Vec<ExchangeRequirement>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
 }
 
@@ -148,6 +153,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             property_assertions: Option<Vec<PropertyAssertion>>,
             #[serde(default, deserialize_with = "present_vec")]
+            exchange_requirements: Option<Vec<ExchangeRequirement>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
         }
         let raw = RawRecipe::deserialize(deserializer)?;
@@ -156,6 +163,11 @@ impl<'de> Deserialize<'de> for Recipe {
         {
             return Err(serde::de::Error::custom(
                 "assembly fields require recipe schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.exchange_requirements.is_some() {
+            return Err(serde::de::Error::custom(
+                "exchange requirements require recipe schema version 2",
             ));
         }
         if raw.schema_version == 1 && raw.property_assertions.is_some() {
@@ -184,6 +196,7 @@ impl<'de> Deserialize<'de> for Recipe {
             assembly_outputs: raw.assembly_outputs.unwrap_or_default(),
             face_assertions: raw.face_assertions.unwrap_or_default(),
             property_assertions: raw.property_assertions.unwrap_or_default(),
+            exchange_requirements: raw.exchange_requirements.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
         })
     }
@@ -694,12 +707,18 @@ pub struct BuildResult {
     pub stats: BuildStats,
     pub face_assertions: BTreeMap<String, FaceResolution>,
     pub property_assertions: BTreeMap<String, PropertyAssertionReport>,
+    /// Unenforced publication obligations; native geometry success does not satisfy them.
+    pub pending_exchange_requirements: Vec<ExchangeRequirement>,
     pub face_datums: ResolvedFaceDatums,
     selection_graph: selection::SelectionGraph,
 }
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("exchange requirements require recipe schema version 2")]
+    ExchangeRequirementSchema,
+    #[error("invalid exchange requirement '{id}': {message}")]
+    InvalidExchangeRequirement { id: String, message: String },
     #[error("invalid sketch feature '{feature}': {message}")]
     Sketch { feature: String, message: String },
     #[error("sketch feature '{feature}' did not solve completely")]
@@ -1191,6 +1210,7 @@ impl BuildEngine {
         }
         assembly::resource_limits(recipe)?;
         property_assertions::preflight(recipe)?;
+        exchange_requirements::preflight(recipe)?;
         face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
@@ -1578,6 +1598,7 @@ impl BuildEngine {
             stats,
             face_assertions: BTreeMap::new(),
             property_assertions: BTreeMap::new(),
+            pending_exchange_requirements: recipe.exchange_requirements.clone(),
             face_datums: BTreeMap::new(),
             selection_graph,
         };

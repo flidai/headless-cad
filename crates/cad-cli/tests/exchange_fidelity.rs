@@ -127,6 +127,17 @@ fn exchange_reports_bind_each_export_to_source_and_complete_integrity_inventory(
                 blake3::hash(&bytes).to_hex().to_string()
             );
             assert_eq!(artifact["report"]["format"], format);
+            let aspects: std::collections::BTreeSet<_> = artifact["report"]["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| entry["aspect"].as_str().unwrap())
+                .collect();
+            assert_eq!(
+                aspects,
+                cad_build::EXCHANGE_ASPECTS.into_iter().collect(),
+                "source policy vocabulary must cover the actual exporter report"
+            );
             assert_eq!(
                 artifact["report"]["source_kind"],
                 if name == "body" { "body" } else { "assembly" }

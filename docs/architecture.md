@@ -1592,9 +1592,16 @@ preserved, approximate, omitted and inapplicable aspects, with source counts
 where the native body/assembly exposes them and unknown presence otherwise.
 Source output, recipe/context and export-byte digests bind the declaration to
 one generation; artifact verification also covers the report. Display-only
-publication emits no report for absent exchange files. This establishes the
-reporting boundary, not a manufacturing release gate: independent round-trip
-semantic checks, required-field policy enforcement and PMI remain unfinished.
+publication emits no report for absent exchange files. Source-authored schema-2 `exchange_requirements` now gate full CLI publication:
+require a named output/format/aspect to have supported status and a positive
+inspected source count. Pending obligations remain explicit in native SDK and
+read-only checks. All requirements are global; selected-output and display-only
+builds cannot omit a required handoff. Success records bind report and output
+identities, while failure preserves the previous generation. Recipe diff exposes
+policy additions, changes and removals independently of geometry hashes, so a
+weakened handoff cannot disappear inside an unchanged-solid result. This enforces the
+current exporter mapping; independent round-trip semantic checks, drawing/PMI
+support and complete manufacturing release gates remain unfinished.
 
 Introduce a versioned drawing/annotation IR containing view definitions,
 projection/section intent, semantic references, dimensions, tolerance standards,

@@ -121,7 +121,33 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         "supported planar face frame uses material area centroid and outward normal; ambiguous, nonplanar or unsupported faces fail",
         "rigid attachment datum, not a manufacturing GD&T datum system",
     ]);
-    vec![cardinality, selector, assertion, property, datum]
+    let mut exchange = object_spec(
+        "exchange_requirement",
+        vec![
+            arg("id", T::String),
+            arg("output", reference("output_name")),
+            arg(
+                "format",
+                T::Enum {
+                    values: vec!["step", "stl"],
+                },
+            ),
+            arg(
+                "aspect",
+                T::Enum {
+                    values: crate::EXCHANGE_ASPECTS.to_vec(),
+                },
+            ),
+        ],
+    );
+    exchange.obligations.extend([
+        "schema 2; unique nonempty ID; known output; at most 256 requirements",
+        "publication obligation authored by Starlark require_exchange; native checks leave it pending",
+        "full CLI publication requires supported fidelity status and a positive inspected source count",
+        "global across selected-output builds and cache hits; unselected required outputs and display-only publication fail",
+        "exporter declarations are not independent downstream fidelity evidence or manufacturing certification",
+    ]);
+    vec![cardinality, selector, assertion, property, datum, exchange]
 }
 
 #[cfg(test)]
