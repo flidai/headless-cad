@@ -44,8 +44,11 @@ fn unsupported_circular_revisions_preserve_every_published_artifact() {
         let failed = build();
         assert!(!failed.status.success(), "accepted {placement}");
         let report: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
-        assert!(report.to_string().contains("circular Boolean"), "{report}");
-        assert!(report.to_string().contains("left_lobe"), "{report}");
+        // A rejected difference may try both circular arrangements and round-stock
+        // drilling. The stable API is the failure code and owning feature, not
+        // whichever bounded geometry path supplies the final diagnostic text.
+        assert_eq!(report["code"], "kernel_operation_failed", "{report}");
+        assert_eq!(report["feature"], "left_lobe", "{report}");
         assert_eq!(fs::read(out.join("manifest.json")).unwrap(), manifest_bytes);
         for (name, bytes) in &artifacts {
             assert_eq!(
