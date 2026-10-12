@@ -2171,9 +2171,34 @@ or clip a view; failure preserves the previous generation, including on selected
 builds. Changing only title or revision reuses native geometry.
 
 These sheets compose native section curves and the existing datum and circle
-dimensions. They do not implement projected hidden-line views, fits, manufacturing
-tolerances, GD&T, or a complete approved manufacturing release.
+dimensions. Optional dimensional tolerances are described below. Projected hidden-line views,
+fit classes, GD&T and a complete approved manufacturing release remain open.
 
+
+### Authored dimensional tolerances
+
+Both `section_dimension` and `section_circle_dimension` accept an optional
+`tolerance = {"nominal":6, "lower":0, "upper":0.02}`. Values are millimetres;
+`lower` and `upper` are signed deviations from nominal. This example declares
+6.00–6.02 mm manufacturing size limits. Symmetric, unilateral and same-sign
+intervals are supported when their finite positive limits are numerically resolved.
+
+The native design measurement must match `nominal` within the model's linear
+tolerance. A broad manufacturing interval cannot authorize a different nominal.
+Existing `min`/`max` remain independent design assertions. The generated report
+retains the measured value, nominal, deviations and absolute limits; SVG displays
+nominal followed by signed upper/lower deviations. Changing deviations reuses
+geometry while updating source-bound section and drawing artifacts.
+
+```sh
+cad build examples/bearing_limits.star --out-dir out/bearing_limits
+```
+
+This fixture dimensions a 6 mm bore, 5.6 mm pin and configurable station pitch
+through nested rotated occurrences. Its A4 sheet carries the three authored size
+requirements. These are manufacturing instructions, not measurements of produced
+parts, named fit classes, tolerance-stack analysis or GD&T. STEP currently carries
+geometry; these annotations remain in the revision-bound JSON/SVG deliverables.
 
 ### Native planar edge chamfers
 

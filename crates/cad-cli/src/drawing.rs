@@ -69,7 +69,7 @@ pub(super) fn publish(
             "scale_kind":"paper_mm_per_model_mm","recipe_context_hash":context,
             "recipe_source":summary["recipe_source"],"views":evidence,
             "svg":{"file":svg_name,"algorithm":"blake3","digest":blake3::hash(svg.as_bytes()).to_hex().to_string()},
-            "fidelity":"Native analytic section curves and supported dimensions at explicit scale; no projected hidden lines, fits, tolerances, GD&T or manufacturing approval."});
+            "fidelity":"Native analytic section curves and supported dimensions at explicit scale; optional authored manufacturing size limits; no projected hidden lines, fit classes, GD&T or manufactured-part conformance."});
         summary["drawing_sheets"][id]["artifacts"] = json!({"svg":svg_name,"json":json_name});
         summary["drawing_sheets"][id]["status"] = json!("published");
         artifacts.push((svg_name, svg));

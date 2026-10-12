@@ -29,6 +29,8 @@ pub struct SectionDimension {
     pub min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tolerance: Option<DimensionTolerance>,
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct SectionDimensionReport {
@@ -40,6 +42,8 @@ pub struct SectionDimensionReport {
     pub to_point: [f64; 2],
     pub from_witness: SectionAnchorWitness,
     pub to_witness: SectionAnchorWitness,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tolerance: Option<DimensionToleranceReport>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -61,6 +65,8 @@ pub struct SectionCircleDimension {
     pub min: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tolerance: Option<DimensionTolerance>,
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct SectionCircleDimensionReport {
@@ -76,6 +82,8 @@ pub struct SectionCircleDimensionReport {
     pub instance_path: Option<Vec<String>>,
     pub part_id: Option<String>,
     pub occurrence_frame: Option<cad_assembly::RigidTransform>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tolerance: Option<DimensionToleranceReport>,
 }
 impl SectionCircleDimension {
     pub fn validate(&self) -> Result<(), String> {
@@ -104,6 +112,9 @@ impl SectionCircleDimension {
             || matches!((self.min,self.max),(Some(a),Some(b)) if a>b)
         {
             return Err("circle dimension label offset must be finite nonzero; bounds finite nonnegative and ordered".into());
+        }
+        if let Some(tolerance) = &self.tolerance {
+            tolerance.validate()?;
         }
         Ok(())
     }
@@ -145,6 +156,9 @@ impl SectionDimension {
             return Err(
                 "dimension offset must be finite; bounds finite nonnegative and ordered".into(),
             );
+        }
+        if let Some(tolerance) = &self.tolerance {
+            tolerance.validate()?;
         }
         Ok(())
     }
@@ -616,6 +630,12 @@ fn dimensions(
             ));
         }
         reports.push(SectionDimensionReport {
+            tolerance: d
+                .tolerance
+                .as_ref()
+                .map(|spec| spec.report(value_mm, tolerance))
+                .transpose()
+                .map_err(|message| fail(message, Some(value_mm)))?,
             declaration: d.clone(),
             status: "passed".into(),
             value_mm,
@@ -830,6 +850,12 @@ fn circle_dimensions(
             ));
         }
         reports.push(SectionCircleDimensionReport {
+            tolerance: d
+                .tolerance
+                .as_ref()
+                .map(|spec| spec.report(value_mm, tolerance))
+                .transpose()
+                .map_err(|message| fail(message, Some(value_mm)))?,
             declaration: d.clone(),
             status: "passed".into(),
             value_mm,
@@ -1093,6 +1119,7 @@ mod tests {
     }
     fn dimension() -> SectionDimension {
         SectionDimension {
+            tolerance: None,
             id: "spacing".into(),
             from: SectionAnchor {
                 instance_path: vec!["left".into(), "leaf".into()],
@@ -1231,6 +1258,7 @@ mod tests {
     }
     fn circle_dimension() -> SectionCircleDimension {
         SectionCircleDimension {
+            tolerance: None,
             id: "diameter".into(),
             anchor_feature: "b".into(),
             role: "wall".into(),
@@ -1366,5 +1394,121 @@ mod tests {
         v["section_views"] = serde_json::json!([]);
         v["schema_version"] = 1.into();
         assert!(serde_json::from_value::<Recipe>(v).is_err());
+    }
+    #[test]
+    fn authored_linear_tolerances_are_global_nominal_checks_and_cache_safe() {
+        let mut r = anchored_recipe();
+        let mut d = dimension();
+        d.tolerance = Some(DimensionTolerance {
+            nominal: 76.,
+            lower: 0.1,
+            upper: 0.2,
+        });
+        r.section_views[0].dimensions = vec![d];
+        let mut engine = BuildEngine::default();
+        let first = engine.build_outputs(&r, &["body".into()]).unwrap();
+        let report = first.section_views["local"].dimensions[0]
+            .tolerance
+            .as_ref()
+            .unwrap();
+        assert_eq!(report.nominal_mm, 76.);
+        assert_eq!(report.lower_limit_mm, 76.1);
+        assert_eq!(report.upper_limit_mm, 76.2);
+        // Both positive deviations intentionally exclude the ideal design size.
+        r.section_views[0].dimensions[0]
+            .tolerance
+            .as_mut()
+            .unwrap()
+            .lower = -0.3;
+        let edited = engine.build_outputs(&r, &["body".into()]).unwrap();
+        assert_eq!(edited.stats.computed_solids, 0);
+        assert_eq!(first.feature_hashes, edited.feature_hashes);
+        assert_eq!(
+            edited.section_views["local"].dimensions[0]
+                .tolerance
+                .as_ref()
+                .unwrap()
+                .lower_limit_mm,
+            75.7
+        );
+        r.section_views[0].dimensions[0]
+            .tolerance
+            .as_mut()
+            .unwrap()
+            .nominal = 75.9;
+        let failure = engine.build_outputs(&r, &["body".into()]).unwrap_err();
+        assert!(failure.to_string().contains("nominal"));
+        // Missing tolerance remains backward-compatible and omitted from reports.
+        r.section_views[0].dimensions[0].tolerance = None;
+        let plain = engine.build(&r).unwrap();
+        assert!(
+            serde_json::to_value(&plain.section_views["local"].dimensions[0])
+                .unwrap()
+                .get("tolerance")
+                .is_none()
+        );
+    }
+    #[test]
+    fn authored_circle_tolerances_do_not_relax_nominal_or_design_bounds() {
+        let mut r = circle_recipe();
+        r.section_views[0].circle_dimensions[0].tolerance = Some(DimensionTolerance {
+            nominal: 6.,
+            lower: -0.2,
+            upper: -0.1,
+        });
+        let mut engine = BuildEngine::default();
+        let first = engine.build_outputs(&r, &["other".into()]).unwrap();
+        assert_eq!(
+            first.section_views["circle"].circle_dimensions[0]
+                .tolerance
+                .as_ref()
+                .unwrap()
+                .upper_limit_mm,
+            5.9
+        );
+        r.section_views[0].circle_dimensions[0]
+            .tolerance
+            .as_mut()
+            .unwrap()
+            .upper = 0.1;
+        let edited = engine.build_outputs(&r, &["other".into()]).unwrap();
+        assert_eq!(edited.stats.computed_solids, 0);
+        r.section_views[0].circle_dimensions[0].max = Some(5.99);
+        assert!(engine.build(&r).is_err());
+        r.section_views[0].circle_dimensions[0].max = None;
+        r.section_views[0].circle_dimensions[0]
+            .tolerance
+            .as_mut()
+            .unwrap()
+            .nominal = 6.05;
+        assert!(engine
+            .build_outputs(&r, &["other".into()])
+            .unwrap_err()
+            .to_string()
+            .contains("nominal"));
+        r.section_views[0].circle_dimensions[0]
+            .tolerance
+            .as_mut()
+            .unwrap()
+            .nominal = 6.;
+        r.section_views[0].circle_dimensions[0].kind = SectionCircleDimensionKind::Radius;
+        assert!(engine
+            .build(&r)
+            .unwrap_err()
+            .to_string()
+            .contains("nominal"));
+        r.section_views[0].circle_dimensions[0]
+            .tolerance
+            .as_mut()
+            .unwrap()
+            .nominal = 3.;
+        assert_eq!(
+            engine.build(&r).unwrap().section_views["circle"].circle_dimensions[0]
+                .tolerance
+                .as_ref()
+                .unwrap()
+                .nominal_mm,
+            3.
+        );
     }
 }

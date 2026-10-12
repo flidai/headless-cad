@@ -81,6 +81,14 @@ exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
 
+M6 dimensional tolerances now attach explicit nominal and signed deviations to
+native linear/circular dimensions. `bearing_limits.star` adds bore, pin and pitch
+requirements to a source-owned A4 sheet. Nominal/native agreement remains a
+global build obligation independent of the authored manufacturing interval.
+Geometry reuse, failure preservation and offline annotation replay are acceptance
+requirements. Continue toward fit classes, GD&T, tolerance stacks, manufactured
+inspection and PMI exchange; authored size limits do not close those gates.
+
 M6 now includes source-owned `drawing_sheet` layouts of existing native section
 views and their supported dimensions. `bearing_drawing.star` composes two
 explicitly scaled views with a title/revision block and source/digest witnesses.

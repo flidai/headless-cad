@@ -93,6 +93,7 @@ fn projected_dimensions_are_bounded_escaped_and_keep_occurrences_separate() {
         .unwrap();
     let dimensions = vec![
         Dimension {
+            tolerance: None,
             id: "spacing <&\"'>".into(),
             from: [20., 10.],
             to: [0., 0.],
@@ -101,6 +102,7 @@ fn projected_dimensions_are_bounded_escaped_and_keep_occurrences_separate() {
             value_mm: 20.,
         },
         Dimension {
+            tolerance: None,
             id: "height".into(),
             from: [0., 10.],
             to: [20., 0.],
@@ -194,6 +196,7 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
         .section(plane(), Tolerance::default())
         .unwrap();
     let base = Dimension {
+        tolerance: None,
         id: "spacing".into(),
         from: [0., 0.],
         to: [20., 0.],
@@ -203,46 +206,57 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
     };
     for invalid in [
         Dimension {
+            tolerance: None,
             axis: 2,
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             offset: f64::INFINITY,
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             from: [f64::NAN, 0.],
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             value_mm: f64::NAN,
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             value_mm: 21.,
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             value_mm: 0.,
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             value_mm: -20.,
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             to: [0., 20.],
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             id: "bad\0".into(),
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             id: "bad\u{ffff}".into(),
             ..base.clone()
         },
         Dimension {
+            tolerance: None,
             id: String::new(),
             ..base.clone()
         },
@@ -250,6 +264,7 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
         assert!(cad_export::annotated_section_to_svg(&section, "plate", &[invalid]).is_err());
     }
     let tiny = Dimension {
+        tolerance: None,
         to: [5e-8, 0.],
         value_mm: 5e-8,
         ..base.clone()
@@ -258,6 +273,7 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
     assert!(svg.contains("spacing: 5.000000e-8 mm"));
     assert!(!svg.contains("spacing: 0 mm"));
     let smaller = Dimension {
+        tolerance: None,
         to: [5e-10, 0.],
         value_mm: 5e-10,
         ..base.clone()
@@ -267,6 +283,7 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
             .unwrap();
     assert!(svg.contains("spacing: 5.000000e-10 mm"));
     let translated = Dimension {
+        tolerance: None,
         from: [1e4, 0.],
         to: [1e4 + 0.1, 0.],
         value_mm: 0.1,
@@ -274,6 +291,7 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
     };
     assert!(cad_export::annotated_section_to_svg(&section, "plate", &[translated]).is_ok());
     let unresolved = Dimension {
+        tolerance: None,
         from: [1e14, 0.],
         to: [1e14 + 0.1, 0.],
         value_mm: 0.1,
@@ -281,6 +299,7 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
     };
     assert!(cad_export::annotated_section_to_svg(&section, "plate", &[unresolved]).is_err());
     let mismatch = Dimension {
+        tolerance: None,
         value_mm: 1e-10,
         ..smaller
     };
@@ -303,6 +322,7 @@ fn circular_dimensions_preserve_native_paths_and_bound_leaders_and_labels() {
         .unwrap();
     let circles = [
         Circle {
+            tolerance: None,
             id: "bore<&\"".into(),
             center: [0., 0.],
             radius: 8.,
@@ -311,6 +331,7 @@ fn circular_dimensions_preserve_native_paths_and_bound_leaders_and_labels() {
             value_mm: 16.,
         },
         Circle {
+            tolerance: None,
             id: "outer".into(),
             center: [0., 0.],
             radius: 20.,
@@ -396,6 +417,7 @@ fn circular_dimension_validation_covers_precision_and_shared_ids() {
         .section(plane(), Tolerance::default())
         .unwrap();
     let base = Circle {
+        tolerance: None,
         id: "bore".into(),
         center: [0., 0.],
         radius: 8.,
@@ -405,50 +427,62 @@ fn circular_dimension_validation_covers_precision_and_shared_ids() {
     };
     for invalid in [
         Circle {
+            tolerance: None,
             radius: 0.,
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             radius: f64::NAN,
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             center: [f64::INFINITY, 0.],
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             value_mm: 9.,
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             kind: Kind::Diameter,
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             label_offset: [0., 0.],
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             label_offset: [8., 0.],
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             label_offset: [1., 1.],
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             label_offset: [f64::NAN, 0.],
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             id: "bad\0".into(),
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             id: "bad\u{ffff}".into(),
             ..base.clone()
         },
         Circle {
+            tolerance: None,
             center: [1e16, 0.],
             ..base.clone()
         },
@@ -456,6 +490,7 @@ fn circular_dimension_validation_covers_precision_and_shared_ids() {
         assert!(cad_export::dimensioned_section_to_svg(&section, "test", &[], &[invalid]).is_err());
     }
     let tiny = Circle {
+        tolerance: None,
         radius: 5e-10,
         value_mm: 5e-10,
         label_offset: [1e-9, 0.],
@@ -470,12 +505,14 @@ fn circular_dimension_validation_covers_precision_and_shared_ids() {
         "test",
         &[],
         &[Circle {
+            tolerance: None,
             value_mm: 1e-10,
             ..tiny
         }]
     )
     .is_err());
     let translated = Circle {
+        tolerance: None,
         center: [1e4, 1e4],
         radius: 0.1,
         value_mm: 0.1,
@@ -484,6 +521,7 @@ fn circular_dimension_validation_covers_precision_and_shared_ids() {
     };
     assert!(cad_export::dimensioned_section_to_svg(&section, "test", &[], &[translated]).is_ok());
     let linear = Linear {
+        tolerance: None,
         id: "bore".into(),
         from: [0., 0.],
         to: [8., 0.],

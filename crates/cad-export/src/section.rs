@@ -42,11 +42,60 @@ pub fn section_to_svg(section: &PlanarSection, label: &str) -> Result<String, Ex
     annotated_section_to_svg(section, label, &[])
 }
 
+/// Source-authored manufacturing size limits, distinct from kernel tolerance.
+#[derive(Debug, Clone)]
+pub struct DimensionToleranceAnnotation {
+    pub nominal_mm: f64,
+    pub lower_deviation_mm: f64,
+    pub upper_deviation_mm: f64,
+}
+fn tolerance_label(t: &DimensionToleranceAnnotation) -> Result<String, ExportError> {
+    let lower = t.nominal_mm + t.lower_deviation_mm;
+    let upper = t.nominal_mm + t.upper_deviation_mm;
+    let width = upper - lower;
+    let arithmetic = 128. * f64::EPSILON * lower.abs().max(upper.abs()).max(t.nominal_mm);
+    if [
+        t.nominal_mm,
+        t.lower_deviation_mm,
+        t.upper_deviation_mm,
+        lower,
+        upper,
+        width,
+    ]
+    .iter()
+    .any(|v| !v.is_finite())
+        || t.nominal_mm <= 0.
+        || lower <= 0.
+        || upper <= 0.
+        || t.lower_deviation_mm >= t.upper_deviation_mm
+        || width <= arithmetic
+    {
+        return Err(ExportError::InvalidModel(
+            "invalid or numerically unresolved manufacturing size tolerance".into(),
+        ));
+    }
+    let signed = |v: f64| {
+        if v >= 0. {
+            format!("+{}", number(v))
+        } else {
+            number(v)
+        }
+    };
+    Ok(format!(
+        "{} {}/{}",
+        number(t.nominal_mm),
+        signed(t.upper_deviation_mm),
+        signed(t.lower_deviation_mm)
+    ))
+}
+
 /// Projected linear inspection annotation in section-plane millimetres.
 /// `axis` is 0 (X) or 1 (Y); `offset` is the absolute perpendicular coordinate
-/// of the dimension line. This carries no fit, tolerance, or GD&T meaning.
+/// of the dimension line. Optional size deviations carry authored manufacturing
+/// limits; no fit class or GD&T interpretation is performed.
 #[derive(Debug, Clone)]
 pub struct SectionDimensionAnnotation {
+    pub tolerance: Option<DimensionToleranceAnnotation>,
     pub id: String,
     pub from: [f64; 2],
     pub to: [f64; 2],
@@ -73,6 +122,7 @@ pub enum SectionCircleDimensionKind {
 /// A native circular section measurement, with a label offset from its center.
 #[derive(Debug, Clone)]
 pub struct SectionCircleDimensionAnnotation {
+    pub tolerance: Option<DimensionToleranceAnnotation>,
     pub id: String,
     pub center: [f64; 2],
     pub radius: f64,
@@ -247,6 +297,11 @@ fn section_layout(
         writeln!(out,"<text x=\"{}\" y=\"{}\" font-family=\"sans-serif\" font-size=\"{}\" fill=\"#0f172a\">{text}</text>",number(bounds[0]),number(y+row as f64*font*1.5),number(font.min(width / (text.chars().count().max(1) as f64 * 0.65)))).unwrap();
     }
     out.push_str("</svg>\n");
+    if dimensions.iter().any(|d| d.tolerance.is_some())
+        || circles.iter().any(|d| d.tolerance.is_some())
+    {
+        out = out.replace("Inspection only; no manufacturing tolerances or GD&amp;T.", "Source-authored manufacturing size deviations in mm; independent of modeling tolerance. No fit classes or GD&amp;T.");
+    }
     Ok(SectionLayout {
         svg: out,
         view_box: [left, top, width, height],
@@ -360,6 +415,7 @@ fn dimension_svg(
             axis,
             offset,
             value_mm,
+            tolerance: manufacturing_tolerance,
         } = dimension;
         if *axis > 1
             || id.is_empty()
@@ -403,6 +459,9 @@ fn dimension_svg(
         // Do not label a nonzero sub-micrometre projection as zero.
         if value == "0" {
             value = format!("{value_mm:.6e}");
+        }
+        if let Some(t) = manufacturing_tolerance {
+            value = tolerance_label(t)?;
         }
         let label = format!("{id}: {value} mm");
         let escaped_label = escape(&label)?;
@@ -483,6 +542,7 @@ fn circle_dimension_svg(
             kind,
             label_offset,
             value_mm,
+            tolerance: manufacturing_tolerance,
         } = circle;
         if id.is_empty()
             || center
@@ -560,6 +620,9 @@ fn circle_dimension_svg(
         }
         if value == "0" {
             value = format!("{value_mm:.6e}");
+        }
+        if let Some(t) = manufacturing_tolerance {
+            value = tolerance_label(t)?;
         }
         let label = format!("{id}: {value} mm {kind_name}");
         let escaped_label = escape(&label)?;

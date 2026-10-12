@@ -766,9 +766,16 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         axis: Option<&str>,
         min: Option<Value>,
         max: Option<Value>,
+        tolerance: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let dimension = cad_build::SectionDimension {
+            tolerance: tolerance
+                .filter(|v| !v.is_none())
+                .map(|v| -> anyhow::Result<cad_build::DimensionTolerance> {
+                    Ok(serde_json::from_str(&v.to_json()?)?)
+                })
+                .transpose()?,
             id: id.into(),
             from: cad_build::SectionAnchor {
                 instance_path: occurrence_path(from_instance_path, "from_instance_path")?,
@@ -835,9 +842,16 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         instance_path: Option<Value>,
         min: Option<Value>,
         max: Option<Value>,
+        tolerance: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let dimension = cad_build::SectionCircleDimension {
+            tolerance: tolerance
+                .filter(|v| !v.is_none())
+                .map(|v| -> anyhow::Result<cad_build::DimensionTolerance> {
+                    Ok(serde_json::from_str(&v.to_json()?)?)
+                })
+                .transpose()?,
             id: id.into(),
             anchor_feature: from_feature.into(),
             role: role.into(),

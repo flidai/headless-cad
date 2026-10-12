@@ -173,6 +173,25 @@ pub(super) struct DrawingGeometry {
     pub circles: Vec<cad_export::SectionCircleDimensionAnnotation>,
 }
 
+fn dimension_tolerance(
+    report: &Value,
+) -> Result<Option<cad_export::DimensionToleranceAnnotation>, Box<dyn Error>> {
+    let Some(value) = report.get("tolerance").filter(|value| !value.is_null()) else {
+        return Ok(None);
+    };
+    Ok(Some(cad_export::DimensionToleranceAnnotation {
+        nominal_mm: value["nominal_mm"]
+            .as_f64()
+            .ok_or("missing tolerance nominal")?,
+        lower_deviation_mm: value["lower_deviation_mm"]
+            .as_f64()
+            .ok_or("missing tolerance lower deviation")?,
+        upper_deviation_mm: value["upper_deviation_mm"]
+            .as_f64()
+            .ok_or("missing tolerance upper deviation")?,
+    }))
+}
+
 pub(super) fn drawing_geometry(report: &Value) -> Result<DrawingGeometry, Box<dyn Error>> {
     let mut label = report["output_name"]
         .as_str()
@@ -224,6 +243,7 @@ pub(super) fn drawing_geometry(report: &Value) -> Result<DrawingGeometry, Box<dy
                     .as_f64()
                     .ok_or("missing dimension offset")?,
                 value_mm: d["value_mm"].as_f64().ok_or("missing dimension value")?,
+                tolerance: dimension_tolerance(d)?,
             })
         })
         .collect::<Result<_, Box<dyn Error>>>()?;
@@ -249,6 +269,7 @@ pub(super) fn drawing_geometry(report: &Value) -> Result<DrawingGeometry, Box<dy
                 value_mm: d["value_mm"]
                     .as_f64()
                     .ok_or("missing circle dimension value")?,
+                tolerance: dimension_tolerance(d)?,
             })
         })
         .collect::<Result<_, Box<dyn Error>>>()?;

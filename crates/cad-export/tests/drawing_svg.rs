@@ -82,6 +82,7 @@ fn rejects_overflow_annotations_overlap_and_invalid_scale() {
     assert!(drawing_sheet_to_svg(&s).is_err());
     let mut s = sheet();
     s.views[0].dimensions.push(SectionDimensionAnnotation {
+        tolerance: None,
         id: "far".into(),
         from: [0., 0.],
         to: [20., 0.],
@@ -99,4 +100,86 @@ fn rejects_overflow_annotations_overlap_and_invalid_scale() {
     let mut s = sheet();
     s.revision = "bad\0".into();
     assert!(drawing_sheet_to_svg(&s).is_err());
+}
+
+#[test]
+fn signed_manufacturing_labels_preserve_native_paths_and_fit_bounds() {
+    use cad_export::{
+        DimensionToleranceAnnotation as Limits, SectionCircleDimensionAnnotation,
+        SectionCircleDimensionKind,
+    };
+    let mut s = sheet();
+    s.views[0].dimensions.push(SectionDimensionAnnotation {
+        id: "width".into(),
+        from: [0., 0.],
+        to: [20., 0.],
+        axis: 0,
+        offset: -5.,
+        value_mm: 20.,
+        tolerance: None,
+    });
+    s.views[1].circles.push(SectionCircleDimensionAnnotation {
+        id: "bore".into(),
+        center: [0., 0.],
+        radius: 2.,
+        kind: SectionCircleDimensionKind::Diameter,
+        label_offset: [8., 8.],
+        value_mm: 4.,
+        tolerance: None,
+    });
+    let baseline = drawing_sheet_to_svg(&s).unwrap();
+    s.views[0].dimensions[0].tolerance = Some(Limits {
+        nominal_mm: 20.,
+        lower_deviation_mm: -0.01,
+        upper_deviation_mm: 0.02,
+    });
+    s.views[1].circles[0].tolerance = Some(Limits {
+        nominal_mm: 4.,
+        lower_deviation_mm: 0.01,
+        upper_deviation_mm: 0.03,
+    });
+    let with = drawing_sheet_to_svg(&s).unwrap();
+    assert!(with.contains("width: 20 +0.02/-0.01 mm"));
+    assert!(with.contains("bore: 4 +0.03/+0.01 mm diameter"));
+    assert!(with.contains("independent of modeling tolerance"));
+    let paths = |svg: &str| {
+        svg.lines()
+            .filter(|s| s.starts_with("<path id="))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(paths(&baseline), paths(&with));
+    s.views[0].dimensions[0].tolerance = Some(Limits {
+        nominal_mm: 20.,
+        lower_deviation_mm: -1e-100,
+        upper_deviation_mm: 0.123456789012345,
+    });
+    s.views[0].width = 50.;
+    assert!(
+        drawing_sheet_to_svg(&s).is_err(),
+        "expanded tolerance text must participate in scale-fit"
+    );
+    for (lower, upper) in [
+        (0.01, 0.01),
+        (0.02, 0.01),
+        (-21., 0.01),
+        (0., f64::NAN),
+        (0., f64::EPSILON),
+    ] {
+        let mut s = sheet();
+        s.views[0].dimensions.push(SectionDimensionAnnotation {
+            id: "bad".into(),
+            from: [0., 0.],
+            to: [20., 0.],
+            axis: 0,
+            offset: -5.,
+            value_mm: 20.,
+            tolerance: Some(Limits {
+                nominal_mm: 20.,
+                lower_deviation_mm: lower,
+                upper_deviation_mm: upper,
+            }),
+        });
+        assert!(drawing_sheet_to_svg(&s).is_err());
+    }
 }

@@ -1993,6 +1993,21 @@ after removing original source files. This is section-based sheet composition;
 projected hidden-line views, fits, manufacturing tolerances, GD&T and the complete
 manufacturing-release gate remain open.
 
+Manufacturing size limits extend both native dimension kinds with an optional
+strict `DimensionTolerance { nominal, lower, upper }` declaration in millimetres.
+Signed deviations are independent of kernel numerical tolerance and min/max
+engineering assertions. Preflight rejects nonfinite, nonpositive absolute limits,
+unordered or numerically unresolved intervals. Native evaluation requires the
+measured dimension to match nominal within model linear tolerance, including
+cache hits and selected-output builds; the authored manufacturing band never
+relaxes that obligation. Reports retain nominal, deviations and absolute limits.
+SVG labels include signed upper/lower deviations in their layout bounds.
+`bearing_limits.star` combines bore, pin and pitch limits through rotated nested
+occurrences on an A4 sheet. Tolerance-only edits reuse geometry and captured
+bundles reproduce the annotations. This declares required sizes; it does not
+establish manufactured-part conformance, fit classes, stack analysis, GD&T or
+STEP PMI. Those remain distinct release requirements.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in

@@ -191,7 +191,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             ),
         ],
     );
-    dimension.obligations.extend(["projected datum-origin distance along resolved section X or Y, not 3D distance; endpoints need not lie in the plane", "value_mm is absolute axis delta; signed_delta_mm and projected endpoints retained; value <= modeling tolerance fails as degenerate", "offset is an absolute dimension-line coordinate on the perpendicular drawing axis in mm, not a measurement adjustment", "IDs case-insensitive unique within view; same safe identifier rules as section_view; finite offset and finite nonnegative ordered bounds", "Starlark section_dimension(view,id,from_instance_path,from_datum,to_instance_path,to_datum,offset,axis='x',min=None,max=None) attaches to an already declared assembly section", "at most 32 per view and 1024 per recipe; all measurements are global native obligations including cache hits and selected builds; datum/face/placement witnesses retained"]);
+    dimension.obligations.extend(["projected datum-origin distance along resolved section X or Y, not 3D distance; endpoints need not lie in the plane", "value_mm is absolute axis delta; signed_delta_mm and projected endpoints retained; value <= modeling tolerance fails as degenerate", "offset is an absolute dimension-line coordinate on the perpendicular drawing axis in mm, not a measurement adjustment", "IDs case-insensitive unique within view; same safe identifier rules as section_view; finite offset and finite nonnegative ordered bounds", "Starlark section_dimension(view,id,from_instance_path,from_datum,to_instance_path,to_datum,offset,axis='x',min=None,max=None,tolerance=None) attaches to an already declared assembly section", "at most 32 per view and 1024 per recipe; all measurements are global native obligations including cache hits and selected builds; datum/face/placement witnesses retained"]);
     let mut circle_dimension = object_spec(
         "section_circle_dimension",
         vec![
@@ -235,6 +235,30 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "Exactly1 semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "only one complete native circular section on the selected face; consistent center/radius/orientation, continuous full turn; no lines, partial arcs, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
+    let mut dimensional_tolerance = object_spec(
+        "dimension_tolerance",
+        vec![
+            arg("nominal", T::Number),
+            arg("lower", T::Number),
+            arg("upper", T::Number),
+        ],
+    );
+    for a in &mut dimensional_tolerance.arguments {
+        a.units = Some("mm");
+    }
+    dimensional_tolerance.obligations.extend(["authored manufacturing limits, not measured manufactured conformance; nominal is the native design dimension", "finite positive nominal; finite signed lower < upper with finite positive width; nominal+lower and nominal+upper must be finite, positive and strictly distinct after arithmetic; deviation width and resulting limit width exceed 128 machine epsilons times maximum operand/limit magnitude", "both deviations may have the same sign; no named fit class or GD&T interpretation", "native measured value must match nominal within model linear tolerance, independently of manufacturing interval and separate min/max design assertions", "report tolerance contains nominal_mm, lower_deviation_mm, upper_deviation_mm, lower_limit_mm and upper_limit_mm"]);
+    for spec in [&mut dimension, &mut circle_dimension] {
+        spec.arguments.push(optional(
+            arg(
+                "tolerance",
+                T::Nullable {
+                    value: Box::new(object("dimension_tolerance")),
+                },
+            ),
+            json!(null),
+        ));
+        spec.obligations.push("optional tolerance dict (or None in Starlark) is a global nominal-match obligation on selected and cached builds; omitted/null leaves existing semantics unchanged");
+    }
     let mut section = object_spec(
         "section_view",
         vec![
@@ -322,6 +346,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
     vec![
         sheet,
         viewport,
+        dimensional_tolerance,
         cardinality,
         selector,
         assertion,

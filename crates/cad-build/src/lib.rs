@@ -28,6 +28,8 @@ pub fn solver_build_id() -> &'static str {
 
 mod assembly;
 mod demand;
+mod dimension_tolerance;
+pub use dimension_tolerance::{DimensionTolerance, DimensionToleranceReport};
 mod drawing_sheets;
 mod exchange_requirements;
 pub use drawing_sheets::{
@@ -101,6 +103,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("exchange_requirements.rs").as_slice(),
             include_bytes!("section_views.rs").as_slice(),
             include_bytes!("drawing_sheets.rs").as_slice(),
+            include_bytes!("dimension_tolerance.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
