@@ -51,7 +51,7 @@ def write_json(path, value):
 
 
 def safe(name):
-    require(isinstance(name, str) and name and '\\' not in name and '\x00' not in name,
+    require(isinstance(name, str) and name and '\\' not in name and ':' not in name and '\x00' not in name,
             'unsafe path')
     p = PurePosixPath(name)
     require(not p.is_absolute() and all(x not in ('', '.', '..') for x in name.split('/')),
@@ -70,8 +70,12 @@ def record(path):
     return {'sha256': digest.hexdigest(), 'size': size}
 
 
+def is_link(path):
+    return path.is_symlink() or getattr(path, 'is_junction', lambda: False)()
+
+
 def inventory(root):
-    require(root.is_dir() and not root.is_symlink(), 'bundle must be a real directory')
+    require(root.is_dir() and not is_link(root), 'bundle must be a real directory')
     result = {}
     directory_count = 0
     for directory, dirs, files in os.walk(root, followlinks=False):
@@ -79,7 +83,7 @@ def inventory(root):
         require(directory_count <= MAX_FILES, 'directory count limit exceeded')
         require(dirs or files or Path(directory) == root, 'empty directory forbidden')
         for name in dirs:
-            require(not (Path(directory)/name).is_symlink(), 'symlink directory forbidden')
+            require(not is_link(Path(directory)/name), 'symlink directory forbidden')
         for name in files:
             path = Path(directory)/name
             relative = safe(path.relative_to(root).as_posix())

@@ -3,6 +3,7 @@
 CAD_EVIDENCE_BUNDLE=/path/to/bundle python3 -m unittest discover -s scripts/tests
 """
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,18 @@ def digest(path):
         while chunk := stream.read(1024 * 1024):
             h.update(chunk)
     return {'sha256': h.hexdigest(), 'size': path.stat().st_size}
+
+
+class EvidencePathContract(unittest.TestCase):
+    def test_paths_are_relative_on_both_posix_and_windows(self):
+        spec = importlib.util.spec_from_file_location('cad_evidence', SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for value in ['../outside', '/outside', 'C:/outside', 'C:outside',
+                      'a\\b', 'a//b', './part', 'part/../outside']:
+            with self.subTest(path=value), self.assertRaises(ValueError):
+                module.safe(value)
+        self.assertEqual(module.safe('source/examples/part.star'), 'source/examples/part.star')
 
 
 @unittest.skipUnless(os.environ.get('CAD_EVIDENCE_BUNDLE'), 'requires actual collected evidence')
