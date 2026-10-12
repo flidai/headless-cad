@@ -22,6 +22,28 @@
       "kind": "engineering"
     },
     {
+      "id": "machining.round-bearing-cartridge",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "boolean.round_stock",
+        "boolean.blind_bore",
+        "boolean.stepped_bore"
+      ],
+      "supported_domain": "Native annular stock with three blind spacer sockets and six counterbored mounting holes; mirrored bearing cartridge at bolt_pitch 40..44 mm, seat_depth 4..8 mm, flange_height 18..24 mm. Native 27-case sweep and independent default/min/max exchange checks.",
+      "exclusions": [
+        "General intersecting holes and pockets",
+        "Conical countersinks",
+        "Threads, fits, loads and bearing performance certification",
+        "Manufacturing drawing release"
+      ],
+      "fixture": "examples/round_bearing_cartridge.star",
+      "checks": [
+        "round-native-moments",
+        "round-exchange-moments"
+      ]
+    },
+    {
       "id": "manufacturing.drive-module-release",
       "status": "planned",
       "domain_ids": [],
@@ -71,6 +93,32 @@
         "{cad}",
         "--retain-dir",
         "{artifacts}/counterbored_fixture"
+      ]
+    },
+    {
+      "id": "round-native-moments",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "round_bearing_cartridge"
+      ]
+    },
+    {
+      "id": "round-exchange-moments",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_round_bearing_cartridge_ocp.py",
+        "--cad",
+        "{cad}",
+        "--retain-dir",
+        "{artifacts}/round_bearing_cartridge"
       ]
     }
   ]

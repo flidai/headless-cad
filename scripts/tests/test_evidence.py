@@ -82,8 +82,9 @@ class CollectedEvidenceAcceptance(unittest.TestCase):
     def test_modified_binary_source_oracle_and_result_are_rejected(self):
         oracle = next(c for c in self.manifest['checks'] if c['kind']=='independent')
         paths = ['tools/cad', 'source/'+self.manifest['capability']['fixture'],
-                 'source/crates/cad-export/tools/check_counterbored_fixture_ocp.py', oracle['stdout'],
-                 'artifacts/counterbored_fixture/reports/0.json']
+                 'source/'+oracle['argv'][1], oracle['stdout'],
+                 next(name for name in self.manifest['files']
+                      if name.startswith('artifacts/') and '/reports/' in name and name.endswith('.json'))]
         for name in paths:
             with self.subTest(path=name):
                 path = self.bundle/name

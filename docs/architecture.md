@@ -845,6 +845,26 @@ revision without replacing the prior published generation. This advances
 fastening workflows while leaving general interacting cuts and manufacturing
 release gates unfinished.
 
+### Machining circular and annular stock
+
+The native `boolean.round_stock` path adapts a validated disk or annular extrusion
+into the existing exact arc-prism boundary: two semicircular outer patches,
+unchanged radius/axis/cap supports, and the periodic inner bore when present.
+It then applies contained cylindrical through/blind drilling and stepped cuts.
+Face history composes through the boundary split; a source outer-wall selector
+resolves to two descendants rather than silently choosing one patch. Existing
+valid parallel-cylinder Boolean results keep their original dispatch path.
+This is an exact curved-boundary conversion, not tessellated Boolean geometry.
+
+`round_bearing_cartridge.star` starts with annular stock, machines three blind
+sockets and six counterbored mounting holes, and assembles mirrored flanges,
+bearings, a shaft, spacer rods and seat-attached fasteners. Independent 27-case
+native moments, direct and assembled STEP/STL checks, publication-failure tests
+and circular silhouette/floor/shoulder picking cover the supported composition.
+General intersecting passages, pockets, conical cutters and fit/load certification
+remain separate obligations. The evidence ledger records this engineering case
+independently from complete manufacturing release or hardware performance gates.
+
 ## Constraints and assemblies
 
 Stage assembly-solver acceptance separately from today's attachment DAG: first a grounded
@@ -1890,7 +1910,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores and coaxial counterbores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores and coaxial counterbores in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |

@@ -218,7 +218,10 @@ fn vector(g: &ArcPrismGeometry, p: [f64; 2]) -> [f64; 3] {
     let y = cross(g.axis, g.x_direction);
     std::array::from_fn(|i| p[0] * g.x_direction[i] + p[1] * y[i])
 }
-fn construct(g: &ArcPrismGeometry, tol: Tolerance) -> Result<ModelSnapshot, KernelError> {
+pub(crate) fn construct(
+    g: &ArcPrismGeometry,
+    tol: Tolerance,
+) -> Result<ModelSnapshot, KernelError> {
     let seg = segments(&g.path, tol)?;
     let n = seg.len();
     let mut m = ModelSnapshot {

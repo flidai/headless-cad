@@ -19,8 +19,8 @@ outlines and simple polygonal through-holes, plus true circular extrusions, simp
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union, cut and intersection support orthogonal solids and a bounded analytic
-branch for two parallel solid cylinders. Existing right prisms also accept
-contained circular through-cuts in sequence. Intersection supports bounded,
+branch for two parallel solid cylinders. Right prisms and circular/annular stock
+also accept contained through/blind drilling and counterbores. Intersection supports bounded,
 well-conditioned convex planar solids, including rotated inputs.
 
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
@@ -1660,3 +1660,34 @@ picking and open pilot holes from both sides in all three viewers. Invalid cuts
 or removed required shoulders leave the previous published generation intact.
 Noncoaxial intersecting passages, conical countersinks and general pockets remain
 future work.
+
+### Machined round bearing cartridge
+
+[round_stock.star](examples/round_stock.star) starts a blind hole directly in
+annular stock. [round_bearing_cartridge.star](examples/round_bearing_cartridge.star)
+combines two machined annular flanges, bearings, a common shaft, three socketed
+spacer rods and twelve fastener/washer pairs: 32 occurrences sharing six part
+definitions. Six counterbores and three blind sockets in each flange retain
+semantic seats; fasteners and rods attach to those seats.
+
+`bolt_pitch` (40..44 mm), `seat_depth` (4..8 mm), and `flange_height` (18..24 mm)
+control the recipe. `flange_inspection` exposes the center bore, pilot holes,
+shoulders and closed socket floors. The assembled `round_bearing_cartridge`
+shows the mirrored pair. Threads, fits, loads and bearing performance are not
+certified by these prescribed analytic envelopes.
+
+The kernel splits the stock's outer periodic cylinder into two exact
+semicylinder faces while retaining its native radius, axis and cap supports.
+Original outer-wall lineage therefore resolves to two descendants; an untouched
+central bore retains its own identity. This enables the existing contained
+through/blind/counterbore operations without polygonizing the stock. Boundary
+contact, cuts crossing the existing bore, skew axes and general intersecting
+passages remain outside this machining domain.
+
+Independent cylinder integrals cover 27 configurations, full native/material
+moments and parameter-driven attachments. Twelve direct identity/oblique exchange
+cases and three assembled STEP/STL oracle configurations cover the new boundary.
+`npm run test:round-stock --prefix tools/preview-check` checks circular silhouettes,
+through openings, socket floors and shoulder picking in all three viewers. The
+ledger capability `machining.round-bearing-cartridge` collects its native and
+retained independent product evidence using the release-evidence workflow above.

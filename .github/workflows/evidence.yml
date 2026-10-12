@@ -1,8 +1,15 @@
 name: Engineering release evidence
 on: [push, pull_request, workflow_dispatch]
 jobs:
-  counterbore:
+  engineering:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - case: counterbore
+            capability: machining.counterbore-fixture
+          - case: round-stock
+            capability: machining.round-bearing-cartridge
     steps:
       - uses: actions/checkout@v4
       - run: rustup show
@@ -14,14 +21,14 @@ jobs:
         run: >-
           python scripts/evidence.py collect
           --ledger evidence/ledger.json
-          --capability machining.counterbore-fixture
+          --capability "${{ matrix.capability }}"
           --python python
-          --out-dir "${{ runner.temp }}/counterbore-evidence"
+          --out-dir "${{ runner.temp }}/${{ matrix.case }}-evidence"
       - name: Verify evidence and reject altered claims
         env:
-          CAD_EVIDENCE_BUNDLE: ${{ runner.temp }}/counterbore-evidence
+          CAD_EVIDENCE_BUNDLE: ${{ runner.temp }}/${{ matrix.case }}-evidence
         run: python -m unittest discover -s scripts/tests -v
       - uses: actions/upload-artifact@v4
         with:
-          name: counterbore-engineering-evidence
-          path: ${{ runner.temp }}/counterbore-evidence/
+          name: ${{ matrix.case }}-engineering-evidence
+          path: ${{ runner.temp }}/${{ matrix.case }}-evidence/

@@ -1,0 +1,10 @@
+# An off-axis blind hole starts directly from native annular stock.
+stock = extrude(id = "stock", profile = circle(id = "stock_profile", radius = 40, inner_radius = 12), height = 12)
+tool = translate(id = "tool", body = extrude(id = "drill", profile = circle(id = "drill_profile", radius = 3), height = 6), offset = [30,0,8])
+finished = cut(id = "socket", left = stock, right = tool)
+output(name = "round_stock", feature = finished)
+assert_faces(id = "outer_wall_lineage", from_feature = stock, role = "wall", in_feature = finished, count = 2)
+assert_faces(id = "original_bore", from_feature = stock, role = "inner_wall", in_feature = finished, count = 1)
+assert_faces(id = "socket_floor", from_feature = finished, role = "bore_floor", in_feature = finished, count = 1)
+expected = 3.141592653589793*((1600-144)*12-9*4)
+assert_property(id = "material_volume", output = "round_stock", property = "volume_mm3", min = expected-0.0001, max = expected+0.0001)

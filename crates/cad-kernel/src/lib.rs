@@ -45,6 +45,7 @@ mod revolve;
 mod simple_polygon;
 mod stepped_bore;
 pub use stepped_bore::MAX_STEPPED_BORE_SEGMENTS;
+mod round_stock;
 mod tessellation;
 mod through_bore;
 mod transform;

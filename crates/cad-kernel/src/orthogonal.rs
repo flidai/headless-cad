@@ -334,8 +334,12 @@ fn neighbor(mut cell: [usize; 3], direction: usize, shape: [usize; 3]) -> Option
 /// lower-dimensional intersections in that general domain are explicit errors.
 /// Two solid circular cylinders additionally support trimmed analytic circle
 /// arrangements: parallel axes, common axial interval for union, and a through
-/// tool for difference. Intersection may trim the axial interval. Annular inputs,
-/// disconnected curved unions, skew axes and unresolved contacts are unsupported.
+/// tool for difference. Intersection may trim the axial interval. Difference also
+/// supports contained cylindrical through/blind cuts in round or annular stock,
+/// preserving dimensions while splitting the outer periodic wall into two exact
+/// semicylinder patches. Subsequent separated bores and coaxial counterbores use
+/// the native prism drilling domain. Annular unions/intersections, disconnected
+/// curved unions, skew axes and unresolved contacts remain unsupported.
 /// Oblique support identity is arithmetic-certified, not a real-number equality
 /// proof; modeling tolerance never merges cap planes or cylinder supports.
 pub fn boolean(
@@ -355,7 +359,12 @@ pub fn boolean(
             .or_else(|_| crate::stepped_bore::cut(a, b, tolerance));
     }
     if a.has_curved_geometry() || b.has_curved_geometry() {
-        return crate::circular_boolean::boolean(a, b, operation, tolerance);
+        let result = crate::circular_boolean::boolean(a, b, operation, tolerance);
+        return if operation == BooleanOp::Difference {
+            result.or_else(|_| crate::round_stock::cut(a, b, tolerance))
+        } else {
+            result
+        };
     }
     let rectangles = (rectangular_faces(a), rectangular_faces(b));
     if matches!(operation, BooleanOp::Intersection)
