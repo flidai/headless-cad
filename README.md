@@ -96,8 +96,8 @@ errors still use human-readable stderr. Successful commands return JSON on stdou
 
 An agent proposes a source patch, checks it, inspects the revision and publishes
 with `build`; it does not issue modeling calls through the viewer. Acceptance
-replays a proposed partial-depth cut, checks its feature-specific failure, applies
-an explicit source correction, and rebuilds matching native/STEP/STL artifacts
+replays a proposed fully enclosed cylindrical cut, checks its feature-specific
+failure, applies an explicit source correction, and rebuilds matching native/STEP/STL artifacts
 in fresh processes. This verifies the headless protocol and deterministic replay,
 not an AI model's reasoning or a completed autonomous design benchmark.
 
@@ -1511,8 +1511,9 @@ twelve; unaffected stock/tools/part definitions remain reusable as applicable.
 
 Drilling requires a recognized right prism and a solid parallel cylinder covering
 its full depth. The bore must be wholly within material and separated from
-existing holes. Crossing, tangent, overlapping, outside and partial-depth bores
-fail explicitly; cuts wholly inside an existing hole are also unsupported.
+existing holes. Crossing, tangent, overlapping and outside bores fail explicitly;
+cuts wholly inside an existing hole are also unsupported. Flat-bottom blind
+bores use the additional native path below.
 General pockets and intersecting drill passages remain future work. Failed
 machining obligations preserve the prior published generation even when only
 the unchanged stock is requested.
@@ -1523,3 +1524,35 @@ Imported drilled jaws retain five inward cylindrical faces and four periodic
 seams. `npm run test:through-bore --prefix tools/preview-check` verifies twelve
 browser views and 1,190 visibility samples, including exposed jaw holes, sleeve
 bores and the exact captured recipe.
+
+### Tooling pallets with blind sockets
+
+[blind_bore.star](examples/blind_bore.star) isolates a flat-bottom cylindrical
+cut. [blind_bore_pallet.star](examples/blind_bore_pallet.star) combines six top
+blind sockets, two underside sockets and four through-bores in one native plate.
+Two nested stations reuse that plate with stepped locating pins, feet and sleeves:
+26 occurrences from four definitions. `pallet_inspection` exposes the machined
+plate without inserted hardware; the pair shows the assembled result.
+
+`socket_radius` (6..10 mm), `socket_depth` (8..16 mm), and `plate_height`
+(24..32 mm) drive the recipe. Blind cuts retain a native planar floor and an
+unopened outer cap. The stock's faces keep their references; the tool wall and
+terminating cap contribute to `bore_wall` and `bore_floor`. Pins attach to
+semantic floor datums, so a socket-depth edit moves their seats from geometry.
+Full signed box/cylinder integrals independently verify volume, centroid, inertia and material
+mass over 27 configurations. Depth edits reuse the unchanged stock, feet and
+sleeves. Removing a required floor or introducing invalid machining prevents
+publication, including requests for only the original stock.
+
+This path supports parallel or opposite-axis solid cylinders in recognized
+polygon or line/arc right prisms, including separated prior blind/through cuts.
+The circular projections must be mutually clear, even when two opposite-side
+pockets would not meet in depth. Positive depth and remaining floor thickness
+must be numerically resolved. Fully enclosed cavities, overlapping/coaxial holes,
+skew cuts, drill-tip cones and general pockets remain unsupported.
+
+Independent STEP/STL checks cover identity and oblique direct cases plus three
+pallet configurations. `npm run test:blind-bore --prefix tools/preview-check`
+checks top and underside floor/cap picking and through-hole visibility across
+Canvas, embedded GPU and streaming GPU clients, plus nested selection and exact
+captured source. These prescribed layouts do not certify fits or load capacity.

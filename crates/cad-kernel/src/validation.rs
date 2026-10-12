@@ -35,7 +35,9 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
         .iter()
         .any(|e| matches!(e.curve, crate::Curve::CircularArc(_)))
     {
-        let result = crate::arc_prism::recognize(model, tolerance);
+        let result = crate::arc_prism::recognize(model, tolerance)
+            .map(|_| ())
+            .or_else(|_| crate::bored_prism::recognize(model, tolerance).map(|_| ()));
         return ValidationReport {
             valid: result.is_ok(),
             issues: result
@@ -54,6 +56,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 .map(|_| ())
                 .or_else(|_| crate::profile_prism::recognize(model, tolerance).map(|_| ()))
                 .or_else(|_| crate::revolve::recognize(model, tolerance).map(|_| ()))
+                .or_else(|_| crate::bored_prism::recognize(model, tolerance).map(|_| ()))
         } else {
             Err(crate::KernelError::InvalidTolerance)
         };

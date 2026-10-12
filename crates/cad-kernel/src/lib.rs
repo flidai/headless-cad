@@ -30,6 +30,7 @@
 
 mod analytic;
 mod arc_prism;
+mod bored_prism;
 mod circular_boolean;
 mod convex_intersection;
 mod face_frame;
@@ -52,6 +53,7 @@ pub use analytic::{
     extrude_annulus, extrude_circle, validate_annulus, validate_circle, CylinderGeometry,
 };
 pub use arc_prism::{extrude_path, validate_path, ArcPrismGeometry, PathSegment, PlanarPath};
+pub use bored_prism::{BoredPrismGeometry, PrismBore};
 pub use face_frame::FaceFrame;
 pub use mass_properties::MassProperties;
 pub use math::Tolerance;
@@ -340,6 +342,9 @@ impl ModelSnapshot {
     /// Empty models have volume zero. Validate deserialized or edited snapshots
     /// first: invalid references or unsupported integration terms yield NaN.
     pub fn volume(&self) -> f64 {
+        if let Ok(v) = bored_prism::volume(self) {
+            return v;
+        }
         if self
             .edges
             .iter()

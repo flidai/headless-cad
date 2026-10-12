@@ -5,11 +5,11 @@ use std::collections::BTreeMap;
 fn bad() -> KernelError {
     KernelError::Unsupported("through bore requires a canonical right prism and a solid aligned cylinder covering its full height; the bore must be strictly within material and separated from every existing hole".into())
 }
-struct Stock {
-    origin: [f64; 3],
-    axis: [f64; 3],
-    x: [f64; 3],
-    height: f64,
+pub(crate) struct Stock {
+    pub(crate) origin: [f64; 3],
+    pub(crate) axis: [f64; 3],
+    pub(crate) x: [f64; 3],
+    pub(crate) height: f64,
     profile: Profile,
 }
 enum Profile {
@@ -51,7 +51,7 @@ fn polygon(
         profile: Profile::Polygon { rings, circles },
     })
 }
-fn stock(a: &ModelSnapshot, t: Tolerance) -> Result<Stock, KernelError> {
+pub(crate) fn stock(a: &ModelSnapshot, t: Tolerance) -> Result<Stock, KernelError> {
     if let Ok(g) = crate::arc_prism::recognize(a, t) {
         return Ok(Stock {
             origin: g.origin,

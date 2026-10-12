@@ -106,6 +106,9 @@ impl ModelSnapshot {
         if !tolerance.is_valid() {
             return Err(KernelError::InvalidTolerance);
         }
+        if let Ok(g) = crate::bored_prism::recognize(self, tolerance) {
+            return g.properties(tolerance);
+        }
         if let Some(g) = self.arc_prism_geometry(tolerance)? {
             return g.properties(tolerance);
         }

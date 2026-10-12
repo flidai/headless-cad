@@ -181,6 +181,9 @@ pub fn tessellate_analytic(
     tolerance: Tolerance,
     policy: TessellationPolicy,
 ) -> Result<CylinderMesh, KernelError> {
+    if let Ok(g) = crate::bored_prism::recognize(model, tolerance) {
+        return crate::bored_prism::tessellate(&g, tolerance, policy);
+    }
     if let Some(g) = model.arc_prism_geometry(tolerance)? {
         return crate::arc_prism::tessellate(model, &g, policy);
     }

@@ -3,9 +3,10 @@ use serde_json::Value;
 use std::{fs, process::Command};
 const PROPOSAL: &str = r#"
 tool_depth = 4
+tool_z = 2
 stock = extrude(id = "stock", profile = rectangle(id = "plate_profile", width = 40, depth = 30), height = 8)
 tool = extrude(id = "tool", profile = circle(id = "bore_profile", radius = 3), height = tool_depth)
-positioned = translate(id = "positioned", body = tool, offset = [20,15,-2])
+positioned = translate(id = "positioned", body = tool, offset = [20,15,tool_z])
 drilled = cut(id = "drill", left = stock, right = positioned)
 output(name = "plate", feature = drilled)
 "#;
@@ -52,7 +53,9 @@ fn discover_diagnose_patch_and_replay_an_engineering_revision() {
     );
     assert_eq!(fs::read_to_string(&recipe).unwrap(), PROPOSAL);
     // Simulate an accepted, reviewable source patch. No geometry or viewer mutation.
-    let corrected = PROPOSAL.replace("tool_depth = 4", "tool_depth = 12");
+    let corrected = PROPOSAL
+        .replace("tool_depth = 4", "tool_depth = 12")
+        .replace("tool_z = 2", "tool_z = -2");
     fs::write(&recipe, &corrected).unwrap();
     good(&["check", source]);
     let properties = good(&["properties", source, "--output", "plate"]);

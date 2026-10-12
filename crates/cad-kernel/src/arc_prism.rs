@@ -880,7 +880,9 @@ impl ModelSnapshot {
             .iter()
             .any(|e| matches!(e.curve, Curve::CircularArc(_)))
         {
-            recognize(self, tol).map(Some)
+            recognize(self, tol)
+                .map(Some)
+                .or_else(|_| crate::bored_prism::recognize(self, tol).map(|_| None))
         } else {
             let report = self.validate(tol);
             if report.valid {

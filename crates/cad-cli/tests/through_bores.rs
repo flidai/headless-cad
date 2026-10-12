@@ -37,13 +37,16 @@ fn failed_machining_obligations_preserve_publication_even_when_stock_is_selected
         })
         .collect();
     // Even an unchanged selected stock cannot bypass global obligations on
-    // its machining sequence. Fail crossing/overlapping bores and partial cuts.
+    // its machining sequence. Fail crossing/overlapping bores and fully enclosed cuts.
     for (old, new) in [
         ("[[12,12],[88,12]", "[[3,12],[88,12]"),
         ("[[12,12],[88,12]", "[[12,12],[14,12]"),
-        ("height = d+4", "height = d-2"),
+        ("height = d+4", "height = d-4"),
     ] {
-        let changed = source.replace(old, new);
+        let mut changed = source.replace(old, new);
+        if old == "height = d+4" {
+            changed = changed.replace("offset = [p[0],p[1],-2]", "offset = [p[0],p[1],2]");
+        }
         assert_ne!(source, changed);
         fs::write(&recipe, changed).unwrap();
         let failed = build(true);

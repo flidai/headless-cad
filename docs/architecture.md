@@ -739,8 +739,8 @@ the actual radius and existing geometry are unchanged. The cylinder must cover
 the full stock interval, with parallel or opposite axis, and resulting world
 supports must meet the arithmetic policy before native validation. Reuse the
 existing maximum of 32 combined holes. Outside cuts, holes entirely inside a
-preexisting void, tangent/crossing/overlapping holes, partial-depth and skew cuts
-are explicit unsupported outcomes. Neither tessellation nor tolerance snapping
+preexisting void, tangent/crossing/overlapping holes and skew cuts are explicit
+unsupported outcomes. Blind cuts use the additional native family below. Neither tessellation nor tolerance snapping
 decides native containment.
 
 `machined_bearing_support.star` applies four cuts to a concave jaw before
@@ -748,8 +748,45 @@ assembling two shared jaws, a shaft and eight sleeves. Independent signed-area
 integrals cover 27 configurations, full native/assembly moments and selective
 invalidation. Publication acceptance checks global machining obligations even
 when the requested output is unchanged stock. Extend toward interacting cuts,
-blind pockets and generalized face splitting to advance the manufacturing
+general pockets and generalized face splitting to advance the manufacturing
 workflow; the current assembly does not certify fits or contact loads.
+
+### Flat-bottom blind cylindrical machining
+
+A native bored-prism family extends machining to top and underside blind holes,
+interleaved with through-bores. Each cut appends an inward cylindrical wall and,
+for a blind cut, a planar floor; it adds an inner loop only to the opened cap.
+All previous faces retain identity. The tool's wall and terminating cap map to
+the new wall and floor; the opposite tool cap is deleted. Generated roles
+`bore_wall` and `bore_floor` support downstream engineering obligations.
+
+Recognition certifies the boundary itself. It peels canonical cylinder blocks,
+checks topology/support/orientations and replays them against a recognized base
+prism. No hidden construction metadata makes an otherwise invalid solid valid.
+An internal full-height surrogate certifies projected profile clearance and
+provides shared cap tessellation boundaries; it is never exported as the native
+solid. Native mass properties subtract the actual removed cylinders from the
+base, using full parallel-axis tensors. Display walls terminate at the true
+floor, floor disks close the pocket, and unopened cap disks restore the original
+outer face identity. Planar datum queries use actual cap areas and floor centers.
+
+The cylindrical tool must open one or both stock caps with a certified parallel
+axis. Blind depth and remaining material must exceed the tolerance plus reserved
+arithmetic uncertainty. Full circular supports are checked against stock and
+terminating tool planes; tolerance is not a snapping policy. Circular projections
+must remain separated, including opposite-side pockets. This intentionally
+excludes coaxial counterbores, intersecting passages, enclosed cavities and
+arbitrary pocket profiles. The existing 32 combined profile-hole bound applies.
+
+`blind_bore_pallet.star` exercises twelve consecutive machining features, both
+opening directions, retained floor references and a nested 26-occurrence assembly.
+Locating pins attach to semantic floor datums; independent expected positions
+therefore test the entire lineage-to-face-frame-to-assembly chain.
+Its 27-configuration signed-integral checks cover native and material moments,
+while independent STEP/STL and browser checks cover exports, floor visibility and
+native face selection. A required floor changed into a through-hole fails its
+engineering obligation before publication. General interacting material removal
+and manufacturing release gates remain unfinished.
 
 ## Constraints and assemblies
 
@@ -1769,7 +1806,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through-bores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
