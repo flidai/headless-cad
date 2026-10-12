@@ -35,7 +35,8 @@
     "test:drill-sketch": "node drill-sketch-check.cjs",
     "test:tangent-sketch": "node tangent-sketch-check.cjs",
     "test:capsule-sketch": "node capsule-sketch-check.cjs",
-    "test:islands-sketch": "node islands-sketch-check.cjs"
+    "test:islands-sketch": "node islands-sketch-check.cjs",
+    "test:concave-profile": "node concave-profile-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

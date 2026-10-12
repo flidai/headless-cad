@@ -57,7 +57,7 @@ release and is checked independently from exported solid validity.
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums with part/rigid-module attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
-| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; convex line/arc path extrusion with circular holes implemented; concave arc paths, arcs in revolved meridians, partial revolution, general Booleans and generalized trim/seam handling remain |
+| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; simple concave line/arc path extrusion with circular holes implemented; curved inner paths, arcs in revolved meridians, partial revolution, general Booleans and generalized trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache and analytic whole-part LOD implemented; metadata paging, cluster LOD, part spatial indexes and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Dimensioned slope fixture → four-bar mechanism → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | In progress: bounded original Rust point sketch solver, ten constraint kinds including directed angles and circle-to-line tangency; separate linear/angular tolerances, polygon extrusion, local rank/residual/conditioning reports, independent constraint islands and atomic failure handling; curves, large connected systems, branch continuation, conflict minimization and assembly solving remain |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
@@ -156,9 +156,9 @@ picking through all three display clients, including oblique occurrences.
 Independent component formulas and a 27-case parameter corpus check link volume,
 centroid/full inertia, assembly material properties, bounds and datum placement.
 Length/radius edits rebuild one definition each, gap edits two. Preserve explicit
-CCW convex-profile, half-turn-arc, strict circular-hole separation and numerical
-limits; concave arc profiles, arc meridians and general curved Booleans remain
-future extensions. Native engineering assertions remain build gates even for
+CCW simple-profile, half-turn-arc, strict circular-hole separation and numerical
+limits. Concave outer profiles and clockwise recesses now extend this domain;
+curved inner paths, arc meridians and general curved Booleans remain future work. Native engineering assertions remain build gates even for
 selected-body publication.
 
 Subsequent examples should combine new operations with
@@ -323,6 +323,14 @@ pass. Certified tessellation is now reused across publication consumers through
 a bounded generation cache; the 30-bore fixture measures its effect separately
 from constraint solving. Continue toward bounded exact-body residency and display
 preprocessing budgets; a cache retention cap is not a full job memory bound.
+
+The concave-profile increment uses `split_bearing_block.star`: two shared jaws
+with inward semicircular seats, a stepped shaft and four sleeves. Native 27-case
+acceptance checks independent volume, centroid, full volume/mass inertia and
+parameter invalidation. Analytic trimmed-boundary separation and winding replace
+the convex halfspace restriction without using tessellation for native validity.
+This is a step toward the supported bearing housing in M2; general curved
+Booleans, fillets, fits and manufacturing release remain separate obligations.
 
 ## Example policy
 

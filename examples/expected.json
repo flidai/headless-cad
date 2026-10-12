@@ -1502,5 +1502,43 @@
       "volume_tolerance_mm3": 0.01,
       "linear_tolerance_mm": 1e-05
     }
+  },
+  "split_bearing_block.star": {
+    "jaw": {
+      "volume_mm3": 45369.20403493734,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          40,
+          16
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "split_bearing_block": {
+      "volume_mm3": 113734.86629415197,
+      "solids": 7,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          -12
+        ],
+        [
+          80,
+          82,
+          28
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }

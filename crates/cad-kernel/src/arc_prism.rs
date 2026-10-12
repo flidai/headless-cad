@@ -1,4 +1,4 @@
-//! Native bounded convex line/arc right prisms. No sampled modeling geometry.
+//! Native bounded simple CCW line/arc right prisms. No sampled modeling geometry.
 use crate::math::{finite, norm};
 use crate::*;
 
@@ -42,8 +42,10 @@ struct Segment {
     b: [f64; 2],
     arc: Option<([f64; 2], f64, f64, f64)>,
 }
+#[path = "arc_prism_validation.rs"]
+mod path_validation;
 fn bad() -> KernelError {
-    KernelError::Unsupported("expected a bounded convex CCW line/arc prism".into())
+    KernelError::Unsupported("expected a bounded simple CCW line/arc prism".into())
 }
 fn cross2(a: [f64; 2], b: [f64; 2]) -> f64 {
     a[0] * b[1] - a[1] * b[0]
@@ -97,9 +99,6 @@ fn segments(path: &PlanarPath, tol: Tolerance) -> Result<Vec<Segment>, KernelErr
             center, clockwise, ..
         } = s
         {
-            if *clockwise {
-                return Err(bad());
-            }
             let va = sub2(a, *center);
             let vb = sub2(b, *center);
             let r = len(va);
@@ -108,10 +107,16 @@ fn segments(path: &PlanarPath, tol: Tolerance) -> Result<Vec<Segment>, KernelErr
             }
             let start = va[1].atan2(va[0]);
             let mut sweep = cross2(va, vb).atan2(dot2(va, vb));
-            if sweep <= 0. {
+            if *clockwise {
+                if sweep >= 0. {
+                    sweep -= std::f64::consts::TAU;
+                }
+            } else if sweep <= 0. {
                 sweep += std::f64::consts::TAU;
             }
-            if sweep > std::f64::consts::PI + 64. * f64::EPSILON || r * sweep <= tol.linear {
+            if sweep.abs() > std::f64::consts::PI + 64. * f64::EPSILON
+                || r * sweep.abs() <= tol.linear
+            {
                 return Err(bad());
             }
             Some((*center, r, start, sweep))
@@ -121,13 +126,12 @@ fn segments(path: &PlanarPath, tol: Tolerance) -> Result<Vec<Segment>, KernelErr
         result.push(Segment { a, b, arc });
         a = b;
     }
-    // A closed regular curve with nonnegative local curvature and total turning
-    // 2π is convex. Arc sweeps contribute continuously; joins contribute exactly
-    // their tangent turn, so this does not inspect sampled chords.
+    // Signed tangent turning establishes CCW orientation after analytic
+    // simplicity certification; neither predicate samples the curve.
     let tangent = |s: &Segment, end: bool| {
-        if let Some((c, r, _, _)) = s.arc {
+        if let Some((c, r, _, sweep)) = s.arc {
             let v = sub2(if end { s.b } else { s.a }, c);
-            [-v[1] / r, v[0] / r]
+            [-v[1] / r * sweep.signum(), v[0] / r * sweep.signum()]
         } else {
             let d = sub2(s.b, s.a);
             let n = len(d);
@@ -143,7 +147,7 @@ fn segments(path: &PlanarPath, tol: Tolerance) -> Result<Vec<Segment>, KernelErr
         let a = tangent(s, true);
         let b = tangent(&result[(i + 1) % result.len()], false);
         let angle = cross2(a, b).atan2(dot2(a, b));
-        if angle < -4096. * f64::EPSILON || angle >= std::f64::consts::PI - 4096. * f64::EPSILON {
+        if angle.abs() >= std::f64::consts::PI - 4096. * f64::EPSILON {
             return Err(bad());
         }
         turning += angle;
@@ -151,18 +155,8 @@ fn segments(path: &PlanarPath, tol: Tolerance) -> Result<Vec<Segment>, KernelErr
     if (turning - std::f64::consts::TAU).abs() > result.len() as f64 * 8192. * f64::EPSILON {
         return Err(bad());
     }
+    path_validation::simple(&result, tol, error)?;
     Ok(result)
-}
-fn arc_max_projection(v: [f64; 2], start: f64, sweep: f64) -> f64 {
-    let end = start + sweep;
-    let f = |t: f64| v[0] * t.cos() + v[1] * t.sin();
-    let angle = v[1].atan2(v[0]);
-    let delta = (angle - start).rem_euclid(std::f64::consts::TAU);
-    let mut max = f(start).max(f(end));
-    if delta <= sweep {
-        max = max.max(len(v));
-    }
-    max
 }
 pub fn validate_path(
     path: &PlanarPath,
@@ -180,6 +174,11 @@ pub fn validate_path(
         .into_iter()
         .chain(seg.iter().flat_map(|s| s.a))
         .chain(
+            seg.iter()
+                .filter_map(|s| s.arc)
+                .flat_map(|(c, r, _, _)| [c[0], c[1], r]),
+        )
+        .chain(
             holes
                 .iter()
                 .flat_map(|h| [h.center[0], h.center[1], h.radius]),
@@ -196,15 +195,12 @@ pub fn validate_path(
             return Err(KernelError::NumericRange);
         }
         for s in &seg {
-            let clearance = if let Some((c, r, start, sweep)) = s.arc {
-                r - arc_max_projection(sub2(h.center, c), start, sweep)
-            } else {
-                let d = sub2(s.b, s.a);
-                cross2(d, sub2(h.center, s.a)) / len(d)
-            };
-            if clearance - h.radius <= tol.linear + error {
+            if path_validation::distance(s, h.center, error) - h.radius <= tol.linear + error {
                 return Err(bad());
             }
+        }
+        if !path_validation::inside(&seg, h.center, error)? {
+            return Err(bad());
         }
         for other in &holes[..i] {
             if len(sub2(h.center, other.center)) - h.radius - other.radius <= tol.linear + error {
@@ -308,13 +304,13 @@ fn construct(g: &ArcPrismGeometry, tol: Tolerance) -> Result<ModelSnapshot, Kern
                 eu(2 * n + i, true),
             ],
         });
-        let surface = if let Some((c, r, _, _)) = s.arc {
+        let surface = if let Some((c, r, _, sweep)) = s.arc {
             Surface::Cylinder(Cylinder {
                 origin: point(g, c, 0.),
                 axis: g.axis,
                 x_direction: vector(g, sub2(s.a, c).map(|v| v / r)),
                 radius: r,
-                inward: false,
+                inward: sweep < 0.,
             })
         } else {
             let d = sub2(s.b, s.a);

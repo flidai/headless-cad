@@ -191,11 +191,12 @@ fn solved_but_invalid_native_arcs_fail_without_snapping() {
 }
 
 #[test]
-fn unsupported_major_arcs_and_concavity_fail_native_validation() {
-    for (points, segments) in [
+fn major_arcs_fail_while_simple_concave_solved_paths_build() {
+    for (points, segments, area) in [
         (
             vec![("a", [0., -5.]), ("b", [5., 0.]), ("o", [0., 0.])],
             json!([{"kind":"line_to","end":"b"},{"kind":"arc_to","center":"o","end":"a"}]),
+            None,
         ),
         (
             vec![
@@ -206,6 +207,20 @@ fn unsupported_major_arcs_and_concavity_fail_native_validation() {
                 ("e", [0., 6.]),
             ],
             json!([{"kind":"line_to","end":"b"},{"kind":"line_to","end":"c"},{"kind":"line_to","end":"d"},{"kind":"line_to","end":"e"},{"kind":"line_to","end":"a"}]),
+            Some(45.),
+        ),
+        (
+            vec![
+                ("a", [0., 0.]),
+                ("b", [20., 0.]),
+                ("c", [20., 10.]),
+                ("d", [15., 10.]),
+                ("e", [5., 10.]),
+                ("f", [0., 10.]),
+                ("o", [10., 10.]),
+            ],
+            json!([{"kind":"line_to","end":"b"},{"kind":"line_to","end":"c"},{"kind":"line_to","end":"d"},{"kind":"arc_to","center":"o","end":"e","clockwise":true},{"kind":"line_to","end":"f"},{"kind":"line_to","end":"a"}]),
+            Some(200. - 12.5 * std::f64::consts::PI),
         ),
     ] {
         let mut v = source(10., 5.);
@@ -219,9 +234,13 @@ fn unsupported_major_arcs_and_concavity_fail_native_validation() {
             .collect::<Vec<_>>());
         v["features"][0]["curve_outline"]["segments"] = segments;
         v["features"][0]["circular_holes"] = json!([]);
-        assert!(matches!(
-            BuildEngine::default().build(&recipe(v)),
-            Err(BuildError::PolygonProfile { .. })
-        ));
+        let result = BuildEngine::default().build(&recipe(v));
+        if let Some(area) = area {
+            let built = result.unwrap();
+            assert!(built.sketch_reports["profile"].is_fully_constrained());
+            assert!((built.outputs["part"].result.model.volume() - area * 8.).abs() < 1e-7);
+        } else {
+            assert!(matches!(result, Err(BuildError::PolygonProfile { .. })));
+        }
     }
 }

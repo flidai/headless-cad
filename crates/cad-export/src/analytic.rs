@@ -685,3 +685,87 @@ mod arc_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod concave_arc_tests {
+    use super::*;
+    use cad_kernel::{CircleHole, PathSegment, PlanarPath};
+    #[test]
+    fn clockwise_seat_preserves_inward_surface_without_a_false_seam() {
+        let t = Tolerance::default();
+        let path = PlanarPath {
+            start: [0., 0.],
+            segments: vec![
+                PathSegment::LineTo { end: [80., 0.] },
+                PathSegment::LineTo { end: [80., 40.] },
+                PathSegment::LineTo { end: [54., 40.] },
+                PathSegment::ArcTo {
+                    center: [40., 40.],
+                    end: [26., 40.],
+                    clockwise: true,
+                },
+                PathSegment::LineTo { end: [0., 40.] },
+                PathSegment::LineTo { end: [0., 0.] },
+            ],
+        };
+        let holes = [
+            CircleHole {
+                center: [10., 12.],
+                radius: 3.,
+            },
+            CircleHole {
+                center: [70., 12.],
+                radius: 3.,
+            },
+        ];
+        let model = cad_kernel::extrude_path(&path, &holes, 16., t)
+            .unwrap()
+            .model;
+        for model in [
+            model.clone(),
+            cad_kernel::transform(&model, [12., -7., 4.], [0.5, 0.5, 0., 0.5_f64.sqrt()], t)
+                .unwrap()
+                .model,
+        ] {
+            let step = to_step(&model, t).unwrap();
+            assert_eq!(step.matches("CYLINDRICAL_SURFACE(").count(), 3);
+            assert_eq!(
+                step.matches("SEAM_CURVE(").count(),
+                2,
+                "only full-circle bores have seams"
+            );
+            assert_eq!(step.matches("PCURVE(").count(), 4);
+            assert_eq!(
+                step.lines()
+                    .filter(|l| l.contains("ADVANCED_FACE(") && l.ends_with(",.F.);"))
+                    .count(),
+                3,
+                "seat and both bore walls point inward"
+            );
+            let stl = to_stl(&model, t).unwrap();
+            let vertices: Vec<Point> = stl
+                .lines()
+                .filter_map(|l| l.trim().strip_prefix("vertex "))
+                .map(|l| {
+                    let p: Vec<f64> = l.split_whitespace().map(|v| v.parse().unwrap()).collect();
+                    [p[0], p[1], p[2]]
+                })
+                .collect();
+            let mut volume = 0.;
+            let mut edges = std::collections::BTreeMap::new();
+            for p in vertices.as_chunks::<3>().0 {
+                volume += dot(p[0], cross(p[1], p[2])) / 6.;
+                for (a, b) in [(p[0], p[1]), (p[1], p[2]), (p[2], p[0])] {
+                    let a = a.map(f64::to_bits);
+                    let b = b.map(f64::to_bits);
+                    let e = edges.entry((a.min(b), a.max(b))).or_insert((0, 0));
+                    e.0 += 1;
+                    e.1 += if a < b { 1 } else { -1 };
+                }
+            }
+            assert!(edges.values().all(|v| *v == (2, 0)));
+            let exact = (3200. - std::f64::consts::PI * (98. + 18.)) * 16.;
+            assert!((volume - exact).abs() / exact < 0.002);
+        }
+    }
+}

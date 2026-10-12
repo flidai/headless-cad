@@ -583,16 +583,17 @@ transforms. Channel dimensions and datum seating remain prescribed design intent
 not pressure/sealing or collision certification. The operation remains a native
 right prism with through-holes, not a general curved Boolean operation.
 
-The line/arc prism increment adds convex CCW outer paths with circular
+The line/arc prism increment supports simple CCW outer paths with circular
 through-holes. `PlanarPath` stores an exact closure point and ordered `LineTo` /
 `ArcTo` segments; the native `CircularArc` retains a circle support, distinct
-endpoint vertices and a signed sweep. Initial outer arcs are counterclockwise
-and at most a half-turn. Tangent joins remain explicit source vertices. Line-only
+endpoint vertices and a signed sweep. Outer arcs can turn either direction
+and are at most a half-turn; clockwise recess walls are inward cylinders. Tangent joins remain explicit source vertices. Line-only
 paths lower to existing polygon prisms with `segment_i` aliases. These are bounded
 profile extrusions, not general curved Booleans or partial revolutions.
 
 Canonical recognition reconstructs the profile and frame from topology and
-supports, validates convex turning and strict hole containment/separation, then
+supports, validates analytic trimmed-curve simplicity, CCW turning and strict
+hole containment/separation, then
 compares the complete reconstructed B-rep. Signed Green integrals use analytic
 Fourier-polynomial integration for curved boundaries; circular-hole subtraction
 and centered integration provide exact volume, centroid and full inertia without
@@ -619,6 +620,28 @@ across capsule/rounded profiles, native/oblique placements and all three display
 clients, including curved walls and circular bores. Captured source matches the
 built recipe and inspection loads no exact geometry. The datum-prescribed pose does not
 claim joint solving or mechanical load validation.
+
+`split_bearing_block.star` extends this domain to an inward semicircular seat.
+Two shared jaws, a stepped shaft and four reused sleeves form seven occurrences
+from three definitions. Independent rectangle/semicircle/cylinder integrals cover
+27 configurations and full native body/assembly inertia, including material mass
+weighting. Gap-only edits reuse all geometry; seat-radius edits rebuild two
+definitions and depth edits rebuild three. Recesses remain native analytic arcs
+in STEP. Three independent STEP-import cases verify inward surface orientation,
+closed STL and assembly placement; 12 browser views check 706 independent rays
+and exact captured source without exact-geometry downloads. An invalid crossing
+revision cannot replace the last valid publication.
+
+Native simplicity uses finite trimmed line/line, line/circle and circle/circle
+intersection and distance candidates. Adjacent segments may share their declared
+endpoints; nonadjacent contact or unresolved separation is rejected. Analytic ray
+winding determines circular-hole containment with explicit failure if ray
+classification remains ambiguous. Clearance uncertainty includes support-circle
+centers and radii, including nearly flat arcs with distant centers. Both convex
+and concave outlines retain the
+existing bounded segment/hole counts, support consistency and mandatory mesh
+coverage checks. This broadens right-prism profiles, not general curved Boolean
+operations, arc-shaped inner loops, fit verification or joint solving.
 
 ## Constraints and assemblies
 
@@ -1562,7 +1585,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and convex line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |

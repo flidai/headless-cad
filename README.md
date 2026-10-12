@@ -15,7 +15,7 @@ See the [dependency license inventory](docs/dependency-licenses.md).
 A local, CLI-first CAD product built around our own Rust B-rep kernel. Recipes
 are plain text suitable for Git, results are inspectable JSON, and exports are
 STEP and STL. Modeling currently supports **orthogonal solids and simple polygon extrusions, including nonconvex
-outlines and simple polygonal through-holes, plus true circular extrusions, convex line/arc profiles and stepped/tapered revolutions**: slotted brackets, open trays, triangular ramps, and polygonal
+outlines and simple polygonal through-holes, plus true circular extrusions, simple concave line/arc profiles and stepped/tapered revolutions**: slotted brackets, open trays, triangular ramps, and polygonal
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union and cut remain orthogonal-only; intersection also supports bounded,
@@ -452,7 +452,7 @@ output(name = "bracket", feature = finished)
 | --- | --- |
 | `rectangle(id, width, depth)` | Profile on XY, starting at the origin |
 | `polygon(id, points, holes=[])` | Simple CCW outer XY ring (convex or nonconvex) with optional simple CW holes; 256 total vertices, at most 32 holes |
-| `path(id, start, segments, circular_holes=[])` | Closed convex CCW line/arc profile; native arcs up to a half-turn, tangent joins and circular through-holes |
+| `path(id, start, segments, circular_holes=[])` | Closed simple CCW line/arc profile, including concave recesses; signed arcs up to a half-turn and circular through-holes |
 | `sketch(id, points, constraints, outline, holes=[])` | Dimension-driven polygon profile; named point guesses, fixed/coincident/horizontal/vertical/distance/equal-length/parallel/perpendicular/directed-angle constraints; requires a converged, locally fully constrained solution |
 | `extrude(id, profile, height)` | Extrude a supported rectangle, polygon, circle or line/arc profile along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
@@ -1180,10 +1180,10 @@ curve_outline = {"start":"a", "segments":[
 ]}
 ```
 
-All referenced points come from the fully constrained sketch. This first curved
-profile contract supports convex CCW outlines, counterclockwise arcs of at most
-a half turn, and circular through-holes. Polygonal holes, concave curves,
-clockwise/major arcs and sketch-driven revolutions remain unsupported.
+All referenced points come from the fully constrained sketch. Curved profiles
+support simple CCW outlines, including concave recesses and clockwise arcs of at
+most a half turn, with circular through-holes. Polygonal holes in curved paths,
+major arcs and sketch-driven revolutions remain unsupported.
 Curved profiles use bounded residual refinement after initial sketch convergence,
 without changing the declared acceptance tolerance or projecting coordinates.
 If refinement stagnates, the best fully certified snapshot is returned with its
@@ -1207,10 +1207,11 @@ including arc silhouettes, bores, pins and captured source.
 
 ### Native line and arc profiles
 
-`path(id, start, segments, circular_holes=[])` defines a closed convex CCW
-profile for `extrude`. Each segment is a `line_to` with an `end`, or an `arc_to`
-with a `center` and `end`; `clockwise` defaults to false. Current outer arcs
-must be counterclockwise, nonzero and at most π radians. The final endpoint must
+`path(id, start, segments, circular_holes=[])` defines a closed simple CCW
+profile for `extrude`, including concave outlines. Each segment is a `line_to`
+with an `end`, or an `arc_to` with a `center` and `end`; `clockwise` defaults to
+false. Arcs may turn either direction but must be nonzero and at most π radians.
+Clockwise recesses produce native inward cylindrical walls. The final endpoint must
 exactly equal `start`. Tangent line/arc joins are supported; unsupported winding,
 major arcs, mismatched radii, open paths and unresolved numerical inputs fail
 explicitly. Limits are 256 segments and 32 circular holes with strict separation.
@@ -1233,7 +1234,7 @@ paths lower to the existing polygon-prism implementation with segment aliases.
 Display meshes share arc samples, include endpoint arithmetic in their chord-error
 budget and independently certify cap coverage. A requested coarse mesh that
 closes a native clearance fails explicitly; reducing chord error can resolve it.
-This does not add general curved Booleans, concave arc paths or partial revolution.
+This does not add general curved Booleans, curved inner paths or partial revolution.
 
 [rounded_clevis.star](examples/rounded_clevis.star) combines a rounded base,
 two shared arched cheeks, a capsule link and a pin: five occurrences from four
@@ -1379,3 +1380,28 @@ existing Chromium executable instead of installing a Playwright browser if
 preferred. The depth test checks rendered visibility and picking against
 independent ray/rectangle intersections. Node is only a test dependency; exported
 viewers have no external dependencies.
+
+### Split bearing block with concave seats
+
+[split_bearing_block.star](examples/split_bearing_block.star) uses a clockwise
+semicircular recess in each of two shared jaws, a stepped shaft and four shared
+annular sleeves: seven occurrences from three definitions. `seat_radius`
+(10..18 mm), `depth` (12..24 mm) and `jaw_gap` (0..3 mm) expose geometry and
+placement edits; changing the gap rebuilds no solids, radius rebuilds two
+definitions and depth rebuilds three. The `jaw` output exposes the native seat
+without the shaft covering it.
+
+Independent rectangle-minus-semicircle integrals check volume, centroid and full
+inertia over 27 configurations; assembly checks include density-weighted mass
+and inertia. Invalid crossing revisions preserve the last published generation.
+Analytic segment intersection, boundary distance and ray winding validate native
+profiles; tessellation is not used to decide whether a path is simple or a hole
+is inside. Nonadjacent contact, overlap, uncertain separation and cusps fail
+explicitly. Placements remain prescribed: this example does not certify fits,
+contact forces, bearing life or constrained motion.
+
+Three independent STEP-import cases additionally verify trimmed inward cylinder
+orientation, assembly placement and closed STL output. `npm run
+test:concave-profile --prefix tools/preview-check` checks 12 browser views and
+706 independent visibility rays, including isolated jaw recesses and captured
+source inspection.
