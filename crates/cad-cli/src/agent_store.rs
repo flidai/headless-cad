@@ -16,6 +16,8 @@ use std::{
 
 type Result<T> = std::result::Result<T, String>;
 pub(crate) const SCHEMA: u32 = 2;
+const ACCEPTANCE_SCHEMA: u32 = 1;
+pub(crate) const MAX_ACCEPTANCES: usize = 64;
 const MAX_RECORD: usize = 64 * 1024 * 1024 + 4096;
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -59,12 +61,59 @@ pub(crate) struct Receipt {
     tree_bytes: u64,
     tree_digest: String,
 }
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Acceptance {
+    schema_version: u32,
+    pub sequence: u64,
+    pub revision_id: String,
+    pub request_id: String,
+    pub payload_fingerprint: String,
+    pub expected_base_revision: Option<String>,
+    pub job_id: String,
+    pub snapshot_id: String,
+    pub manifest_digest: String,
+    pub build_executable_digest: String,
+    pub verifier_executable_digest: String,
+}
+impl Acceptance {
+    pub(crate) fn public_value(&self) -> Value {
+        serde_json::json!({"revision_id":self.revision_id,"sequence":self.sequence,"request_id":self.request_id,"job_id":self.job_id,"snapshot_id":self.snapshot_id,"manifest_digest":self.manifest_digest,"expected_base_revision":self.expected_base_revision,"build_executable_digest":self.build_executable_digest,"verifier_executable_digest":self.verifier_executable_digest})
+    }
+}
+pub(crate) fn acceptance_fingerprint(
+    request_id: &str,
+    job_id: &str,
+    manifest_digest: &str,
+    expected_base_revision: Option<&str>,
+) -> Result<String> {
+    request_hash(request_id)?;
+    let payload = serde_json::json!({"acceptance_schema_version":ACCEPTANCE_SCHEMA,"request_id":request_id,"job_id":job_id,"manifest_digest":manifest_digest,"expected_base_revision":expected_base_revision});
+    Ok(
+        blake3::hash(&serde_json::to_vec(&payload).map_err(|e| e.to_string())?)
+            .to_hex()
+            .to_string(),
+    )
+}
+fn acceptance_revision_id(record: &Acceptance) -> Result<String> {
+    let mut value = serde_json::to_value(record).map_err(|e| e.to_string())?;
+    value
+        .as_object_mut()
+        .ok_or("invalid acceptance record")?
+        .remove("revision_id");
+    Ok(
+        blake3::hash(&serde_json::to_vec(&value).map_err(|e| e.to_string())?)
+            .to_hex()
+            .to_string(),
+    )
+}
 pub(crate) struct AgentStore {
     _root: Dir,
     snapshots: Dir,
     intents: Dir,
     receipts: Dir,
     jobs: Dir,
+    acceptances: Dir,
     executable_digest: String,
 }
 
@@ -337,6 +386,7 @@ impl AgentStore {
         let intents = make_dir(&root, "intents")?;
         let receipts = make_dir(&root, "receipts")?;
         let jobs = make_dir(&root, "jobs")?;
+        let acceptances = make_dir(&root, "acceptances")?;
         let executable_digest =
             blake3::hash(&std::fs::read("/proc/self/exe").map_err(|e| e.to_string())?)
                 .to_hex()
@@ -347,6 +397,7 @@ impl AgentStore {
             intents,
             receipts,
             jobs,
+            acceptances,
             executable_digest,
         })
     }
@@ -855,6 +906,122 @@ impl AgentStore {
         let mut total = 0;
         copy(&source, &target, 0, &mut count, &mut total)
     }
+    pub(crate) fn accepted_revisions(&self) -> Result<Vec<Acceptance>> {
+        let intents = self.intents()?;
+        let receipts = self.receipts(&intents)?;
+        let mut records = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+        for name in names(&self.acceptances, true)? {
+            let sequence = records.len() + 1;
+            if sequence > MAX_ACCEPTANCES || name != format!("{sequence:016x}.json") {
+                return Err("acceptance chain has a gap or exceeds limit".into());
+            }
+            let record: Acceptance =
+                serde_json::from_slice(&read_bounded(&self.acceptances, &name, 4096)?)
+                    .map_err(|e| e.to_string())?;
+            let prior = records.last().map(|r: &Acceptance| r.revision_id.as_str());
+            if record.schema_version != ACCEPTANCE_SCHEMA
+                || record.sequence != sequence as u64
+                || record.expected_base_revision.as_deref() != prior
+                || !is_hex(&record.revision_id)
+                || !is_hex(&record.payload_fingerprint)
+                || !is_hex(&record.manifest_digest)
+                || !is_hex(&record.build_executable_digest)
+                || !is_hex(&record.verifier_executable_digest)
+                || !seen.insert(record.request_id.clone())
+                || acceptance_revision_id(&record)? != record.revision_id
+                || acceptance_fingerprint(
+                    &record.request_id,
+                    &record.job_id,
+                    &record.manifest_digest,
+                    record.expected_base_revision.as_deref(),
+                )? != record.payload_fingerprint
+            {
+                return Err("acceptance record identity or chain mismatch".into());
+            }
+            let intent = intents
+                .values()
+                .find(|i| i.job_id == record.job_id)
+                .ok_or("acceptance references unknown job")?;
+            let receipt = receipts
+                .get(&intent.request_id)
+                .ok_or("acceptance references incomplete job")?;
+            if intent.mode != "build"
+                || intent.snapshot_id != record.snapshot_id
+                || intent.executable_digest != record.build_executable_digest
+                || receipt.report["worker"]["success"] != true
+                || receipt.report["manifest_hash"] != record.manifest_digest
+            {
+                return Err("acceptance candidate binding mismatch".into());
+            }
+            records.push(record);
+        }
+        Ok(records)
+    }
+    pub(crate) fn commit_acceptance(
+        &self,
+        request_id: &str,
+        job_id: &str,
+        snapshot_id: &str,
+        manifest_digest: &str,
+        expected_base_revision: Option<&str>,
+        build_executable_digest: &str,
+    ) -> Result<Acceptance> {
+        let records = self.accepted_revisions()?;
+        if records.len() >= MAX_ACCEPTANCES {
+            return Err("acceptance record limit reached".into());
+        }
+        if records.iter().any(|r| r.request_id == request_id) {
+            return Err("acceptance request_id already committed".into());
+        }
+        if records.last().map(|r| r.revision_id.as_str()) != expected_base_revision {
+            return Err("stale expected_base_revision".into());
+        }
+        let intents = self.intents()?;
+        let intent = intents
+            .values()
+            .find(|i| i.job_id == job_id)
+            .ok_or("acceptance references unknown job")?;
+        let receipt = self
+            .receipts(&intents)?
+            .remove(&intent.request_id)
+            .ok_or("acceptance references incomplete job")?;
+        if intent.mode != "build"
+            || intent.snapshot_id != snapshot_id
+            || intent.executable_digest != build_executable_digest
+            || receipt.report["worker"]["success"] != true
+            || receipt.report["manifest_hash"] != manifest_digest
+        {
+            return Err("acceptance candidate binding mismatch".into());
+        }
+        self.verify_job_seal(job_id)?;
+        let sequence = (records.len() + 1) as u64;
+        let mut record = Acceptance {
+            schema_version: ACCEPTANCE_SCHEMA,
+            sequence,
+            revision_id: String::new(),
+            request_id: request_id.to_owned(),
+            payload_fingerprint: acceptance_fingerprint(
+                request_id,
+                job_id,
+                manifest_digest,
+                expected_base_revision,
+            )?,
+            expected_base_revision: expected_base_revision.map(str::to_owned),
+            job_id: job_id.to_owned(),
+            snapshot_id: snapshot_id.to_owned(),
+            manifest_digest: manifest_digest.to_owned(),
+            build_executable_digest: build_executable_digest.to_owned(),
+            verifier_executable_digest: self.executable_digest.clone(),
+        };
+        record.revision_id = acceptance_revision_id(&record)?;
+        atomic_record(
+            &self.acceptances,
+            &format!("{sequence:016x}.json"),
+            &serde_json::to_vec(&record).map_err(|e| e.to_string())?,
+        )?;
+        Ok(record)
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -869,4 +1036,81 @@ fn open_root_existing(path: &Path) -> Result<Dir> {
         .map_err(|e| e.to_string())?,
     );
     Ok(Dir::from_std_file(file))
+}
+
+#[cfg(test)]
+mod acceptance_tests {
+    use super::*;
+    use cap_std::ambient_authority;
+
+    #[test]
+    fn acceptance_chain_survives_reopen_and_rejects_gap_and_stale_base() {
+        let workspace = tempfile::tempdir().unwrap();
+        let state = tempfile::tempdir().unwrap();
+        let pinned = Dir::open_ambient_dir(workspace.path(), ambient_authority()).unwrap();
+        let store = AgentStore::open(state.path(), workspace.path(), &pinned).unwrap();
+        let intent = Intent {
+            schema_version: SCHEMA,
+            request_id: "build-key".into(),
+            fingerprint: "b".repeat(64),
+            job_id: "job_0000000000000001".into(),
+            snapshot_id: "a".repeat(64),
+            mode: "build".into(),
+            executable_digest: store.executable_digest().into(),
+        };
+        store.persist_intent(&intent).unwrap();
+        store.create_job_dir(&intent.job_id).unwrap();
+        let generation = state
+            .path()
+            .join("jobs")
+            .join(&intent.job_id)
+            .join("generation");
+        std::fs::create_dir(&generation).unwrap();
+        std::fs::write(generation.join("part.json"), b"part").unwrap();
+        let manifest = serde_json::json!({"artifact_files":["part.json"]}).to_string();
+        std::fs::write(generation.join("manifest.json"), &manifest).unwrap();
+        let manifest_digest = blake3::hash(manifest.as_bytes()).to_hex().to_string();
+        let artifact_digest = blake3::hash(b"part").to_hex().to_string();
+        let artifacts = BTreeMap::from([("part.json".into(), (4, artifact_digest.clone()))]);
+        let report = serde_json::json!({"job_id":intent.job_id,"snapshot_id":intent.snapshot_id,"mode":"build","worker":{"success":true},"publication":"immutable_candidate_only","manifest_hash":manifest_digest,"artifacts":[{"name":"part.json","bytes":4,"blake3":artifact_digest}]});
+        store
+            .persist_receipt(&intent.request_id, &intent.job_id, &report, &artifacts)
+            .unwrap();
+        let first = store
+            .commit_acceptance(
+                "accept-1",
+                &intent.job_id,
+                &intent.snapshot_id,
+                &manifest_digest,
+                None,
+                &intent.executable_digest,
+            )
+            .unwrap();
+        assert!(store
+            .commit_acceptance(
+                "accept-2",
+                &intent.job_id,
+                &intent.snapshot_id,
+                &manifest_digest,
+                None,
+                &intent.executable_digest
+            )
+            .is_err());
+        let second = store
+            .commit_acceptance(
+                "accept-2",
+                &intent.job_id,
+                &intent.snapshot_id,
+                &manifest_digest,
+                Some(&first.revision_id),
+                &intent.executable_digest,
+            )
+            .unwrap();
+        assert_ne!(first.revision_id, second.revision_id);
+        drop(store);
+        let reopened = AgentStore::open(state.path(), workspace.path(), &pinned).unwrap();
+        assert_eq!(reopened.accepted_revisions().unwrap().len(), 2);
+        std::fs::remove_file(state.path().join("acceptances/0000000000000001.json")).unwrap();
+        assert!(reopened.accepted_revisions().is_err());
+    }
 }

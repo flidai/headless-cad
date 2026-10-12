@@ -118,8 +118,8 @@ captured sources with `cad_snapshots` and jobs with `cad_jobs` after reconnectin
 Interrupted work is reported as interrupted and is never silently rerun. The
 state directory is exclusively locked and must be separate from the workspace.
 The same snapshot, job and byte limits persist across restarts; restarting does
-not clear durable retention. Release acceptance and garbage collection remain
-separate work. The viewer remains read-only.
+not clear durable retention. Garbage collection remains separate work. The viewer
+remains read-only.
 This local adapter is Linux-only for confined source capture, accepts numeric
 parameter overrides, and limits sessions to one active tool, 32 snapshots and 16
 jobs. Before evaluating a recipe, Linux workers enforce a 2 GiB virtual-address limit,
@@ -128,8 +128,8 @@ files, and no core dumps. Stricter inherited limits are preserved. The separate
 wall-time and aggregate-disk guards remain polling checks. This is not a filesystem
 sandbox or a cgroup RSS quota. Workers also register parent-death termination
 before admission, so an exited agent process cannot leave a model worker running.
-Hosted workers, module editing, expected-base release publication and automated
-retention management remain open. See [the agent contract](docs/architecture.md#local-agent-candidate-jobs)
+Hosted workers, module editing, external release delivery and automated retention
+management remain open. See [the agent contract](docs/architecture.md#local-agent-candidate-jobs)
 for the precise boundary.
 
 From a source checkout, run the full rotating-drive client fixture after building
@@ -158,6 +158,26 @@ source revisions, records a rejected engineering edit, kills the server,
 reconnects, and recovers the same three outcomes before downloading verified
 inspection artifacts. It demonstrates local protocol recovery, not autonomous
 design or acceptance of a production release.
+
+Durable sessions can also record an accepted local candidate. Read the current
+head with `cad_release`, then call `cad_accept` with `request_id`, `job_id`,
+`manifest_digest`, and an explicit `expected_base_revision` (null for the first
+acceptance). Only a freshly verified successful build can be accepted. A stale
+base or a changed payload under an existing request ID refuses; an identical
+retry returns its original acceptance, including after restart. This records
+local review state without modifying recipes or delivering a manufacturing release.
+The store retains at most 64 acceptance records.
+
+To exercise acceptance, stale-proposal rejection and recovery on the full drive:
+
+```sh
+python scripts/agent_recovery_demo.py --cad target/release/cad \
+  --workspace "$PWD" --state-dir /tmp/cad-drive-acceptance-state \
+  --out-dir out/agent_acceptance_demo --accept-revisions
+```
+
+Open `http://localhost:8080/agent_acceptance_demo/index.html` with the viewer
+server running. Use fresh state and delivery directories for each run.
 
 ## Review a complete source revision
 

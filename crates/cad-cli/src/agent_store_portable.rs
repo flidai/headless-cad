@@ -11,6 +11,21 @@ use std::{
 
 type Result<T> = std::result::Result<T, String>;
 pub(crate) const SCHEMA: u32 = 2;
+pub(crate) const MAX_ACCEPTANCES: usize = 64;
+pub(crate) struct Acceptance {
+    pub revision_id: String,
+    pub request_id: String,
+    pub payload_fingerprint: String,
+    pub job_id: String,
+}
+impl Acceptance {
+    pub(crate) fn public_value(&self) -> Value {
+        Value::Null
+    }
+}
+pub(crate) fn acceptance_fingerprint(_: &str, _: &str, _: &str, _: Option<&str>) -> Result<String> {
+    unavailable()
+}
 #[derive(Clone)]
 pub(crate) struct Intent {
     pub schema_version: u32,
@@ -90,6 +105,20 @@ impl AgentStore {
         unavailable()
     }
     pub(crate) fn copy_job_to_temp(&self, _: &str, _: &Path) -> Result<()> {
+        unavailable()
+    }
+    pub(crate) fn accepted_revisions(&self) -> Result<Vec<Acceptance>> {
+        unavailable()
+    }
+    pub(crate) fn commit_acceptance(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: Option<&str>,
+        _: &str,
+    ) -> Result<Acceptance> {
         unavailable()
     }
 }

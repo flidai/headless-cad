@@ -227,7 +227,7 @@ release and is checked independently from exported solid validity.
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Dimensioned slope fixture → four-bar mechanism → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | In progress: bounded original Rust point sketch solver, ten constraint kinds including directed angles and circle-to-line tangency; separate linear/angular tolerances, polygon extrusion, local rank/residual/conditioning reports, independent constraint islands and atomic failure handling; curves, large connected systems, branch continuation, conflict minimization and nonlinear assembly solving remain; bounded prescribed revolute/prismatic forward kinematics has product/exchange acceptance; planar pin/bar closed-loop integration adds numerical solution and explicit branch admission |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | In progress: local equal-distance straight-edge chamfers on strictly convex planar solids, with complete face lineage and generated-face datums; longitudinal line–line corner fillets on convex right prisms with circular holes; curved/unequal chamfers, general rolling-ball fillets, sweeps/lofts, offsets/shelling and general repair remain |
 | M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries and global recipe property assertions and revision-bound STEP/STL fidelity declarations and source-bound native planar-section JSON/SVG implemented; drawings, PMI, broader independent semantic round-trip evidence, principal axes and configuration policies remain |
-| M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | In progress: pinned local modules and offline replay, confined Linux stdio MCP candidate sessions, verified worker process limits and immutable manifest-bound results; local durable job recovery and evaluation retry identity implemented; expected-base publication, idempotent external delivery, hosted isolation and adapters remain |
+| M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | In progress: pinned local modules and offline replay, confined Linux stdio MCP candidate sessions, verified worker process limits and immutable manifest-bound results; local durable job recovery, evaluation retry identity and expected-base candidate acceptance implemented; external publication, idempotent external delivery, hosted isolation and adapters remain |
 
 Completing M1 and extending the display-asset interface are the immediate
 architectural priorities. Nested assemblies now share definitions and display
@@ -728,7 +728,7 @@ propose → native rejection → repair → build → verify → offline replay.
 
 Default execution is session-local; opt-in durable recovery is described below.
 Neither completes M7/R5. Exact-body memory scheduling and aggregate disk quotas,
-module proposals, expected-base publication,
+module proposals, external release publication,
 remote authentication, idempotent delivery, and measured autonomous engineering
 success remain open. All five commercial product gates remain open.
 
@@ -815,5 +815,14 @@ survive process exit. Stable evaluation request IDs recover recorded outcomes;
 interrupted attempts remain interrupted. Real restart, orphan-worker termination,
 conflicting retries and tampered-artifact tests exercise the boundary. Default
 MCP sessions remain ephemeral. This is one local writer with fixed quotas;
-expected-base release acceptance, retention management, external delivery and
+retention management, external delivery and
 hosted isolation remain open, so the agent lifecycle release gate stays open.
+
+
+Local accepted-candidate state now uses explicit expected-base revision checks,
+fresh native verification and immutable acceptance records. Conflicting proposals
+preserve the accepted head; identical retries recover their original acceptance
+after restart. The full drive walkthrough exercises two accepted source revisions
+and one stale rejection. This is local review state with bounded history, not
+manufacturing certification, distributed history or external delivery. Those
+requirements and all five commercial release gates remain open.

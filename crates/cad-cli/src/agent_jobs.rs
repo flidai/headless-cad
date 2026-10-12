@@ -90,6 +90,10 @@ impl AgentJobs {
         }
         let receipts = store.receipts(&intents)?;
         store.retained_bytes(&intents)?;
+        let accepted = store.accepted_revisions()?;
+        if let Some(head) = accepted.last() {
+            store.verify_job_seal(&head.job_id)?;
+        }
         let mut jobs = BTreeMap::new();
         let mut sequence = 0u64;
         for (request_id, intent) in &intents {
@@ -468,6 +472,98 @@ impl AgentJobs {
             TIMEOUT,
             &cancel,
         )
+    }
+    pub fn release(&self) -> Result<Value> {
+        let store = self
+            .store
+            .as_ref()
+            .ok_or("accepted revisions require durable state")?;
+        let records = store.accepted_revisions()?;
+        if let Some(head) = records.last() {
+            store.verify_job_seal(&head.job_id)?;
+            Ok(json!({"revision":head.public_value()}))
+        } else {
+            Ok(json!({"revision":null}))
+        }
+    }
+    pub fn accept(
+        &mut self,
+        request_id: &str,
+        job_id: &str,
+        manifest_digest: &str,
+        expected_base_revision: Option<&str>,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<Value> {
+        let store = self
+            .store
+            .as_ref()
+            .ok_or("acceptance requires durable state")?;
+        crate::agent_store::request_hash(request_id)?;
+        if manifest_digest.len() != 64
+            || !manifest_digest
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        {
+            return Err("manifest_digest must be lowercase BLAKE3 hex".into());
+        }
+        if expected_base_revision.is_some_and(|id| {
+            id.len() != 64
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        }) {
+            return Err("expected_base_revision must be null or lowercase revision ID".into());
+        }
+        let fingerprint = crate::agent_store::acceptance_fingerprint(
+            request_id,
+            job_id,
+            manifest_digest,
+            expected_base_revision,
+        )?;
+        let records = store.accepted_revisions()?;
+        if let Some(prior) = records.iter().find(|r| r.request_id == request_id) {
+            if prior.payload_fingerprint != fingerprint {
+                return Err("acceptance request_id conflicts with different payload".into());
+            }
+            store.verify_job_seal(&prior.job_id)?;
+            return Ok(json!({"accepted":true,"revision":prior.public_value()}));
+        }
+        if records.last().map(|r| r.revision_id.as_str()) != expected_base_revision {
+            return Err("stale expected_base_revision".into());
+        }
+        let job = self.jobs.get(job_id).ok_or("unknown session job")?;
+        if job.directory.is_none()
+            || job.report["mode"] != "build"
+            || job.report["worker"]["success"] != true
+            || job.report["manifest_hash"] != manifest_digest
+        {
+            return Err("acceptance requires a successful matching build".into());
+        }
+        let intent = store
+            .intents()?
+            .into_values()
+            .find(|i| i.job_id == job_id)
+            .ok_or("acceptance job has no durable intent")?;
+        store.verify_job_seal(job_id)?;
+        let verified = self.verify(job_id, manifest_digest, cancel.clone())?;
+        if verified["success"] != true || verified["result"]["valid"] != true {
+            return Err("fresh candidate verification failed".into());
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err("acceptance cancelled before commit".into());
+        }
+        let snapshot_id = job.report["snapshot_id"]
+            .as_str()
+            .ok_or("job snapshot missing")?;
+        let record = store.commit_acceptance(
+            request_id,
+            job_id,
+            snapshot_id,
+            manifest_digest,
+            expected_base_revision,
+            &intent.executable_digest,
+        )?;
+        Ok(json!({"accepted":true,"revision":record.public_value()}))
     }
     /// Allows discovery after a response-delivery/cancellation race.
     pub fn list_jobs(&self) -> Value {

@@ -14,6 +14,15 @@ const assert=require('node:assert/strict');
   assert.equal(report.durable_jobs,3);assert.equal(report.recovered_retry_results,3);
   assert.equal(report.rejected_job.worker.success,false);
   assert.equal(report.conflicting_retry.code,'agent_request_failed');
+  if (report.acceptances?.length) {
+   assert.equal(report.acceptances.length,2);
+   const [a,b]=report.acceptances;
+   assert.equal(a.accepted,true);assert.equal(b.accepted,true);
+   assert.equal(a.revision.sequence,1);assert.equal(b.revision.sequence,2);
+   assert.equal(b.revision.expected_base_revision,a.revision.revision_id);
+   assert.equal(report.stale_acceptance.code,'agent_request_failed');
+   assert.match(await page.locator('body').innerText(),/stale proposal was refused/);
+  }
   await page.screenshot({path:'/tmp/cad-agent-recovery-demo.png',fullPage:true});
   for(const [name,diameter] of [['before',12],['after',14]]) {
    const source=await(await page.request.get(`${base}/${name}/recipe.star`)).text();

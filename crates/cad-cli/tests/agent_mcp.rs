@@ -151,9 +151,21 @@ fn agent_proposes_diagnoses_repairs_verifies_and_replays_without_workspace_write
         "cad_job",
         "cad_read_artifact",
         "cad_verify",
+        "cad_release",
+        "cad_accept",
     ] {
         assert!(tools.iter().any(|tool| tool["name"] == name));
     }
+    let release_tool = tools
+        .iter()
+        .find(|tool| tool["name"] == "cad_release")
+        .unwrap();
+    assert_eq!(release_tool["annotations"]["readOnlyHint"], true);
+    let accept_tool = tools
+        .iter()
+        .find(|tool| tool["name"] == "cad_accept")
+        .unwrap();
+    assert_eq!(accept_tool["annotations"]["destructiveHint"], true);
     let capabilities = client.tool(
         "cad_capabilities",
         json!({"operation":"feature.extrude"}),
@@ -168,6 +180,12 @@ fn agent_proposes_diagnoses_repairs_verifies_and_replays_without_workspace_write
         false
     );
     assert_eq!(capabilities["agent_session"]["request_id_required"], false);
+    assert_eq!(
+        capabilities["agent_session"]["release_publication"],
+        "unavailable"
+    );
+    client.tool("cad_release", json!({}), true);
+    client.tool("cad_accept", json!({"request_id":"no-state","job_id":"job_0000000000000001","manifest_digest":"0".repeat(64),"expected_base_revision":null}), true);
     let snapshots = client.tool("cad_snapshots", json!({}), false);
     assert_eq!(snapshots["snapshots"].as_array().unwrap().len(), 1);
     assert_eq!(

@@ -2947,9 +2947,9 @@ temporary jobs. Opt-in local durable recovery is described below; hosted storage
 and automatic resumption of interrupted work remain outside this adapter.
 
 This adapter advances R5 but does not close it. It does not write workspace source,
-publish active releases, solve constraints from natural language, or certify all
+deliver external releases, solve constraints from natural language, or certify all
 assembly collisions. Still required: hosted isolated jobs, exact-body scheduling with resource admission,
-expected-base serialized compare-and-swap publication, client delivery reconciliation,
+external release publication and client delivery reconciliation,
 and measured end-to-end autonomous task success. A scripted protocol fixture proves
 the propose/fail/repair/replay interface, not autonomous reasoning by an AI model.
 
@@ -3233,5 +3233,50 @@ race before any recipe evaluation. Tests stop a real admitted child, kill its
 server, and require child termination plus interrupted-request recovery. Other
 acceptance cases cover lost full-drive delivery, source-independent replay,
 changed executable images, workspace replacement, live/offline artifact tampering,
-second-writer refusal and retention across restart. Expected-base release
-acceptance, garbage collection and external delivery reconciliation remain open.
+second-writer refusal and retention across restart. Local expected-base candidate
+acceptance is described below; garbage collection and external delivery
+reconciliation remain open.
+
+
+### Local expected-base candidate acceptance
+
+Durable MCP sessions expose `cad_release` to inspect the current accepted head
+and `cad_accept` to record a verified candidate. This is a local workflow record;
+recipes remain authoritative, and the viewer continues to inspect source and
+artifacts without invoking modeling or acceptance tools. It does not certify a
+manufacturing release or synchronize an external document/BOM system.
+
+Acceptance requires an explicit expected revision ID, or null for an empty
+history, plus job ID, manifest digest and a stable request ID. The candidate must
+have a committed, successful build receipt with that manifest. Acceptance freshly
+verifies a private copy through the native verifier and requires both worker
+success and the nested integrity result. Failed, interrupted, compile-only and
+altered candidates cannot become accepted. The state-directory lock and single
+active tool serialize the operation; the head is checked again before commit.
+
+Each acceptance is an immutable, numbered record in a bounded 64-record chain.
+The record binds its previous revision, request payload, job/source/manifest,
+build executable and verifier executable. Its revision ID hashes the record
+contents. Atomic no-replace publication followed by directory fsync commits the
+record; the highest validated contiguous record is the logical head, avoiding a
+second mutable pointer write. A lost response is recoverable by repeating the
+same acceptance request. Replays are checked before stale-base comparison, so
+an old request still returns its original acceptance after the head advances.
+A changed payload under that ID refuses. New acceptance after an executable
+upgrade runs the new verifier; historical acceptance retry identity remains stable.
+
+Recovery checks record identities, predecessor links, successful receipt bindings
+and candidate seals. Read/replay paths fail closed when stored candidates are
+altered. Missing interior records, truncated JSON and symlinks refuse recovery.
+These checks do not provide authenticated anti-rollback: a writer can remove the
+last record and leave a valid shorter chain, or rewrite the whole local store.
+Clients needing rollback detection must retain their expected revision outside
+the store. Hosted authorization and trusted history remain separate work.
+
+Real MCP tests exercise competing expected bases, lost-reply restart, historical
+retry, executable replacement, invalid candidate refusal, corrupted histories
+and capacity across restart. The rotating-drive client fixture accepts its two
+source revisions, rejects a stale proposal and recovers both acceptance records
+alongside all candidate artifacts. This advances R5 without closing the commercial
+release gate; external delivery, retention management and autonomous engineering
+acceptance remain open.

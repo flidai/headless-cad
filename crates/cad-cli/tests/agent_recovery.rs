@@ -400,6 +400,11 @@ fn killed_worker_is_interrupted_and_same_request_never_reexecutes() {
     assert_eq!(retry["status"], "interrupted");
     assert_eq!(retry["artifacts"], json!([]));
     assert_eq!(retry["worker"]["success"], false);
+    recovered.tool("cad_accept",json!({"request_id":"interrupted-accept","job_id":retry["job_id"],"manifest_digest":"0".repeat(64),"expected_base_revision":null}),true);
+    assert_eq!(
+        recovered.tool("cad_release", json!({}), false)["revision"],
+        Value::Null
+    );
     assert_eq!(recovered.tool("cad_evaluate", args, true), retry);
     assert_eq!(
         recovered.tool("cad_jobs", json!({}), false)["jobs"]
@@ -585,5 +590,299 @@ fn restart_preserves_job_quota_but_allows_retrieval_at_capacity() {
             .filter(|entry| entry.path().extension().is_some_and(|x| x == "json"))
             .count(),
         16
+    );
+}
+
+const ACCEPT_SOURCE: &str = "body = extrude(id=\"body\", profile=rectangle(id=\"outline\", width=10, depth=8), height=6)\noutput(name=\"box\", feature=body)\n";
+fn acceptance_build(client: &mut Client, request: &str) -> Value {
+    let snapshot = client.tool("cad_snapshot", json!({"recipe":"box.star"}), false);
+    client.tool(
+        "cad_evaluate",
+        json!({"snapshot_id":snapshot["snapshot_id"],"mode":"build","request_id":request}),
+        false,
+    )
+}
+fn accept_args(job: &Value, request: &str, base: Value) -> Value {
+    json!({"request_id":request,"job_id":job["job_id"],"manifest_digest":job["manifest_hash"],"expected_base_revision":base})
+}
+
+#[test]
+fn accepted_revisions_require_exact_base_and_recover_lost_reply() {
+    let workspace = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    fs::write(workspace.path().join("box.star"), ACCEPT_SOURCE).unwrap();
+    let mut client = Client::start(workspace.path(), state.path());
+    assert_eq!(
+        client.tool("cad_release", json!({}), false),
+        json!({"revision":null})
+    );
+    let original = acceptance_build(&mut client, "build-original");
+    let first_args = accept_args(&original, "accept-original", Value::Null);
+    let mut missing = first_args.clone();
+    missing
+        .as_object_mut()
+        .unwrap()
+        .remove("expected_base_revision");
+    client.tool("cad_accept", missing, true);
+    assert_eq!(
+        client.tool("cad_release", json!({}), false)["revision"],
+        Value::Null
+    );
+    let accepted = client.tool("cad_accept", first_args.clone(), false);
+    assert_eq!(accepted["accepted"], true);
+    assert_eq!(accepted["revision"]["sequence"], 1);
+    assert_eq!(accepted["revision"]["job_id"], original["job_id"]);
+    let head = accepted["revision"]["revision_id"].clone();
+    assert_eq!(head.as_str().unwrap().len(), 64);
+    assert_eq!(
+        client.tool("cad_release", json!({}), false)["revision"],
+        accepted["revision"]
+    );
+    let snapshot=client.tool("cad_revise",json!({"snapshot_id":original["snapshot_id"],"source":ACCEPT_SOURCE.replace("height=6","height=7")}),false);
+    let revised = client.tool(
+        "cad_evaluate",
+        json!({"snapshot_id":snapshot["snapshot_id"],"mode":"build","request_id":"build-revised"}),
+        false,
+    );
+    client.tool(
+        "cad_accept",
+        accept_args(&revised, "stale-sibling", Value::Null),
+        true,
+    );
+    client.tool(
+        "cad_accept",
+        accept_args(&revised, "accept-original", head.clone()),
+        true,
+    );
+    assert_eq!(
+        client.tool("cad_release", json!({}), false)["revision"],
+        accepted["revision"]
+    );
+    // Deliver the request but deliberately never consume its successful response.
+    let second_args = accept_args(&revised, "accept-revised", head.clone());
+    client.id += 1;
+    client.send(json!({"jsonrpc":"2.0","id":client.id,"method":"tools/call","params":{"name":"cad_accept","arguments":second_args}}));
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        let committed = fs::read_dir(state.path().join("acceptances"))
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().is_some_and(|x| x == "json"))
+            .count();
+        if committed == 2 {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "acceptance did not commit"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    drop(client);
+    let mut recovered = Client::start(workspace.path(), state.path());
+    let second = recovered.tool("cad_accept", second_args, false);
+    assert_eq!(second["revision"]["sequence"], 2);
+    assert_eq!(second["revision"]["expected_base_revision"], head);
+    assert_eq!(second["revision"]["job_id"], revised["job_id"]);
+    assert_eq!(recovered.tool("cad_accept", first_args, false), accepted);
+    assert_eq!(
+        recovered.tool("cad_release", json!({}), false)["revision"],
+        second["revision"]
+    );
+    assert_eq!(
+        fs::read_to_string(workspace.path().join("box.star")).unwrap(),
+        ACCEPT_SOURCE
+    );
+    assert_eq!(fs::read_dir(workspace.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn acceptance_rejects_nonbuild_failed_wrong_manifest_and_tampered_candidates() {
+    let workspace = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    fs::write(workspace.path().join("box.star"), ACCEPT_SOURCE).unwrap();
+    let mut client = Client::start(workspace.path(), state.path());
+    let good = acceptance_build(&mut client, "good");
+    let compiled = client.tool(
+        "cad_evaluate",
+        json!({"snapshot_id":good["snapshot_id"],"mode":"compile","request_id":"compiled"}),
+        false,
+    );
+    let mut args = accept_args(&compiled, "reject-compile", Value::Null);
+    args["manifest_digest"] = good["manifest_hash"].clone();
+    client.tool("cad_accept", args, true);
+    let bad=client.tool("cad_revise",json!({"snapshot_id":good["snapshot_id"],"source":"fail(\"deliberately rejected design\")"}),false);
+    let failed = client.tool(
+        "cad_evaluate",
+        json!({"snapshot_id":bad["snapshot_id"],"mode":"build","request_id":"failed"}),
+        true,
+    );
+    let mut args = accept_args(&failed, "reject-failed", Value::Null);
+    args["manifest_digest"] = good["manifest_hash"].clone();
+    client.tool("cad_accept", args, true);
+    let mut args = accept_args(&good, "reject-digest", Value::Null);
+    args["manifest_digest"] = json!("0".repeat(64));
+    client.tool("cad_accept", args, true);
+    assert_eq!(
+        client.tool("cad_release", json!({}), false)["revision"],
+        Value::Null
+    );
+    let accepted = client.tool(
+        "cad_accept",
+        accept_args(&good, "accept-good", Value::Null),
+        false,
+    );
+    let artifact = state
+        .path()
+        .join("jobs")
+        .join(good["job_id"].as_str().unwrap())
+        .join("generation/box.step");
+    fs::write(artifact, "tampered").unwrap();
+    client.tool(
+        "cad_accept",
+        accept_args(&good, "accept-good", Value::Null),
+        true,
+    );
+    client.tool(
+        "cad_accept",
+        accept_args(
+            &good,
+            "reject-tampered",
+            accepted["revision"]["revision_id"].clone(),
+        ),
+        true,
+    );
+    client.tool("cad_release", json!({}), true);
+    drop(client);
+    assert!(!startup_refuses(workspace.path(), state.path()).is_empty());
+}
+
+#[test]
+fn broken_acceptance_chain_refuses_recovery() {
+    use std::os::unix::fs::symlink;
+    for variant in ["missing_predecessor", "truncated", "symlink"] {
+        let workspace = tempfile::tempdir().unwrap();
+        let state = tempfile::tempdir().unwrap();
+        fs::write(workspace.path().join("box.star"), ACCEPT_SOURCE).unwrap();
+        let mut client = Client::start(workspace.path(), state.path());
+        let job = acceptance_build(&mut client, "build");
+        let first = client.tool("cad_accept", accept_args(&job, "one", Value::Null), false);
+        client.tool(
+            "cad_accept",
+            accept_args(&job, "two", first["revision"]["revision_id"].clone()),
+            false,
+        );
+        drop(client);
+        let mut records: Vec<_> = fs::read_dir(state.path().join("acceptances"))
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| p.extension().is_some_and(|x| x == "json"))
+            .collect();
+        records.sort();
+        assert_eq!(records.len(), 2);
+        match variant {
+            "missing_predecessor" => fs::remove_file(&records[0]).unwrap(),
+            "truncated" => fs::write(&records[1], "{").unwrap(),
+            "symlink" => {
+                fs::remove_file(&records[1]).unwrap();
+                symlink(&records[0], &records[1]).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            !startup_refuses(workspace.path(), state.path()).is_empty(),
+            "{variant}"
+        );
+    }
+}
+
+#[test]
+fn acceptance_replay_survives_executable_upgrade_and_records_new_verifier() {
+    let workspace = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    let bin = tempfile::tempdir().unwrap();
+    let binary = bin.path().join("cad");
+    fs::copy(env!("CARGO_BIN_EXE_cad"), &binary).unwrap();
+    fs::write(workspace.path().join("box.star"), ACCEPT_SOURCE).unwrap();
+    let mut client = Client::start_binary(&binary, workspace.path(), state.path());
+    let job = acceptance_build(&mut client, "old-build");
+    let args = accept_args(&job, "old-accept", Value::Null);
+    let accepted = client.tool("cad_accept", args.clone(), false);
+    drop(client);
+    fs::OpenOptions::new()
+        .append(true)
+        .open(&binary)
+        .unwrap()
+        .write_all(b"\nnew-acceptance-verifier-identity\n")
+        .unwrap();
+    let mut recovered = Client::start_binary(&binary, workspace.path(), state.path());
+    assert_eq!(recovered.tool("cad_accept", args, false), accepted);
+    let new = recovered.tool(
+        "cad_accept",
+        accept_args(
+            &job,
+            "new-accept",
+            accepted["revision"]["revision_id"].clone(),
+        ),
+        false,
+    );
+    assert_eq!(
+        new["revision"]["build_executable_digest"],
+        accepted["revision"]["build_executable_digest"]
+    );
+    assert_ne!(
+        new["revision"]["verifier_executable_digest"],
+        accepted["revision"]["verifier_executable_digest"]
+    );
+}
+
+#[test]
+fn acceptance_quota_survives_restart_and_preserves_idempotent_replay() {
+    let workspace = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    fs::write(workspace.path().join("box.star"), ACCEPT_SOURCE).unwrap();
+    let mut client = Client::start(workspace.path(), state.path());
+    let job = acceptance_build(&mut client, "quota-build");
+    let mut head = Value::Null;
+    let mut first = Value::Null;
+    for index in 0..64 {
+        let accepted = client.tool(
+            "cad_accept",
+            accept_args(&job, &format!("accept-{index}"), head),
+            false,
+        );
+        head = accepted["revision"]["revision_id"].clone();
+        if index == 0 {
+            first = accepted;
+        }
+    }
+    drop(client);
+    let mut recovered = Client::start(workspace.path(), state.path());
+    assert_eq!(
+        recovered.tool("cad_release", json!({}), false)["revision"]["sequence"],
+        64
+    );
+    assert_eq!(
+        recovered.tool(
+            "cad_accept",
+            accept_args(&job, "accept-0", Value::Null),
+            false
+        ),
+        first
+    );
+    recovered.tool(
+        "cad_accept",
+        accept_args(&job, "accept-65", head.clone()),
+        true,
+    );
+    assert_eq!(
+        recovered.tool("cad_release", json!({}), false)["revision"]["revision_id"],
+        head
+    );
+    assert_eq!(
+        fs::read_dir(state.path().join("acceptances"))
+            .unwrap()
+            .count(),
+        64
     );
 }

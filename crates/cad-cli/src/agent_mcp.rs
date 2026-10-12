@@ -93,6 +93,14 @@ struct Verify {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct Accept {
+    request_id: String,
+    job_id: String,
+    manifest_digest: String,
+    expected_base_revision: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Capabilities {
     operation: Option<String>,
     object_type: Option<String>,
@@ -116,7 +124,16 @@ fn tools() -> Vec<Tool> {
         Tool::new("cad_job", "Read a completed retained job report.", schema(json!({"job_id":s}), &["job_id"])),
         Tool::new("cad_read_artifact", "Read a bounded UTF-8 artifact chunk from a job's verified inventory. Offset and length are bytes.", schema(json!({"job_id":s,"name":s,"offset":{"type":"integer","minimum":0},"max_bytes":{"type":"integer","minimum":1,"maximum":65536}}), &["job_id","name","max_bytes"])),
         Tool::new("cad_verify", "Verify a candidate against the expected manifest digest.", schema(json!({"job_id":s,"manifest_digest":s}), &["job_id","manifest_digest"])),
-    ].into_iter().map(|mut t| { let mut a=ToolAnnotations::default(); a.destructive_hint=Some(false); a.open_world_hint=Some(false); t.annotations=Some(a); t }).collect()
+        Tool::new("cad_release", "Read the current locally accepted candidate revision. Requires durable --state-dir. This is not a manufacturing release or external delivery.", schema(json!({}), &[])),
+        Tool::new("cad_accept", "Accept a verified completed build as the next local revision only when expected_base_revision matches the current revision. Requires durable --state-dir and an idempotency request_id. Does not change recipe source or deliver a manufacturing release.", schema(json!({"request_id":{"type":"string","minLength":1,"maxLength":128},"job_id":s,"manifest_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"},"expected_base_revision":{"type":["string","null"],"pattern":"^[0-9a-f]{64}$"}}), &["request_id","job_id","manifest_digest","expected_base_revision"])),
+    ].into_iter().map(|mut t| {
+        let mut a=ToolAnnotations::default();
+        if t.name == "cad_release" { a.read_only_hint=Some(true); }
+        a.destructive_hint=Some(t.name == "cad_accept");
+        a.open_world_hint=Some(false);
+        t.annotations=Some(a);
+        t
+    }).collect()
 }
 impl State {
     fn remember(&mut self, snapshot: Snapshot, parent: Option<&str>) -> Result<Value, String> {
@@ -162,7 +179,7 @@ impl State {
                     a.object_type.as_deref(),
                     cancel,
                 )?;
-                report["agent_session"] = json!({"transport":"stdio","source_capture_platform":"linux","publication":"immutable_candidate_only","viewer":"read_only","maximum_snapshots":MAX_SNAPSHOTS,"maximum_snapshot_bytes":MAX_SNAPSHOT_BYTES,"maximum_jobs":crate::agent_jobs::MAX_JOBS,"maximum_job_bytes":crate::agent_jobs::MAX_JOB_BYTES,"maximum_retained_job_bytes":crate::agent_jobs::MAX_RETAINED_BYTES,"maximum_frame_bytes":MAX_FRAME,"maximum_response_bytes":MAX_RESPONSE,"maximum_session_frames":4096,"worker_timeout_seconds":60,"maximum_active_tools":1,"hard_os_memory_sandbox":false,"worker_process_admission":crate::worker_limits::policy(),"retention":if self.durable {"durable_state_directory"} else {"until_process_exit"},"durable_state_enabled":self.durable,"request_id_required":self.durable,"request_id_max_bytes":128,"request_id_controls_allowed":false,"evaluate_request_id":if self.durable {"required; same payload reuses recorded outcome; interrupted intents require a new key"} else {"unsupported"},"snapshot_parentage":"first_observed_parent", "release_publication":"unavailable"});
+                report["agent_session"] = json!({"transport":"stdio","source_capture_platform":"linux","publication":if self.durable {"immutable_candidates_and_local_expected_base_acceptance"} else {"immutable_candidate_only"},"viewer":"read_only","maximum_snapshots":MAX_SNAPSHOTS,"maximum_snapshot_bytes":MAX_SNAPSHOT_BYTES,"maximum_jobs":crate::agent_jobs::MAX_JOBS,"maximum_job_bytes":crate::agent_jobs::MAX_JOB_BYTES,"maximum_retained_job_bytes":crate::agent_jobs::MAX_RETAINED_BYTES,"maximum_acceptance_records":crate::agent_store::MAX_ACCEPTANCES,"maximum_frame_bytes":MAX_FRAME,"maximum_response_bytes":MAX_RESPONSE,"maximum_session_frames":4096,"worker_timeout_seconds":60,"maximum_active_tools":1,"hard_os_memory_sandbox":false,"worker_process_admission":crate::worker_limits::policy(),"retention":if self.durable {"durable_state_directory"} else {"until_process_exit"},"durable_state_enabled":self.durable,"request_id_required":self.durable,"request_id_max_bytes":128,"request_id_controls_allowed":false,"evaluate_request_id":if self.durable {"required; same payload reuses recorded outcome; interrupted intents require a new key"} else {"unsupported"},"snapshot_parentage":"first_observed_parent", "release_publication":if self.durable {"local_expected_base_only"} else {"unavailable"},"manufacturing_release":false,"external_delivery":false});
                 Ok(report)
             }
             "cad_snapshot" => {
@@ -268,6 +285,35 @@ impl State {
                 let a: Verify = decode(args)?;
                 self.jobs.verify(&a.job_id, &a.manifest_digest, cancel)
             }
+            "cad_release" => {
+                let _: Empty = decode(args)?;
+                if !self.durable {
+                    return Err("cad_release requires --state-dir".into());
+                }
+                self.jobs.release()
+            }
+            "cad_accept" => {
+                if !self.durable {
+                    return Err("cad_accept requires --state-dir".into());
+                }
+                if args.get("expected_base_revision").is_none() {
+                    return Err("cad_accept requires explicit expected_base_revision (null for the first revision)".into());
+                }
+                let a: Accept = decode(args)?;
+                if a.request_id.is_empty()
+                    || a.request_id.len() > 128
+                    || a.request_id.chars().any(char::is_control)
+                {
+                    return Err("request_id must be 1..128 bytes without control characters".into());
+                }
+                self.jobs.accept(
+                    &a.request_id,
+                    &a.job_id,
+                    &a.manifest_digest,
+                    a.expected_base_revision.as_deref(),
+                    cancel,
+                )
+            }
             _ => Err("unknown tool".into()),
         }
     }
@@ -297,7 +343,7 @@ fn result(value: Result<Value, String>) -> CallToolResponse {
 }
 impl ServerHandler for CadServer {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions("Experimental original Rust headless CAD. Capture source, create candidate revisions, evaluate and inspect native evidence. Source recipes are authoritative. Jobs are immutable candidates: ephemeral by default, durable only when launched with --state-dir. Durable evaluation requires an explicit request_id; interrupted requests never rerun automatically. No automatic source writes or release publication. Viewer is read-only. One active tool call; limits enforced, not an OS memory sandbox.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions("Experimental original Rust headless CAD. Capture source, create candidate revisions, evaluate and inspect native evidence. Source recipes are authoritative. Jobs are immutable candidates: ephemeral by default, durable only when launched with --state-dir. Durable evaluation requires an explicit request_id; interrupted requests never rerun automatically. Durable mode can accept a verified candidate into a local revision with an explicit expected base; it does not write source or deliver a manufacturing release. Viewer is read-only. One active tool call; limits enforced, not an OS memory sandbox.")
     }
     async fn list_tools(
         &self,
