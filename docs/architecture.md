@@ -1653,6 +1653,30 @@ entry cover this bounded foundation. This is not a released drawing system:
 associative annotation intent, projected/hidden-line views, dimensions, fits and
 GD&T remain separate manufacturing obligations.
 
+Schema-2 `section_view` declarations now move inspection-view intent into the
+recipe. Each names a body/assembly output and an explicit orthonormal plane;
+Starlark expressions can bind its position to design parameters. Optional
+inclusive area bounds are native engineering assertions in mm². They are not
+manufacturing tolerance annotations. The build SDK and standalone CLI share one
+section evaluator, including occurrence frames and material-sum semantics.
+
+Every declared view is a global obligation: selected-output demand includes its
+target dependencies, and cache hits still evaluate the query and area checks.
+Successful full or display-only publication includes each view's JSON and SVG in
+the same atomic, integrity-checked generation. Reports retain captured-source,
+parameter, target-content, query-implementation and generation bindings; SVG
+metadata embeds the report. A failed view preserves the prior generation, and
+removing a declaration removes its managed artifacts on successful publication.
+Semantic diff reports declaration changes independently of body geometry.
+
+The current view limit is 128 with a separately exposed aggregate geometry-work
+cap. This bounds admitted query work, not total job memory. The bearing-cover
+corpus varies its four source-owned views over 27 configurations; independent
+STEP intersections verify three retained configurations and their per-occurrence
+assembly sections. These are parameter-associated plane views, not face-selected
+associative annotations or a complete drawing-release system. The scoped evidence
+entry is `manufacturing.recipe-section-views`.
+
 Expose accuracy explicitly: visual approximation, conservative bound, or
 validated geometry result with tolerance/error. Bounding boxes can reject
 collision candidates; overlapping boxes cannot prove collision. Approximate

@@ -339,6 +339,7 @@ fn recipe_envelope_defaults_and_populated_metadata_roundtrip_match_catalog() {
         "assembly_outputs",
         "face_assertions",
         "property_assertions",
+        "section_views",
         "face_datums",
     ] {
         let argument = envelope["arguments"]

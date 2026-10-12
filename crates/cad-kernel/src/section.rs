@@ -48,7 +48,7 @@ fn unsupported(reason: &str) -> KernelError {
 }
 impl SectionPlane {
     /// Frames must already be finite, unit length and orthogonal. They are not normalized.
-    fn validate(self) -> Result<(), KernelError> {
+    pub fn validate(self) -> Result<(), KernelError> {
         if !finite(self.origin)
             || !finite(self.normal)
             || !finite(self.x_direction)

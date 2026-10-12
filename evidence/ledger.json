@@ -91,6 +91,28 @@
       ]
     },
     {
+      "id": "manufacturing.recipe-section-views",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "query.planar_section",
+        "boolean.countersink"
+      ],
+      "supported_domain": "Schema-2 source-owned body and rigid-assembly section views with parameter-driven planes, global inclusive area bounds and atomically published JSON/SVG. Bearing-cover recipe has four views over the 27-case native parameter corpus; three independently imported STEP configurations check 12 published views and individual assembly sections.",
+      "exclusions": [
+        "Associative face-driven annotation and projected hidden-line drawing views",
+        "Oblique curved section intersections, topology-event planes and unsupported numeric ranges",
+        "Fits, tolerances, GD&T and manufacturing approval",
+        "Material union of overlapping assembly parts"
+      ],
+      "fixture": "examples/countersunk_bearing_cover.star",
+      "checks": [
+        "recipe-section-native",
+        "recipe-section-publication",
+        "recipe-section-independent"
+      ]
+    },
+    {
       "id": "manufacturing.drive-module-release",
       "status": "planned",
       "domain_ids": [],
@@ -269,6 +291,46 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/sections"
+      ]
+    },
+    {
+      "id": "recipe-section-native",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "countersunk_bearing_cover"
+      ]
+    },
+    {
+      "id": "recipe-section-publication",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "section_views"
+      ]
+    },
+    {
+      "id": "recipe-section-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_section_views_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/section_views"
       ]
     }
   ]

@@ -326,6 +326,7 @@ fn gallery(directory: &Dir) -> String {
         depth: usize,
         remaining: &mut usize,
         previews: &mut Vec<String>,
+        sections: &mut std::collections::BTreeMap<String, Vec<String>>,
     ) {
         if depth > 8 || *remaining == 0 || previews.len() >= 500 {
             return;
@@ -349,17 +350,32 @@ fn gallery(directory: &Dir) -> String {
             let path = format!("{prefix}{name}");
             if kind.is_dir() {
                 if let Ok(child) = directory.open_dir(&name) {
-                    discover(&child, &format!("{path}/"), depth + 1, remaining, previews);
+                    discover(
+                        &child,
+                        &format!("{path}/"),
+                        depth + 1,
+                        remaining,
+                        previews,
+                        sections,
+                    );
                 }
             } else if kind.is_file()
                 && (name.ends_with(".preview.html") || name.ends_with(".gpu.html"))
             {
                 previews.push(path);
+            } else if kind.is_file() && name.starts_with("section-") && name.ends_with(".svg") {
+                let views = sections
+                    .entry(prefix.trim_end_matches('/').to_owned())
+                    .or_default();
+                if views.len() < cad_build::MAX_SECTION_VIEWS {
+                    views.push(path);
+                }
             }
         }
     }
     let mut previews = Vec::new();
-    discover(directory, "", 0, &mut 5000, &mut previews);
+    let mut sections = std::collections::BTreeMap::new();
+    discover(directory, "", 0, &mut 5000, &mut previews, &mut sections);
     let mut models = std::collections::BTreeMap::new();
     for path in previews {
         let stem = path
@@ -439,7 +455,23 @@ fn gallery(directory: &Dir) -> String {
                 ));
             }
         }
-        output.push_str("</nav></article>");
+        output.push_str("</nav>");
+        if let Some(views) = sections.get(folder) {
+            output.push_str(
+                "<details style=\"margin-top:18px\"><summary>Recipe sections</summary><nav>",
+            );
+            for path in views {
+                let label = path
+                    .rsplit('/')
+                    .next()
+                    .unwrap()
+                    .trim_start_matches("section-")
+                    .trim_end_matches(".svg");
+                output.push_str(&format!("<a href=\"{}\">{}</a>", url(path), escape(label)));
+            }
+            output.push_str("</nav></details>");
+        }
+        output.push_str("</article>");
     }
     if previews.is_empty() {
         output

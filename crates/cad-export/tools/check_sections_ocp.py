@@ -60,8 +60,13 @@ def rigid(p,translation=True):
 def imported_section(path,plane):
     reader=STEPControl_Reader()
     require(reader.ReadFile(str(path))==IFSelect_RetDone and reader.TransferRoots()==1,'STEP import failed')
+    return shape_section(reader.OneShape(),plane)
+
+
+def shape_section(shape,plane):
+    """Fixture contract: at most one outer material loop and disjoint holes."""
     support=gp_Pln(gp_Pnt(*plane['origin']),gp_Dir(*plane['normal']))
-    operation=BRepAlgoAPI_Section(reader.OneShape(),support)
+    operation=BRepAlgoAPI_Section(shape,support)
     operation.Build();require(operation.IsDone(),'OCCT section failed')
     edges=HSequence_TopoDS_Shape()
     explorer=TopExp_Explorer(operation.Shape(),TopAbs_EDGE)

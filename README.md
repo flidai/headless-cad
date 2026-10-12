@@ -1837,3 +1837,31 @@ not compute a union. Sections use native boundaries, never a display mesh.
 General planar sections and transverse cylinder/cone sections are supported;
 planes at topology events and oblique curved intersections return an explicit
 error. These inspection sections do not specify manufacturing tolerances or GD&T.
+
+Declare a section in the recipe to regenerate it with every successful build:
+
+```python
+section_view(
+    id = "seat", output = "countersunk", origin = [0, 0, 12-depth/2],
+    min_area = seat_area-0.000001, max_area = seat_area+0.000001,
+)
+```
+
+`normal` defaults to `[0,0,1]` and `x_direction` to `[1,0,0]`; supplied frames
+must be finite, unit length and orthogonal. Optional `min_area` / `max_area` are
+inclusive engineering assertions in mm². View IDs use ASCII letters, digits,
+underscores or hyphens. A recipe can declare at most 128 views; capability
+discovery reports the aggregate geometry-work limit.
+
+`cad build` publishes `section-seat.json` and `section-seat.svg` in the same
+managed generation as the captured recipe and model artifacts. Their metadata
+binds source, effective parameters, target geometry, query and generation.
+All declared views are global obligations, including selected-output builds,
+cache hits and display-only builds. An invalid plane, unsupported intersection
+or failed area bound preserves the previous complete generation. Removing a
+declaration removes its artifacts on the next successful build. Recipe diff
+reports view changes even when the geometry stays unchanged.
+
+The countersink and bearing-cover examples declare parameter-driven body and
+assembly views. Assembly sections retain occurrence identity and sum overlapping
+material; these inspection artifacts are a foundation for future drawings.

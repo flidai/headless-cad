@@ -29,6 +29,11 @@ pub fn solver_build_id() -> &'static str {
 mod assembly;
 mod demand;
 mod exchange_requirements;
+mod section_views;
+pub use section_views::{
+    query_section, SectionOccurrence, SectionQuery, SectionSource, SectionSummary, SectionView,
+    SectionViewReport, MAX_SECTION_VIEWS, MAX_SECTION_VIEW_WORK,
+};
 mod property_assertions;
 pub use demand::{BuildMode, BuildScope};
 pub use exchange_requirements::{ExchangeRequirement, EXCHANGE_ASPECTS, MAX_EXCHANGE_REQUIREMENTS};
@@ -74,6 +79,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("face_datums.rs").as_slice(),
             include_bytes!("property_assertions.rs").as_slice(),
             include_bytes!("exchange_requirements.rs").as_slice(),
+            include_bytes!("section_views.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -120,6 +126,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub exchange_requirements: Vec<ExchangeRequirement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub section_views: Vec<SectionView>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
 }
 
@@ -155,9 +163,16 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             exchange_requirements: Option<Vec<ExchangeRequirement>>,
             #[serde(default, deserialize_with = "present_vec")]
+            section_views: Option<Vec<SectionView>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
         }
         let raw = RawRecipe::deserialize(deserializer)?;
+        if raw.schema_version == 1 && raw.section_views.is_some() {
+            return Err(serde::de::Error::custom(
+                "section views require schema version 2",
+            ));
+        }
         if raw.schema_version == 1
             && (raw.parts.is_some() || raw.assemblies.is_some() || raw.assembly_outputs.is_some())
         {
@@ -197,6 +212,7 @@ impl<'de> Deserialize<'de> for Recipe {
             face_assertions: raw.face_assertions.unwrap_or_default(),
             property_assertions: raw.property_assertions.unwrap_or_default(),
             exchange_requirements: raw.exchange_requirements.unwrap_or_default(),
+            section_views: raw.section_views.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
         })
     }
@@ -709,12 +725,26 @@ pub struct BuildResult {
     pub property_assertions: BTreeMap<String, PropertyAssertionReport>,
     /// Unenforced publication obligations; native geometry success does not satisfy them.
     pub pending_exchange_requirements: Vec<ExchangeRequirement>,
+    pub section_views: BTreeMap<String, SectionViewReport>,
     pub face_datums: ResolvedFaceDatums,
     selection_graph: selection::SelectionGraph,
 }
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("section views require recipe schema version 2")]
+    SectionViewSchema,
+    #[error("invalid section view '{id}': {message}")]
+    InvalidSectionView { id: String, message: String },
+    #[error("section view '{id}' on output '{output}' failed: {message}")]
+    SectionViewFailed {
+        id: String,
+        output: String,
+        message: String,
+        actual_area: Option<f64>,
+    },
+    #[error("section query failed: {message}")]
+    SectionQuery { message: String },
     #[error("exchange requirements require recipe schema version 2")]
     ExchangeRequirementSchema,
     #[error("invalid exchange requirement '{id}': {message}")]
@@ -1211,6 +1241,7 @@ impl BuildEngine {
         assembly::resource_limits(recipe)?;
         property_assertions::preflight(recipe)?;
         exchange_requirements::preflight(recipe)?;
+        section_views::preflight(recipe)?;
         face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
@@ -1599,6 +1630,7 @@ impl BuildEngine {
             face_assertions: BTreeMap::new(),
             property_assertions: BTreeMap::new(),
             pending_exchange_requirements: recipe.exchange_requirements.clone(),
+            section_views: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             selection_graph,
         };
@@ -1637,6 +1669,7 @@ impl BuildEngine {
             .iter()
             .cloned()
             .chain(recipe.property_assertions.iter().map(|a| a.output.clone()))
+            .chain(recipe.section_views.iter().map(|a| a.output.clone()))
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -1649,6 +1682,13 @@ impl BuildEngine {
             &assembly_requests,
         )?;
         result.property_assertions = property_assertions::evaluate(
+            recipe,
+            &result.feature_hashes,
+            &evaluated,
+            &assertion_assemblies,
+            tolerance,
+        )?;
+        result.section_views = section_views::evaluate(
             recipe,
             &result.feature_hashes,
             &evaluated,

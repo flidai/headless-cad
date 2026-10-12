@@ -18,3 +18,10 @@ pi = 3.141592653589793
 r = 3+depth
 expected = 60*40*12-pi*9*(12-depth)-pi*depth*(9+3*r+r*r)/3
 assert_property(id = "volume", output = "countersunk", property = "volume_mm3", min = expected-0.00001, max = expected+0.00001)
+
+# Section intent is source: edits rebuild these native curves with the part.
+# These area checks are engineering assertions, not manufacturing tolerances.
+pilot_area = 60*40-pi*9
+seat_area = 60*40-pi*(3+depth/2)*(3+depth/2)
+section_view(id = "pilot", output = "countersunk", origin = [0,0,2], min_area = pilot_area-0.000001, max_area = pilot_area+0.000001)
+section_view(id = "seat", output = "countersunk", origin = [0,0,12-depth/2], min_area = seat_area-0.000001, max_area = seat_area+0.000001)

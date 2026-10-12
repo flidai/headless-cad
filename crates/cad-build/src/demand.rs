@@ -81,6 +81,7 @@ pub(super) fn scope(
         .property_assertions
         .iter()
         .map(|a| a.output.as_str())
+        .chain(recipe.section_views.iter().map(|a| a.output.as_str()))
         .collect();
     for output in recipe
         .outputs

@@ -157,6 +157,42 @@ fn annular_machining_and_cartridge_match_twenty_seven_independent_integrals() {
         for h in [2., 3., 4.] {
             for d in [18., 21., 24.] {
                 let build = cad_build::build(&recipe(p, h, d)).unwrap();
+                assert_eq!(build.section_views.len(), 4);
+                let pi = std::f64::consts::PI;
+                // Independent cross-sectional material sums at the source-owned planes.
+                for (id, z, area) in [
+                    ("pilot", d - 6., pi * (3200. - 6. * 3.2_f64.powi(2))),
+                    (
+                        "socket",
+                        d - (5. + h) / 2.,
+                        pi * (3200. - 6. * 3.2_f64.powi(2) - 27.),
+                    ),
+                    (
+                        "seat",
+                        d - h / 2.,
+                        pi * (3200. - 6. * (3.2 + h / 2.).powi(2) - 27.),
+                    ),
+                    (
+                        "assembly",
+                        d - 1.5,
+                        pi * (3200. - 6. * (1.7 + h).powi(2) - 27. + 19.8_f64.powi(2) - 100.
+                            + 9.8_f64.powi(2)
+                            + 3. * 2.8_f64.powi(2)
+                            + 6. * (1.5 + h).powi(2)),
+                    ),
+                ] {
+                    let report = &build.section_views[id];
+                    assert_eq!(report.status, "passed");
+                    near(report.declaration.origin[2], z);
+                    near(report.query.section.plane.origin[2], z);
+                    near(report.query.section.area, area);
+                    for coordinate in report.query.section.centroid.unwrap() {
+                        near(coordinate, 0.);
+                    }
+                }
+                let assembly_section = &build.section_views["assembly"].query;
+                assert_eq!(assembly_section.occurrences.len(), 20);
+                assert!(assembly_section.section.loops.is_none());
                 let model = &build.outputs["flange"].result.model;
                 assert!(model.validate(t).valid);
                 let properties = model.mass_properties(t).unwrap();

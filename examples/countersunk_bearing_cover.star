@@ -87,3 +87,18 @@ def require_handoff():
         require_exchange(id = "cartridge_step_" + aspect, output = "countersunk_bearing_cover", format = "step", aspect = aspect)
 
 require_handoff()
+
+# Source-owned inspection sections follow depth edits. Each area is derived
+# independently from circular stock, bores and hardware envelopes; overlapping
+# assembly occurrences are summed, not fused. No fits or GD&T are certified.
+pilot_area = pi*(3600-400-6*3.2*3.2)
+socket_area = pilot_area-3*pi*9
+seat_radius = 3.2+h/2
+seat_area = pi*(3600-400-6*seat_radius*seat_radius-3*9)
+assembly_bore_radius = 3.2+h-1.5
+assembly_screw_radius = 3+h-1.5
+assembly_area = pi*(3600-400-6*assembly_bore_radius*assembly_bore_radius-3*9+19.8*19.8-100+9.8*9.8+3*2.8*2.8+6*assembly_screw_radius*assembly_screw_radius)
+section_view(id = "pilot", output = "flange", origin = [0,0,d-6], min_area = pilot_area-0.000001, max_area = pilot_area+0.000001)
+section_view(id = "socket", output = "flange", origin = [0,0,d-(5+h)/2], min_area = socket_area-0.000001, max_area = socket_area+0.000001)
+section_view(id = "seat", output = "flange", origin = [0,0,d-h/2], min_area = seat_area-0.000001, max_area = seat_area+0.000001)
+section_view(id = "assembly", output = "countersunk_bearing_cover", origin = [0,0,d-1.5], min_area = assembly_area-0.000001, max_area = assembly_area+0.000001)

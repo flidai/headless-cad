@@ -2,6 +2,9 @@
 //! All lengths in this first API are millimetres. Imports and external IO are
 //! deliberately not exposed. Native functions only append declarative nodes.
 
+// Starlark generates sibling wrappers for explicit named section-view fields.
+#![allow(clippy::too_many_arguments)]
+
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -37,6 +40,7 @@ struct GraphStore {
     face_assertions: RefCell<Vec<serde_json::Value>>,
     property_assertions: RefCell<Vec<serde_json::Value>>,
     exchange_requirements: RefCell<Vec<serde_json::Value>>,
+    section_views: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
@@ -484,6 +488,53 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         store(eval)?.output(serde_json::json!({
             "name": name, "feature": feature,
         }))?;
+        Ok(NoneType)
+    }
+
+    /// Declare a globally evaluated native section and optional area bounds.
+    fn section_view(
+        id: &str,
+        output: &str,
+        origin: Value,
+        normal: Option<Value>,
+        x_direction: Option<Value>,
+        min_area: Option<Value>,
+        max_area: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let vector =
+            |v: Value| -> anyhow::Result<[f64; 3]> { Ok(serde_json::from_str(&v.to_json()?)?) };
+        let view = cad_build::SectionView {
+            id: id.into(),
+            output: output.into(),
+            origin: vector(origin)?,
+            normal: normal
+                .filter(|v| !v.is_none())
+                .map(vector)
+                .transpose()?
+                .unwrap_or([0., 0., 1.]),
+            x_direction: x_direction
+                .filter(|v| !v.is_none())
+                .map(vector)
+                .transpose()?
+                .unwrap_or([1., 0., 0.]),
+            min_area: min_area.filter(|v| !v.is_none()).map(number).transpose()?,
+            max_area: max_area.filter(|v| !v.is_none()).map(number).transpose()?,
+        };
+        view.validate()?;
+        let graph = store(eval)?;
+        let mut views = graph.section_views.borrow_mut();
+        anyhow::ensure!(
+            views.len() < cad_build::MAX_SECTION_VIEWS,
+            "too many section views"
+        );
+        anyhow::ensure!(
+            !views
+                .iter()
+                .any(|a| a["id"].as_str().is_some_and(|a| a.eq_ignore_ascii_case(id))),
+            "duplicate section view ID"
+        );
+        views.push(serde_json::to_value(view)?);
         Ok(NoneType)
     }
 
@@ -946,11 +997,12 @@ pub fn from_starlark_with_params(
     let face_assertions = graph.face_assertions.into_inner();
     let property_assertions = graph.property_assertions.into_inner();
     let exchange_requirements = graph.exchange_requirements.into_inner();
+    let section_views = graph.section_views.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() { 2 } else { 1 },
+        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -959,6 +1011,9 @@ pub fn from_starlark_with_params(
         value["parts"] = serde_json::json!(parts);
         value["assemblies"] = serde_json::json!(assemblies);
         value["assembly_outputs"] = serde_json::json!(assembly_outputs);
+    }
+    if !section_views.is_empty() {
+        value["section_views"] = serde_json::json!(section_views);
     }
     if !exchange_requirements.is_empty() {
         value["exchange_requirements"] = serde_json::json!(exchange_requirements);
@@ -2303,5 +2358,33 @@ mod exchange_requirement_tests {
             cad_build::build(&unknown),
             Err(cad_build::BuildError::InvalidExchangeRequirement { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+mod section_view_tests {
+    use super::*;
+    const SOURCE:&str="b=extrude(id='b',profile=rectangle(id='p',width=10,depth=12),height=8)\noutput(name='body',feature=b)\n";
+    #[test]
+    fn section_view_defaults_and_bounds_lower_to_schema_two() {
+        let r=from_starlark("view.star",&format!("{SOURCE}section_view(id='plan',output='body',origin=[0,0,4],min_area=120,max_area=120)\n")).unwrap();
+        assert_eq!(r.schema_version, 2);
+        assert_eq!(r.section_views[0].normal, [0., 0., 1.]);
+        assert_eq!(
+            cad_build::build(&r).unwrap().section_views["plan"]
+                .query
+                .section
+                .area,
+            120.
+        );
+        for args in [
+            "id='../bad',output='body',origin=[0,0,4]",
+            "id='bad',output='body',origin=[0,0,4],normal=[0,0,2]",
+            "id='bad',output='body',origin=[0,0,4],min_area=-1",
+            "id='bad',output='body',origin=[0,0,4],min_area=2,max_area=1",
+        ] {
+            assert!(from_starlark("bad.star", &format!("{SOURCE}section_view({args})")).is_err());
+        }
+        assert!(from_starlark("bad.star",&format!("{SOURCE}section_view(id='plan',output='body',origin=[0,0,4])\nsection_view(id='PLAN',output='body',origin=[0,0,4])")).is_err());
     }
 }

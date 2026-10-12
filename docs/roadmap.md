@@ -21,6 +21,13 @@ The native section-query increment implements a bounded M6 foundation: native
 line/arc curves, area/centroid, occurrence identity and source-bound SVG. These
 queries do not close associative drawings, dimensions, fits or GD&T.
 
+Source-authored `section_view` declarations now regenerate JSON/SVG inspection
+views inside atomic generations. Their optional area bounds are global build
+obligations even for selected outputs and cache hits. Four bearing-cover views
+follow source parameters and retain body/occurrence provenance. Continue M6 toward
+semantic annotation references, projected/hidden-line views and dimensions; these
+parameter-associated planes alone do not satisfy the drawing release gate.
+
 Use the architecture's [delivery priorities](architecture.md#delivery-priorities-and-completion-authority)
 to select and review increments across modeling, assembly scale, inspection,
 constraints, manufacturing and automation. Report the supported domain and

@@ -147,7 +147,44 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         "global across selected-output builds and cache hits; unselected required outputs and display-only publication fail",
         "exporter declarations are not independent downstream fidelity evidence or manufacturing certification",
     ]);
-    vec![cardinality, selector, assertion, property, datum, exchange]
+    let mut section = object_spec(
+        "section_view",
+        vec![
+            arg("id", T::String),
+            arg("output", reference("output")),
+            arg("origin", numbers(3)),
+            optional(arg("normal", numbers(3)), json!([0, 0, 1])),
+            optional(arg("x_direction", numbers(3)), json!([1, 0, 0])),
+            optional(
+                arg(
+                    "min_area",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+            optional(
+                arg(
+                    "max_area",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+        ],
+    );
+    section.obligations.extend(["recipe-level declaration in recipe.section_views, authored by Starlark section_view; not a feature operation", "native query domain query.planar_section; examples/countersink.star and examples/countersunk_bearing_cover.star", "schema 2; at most 128 declarations; IDs are case-insensitive unique ASCII letters/digits/underscore/hyphen, length 1..128", "finite unit orthogonal section frame; origin in mm; area bounds in mm2 finite nonnegative and ordered", "global native validation even on selected builds and cache hits; all declared targets demanded; failed section or bound blocks publication", "10,000,000 aggregate topology visits across all views, charging every occurrence; assembly area is a sum, not union"]);
+    vec![
+        cardinality,
+        selector,
+        assertion,
+        property,
+        datum,
+        exchange,
+        section,
+    ]
 }
 
 #[cfg(test)]

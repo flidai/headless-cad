@@ -253,6 +253,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "feature_hashes": build.feature_hashes,
         "face_assertions": build.face_assertions,
         "property_assertions": build.property_assertions,
+        "section_views": build.section_views,
         "exchange_requirements": exchange::pending(&recipe.exchange_requirements),
         "exchange_policy_status": if recipe.exchange_requirements.is_empty() { "not_requested" } else { "pending_publication" },
         "sketch_reports": build.sketch_reports,
@@ -510,6 +511,25 @@ fn difference(before: &Value, after: &Value) -> Value {
             (id.clone(), json!({"status":status,"before":a,"after":b}))
         })
         .collect();
+    let before_views = before["section_views"].as_object().expect("section views");
+    let after_views = after["section_views"].as_object().expect("section views");
+    let view_changes: serde_json::Map<String, Value> = before_views
+        .keys()
+        .chain(after_views.keys())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|id| {
+            let a = before_views.get(id);
+            let b = after_views.get(id);
+            let status = match (a, b) {
+                (None, Some(_)) => "added",
+                (Some(_), None) => "removed",
+                (Some(a), Some(b)) if a == b => "unchanged",
+                _ => "changed",
+            };
+            (id.clone(), json!({"status":status,"before":a,"after":b}))
+        })
+        .collect();
     let before_datums = before["face_datums"]
         .as_object()
         .expect("build face datums");
@@ -563,7 +583,7 @@ fn difference(before: &Value, after: &Value) -> Value {
             };
             (id.clone(),json!({"status":status,"before":a,"after":b,"before_hash":old_hash,"after_hash":new_hash}))
         }).collect();
-    json!({"outputs":changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -928,6 +948,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             result["build_scope"] = json!(built.scope);
             result["property_assertions"] = json!(built.property_assertions);
             result["sketch_reports"] = json!(built.sketch_reports);
+            result["section_views"] = json!(built.section_views);
             result["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
             result["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
                 "not_requested"
@@ -965,6 +986,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             report["stats"] = json!(build.stats);
             report["property_assertions"] = json!(build.property_assertions);
             report["sketch_reports"] = json!(build.sketch_reports);
+            report["section_views"] = json!(build.section_views);
             report["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
             report["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
                 "not_requested"
@@ -1107,6 +1129,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         )?;
         result["property_assertions"] = json!(build.property_assertions);
         result["sketch_reports"] = json!(build.sketch_reports);
+        result["section_views"] = json!(build.section_views);
         result["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
         result["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
             "not_requested"
@@ -1132,37 +1155,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         let mut result =
             section::report(&recipe, &build, output, plane, &source_bytes, &parameters)?;
         if format == "svg" {
-            let label = if result["kind"] == "assembly" {
-                format!("{output} — summed part areas (overlaps counted)")
-            } else {
-                output.clone()
-            };
-            let mut sections: Vec<cad_kernel::PlanarSection> = if result["kind"] == "assembly" {
-                result["occurrences"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|o| serde_json::from_value(o["section"].clone()))
-                    .collect::<Result<_, _>>()?
-            } else {
-                vec![serde_json::from_value(result["section"].clone())?]
-            };
-            if sections.is_empty() {
-                sections.push(cad_kernel::PlanarSection {
-                    plane,
-                    loops: vec![],
-                    area: 0.,
-                    centroid: None,
-                });
-            }
-            let mut svg = cad_export::sections_to_svg(&sections, &label)?;
-            let metadata = serde_json::to_string(&result)?
-                .replace('&', "&amp;")
-                .replace('<', "&lt;")
-                .replace('>', "&gt;");
-            let at = svg.find('>').expect("SVG root") + 1;
-            svg.insert_str(at, &format!("\n<metadata>{metadata}</metadata>"));
-            result["svg"] = json!(svg);
+            result["svg"] = json!(section::svg(&result)?);
         }
         return Ok(result);
     }
@@ -1228,6 +1221,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             "scope": summary["scope"],
             "property_assertions": summary["property_assertions"],
             "exchange_requirements": recipe.exchange_requirements,
+            "section_views": recipe.section_views,
+            "section_build_id": section::implementation_id(),
             "sketch_reports": summary["sketch_reports"],
             "solver_build_id": summary["solver_build_id"],
             "kernel_build_id": summary["kernel_build_id"],
@@ -1475,6 +1470,39 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             );
             summary["outputs"][name]["available_files"] = json!(dependencies);
         }
+        // Source-authored views are global native obligations, including when
+        // their target is omitted from selected/display-only geometry exports.
+        for (id, view) in &build.section_views {
+            filename(&format!("section-{id}"))?;
+            let mut view_report = section::bind_report(
+                &recipe,
+                &build,
+                &view.declaration.output,
+                &view.query,
+                &source_bytes,
+                &parameters,
+            )?;
+            view_report["section_view"] =
+                json!({"declaration":view.declaration,"status":view.status});
+            view_report["publication"] = json!({
+                "recipe_context_hash":summary["recipe_context_hash"],
+                "recipe_source":summary["recipe_source"],
+                "generation_mode":summary["generation_mode"],
+                "fidelity":"native analytic inspection section; no manufacturing dimensions, tolerances or GD&T",
+            });
+            let json_text = serde_json::to_string_pretty(&view_report)?;
+            let svg_text = section::svg(&view_report)?;
+            let json_file = format!("section-{id}.json");
+            let svg_file = format!("section-{id}.svg");
+            let record = |file: &str, text: &str| json!({"file":file,"algorithm":"blake3","digest":blake3::hash(text.as_bytes()).to_hex().to_string(),"bytes":text.len()});
+            summary["section_views"][id]["artifacts"] =
+                json!({"json":record(&json_file,&json_text),"svg":record(&svg_file,&svg_text)});
+            summary["section_views"][id]["snapshot"] = view_report["snapshot"].clone();
+            summary["section_views"][id]["fidelity"] =
+                view_report["publication"]["fidelity"].clone();
+            artifacts.push((json_file, json_text));
+            artifacts.push((svg_file, svg_text));
+        }
         summary["exchange_requirements"] =
             exchange::enforce(&recipe.exchange_requirements, &artifacts, *display_only)?;
         summary["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
@@ -1580,6 +1608,27 @@ fn main() {
                         report["sketch"] = json!(solve);
                         report["solver_build_id"] = json!(cad_build::solver_build_id());
                         report["target_content_hash"] = json!(content_hash);
+                    }
+                    cad_build::BuildError::SectionQuery { message } => {
+                        report["code"] = json!("section_failed");
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::InvalidSectionView { id, message } => {
+                        report["code"] = json!("invalid_section_view");
+                        report["section_view_id"] = json!(id);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::SectionViewFailed {
+                        id,
+                        output,
+                        message,
+                        actual_area,
+                    } => {
+                        report["code"] = json!("section_view_failed");
+                        report["section_view_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                        report["actual_area_mm2"] = json!(actual_area);
                     }
                     cad_build::BuildError::InvalidPropertyAssertion { id, .. } => {
                         report["code"] = json!("invalid_property_assertion");
