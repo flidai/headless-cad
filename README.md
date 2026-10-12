@@ -436,10 +436,10 @@ missing-material count reported separately. CSV uses empty unknown numeric
 fields and preserves quoted text; import textual columns as text in spreadsheet
 tools. The viewer shows selected part metadata and summed mass.
 
-Native assembly artifacts retain metadata. STEP currently preserves assembly
-geometry and structure, but does not carry these material or revision fields;
-use the accompanying BOM. Materials do not yet include certified property
-libraries, occurrence overrides, configurations, or mass moments/inertia.
+Native assembly artifacts retain metadata. STEP preserves assembly geometry and
+structure plus authored part numbers, descriptions and revisions. Material names
+and density remain in native artifacts and the accompanying BOM. Materials do
+not yet include certified property libraries, occurrence overrides or configurations.
 
 ## Mass properties
 
@@ -774,6 +774,32 @@ These are exporter declarations with source inspection, not an independent
 round-trip certificate. Source requirements can gate publication as described below; manufacturing PMI
 remains future work. `cad verify` checks bytes, not engineering completeness.
 
+### STEP part identity and revisions
+
+Assembly STEP exports now carry source part numbers in `PRODUCT.id`, descriptions
+in `PRODUCT.description`, and revisions in `PRODUCT_DEFINITION_FORMATION.id`.
+`PRODUCT.name` retains the internal part ID: distinct definitions with the same
+engineering part number remain distinct, while native geometry stays reusable.
+STEP emits separate topology per logical part definition: sharing a single
+B-rep across different products lets OCCT/XCAF collapse their identities. Repeated
+occurrences of the same definition still share its STEP representation.
+Missing metadata retains the legacy identifiers/default formation value and is
+reported as absent source metadata, never inferred as an authored revision.
+
+[step_metadata.star](examples/step_metadata.star) exercises duplicate part
+numbers, different revisions, Unicode and quoted text, shared geometry and nested
+occurrences. The independent OCCT oracle checks decoded product fields as well
+as names, hierarchy, placements and unchanged geometry after metadata edits:
+
+```sh
+python crates/cad-export/tools/check_step_metadata_ocp.py --cad target/release/cad
+```
+
+Use the optional OCP environment described below. Fidelity reports and source
+requirements now recognize these three fields as supported for STEP. STL still
+omits them. Materials, density, attachment datums, manufacturing PMI and recipe
+history remain outside this STEP mapping.
+
 ### Require exchange semantics before publication
 
 Declare the handoff contract in Starlark (or schema-2 JSON IR):
@@ -783,12 +809,14 @@ require_exchange(id = "units", output = "plate", format = "step", aspect = "unit
 require_exchange(id = "solid", output = "plate", format = "step", aspect = "geometry")
 ```
 
-See [exchange_contract.star](examples/exchange_contract.star) and the nine STEP
+See [exchange_contract.star](examples/exchange_contract.star) and the twelve STEP
 requirements in [round_bearing_cartridge.star](examples/round_bearing_cartridge.star).
 `cad capabilities --type exchange_requirement` lists the accepted formats and
 aspects. A requirement passes only when the exporter declares the aspect
 `supported` and its inspected source count is positive. Approximate, omitted,
-absent and unknown values fail; requiring STL units or manufacturing PMI therefore
+absent and unknown values fail. For metadata requirements, a positive count means
+at least one definition authors that field and all supplied values are carried;
+it does not require every part to author that field. Requiring STL units or manufacturing PMI therefore
 fails with the current exporters.
 
 Full `cad build` evaluates every declaration before atomic publication, including

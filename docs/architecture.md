@@ -1603,6 +1603,26 @@ weakened handoff cannot disappear inside an unchanged-solid result. This enforce
 current exporter mapping; independent round-trip semantic checks, drawing/PMI
 support and complete manufacturing release gates remain unfinished.
 
+Assembly STEP now maps authored part numbers, descriptions and revisions to
+PRODUCT.id, PRODUCT.description and PRODUCT_DEFINITION_FORMATION.id, respectively.
+PRODUCT.name remains the internal part-definition ID; duplicate engineering part
+numbers do not merge definitions or replace assembly identity. Each logical part
+definition receives distinct STEP topology, including geometrically identical
+parts: the OCCT/XCAF oracle otherwise merges their definitions. Occurrences of
+one definition still reuse its representation; native geometry/cache sharing
+remains independent. Absent fields keep
+the legacy export defaults and remain absent in the fidelity source counts.
+Materials, density, datum intent and manufacturing PMI are still omitted. Native
+and independent OCCT checks cover escaped/Unicode fields, definition reuse,
+revision-only edits and round-cartridge handoffs; geometry and placements must
+remain unchanged on metadata-only edits.
+
+The mapping follows OCCT's [product field reader/writer](https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/master/src/DataExchange/TKDESTEP/RWStepBasic/RWStepBasic_RWProduct.cxx)
+and [product formation reader/writer](https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/master/src/DataExchange/TKDESTEP/RWStepBasic/RWStepBasic_RWProductDefinitionFormation.cxx).
+The [PDM implementation guide](https://www.mbx-if.org/home/wp-content/uploads/2024/05/pdmug_release4_3.pdf)
+identifies a product formation as a specific product version. These scoped field
+mappings do not establish complete STEP/PDM interoperability or PMI support.
+
 Introduce a versioned drawing/annotation IR containing view definitions,
 projection/section intent, semantic references, dimensions, tolerance standards,
 units and revision identity. Rendering consumes that IR; it does not infer

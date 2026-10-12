@@ -13,6 +13,7 @@ from check_blind_pallet_ocp import cylinder, combine
 from check_constrained_fixture_ocp import body_properties, close, json_output, require
 from check_round_stock_ocp import cylinder_radii
 from check_counterbores_ocp import verify
+from check_step_metadata_ocp import check_metadata
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 RECIPE = ROOT/'examples/round_bearing_cartridge.star'
@@ -83,6 +84,7 @@ def check(cad,out,p,h,d,report_path=None):
     require(step.count('PLANE(')==11,'three blind floors and six shoulders missing')
     require(step.count('SEAM_CURVE(')==16,'periodic stock and bore seams missing')
     imported=json_output([sys.executable,str(pathlib.Path(__file__).with_name('check_assembly_ocp.py')),str(out/'round_bearing_cartridge.step'),'--instances','32','--definitions','6','--solids','32','--assembly-json',str(out/'round_bearing_cartridge.assembly.json')])
+    metadata_report=check_metadata(out/'round_bearing_cartridge.step',out/'round_bearing_cartridge.assembly.json')
     aluminum,steel=assembly_pieces(p,h,d)
     expected=combine(aluminum+steel)
     assembly_step=body_properties(out/'round_bearing_cartridge.step')
@@ -101,11 +103,11 @@ def check(cad,out,p,h,d,report_path=None):
         native=native,expected=volume_moments(expected),step=volume_moments(assembly_step),
         expected_material=dict(mass_kg=mass,center_of_mass_mm=center,central_mass_inertia_kg_mm2=tensor))
     if report_path is not None:
-        report=dict(valid=True,parameters=params,build=build,queries=queries,assembly_importer=imported)
+        report=dict(valid=True,parameters=params,build=build,queries=queries,assembly_importer=imported,step_metadata=metadata_report)
         with report_path.open('x') as destination:
             json.dump(report,destination,indent=2,allow_nan=False)
             destination.write('\n')
-    return dict(parameters=params,volume_mm3=expected[0],closed_stl=True,inward_cylinders=16,blind_floors=3,annular_shoulders=6,hierarchy_checked=imported['hierarchy_checked'],placements_checked=imported['placements_checked'])
+    return dict(parameters=params,volume_mm3=expected[0],closed_stl=True,inward_cylinders=16,blind_floors=3,annular_shoulders=6,hierarchy_checked=imported['hierarchy_checked'],placements_checked=imported['placements_checked'],metadata_checked=metadata_report['valid'],metadata_definitions=metadata_report['part_definitions_checked'])
 
 
 def main():

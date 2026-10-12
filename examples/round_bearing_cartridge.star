@@ -42,18 +42,18 @@ def seat_checks():
         for i in range(count):
             assert_faces(id = prefix+"_floor_"+str(i), from_feature = prefix+"_cut_"+str(i), role = "bore_floor", in_feature = finished, count = 1)
 seat_checks()
-flange = part(id = "flange", body = finished, material = "Aluminum", density_kg_per_m3 = 2700, datums = {
+flange = part(id = "flange", part_number = "RBC-FLANGE", revision = "A", description = "Machined annular flange", body = finished, material = "Aluminum", density_kg_per_m3 = 2700, datums = {
     prefix+"_"+str(i):face_datum(from_feature = prefix+"_cut_"+str(i), role = "bore_floor", x_direction = [1,0,0]) for prefix,count in [["socket",3],["seat",6]] for i in range(count)
 })
 assembly_output(name = "flange_inspection", assembly = assembly(id = "flange_inspection", instances = [instance(id = "inspection_flange", part = flange)]))
 def ring(id, outer, inner, height):
     return extrude(id = id, profile = circle(id = id+"_profile", radius = outer, inner_radius = inner), height = height)
-washer = part(id = "washer", body = ring("washer_body",5.7,3.1,1), material = "Steel", density_kg_per_m3 = 7800, datums = {"base":datum(), "end":datum(offset = [0,0,1])})
+washer = part(id = "washer", part_number = "RBC-WASHER", revision = "A", description = "Counterbore seat washer", body = ring("washer_body",5.7,3.1,1), material = "Steel", density_kg_per_m3 = 7800, datums = {"base":datum(), "end":datum(offset = [0,0,1])})
 length = d-h+7
-bolt = part(id = "bolt", body = revolve(id = "bolt_body", profile = polygon(id = "bolt_profile", points = [[0,0],[3,0],[3,length],[5.3,length],[5.3,length+3],[0,length+3]])), material = "Steel", density_kg_per_m3 = 7800, datums = {"head_seat":datum(offset = [0,0,length])})
-bearing = part(id = "bearing", body = ring("bearing_body",19.8,10,d-2), material = "Steel", density_kg_per_m3 = 7800)
-rod = part(id = "rod", body = extrude(id = "rod_body", profile = circle(id = "rod_profile", radius = 2.8), height = gap+10), material = "Steel", density_kg_per_m3 = 7800, datums = {"base":datum()})
-shaft = part(id = "shaft", body = extrude(id = "shaft_body", profile = circle(id = "shaft_profile", radius = 9.8), height = 2*d+gap+20), material = "Steel", density_kg_per_m3 = 7800)
+bolt = part(id = "bolt", part_number = "RBC-BOLT", revision = "A", description = "Fastener envelope", body = revolve(id = "bolt_body", profile = polygon(id = "bolt_profile", points = [[0,0],[3,0],[3,length],[5.3,length],[5.3,length+3],[0,length+3]])), material = "Steel", density_kg_per_m3 = 7800, datums = {"head_seat":datum(offset = [0,0,length])})
+bearing = part(id = "bearing", part_number = "RBC-BEARING", revision = "A", description = "Bearing envelope", body = ring("bearing_body",19.8,10,d-2), material = "Steel", density_kg_per_m3 = 7800)
+rod = part(id = "rod", part_number = "RBC-ROD", revision = "A", description = "Socket spacer rod", body = extrude(id = "rod_body", profile = circle(id = "rod_profile", radius = 2.8), height = gap+10), material = "Steel", density_kg_per_m3 = 7800, datums = {"base":datum()})
+shaft = part(id = "shaft", part_number = "RBC-SHAFT", revision = "A", description = "Central shaft", body = extrude(id = "shaft_body", profile = circle(id = "shaft_profile", radius = 9.8), height = 2*d+gap+20), material = "Steel", density_kg_per_m3 = 7800)
 def hardware():
     result = []
     for side in ["lower","upper"]:
@@ -83,7 +83,7 @@ assert_property(id = "assembly_mass", output = "round_bearing_cartridge", proper
 def require_handoff():
     for aspect in ["geometry", "units", "modeling_tolerance"]:
         require_exchange(id = "flange_step_" + aspect, output = "flange", format = "step", aspect = aspect)
-    for aspect in ["geometry", "units", "assembly_definitions", "assembly_hierarchy", "occurrence_paths", "occurrence_placements"]:
+    for aspect in ["geometry", "units", "assembly_definitions", "assembly_hierarchy", "occurrence_paths", "occurrence_placements", "part_numbers", "part_revisions", "part_descriptions"]:
         require_exchange(id = "cartridge_step_" + aspect, output = "round_bearing_cartridge", format = "step", aspect = aspect)
 
 require_handoff()

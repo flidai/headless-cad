@@ -144,12 +144,12 @@ pub fn exchange_fidelity(
         }
     };
     for (aspect, count, detail) in [
-        ("part_numbers", count_metadata(|m| m.part_number.is_some()), "Part definitions with a part-number value. STEP uses internal part IDs as product names; neither exporter maps engineering part numbers. BOM exports carry these fields separately."),
-        ("part_descriptions", count_metadata(|m| m.description.is_some()), "Part definitions with an engineering description; not mapped to STEP or STL. BOM exports carry these fields separately."),
-        ("part_revisions", count_metadata(|m| m.revision.is_some()), "Part definitions with a metadata revision value; not mapped to STEP or STL. This is not a Git or recipe revision."),
+        ("part_numbers", count_metadata(|m| m.part_number.is_some()), "Part definitions with a part-number value: STEP PRODUCT.id carries the value; PRODUCT.name retains the internal definition ID. STL does not carry engineering part numbers."),
+        ("part_descriptions", count_metadata(|m| m.description.is_some()), "Part definitions with an engineering description: STEP PRODUCT.description carries the value. STL does not carry descriptions."),
+        ("part_revisions", count_metadata(|m| m.revision.is_some()), "Part definitions with a metadata revision: STEP PRODUCT_DEFINITION_FORMATION.id carries the value. STL does not carry revisions. This is not a Git or recipe revision."),
         ("material_names", count_metadata(|m| m.material.is_some()), "Part definitions with a material name; not mapped to STEP or STL. BOM exports carry material metadata separately."),
         ("material_density", count_metadata(|m| m.material.is_some()), "Part definitions with density in kg/m3; not mapped to STEP or STL. Neither format receives the source material mass/inertia report."),
-    ] { add(aspect, omitted(count), Some(count), detail); }
+    ] { add(aspect, if matches!(aspect, "part_numbers" | "part_descriptions" | "part_revisions") { mapped(count) } else { omitted(count) }, Some(count), detail); }
     let datums = assembly.map_or(0, |a| a.parts.values().map(|p| p.datums.len()).sum());
     add("datums", omitted(datums), Some(datums), "Named resolved datum frames summed once per part definition; these names and frames are not exported. A body snapshot does not contain datum fields.");
     let attachments = assembly.map_or(0, |a| {
@@ -298,8 +298,20 @@ mod tests {
             "attachment_intent",
         ] {
             assert_eq!(entry(&step_report, aspect).source_count, Some(1));
+            let supported = matches!(
+                aspect,
+                "part_numbers" | "part_descriptions" | "part_revisions"
+            );
             assert_eq!(
                 entry(&step_report, aspect).status,
+                if supported {
+                    FidelityStatus::Supported
+                } else {
+                    FidelityStatus::NotCarried
+                }
+            );
+            assert_eq!(
+                entry(&stl_report, aspect).status,
                 FidelityStatus::NotCarried
             );
         }
@@ -308,10 +320,10 @@ mod tests {
         assert!(step.contains("NEXT_ASSEMBLY_USAGE_OCCURRENCE"));
         assert!(step.contains("GLOBAL_UNIT_ASSIGNED_CONTEXT"));
         assert!(step.contains("UNCERTAINTY_MEASURE_WITH_UNIT"));
-        assert!(!step.contains("ENGINEERING-PN"));
-        assert!(!step.contains("REV-17"));
+        assert!(step.contains("PRODUCT('ENGINEERING-PN','part','engineering description'"));
+        assert!(step.contains("PRODUCT_DEFINITION_FORMATION('REV-17'"));
         assert!(!step.contains("Steel"));
-        assert!(!step.contains("engineering description"));
+
         let stl = crate::assembly_to_stl(&a, t).unwrap();
         assert_eq!(stl.lines().filter(|l| l.starts_with("solid ")).count(), 2);
         assert!(!stl.contains("NEXT_ASSEMBLY_USAGE_OCCURRENCE"));

@@ -257,21 +257,23 @@ def main():
                     wanted = resolved[name][instance["id"]]
                     require(all(close(a, b, 1e-12) for row, target in zip(edge["placement"], wanted)
                                 for a, b in zip(row, target)), f"local placement differs: {name}/{instance['id']}")
-        hash_to_reference = {}
-        reference_to_hash = {}
+        part_to_reference = {}
+        reference_to_part = {}
         for name, instance in instances.items():
             actual = occurrences[name]
             wanted = placement_matrix(instance["transform"])
             require(all(close(a, b, 1e-12) for row, target in zip(actual["placement"], wanted)
                         for a, b in zip(row, target)), f"incorrect placement for {name}: {actual['placement']}")
-            content_hash = expected["definitions"][instance["part"]]["content_hash"]
+            # Engineering definitions remain distinct even when native geometry
+            # hashes match; only repeated occurrences of the same part may share.
+            part = instance["part"]
             identity = actual["definition"]
-            require(hash_to_reference.setdefault(content_hash, identity) == identity,
+            require(part_to_reference.setdefault(part, identity) == identity,
                     f"definition duplicated instead of reused for {name}")
-            require(reference_to_hash.setdefault(identity, content_hash) == content_hash,
-                    f"distinct definitions incorrectly share geometry for {name}")
-            aliases = [part for part, data in expected["definitions"].items() if data["content_hash"] == content_hash]
-            require(definitions[identity] in aliases, f"incorrect definition product name: {definitions[identity]}")
+            require(reference_to_part.setdefault(identity, part) == part,
+                    f"distinct engineering definitions incorrectly merged for {name}")
+            require(definitions[identity] == part,
+                    f"incorrect definition product name: {definitions[identity]}")
     print(json.dumps({"valid": True, "roots": root_names, "instances": len(occurrences),
                       "definitions": definitions, "assembly_definitions": assembly_definitions, "solids": solids,
                       "material_volume_mm3": volume, "bounds_mm": coordinates,

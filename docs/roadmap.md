@@ -60,6 +60,10 @@ The first M6 exchange-fidelity sidecars bind STEP/STL preservation/loss declarat
 to inspected native source and exported bytes. Source-authored required-field publication gates now reject unsupported, absent
 and unknown semantics, including selection/display-only bypasses. Independent
 semantic round-trip evidence and complete manufacturing release remain open.
+STEP now preserves authored part numbers, descriptions and revisions while
+retaining internal definition identities and shared geometry. Independent decoded
+field checks cover duplicate part numbers, revision edits and nested occurrences;
+materials, datum intent and PMI mapping remain open.
 M6 release policies declare required manufacturing semantics. Loss of required
 units, tolerances, datum references, revisions or occurrence mappings blocks
 release and is checked independently from exported solid validity.

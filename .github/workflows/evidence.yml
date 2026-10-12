@@ -28,6 +28,9 @@ jobs:
         env:
           CAD_EVIDENCE_BUNDLE: ${{ runner.temp }}/${{ matrix.case }}-evidence
         run: python -m unittest discover -s scripts/tests -v
+      - name: Check STEP metadata with independent importer
+        if: matrix.case == 'round-stock'
+        run: python crates/cad-export/tools/check_step_metadata_ocp.py --cad target/release/cad
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.case }}-engineering-evidence

@@ -44,15 +44,32 @@ fn product(
     step: &mut Step,
     name: &str,
     namespace: &str,
+    metadata: Option<&cad_assembly::PartMetadata>,
     product_context: usize,
     definition_context: usize,
 ) -> (usize, usize) {
-    let identifier = string(&format!("{namespace}:{name}"));
+    // AP214 PRODUCT identifies the engineering item; its name retains the
+    // internal definition key used to reconstruct hierarchy. Formation.id is
+    // the product version. Distinct definition entities are never merged by PN.
+    let fallback = format!("{namespace}:{name}");
+    let identifier = string(
+        metadata
+            .and_then(|m| m.part_number.as_deref())
+            .unwrap_or(&fallback),
+    );
+    let description = string(
+        metadata
+            .and_then(|m| m.description.as_deref())
+            .unwrap_or(""),
+    );
+    let revision = string(metadata.and_then(|m| m.revision.as_deref()).unwrap_or("1"));
     let name = string(name);
     let product = step.add(format!(
-        "PRODUCT({identifier},{name},'',(#{product_context}))"
+        "PRODUCT({identifier},{name},{description},(#{product_context}))"
     ));
-    let formation = step.add(format!("PRODUCT_DEFINITION_FORMATION('1','',#{product})"));
+    let formation = step.add(format!(
+        "PRODUCT_DEFINITION_FORMATION({revision},'',#{product})"
+    ));
     let definition = step.add(format!(
         "PRODUCT_DEFINITION('design','',#{formation},#{definition_context})"
     ));
@@ -106,6 +123,7 @@ pub fn assembly_to_step(
             &mut step,
             name,
             "assembly",
+            None,
             product_context,
             definition_context,
         );
@@ -122,31 +140,34 @@ pub fn assembly_to_step(
         placements.insert(name, local);
     }
     let mut definitions = BTreeMap::new();
-    let mut geometry = BTreeMap::new();
     for (name, part) in &assembly.parts {
-        let (definition, shape) =
-            product(&mut step, name, "part", product_context, definition_context);
-        let representation = if let Some(&cached) = geometry.get(&part.content_hash) {
-            cached
+        let (definition, shape) = product(
+            &mut step,
+            name,
+            "part",
+            Some(&part.metadata),
+            product_context,
+            definition_context,
+        );
+        // Separate logical definitions need separate STEP topology: XCAF merges
+        // products that share the same transferred solid even with distinct
+        // representation entities, losing revisions and part identities. Repeated
+        // occurrences still reuse this one representation for their definition.
+        let model = &part.result.model;
+        if model.solids.is_empty() {
+            return Err(ExportError::UnsupportedModel(
+                "STEP assembly parts must have at least one solid",
+            ));
+        }
+        let mut items = vec![identity];
+        let kind = if model.has_curved_geometry() {
+            items.extend(crate::analytic::solids(&mut step, model, tolerance)?);
+            "ADVANCED_BREP_SHAPE_REPRESENTATION"
         } else {
-            let model = &part.result.model;
-            if model.solids.is_empty() {
-                return Err(ExportError::UnsupportedModel(
-                    "STEP assembly parts must have at least one solid",
-                ));
-            }
-            let mut items = vec![identity];
-            let kind = if model.has_curved_geometry() {
-                items.extend(crate::analytic::solids(&mut step, model, tolerance)?);
-                "ADVANCED_BREP_SHAPE_REPRESENTATION"
-            } else {
-                items.extend(step_solids(&mut step, model, polygons(model, tolerance)?));
-                "FACETED_BREP_SHAPE_REPRESENTATION"
-            };
-            let representation = step.add(format!("{kind}('',({}),#{context})", refs(&items)));
-            geometry.insert(part.content_hash.clone(), representation);
-            representation
+            items.extend(step_solids(&mut step, model, polygons(model, tolerance)?));
+            "FACETED_BREP_SHAPE_REPRESENTATION"
         };
+        let representation = step.add(format!("{kind}('',({}),#{context})", refs(&items)));
         step.add(format!(
             "SHAPE_DEFINITION_REPRESENTATION(#{shape},#{representation})"
         ));
@@ -425,6 +446,74 @@ mod tests {
         for (actual, expected) in placed.into_iter().zip([26., -2., -3.]) {
             assert!((actual - expected).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn engineering_metadata_preserves_definitions_and_reuses_occurrences() {
+        let t = Tolerance::default();
+        let base = two_instances();
+        let mut left = base.parts["block"].clone();
+        left.metadata = cad_assembly::PartMetadata {
+            part_number: Some("PN-42".into()),
+            revision: Some("A'α".into()),
+            description: Some("operator's\\note\n🔧".into()),
+            material: None,
+        };
+        let mut right = left.clone();
+        right.metadata.revision = Some("B".into());
+        let a = BuiltAssembly::new(
+            "fixture".into(),
+            BTreeMap::from([("left".into(), left), ("right".into(), right)]),
+            vec![
+                Instance {
+                    id: "left1".into(),
+                    part: "left".into(),
+                    attachment: None,
+                    transform: RigidTransform::default(),
+                },
+                Instance {
+                    id: "left2".into(),
+                    part: "left".into(),
+                    attachment: None,
+                    transform: RigidTransform {
+                        translation: [10., 0., 0.],
+                        ..Default::default()
+                    },
+                },
+                Instance {
+                    id: "right".into(),
+                    part: "right".into(),
+                    attachment: None,
+                    transform: RigidTransform {
+                        translation: [20., 0., 0.],
+                        ..Default::default()
+                    },
+                },
+            ],
+            t,
+        )
+        .unwrap();
+        let step = assembly_to_step(&a, t).unwrap();
+        assert_eq!(step.matches("PRODUCT('PN-42'").count(), 2);
+        assert_eq!(step.matches("FACETED_BREP(").count(), 2);
+        assert!(step.contains("PRODUCT('PN-42','left'"));
+        assert!(step.contains("PRODUCT('PN-42','right'"));
+        assert!(step.contains(r"PRODUCT_DEFINITION_FORMATION('A''\X2\03B1\X0\'"));
+        assert!(step.contains("PRODUCT_DEFINITION_FORMATION('B'"));
+        assert_eq!(
+            step.matches(r"'operator''s\X2\005C\X0\note\X2\000A\X0\\X2\D83DDD27\X0\'")
+                .count(),
+            2
+        );
+        assert!(step.is_ascii());
+        assert_eq!(step.matches("PRODUCT(").count(), 3);
+        assert_eq!(
+            step.matches("FACETED_BREP_SHAPE_REPRESENTATION(").count(),
+            2
+        );
+        assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 3);
+        assert!(step.contains("PRODUCT('assembly:fixture','fixture',''"));
+        assert_eq!(step, assembly_to_step(&a, t).unwrap());
     }
 
     #[test]
