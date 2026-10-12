@@ -32,7 +32,8 @@ paid AI services, or a vendor-hosted account.
 Goal reaffirmed on 2026-10-12 from the commercial-CAD and virtualized-geometry
 briefs: this is a product-level engineering ambition, covering the kernel,
 regeneration, assemblies, manufacturing and team workflows. The project goal
-remains active until a declared commercial workflow passes its release gates;
+remains active until the complete declared commercial release contract passes,
+including both the drive-module workflow and the separate assembly-scale workload;
 finishing the current prototype or display milestone does not complete it.
 
 ### First competitive release contract
@@ -65,14 +66,14 @@ The commercial goal is the product contract. Use the following decision order
 when extending the implementation; completing a row advances the product but
 does not close the overall goal:
 
-| Track | Next architectural obligation | Required product evidence |
-| --- | --- | --- |
-| Reliable mechanical modeling | Extend supported operation composition with explicit tolerance, topology-lineage and failure contracts | An increasingly demanding drive-module revision passes independent geometry and engineering checks; failed edits retain the last valid generation |
-| Assembly scale | Bound exact-body residency and page assembly metadata independently of display meshes | Cold inspection, one-part edits and full exports each report their own loaded bodies, peak memory and completion time |
-| Progressive inspection | Advance from whole-part LOD to paged metadata, then crack-safe cluster refinement and conservative visibility | A pinned camera trace meets declared error/resource budgets while picks retain occurrence identity and actual captured Starlark source |
-| Mechanical intent | Expand sketch solving and introduce a separate rigid-frame joint solver | Parameter and motion changes report residuals, degrees of freedom, conflicts and branch behavior against independent expected results |
-| Manufacturing handoff | Preserve declared exchange semantics and add associative drawings, fits and GD&T | One revised source generation produces an independently checked release pack; required semantic loss blocks publication |
-| Team and agent workflows | Version the capability/job protocol and revision lifecycle | Human and agent patches follow the same reproducible validation path, with atomic publication and offline replay |
+| Track | Current foundation | Next architectural obligation | Required product evidence |
+| --- | --- | --- | --- |
+| Reliable mechanical modeling | Bounded analytic solids, machining, planar chamfers and semantic face lineage | Extend operation composition, general intersections and edge treatments with explicit tolerance, lineage and failure contracts | A demanding drive-module revision passes independent geometry and engineering checks; failed edits retain the last valid generation |
+| Assembly scale | Shared definitions and selective feature evaluation | Bound exact-body residency and page assembly metadata independently of display meshes | Cold inspection, one-part edits and full exports each report loaded bodies, peak memory and completion time, including an oversized unique part |
+| Progressive inspection | Verified mesh streaming, occurrence culling and whole-part LOD | Add paged metadata, then crack-safe cluster refinement and conservative visibility | A pinned camera trace meets declared error/resource budgets while picks retain occurrence identity and captured Starlark source |
+| Mechanical intent | Bounded sketches, prescribed joints, solved planar pin/bar loops and recorded motion samples | Extend connected-system solving, spatial joints and singularity/conflict diagnostics; add separate clearance checks | Motion changes report residuals, degrees of freedom and branch behavior against independent results; sampled poses never imply continuous collision clearance |
+| Manufacturing handoff | Native sections, scoped associative dimensions, material/BOM queries and independently checked STEP | Add complete associative drawings, fits, GD&T and explicit exchange-semantic coverage | One revised source generation produces an independently checked release pack; required semantic loss blocks publication |
+| Team and agent workflows | Capability discovery, locked local libraries, captured replay and atomic generations | Add isolated budgeted jobs, a versioned service protocol and reviewed revision lifecycle | Human and agent patches follow the same reproducible validation path, with concurrent-job recovery and offline replay |
 
 These tracks can advance in parallel. Select increments by the engineering
 workflow they unblock and the evidence they add, rather than by how many new
@@ -1545,7 +1546,7 @@ encoder or a successful screenshot:
 
 | Stage | Deliverable | Gate before proceeding |
 | --- | --- | --- |
-| M3a: part LOD | Shared coarse/fine meshes with conservative accumulated error and semantic mapping | Curved and thin-feature fixtures meet a declared 1-pixel target along a fixed camera trace, or visibly report unmet detail; picking and captured source remain generation-correct |
+| M3a: part LOD | Shared coarse/fine meshes with conservative accumulated error and semantic mapping | Budget-feasible curved and thin-feature fixtures reach the declared 1-pixel target within a predeclared detail-latency limit along a fixed camera trace; separate overload tests retain coverage and visibly report unmet detail; picking and captured source remain generation-correct |
 | M3b: metadata paging | Paged occurrence/spatial hierarchy with bounded decoding and assembly proxies | First meaningful coverage does not expand all occurrences; a 100k-occurrence fixture stays within declared metadata and request budgets during rapid camera reversals |
 | M3c: cluster streaming | Shared part cluster hierarchies, crack-safe replacement and budgeted page residency | Partial/corrupt/out-of-order children preserve parent coverage; measured error and ownership survive refinement and eviction |
 | M3d: accelerated visibility | Conservative occlusion and optional GPU traversal | Compare visibility against an unculled reference across disocclusion, sections and selected objects; retain the path only with measured gains on supported hardware |

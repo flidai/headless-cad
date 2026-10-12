@@ -20,6 +20,11 @@ cluster replacement and revision-bound manufacturing packs. Prioritize metadata
 paging before cluster-streaming acceleration; pursue kernel, constraint and
 manufacturing coverage in parallel. Keep all stages open until their own evidence
 passes, including unique-part workloads and failure recovery.
+Normal-operation display acceptance must reach the declared detail target within
+its predeclared latency budget. Visible proxies and unmet-detail reports establish
+safe overload behavior only; they cannot satisfy the normal-operation gate.
+The complete first release requires both the drive-module engineering workflow
+and the separate assembly-scale workload.
 
 M3's large-assembly gate also includes the architecture's
 [exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):
