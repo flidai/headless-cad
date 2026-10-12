@@ -2130,6 +2130,51 @@ assembly views. Assembly sections retain occurrence identity and sum overlapping
 material; these inspection artifacts are a foundation for future drawings.
 
 
+### Source-owned drawing sheets
+
+Place declared sections and their supported native dimensions on paper:
+
+```python
+drawing_sheet(
+    id = "bearing_sections", title = "Bearing fixture sections", revision = "A",
+    width = 420, height = 297,
+    views = [
+        {"view":"left_seat", "x":10, "y":10, "width":195, "height":240, "scale":0.8},
+        {"view":"right_seat", "x":215, "y":10, "width":195, "height":240, "scale":0.8},
+    ],
+)
+```
+
+The referenced `section_view` declarations must already exist in Starlark.
+Paper sizes and viewport coordinates are millimetres, measured from the top left
+with X right and Y down. `scale` is explicit paper millimetres per model
+millimetre: `0.8` prints a 10 mm model length as 8 mm. Viewports cannot overlap;
+10 mm margins and an additional 25 mm bottom title block are reserved. Limits
+are 16 sheets, 32 viewports per sheet and 256 total, with paper dimensions at
+most 2000 mm. Each section appears at most once per sheet.
+
+```sh
+cad build examples/bearing_drawing.star --out-dir out/bearing_drawing
+cad verify out/bearing_drawing
+cad build out/bearing_drawing/recipe.bundle.json --out-dir out/bearing_drawing_replay
+```
+
+The example imports its fixture through a pinned local module. Publication adds
+`drawing-bearing_sections.svg` and `.json`, binding the sheet revision, captured
+source context, section snapshots and exact section/SVG byte digests. The
+captured bundle supports offline replay without the original source files.
+
+Build reports use `layout_validated`: references and paper layout passed, but
+geometry and annotation fit at the requested scale remain unchecked. Publication
+checks that fit and only then reports `published`. It does not silently shrink
+or clip a view; failure preserves the previous generation, including on selected
+builds. Changing only title or revision reuses native geometry.
+
+These sheets compose native section curves and the existing datum and circle
+dimensions. They do not implement projected hidden-line views, fits, manufacturing
+tolerances, GD&T, or a complete approved manufacturing release.
+
+
 ### Native planar edge chamfers
 
 ```python

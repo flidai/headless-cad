@@ -46,6 +46,7 @@ struct GraphStore {
     property_assertions: RefCell<Vec<serde_json::Value>>,
     exchange_requirements: RefCell<Vec<serde_json::Value>>,
     section_views: RefCell<Vec<serde_json::Value>>,
+    drawing_sheets: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     mechanisms: RefCell<Vec<serde_json::Value>>,
     motion_studies: RefCell<Vec<serde_json::Value>>,
@@ -629,6 +630,59 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "too many mechanism bindings"
         );
         bindings.push(serde_json::json!({"assembly":assembly,"instance":instance,"mechanism":mechanism,"link":link}));
+        Ok(NoneType)
+    }
+
+    /// Lay out source-owned section views at explicit paper scales.
+    fn drawing_sheet(
+        id: &str,
+        title: &str,
+        revision: &str,
+        width: Value,
+        height: Value,
+        views: Value,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let sheet = cad_build::DrawingSheet {
+            id: id.into(),
+            title: title.into(),
+            revision: revision.into(),
+            width: number(width)?,
+            height: number(height)?,
+            views: serde_json::from_str(&views.to_json()?)?,
+        };
+        sheet.validate()?;
+        let graph = store(eval)?;
+        for viewport in &sheet.views {
+            anyhow::ensure!(
+                graph
+                    .section_views
+                    .borrow()
+                    .iter()
+                    .any(|v| v["id"].as_str() == Some(&viewport.view)),
+                "drawing viewport requires an already declared section view"
+            );
+        }
+        let mut sheets = graph.drawing_sheets.borrow_mut();
+        anyhow::ensure!(
+            sheets.len() < cad_build::MAX_DRAWING_SHEETS,
+            "too many drawing sheets"
+        );
+        anyhow::ensure!(
+            !sheets.iter().any(|s| s["id"]
+                .as_str()
+                .is_some_and(|other| other.eq_ignore_ascii_case(id))),
+            "duplicate drawing sheet ID"
+        );
+        let count: usize = sheets
+            .iter()
+            .map(|s| s["views"].as_array().map_or(0, Vec::len))
+            .sum();
+        anyhow::ensure!(
+            count + sheet.views.len() <= cad_build::MAX_DRAWING_VIEWPORTS,
+            "too many drawing viewports"
+        );
+        sheets.push(serde_json::to_value(sheet)?);
         Ok(NoneType)
     }
 
@@ -1333,6 +1387,7 @@ pub fn from_starlark_with_modules(
     let property_assertions = graph.property_assertions.into_inner();
     let exchange_requirements = graph.exchange_requirements.into_inner();
     let section_views = graph.section_views.into_inner();
+    let drawing_sheets = graph.drawing_sheets.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let mechanisms = graph.mechanisms.into_inner();
     let motion_studies = graph.motion_studies.into_inner();
@@ -1340,7 +1395,7 @@ pub fn from_starlark_with_modules(
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() { 2 } else { 1 },
+        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -1358,6 +1413,9 @@ pub fn from_starlark_with_modules(
     }
     if !mechanism_bindings.is_empty() {
         value["mechanism_bindings"] = serde_json::json!(mechanism_bindings);
+    }
+    if !drawing_sheets.is_empty() {
+        value["drawing_sheets"] = serde_json::json!(drawing_sheets);
     }
     if !section_views.is_empty() {
         value["section_views"] = serde_json::json!(section_views);

@@ -373,11 +373,14 @@ fn gallery(directory: &Dir) -> String {
                 if views.len() < cad_build::MAX_MOTION_STUDIES {
                     views.push(path);
                 }
-            } else if kind.is_file() && name.starts_with("section-") && name.ends_with(".svg") {
+            } else if kind.is_file()
+                && (name.starts_with("section-") || name.starts_with("drawing-"))
+                && name.ends_with(".svg")
+            {
                 let views = sections
                     .entry(prefix.trim_end_matches('/').to_owned())
                     .or_default();
-                if views.len() < cad_build::MAX_SECTION_VIEWS {
+                if views.len() < cad_build::MAX_SECTION_VIEWS + 16 {
                     views.push(path);
                 }
             }
@@ -479,7 +482,7 @@ fn gallery(directory: &Dir) -> String {
         output.push_str("</nav>");
         if let Some(views) = sections.get(folder) {
             output.push_str(
-                "<details style=\"margin-top:18px\"><summary>Recipe sections</summary><nav>",
+                "<details style=\"margin-top:18px\"><summary>Sections and drawing sheets</summary><nav>",
             );
             for path in views {
                 let label = path

@@ -284,7 +284,44 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     section.obligations.extend(["recipe-level declaration in recipe.section_views, authored by Starlark section_view; not a feature operation", "native query domain query.planar_section; examples/countersink.star and examples/countersunk_bearing_cover.star", "schema 2; at most 128 declarations; IDs are case-insensitive unique ASCII letters/digits/underscore/hyphen, length 1..128", "finite unit orthogonal section frame; origin in mm; area bounds in mm2 finite nonnegative and ordered", "global native validation even on selected builds and cache hits; all declared targets demanded; failed section or bound blocks publication", "10,000,000 aggregate topology visits across all views, charging every occurrence; assembly area is a sum, not union"]);
+    let mut viewport = object_spec(
+        "drawing_viewport",
+        vec![
+            arg(
+                "view",
+                T::Reference {
+                    target: "section_view",
+                },
+            ),
+            arg("x", T::Number),
+            arg("y", T::Number),
+            arg("width", T::Number),
+            arg("height", T::Number),
+            arg("scale", T::Number),
+        ],
+    );
+    for field in &mut viewport.arguments[1..5] {
+        field.units = Some("paper mm");
+    }
+    viewport.arguments[5].units = Some("paper mm / model mm");
+    viewport.obligations.extend(["top-left paper origin; X right, Y down; finite coordinates and strictly positive sizes and explicit scale", "viewport wholly within sheet's 10 mm margins, additionally reserving 25 mm at bottom for title block; touching boundaries allowed, overlapping interiors rejected", "exact section_view ID, unique within sheet; repeated section across different sheets allowed"]);
+    let mut sheet = object_spec(
+        "drawing_sheet",
+        vec![
+            arg("id", T::String),
+            arg("title", T::String),
+            arg("revision", T::String),
+            arg("width", T::Number),
+            arg("height", T::Number),
+            arg("views", array(object("drawing_viewport"), None)),
+        ],
+    );
+    sheet.arguments[3].units = Some("paper mm");
+    sheet.arguments[4].units = Some("paper mm");
+    sheet.obligations.extend(["recipe.drawing_sheets requires schema 2 even when empty; null and unknown fields rejected", "case-insensitive unique IDs: 1..128 ASCII letters/digits/underscore/hyphen, excluding reserved Windows device names", "nonempty trimmed title/revision without controls, maximum 256/64 UTF-8 bytes; finite positive paper dimensions at most 2000 mm", "at most 16 sheets, 1..32 viewports each, 256 total; all section references and layout validated before geometry, even for selected outputs", "Starlark drawing_sheet(id,title,revision,width,height,views) references already declared section_view IDs; each viewport dictionary requires view,x,y,width,height,scale", "report status layout_validated certifies layout and references only; geometry/annotation scale fit remains pending publication; report retains declaration and sorted unique section_view_ids, native query/witnesses remain in section_views; no projected hidden-line views or GD&T support implied"]);
     vec![
+        sheet,
+        viewport,
         cardinality,
         selector,
         assertion,

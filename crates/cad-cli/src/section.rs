@@ -166,7 +166,14 @@ pub(super) fn bind_report(
     }))
 }
 
-pub(super) fn svg(report: &Value) -> Result<String, Box<dyn Error>> {
+pub(super) struct DrawingGeometry {
+    pub label: String,
+    pub sections: Vec<PlanarSection>,
+    pub dimensions: Vec<cad_export::SectionDimensionAnnotation>,
+    pub circles: Vec<cad_export::SectionCircleDimensionAnnotation>,
+}
+
+pub(super) fn drawing_geometry(report: &Value) -> Result<DrawingGeometry, Box<dyn Error>> {
     let mut label = report["output_name"]
         .as_str()
         .unwrap_or("section")
@@ -245,8 +252,22 @@ pub(super) fn svg(report: &Value) -> Result<String, Box<dyn Error>> {
             })
         })
         .collect::<Result<_, Box<dyn Error>>>()?;
-    let mut svg =
-        cad_export::dimensioned_sections_to_svg(&sections, &label, &dimensions, &circles)?;
+    Ok(DrawingGeometry {
+        label,
+        sections,
+        dimensions,
+        circles,
+    })
+}
+
+pub(super) fn svg(report: &Value) -> Result<String, Box<dyn Error>> {
+    let geometry = drawing_geometry(report)?;
+    let mut svg = cad_export::dimensioned_sections_to_svg(
+        &geometry.sections,
+        &geometry.label,
+        &geometry.dimensions,
+        &geometry.circles,
+    )?;
     let metadata = serde_json::to_string(report)?
         .replace('&', "&amp;")
         .replace('<', "&lt;")

@@ -88,6 +88,18 @@ pub fn dimensioned_section_to_svg(
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
 ) -> Result<String, ExportError> {
+    Ok(section_layout(section, label, dimensions, circles)?.svg)
+}
+pub(crate) struct SectionLayout {
+    pub svg: String,
+    pub view_box: [f64; 4],
+}
+fn section_layout(
+    section: &PlanarSection,
+    label: &str,
+    dimensions: &[SectionDimensionAnnotation],
+    circles: &[SectionCircleDimensionAnnotation],
+) -> Result<SectionLayout, ExportError> {
     let mut ids = std::collections::BTreeSet::new();
     if dimensions
         .iter()
@@ -235,7 +247,10 @@ pub fn dimensioned_section_to_svg(
         writeln!(out,"<text x=\"{}\" y=\"{}\" font-family=\"sans-serif\" font-size=\"{}\" fill=\"#0f172a\">{text}</text>",number(bounds[0]),number(y+row as f64*font*1.5),number(font.min(width / (text.chars().count().max(1) as f64 * 0.65)))).unwrap();
     }
     out.push_str("</svg>\n");
-    Ok(out)
+    Ok(SectionLayout {
+        svg: out,
+        view_box: [left, top, width, height],
+    })
 }
 
 /// Render separate occurrences in one common section frame. Each occurrence has
@@ -260,6 +275,14 @@ pub fn dimensioned_sections_to_svg(
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
 ) -> Result<String, ExportError> {
+    Ok(sections_layout(sections, label, dimensions, circles)?.svg)
+}
+pub(crate) fn sections_layout(
+    sections: &[PlanarSection],
+    label: &str,
+    dimensions: &[SectionDimensionAnnotation],
+    circles: &[SectionCircleDimensionAnnotation],
+) -> Result<SectionLayout, ExportError> {
     let first = sections.first().ok_or_else(invalid)?;
     if sections.iter().any(|section| section.plane != first.plane) {
         return Err(ExportError::InvalidModel(
@@ -286,7 +309,8 @@ pub fn dimensioned_sections_to_svg(
             }))
         },
     };
-    let base = dimensioned_section_to_svg(&aggregate, label, dimensions, circles)?.replace(
+    let layout = section_layout(&aggregate, label, dimensions, circles)?;
+    let base = layout.svg.replace(
         "Exact native section;",
         "Native occurrence sections; overlapping occurrence areas are summed;",
     );
@@ -315,7 +339,10 @@ pub fn dimensioned_sections_to_svg(
             writeln!(out, "{line}").unwrap();
         }
     }
-    Ok(out)
+    Ok(SectionLayout {
+        svg: out,
+        view_box: layout.view_box,
+    })
 }
 
 fn dimension_svg(

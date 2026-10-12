@@ -28,7 +28,12 @@ pub fn solver_build_id() -> &'static str {
 
 mod assembly;
 mod demand;
+mod drawing_sheets;
 mod exchange_requirements;
+pub use drawing_sheets::{
+    DrawingSheet, DrawingSheetReport, DrawingViewport, DRAWING_MARGIN_MM, DRAWING_TITLE_BLOCK_MM,
+    MAX_DRAWING_SHEETS, MAX_DRAWING_VIEWPORTS, MAX_DRAWING_VIEWPORTS_PER_SHEET,
+};
 mod section_views;
 pub use section_views::{
     query_section, SectionAnchor, SectionAnchorWitness, SectionCircleDimension,
@@ -95,6 +100,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("property_assertions.rs").as_slice(),
             include_bytes!("exchange_requirements.rs").as_slice(),
             include_bytes!("section_views.rs").as_slice(),
+            include_bytes!("drawing_sheets.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -143,6 +149,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub section_views: Vec<SectionView>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub drawing_sheets: Vec<DrawingSheet>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanisms: Vec<MechanismDefinition>,
@@ -186,6 +194,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             section_views: Option<Vec<SectionView>>,
             #[serde(default, deserialize_with = "present_vec")]
+            drawing_sheets: Option<Vec<DrawingSheet>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             mechanisms: Option<Vec<MechanismDefinition>>,
@@ -204,6 +214,11 @@ impl<'de> Deserialize<'de> for Recipe {
         {
             return Err(serde::de::Error::custom(
                 "mechanisms require schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.drawing_sheets.is_some() {
+            return Err(serde::de::Error::custom(
+                "drawing sheets require schema version 2",
             ));
         }
         if raw.schema_version == 1 && raw.section_views.is_some() {
@@ -251,6 +266,7 @@ impl<'de> Deserialize<'de> for Recipe {
             property_assertions: raw.property_assertions.unwrap_or_default(),
             exchange_requirements: raw.exchange_requirements.unwrap_or_default(),
             section_views: raw.section_views.unwrap_or_default(),
+            drawing_sheets: raw.drawing_sheets.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
             mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
@@ -834,6 +850,7 @@ pub struct BuildResult {
     /// Unenforced publication obligations; native geometry success does not satisfy them.
     pub pending_exchange_requirements: Vec<ExchangeRequirement>,
     pub section_views: BTreeMap<String, SectionViewReport>,
+    pub drawing_sheets: BTreeMap<String, DrawingSheetReport>,
     pub face_datums: ResolvedFaceDatums,
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
     pub mechanism_bindings: Vec<MechanismBindingReport>,
@@ -866,6 +883,10 @@ pub enum BuildError {
     },
     #[error("section views require recipe schema version 2")]
     SectionViewSchema,
+    #[error("drawing sheets require recipe schema version 2")]
+    DrawingSheetSchema,
+    #[error("invalid drawing sheet '{id}': {message}")]
+    InvalidDrawingSheet { id: String, message: String },
     #[error("invalid section view '{id}': {message}")]
     InvalidSectionView { id: String, message: String },
     #[error("section view '{id}' on output '{output}' failed: {message}")]
@@ -1392,6 +1413,7 @@ impl BuildEngine {
         property_assertions::preflight(recipe)?;
         exchange_requirements::preflight(recipe)?;
         section_views::preflight(recipe)?;
+        drawing_sheets::preflight(recipe)?;
         face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
@@ -1886,6 +1908,7 @@ impl BuildEngine {
             property_assertions: BTreeMap::new(),
             pending_exchange_requirements: recipe.exchange_requirements.clone(),
             section_views: BTreeMap::new(),
+            drawing_sheets: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             motion_studies: mechanism_evaluation.motion_studies,
             mechanism_reports: mechanism_evaluation.reports,
@@ -1954,6 +1977,7 @@ impl BuildEngine {
             tolerance,
             &mut assertion_work_remaining,
         )?;
+        result.drawing_sheets = drawing_sheets::evaluate(recipe, &result.section_views)?;
         result.assemblies = assertion_assemblies
             .into_iter()
             .filter(|(name, _)| result.scope.requested_outputs.binary_search(name).is_ok())

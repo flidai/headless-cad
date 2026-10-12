@@ -69,8 +69,8 @@ does not close the overall goal:
 | Track | Current foundation | Next architectural obligation | Required product evidence |
 | --- | --- | --- | --- |
 | Reliable mechanical modeling | Bounded analytic solids, machining, planar chamfers and semantic face lineage | Extend operation composition, general intersections and edge treatments with explicit tolerance, lineage and failure contracts | A demanding drive-module revision passes independent geometry and engineering checks; failed edits retain the last valid generation |
-| Assembly scale | Shared definitions and selective feature evaluation | Bound exact-body residency and page assembly metadata independently of display meshes | Cold inspection, one-part edits and full exports each report loaded bodies, peak memory and completion time, including an oversized unique part |
-| Progressive inspection | Verified mesh streaming, occurrence culling and whole-part LOD | Add paged metadata, then crack-safe cluster refinement and conservative visibility | A pinned camera trace meets declared error/resource budgets while picks retain occurrence identity and captured Starlark source |
+| Assembly scale | Shared definitions, selective feature evaluation and experimental paged occurrence metadata | Bound exact-body residency, total decoded metadata memory and display preprocessing independently | Cold inspection, one-part edits and full exports each report loaded bodies, peak memory and completion time, including an oversized unique part |
+| Progressive inspection | Verified mesh streaming, occurrence culling and adaptive whole-part LOD integrated with experimental metadata paging | Establish hardware/detail-latency gates, then crack-safe cluster refinement and conservative visibility | A pinned camera trace meets declared error/resource budgets while picks retain occurrence identity and captured Starlark source |
 | Mechanical intent | Bounded sketches, prescribed joints, solved planar pin/bar loops and recorded motion samples | Extend connected-system solving, spatial joints and singularity/conflict diagnostics; add separate clearance checks | Motion changes report residuals, degrees of freedom and branch behavior against independent results; sampled poses never imply continuous collision clearance |
 | Manufacturing handoff | Native sections, scoped associative dimensions, material/BOM queries and independently checked STEP | Add complete associative drawings, fits, GD&T and explicit exchange-semantic coverage | One revised source generation produces an independently checked release pack; required semantic loss blocks publication |
 | Team and agent workflows | Capability discovery, locked local libraries, captured replay and atomic generations | Add isolated budgeted jobs, a versioned service protocol and reviewed revision lifecycle | Human and agent patches follow the same reproducible validation path, with concurrent-job recovery and offline replay |
@@ -1838,9 +1838,9 @@ An independent thin-annulus fixture retains a 0.2 mm wall gap, all four semantic
 faces, shared watertight triangle edges and the expected polygon-annulus volume
 at every level. None of those display volumes replaces the native volume.
 `spindle_line.star` combines tapered housing variants and shared drilled bases,
-shafts and rings. This is bounded whole-part refinement; metadata paging,
-cluster transitions, full screen-space error certification and hardware scale
-gates remain open.
+shafts and rings. The experimental paged inspector now combines this bounded
+whole-part refinement with occurrence paging. Cluster transitions, total decoded-memory
+validation, full screen-space error certification and hardware scale gates remain open.
 
 Streaming requires HTTP(S), WebGL2 and Web Crypto (localhost is supported).
 Content-addressed assets are verified individually; unavailable assets remain
@@ -1969,7 +1969,29 @@ operations and independently checks its seat and central bore dimensions. Two
 exercise these references; a shared cutter role is not treated as an occurrence
 selector.
 This extends associative inspection annotations; angular dimensions, general
-curve references, drawing layouts, fits, GD&T and PMI exchange remain open.
+curve references, projected drawing layouts, fits, GD&T and PMI exchange remain open.
+
+Source-owned `drawing_sheet` declarations now compose existing native sections
+and their datum/circle dimensions into explicitly scaled SVG paper sheets.
+Schema 2 records title, revision, paper dimensions and nonoverlapping viewport
+rectangles. Paper coordinates use millimetres from the top left, X right/Y down;
+scale is paper millimetres per model millimetre. Preflight enforces references,
+10 mm margins, an additional bottom 25 mm title block, at most 16 sheets,
+32 viewports per sheet and 256 total. These remain global obligations during
+selected builds; section reports retain the native queries and reference witnesses.
+
+The build report status `layout_validated` certifies layout and references only.
+Publication additionally checks the complete geometry/annotation canvas at its
+explicit scale; overflow fails instead of shrinking or clipping the view.
+Only then does the publication summary report `published`. Sheet JSON binds the
+revision, renderer implementation, captured source context, referenced section
+snapshots and section/SVG byte digests inside the atomic generation.
+`bearing_drawing.star` imports the pinned datum-section fixture and lays out its
+two station views. Tests cover paper scaling, native arcs, escaped title text,
+fit/overlap failure, revision-only geometry reuse, and captured-bundle replay
+after removing original source files. This is section-based sheet composition;
+projected hidden-line views, fits, manufacturing tolerances, GD&T and the complete
+manufacturing-release gate remain open.
 
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
@@ -2434,11 +2456,11 @@ pin/bar solver has its own bounded acceptance contract above.
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters and locked local modules with captured replay bundles; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Remote package resolution, unit types, source maps, full public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
-| References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
+| References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums, snapshot witnesses and semantic face-pair chamfer selection | Broader instance-path, edge/vertex and predicate selectors, additional downstream modeling consumers and general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM; bounded prescribed revolute/prismatic motion; bounded planar pin/bar closure and sampled motion studies | General 3D/closed-loop joint constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
-| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
+| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback; experimental verified metadata paging with adaptive LOD and captured-source picking | Total decoded-memory and hardware/detail-latency gates, within-part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
 | Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; source-bound native planar sections with occurrence-aware SVG; recipe property assertions with pinned evidence and global validation | Broader sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 
