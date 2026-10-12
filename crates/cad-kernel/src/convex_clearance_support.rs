@@ -289,7 +289,7 @@ fn validate(m: &ModelSnapshot, t: Tolerance) -> Result<Option<Geometry>, KernelE
 pub(super) fn validate_operand(m: &ModelSnapshot, t: Tolerance) -> Result<(), KernelError> {
     validate(m, t).map(|_| ())
 }
-fn revolution_consistency(
+pub(crate) fn revolution_consistency(
     m: &ModelSnapshot,
     g: &RevolveGeometry,
     error: f64,
@@ -568,6 +568,49 @@ fn query_bounded(
         simplex.push(next);
     }
     Err(KernelError::Unsupported("analytic clearance did not converge to a certified separation within 256 support iterations; this is not a collision classification".into()))
+}
+
+// Reuse the solid-cylinder strict support checks for each side of an annulus.
+pub(crate) fn circular_consistency(
+    m: &ModelSnapshot,
+    g: &CylinderGeometry,
+    error: f64,
+) -> Result<(), KernelError> {
+    for (i, vertex) in m.vertices.iter().enumerate() {
+        let radius = if i < 2 { g.radius } else { g.inner_radius };
+        let z = if i % 2 == 0 { 0. } else { g.height };
+        let expected = add(g.origin, add(mul(g.axis, z), mul(g.x_direction, radius)));
+        if norm(sub(vertex.position, expected)) > error {
+            return Err(KernelError::NumericRange);
+        }
+    }
+    for edge in &m.edges {
+        if let Curve::Circle(c) = &edge.curve {
+            if norm(sub(c.x_direction, g.x_direction)) > 128. * f64::EPSILON
+                || norm(sub(c.x_direction, g.x_direction)) * g.radius > error
+            {
+                return Err(KernelError::NumericRange);
+            }
+        }
+    }
+    if g.inner_radius == 0. {
+        return consistency(m, Some(&Geometry::Cylinder(g.clone())), error);
+    }
+    let mut outer = m.clone();
+    outer.vertices.truncate(2);
+    outer.edges.truncate(3);
+    outer.faces.truncate(3);
+    consistency(&outer, Some(&Geometry::Cylinder(g.clone())), error)?;
+    let mut inner = outer;
+    inner.vertices = m.vertices[2..].to_vec();
+    inner.edges = m.edges[3..].to_vec();
+    for e in &mut inner.edges {
+        e.vertices = e.vertices.map(|v| VertexId(v.0 - 2));
+    }
+    inner.faces[2] = m.faces[3].clone();
+    let mut bore = g.clone();
+    bore.radius = g.inner_radius;
+    consistency(&inner, Some(&Geometry::Cylinder(bore)), error)
 }
 
 #[cfg(test)]

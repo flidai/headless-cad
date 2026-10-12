@@ -54,7 +54,7 @@ pub struct ClearanceCheckReport {
     pub left: ClearanceOccurrenceWitness,
     pub right: ClearanceOccurrenceWitness,
     /// Certificate for the rounded, placed native snapshots.
-    pub query: cad_kernel::ConvexClearance,
+    pub query: cad_kernel::SolidClearance,
     /// Additional conservative displacement allowance for both native placements.
     pub placement_uncertainty_mm: f64,
     pub lower_bound_mm: f64,
@@ -186,14 +186,13 @@ pub(super) fn evaluate(
         // kernel still performs the full native convexity/certificate validation.
         for instance in [left, right] {
             let m = &assembly.parts[&instance.part].result.model;
-            m.validate_convex_clearance_operand(tolerance)
-                .map_err(|e| {
-                    fail(
-                        format!("pre-placement clearance admission: {e}"),
-                        None,
-                        None,
-                    )
-                })?;
+            m.validate_clearance_operand(tolerance).map_err(|e| {
+                fail(
+                    format!("pre-placement clearance admission: {e}"),
+                    None,
+                    None,
+                )
+            })?;
         }
         let placed =
             |instance: &cad_assembly::Instance, path: &Vec<String>| -> Result<_, BuildError> {
@@ -257,7 +256,7 @@ pub(super) fn evaluate(
             ));
         }
         let query = left_model
-            .convex_clearance(&right_model, tolerance)
+            .clearance(&right_model, tolerance)
             .map_err(|e| fail(e.to_string(), None, None))?;
         let lower = (query.lower_bound_mm - uncertainty).next_down();
         let upper = (query.upper_bound_mm + uncertainty).next_up();

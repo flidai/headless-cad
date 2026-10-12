@@ -2081,6 +2081,36 @@ differ only within an arithmetic tie, avoiding stagnation at flat/smooth support
 transitions. This changes search progression, not the final interval acceptance.
 A scaled cone-to-box regression with a known 500 mm gap protects that behavior.
 
+The generic native `ModelSnapshot::clearance` query now dispatches either to the
+unchanged convex contract or to coaxial full-turn material profiles. The latter
+admits recognized solid/annular circular extrusions and simple linear-meridian
+revolutions, including stepped and hollow profiles. For a shared axis and
+nonnegative radii, minimum 3D distance occurs at a shared azimuth, reducing to
+minimum distance between filled radial/axial polygons. Robust segment separation
+and bidirectional point-in-region tests reject contact, crossing and containment
+before endpoint/segment distance enumeration. This does not substitute a hull.
+
+Coaxial admission accepts parallel or antiparallel recovered axes only within
+arithmetic uncertainty. It bounds transverse offset and angular displacement
+across the complete radial/axial extent, rejects genuine misalignment, and widens
+the final interval for the accepted deviation. Native annular seams, cap/wall
+supports, conical slopes and frames are independently checked against recovered
+geometry. The bounded topology admits at most two loops per face for annular
+caps, 256 loops, 128 faces and the existing vertex/edge/reference limits. Placement
+precision and global selected/cache obligations remain unchanged.
+
+`SolidClearance.method` distinguishes `convex_support` from `coaxial_meridian`;
+`axis` denotes witness direction, not a separating plane for nested material.
+The original `ConvexClearance` API retains its separating-direction contract.
+Publication advances clearance JSON to schema 2, kind `native_geometric_clearance`,
+and shows the method in the static report. `coaxial_clearance.star` integrates
+stepped shafts, tapered/stepped bores and an axial spacer. Acceptance requires
+independent source-profile material distances, imported STEP boundary witnesses,
+exact occurrence frames, radial/axial/diagonal constants, reversed/common poses,
+offline replay and failed-publication preservation. General noncoaxial curved or
+nonconvex distance, penetration, manufactured envelopes and swept motion remain
+open release obligations.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in
@@ -2550,7 +2580,7 @@ pin/bar solver has its own bounded acceptance contract above.
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback; experimental verified metadata paging with adaptive LOD and captured-source picking | Total decoded-memory and hardware/detail-latency gates, within-part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
-| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; source-bound native planar sections with occurrence-aware SVG, source-authored sheets and dimensional tolerances; outward-rounded worst-case size stacks; bounded native convex occurrence-pair clearance; recipe property assertions with pinned evidence and global validation | General curved/nonconvex and motion clearance, projected drawings, fits/GD&T/PMI, material property libraries, configurations, principal axes and dynamics |
+| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; source-bound native planar sections with occurrence-aware SVG, source-authored sheets and dimensional tolerances; outward-rounded worst-case size stacks; bounded native convex and coaxial material occurrence-pair clearance; recipe property assertions with pinned evidence and global validation | General curved/nonconvex and motion clearance, projected drawings, fits/GD&T/PMI, material property libraries, configurations, principal axes and dynamics |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
 The current working commands are in [README.md](../README.md).

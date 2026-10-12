@@ -81,6 +81,14 @@ exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
 
+Coaxial native clearance now advances the bearing workflow beyond convex shapes:
+actual hollow bores, stepped shafts and concave meridians retain their material
+regions. `coaxial_clearance.star` combines radial bearing and axial spacer checks
+with explicit query-method reports. Independent profile distances, STEP boundary
+witnesses, pose/reversal cases, containment rejection and preserved generations
+are required evidence. Noncoaxial nonconvex geometry, manufactured envelopes and
+continuous-motion clearance remain open.
+
 Convex linear-meridian revolutions extend native clearance toward tapered drive
 components: cones, frustums and convex crowned profiles. The shared kernel admission
 contract must reject hollow and waisted profiles before placement/query work.

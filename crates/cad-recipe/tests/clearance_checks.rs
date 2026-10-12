@@ -56,3 +56,17 @@ fn source_revolved_cone_clearance_is_native() {
     let q = &b.clearance_checks["gap"];
     assert!(q.lower_bound_mm <= 3. && q.upper_bound_mm >= 3.);
 }
+
+#[test]
+fn source_coaxial_shaft_inside_ring_reports_meridian_method() {
+    let source = "shaft=extrude(id='shaft',profile=circle(id='sp',radius=1),height=4)\nring=extrude(id='ring',profile=circle(id='rp',radius=3,inner_radius=2),height=4)\na=part(id='shaft_part',body=shaft)\nb=part(id='ring_part',body=ring)\nassembly_output(name='pair',assembly=assembly(id='root',instances=[instance(id='left',part=a),instance(id='right',part=b)]))\n";
+    let check = CHECK.replace("min_clearance=4.99", "min_clearance=0.99");
+    let r = cad_recipe::from_starlark("coaxial.star", &format!("{source}{check}")).unwrap();
+    let b = cad_build::build(&r).unwrap();
+    let q = &b.clearance_checks["gap"].query;
+    assert_eq!(
+        serde_json::to_value(q).unwrap()["method"],
+        "coaxial_meridian"
+    );
+    assert!(q.lower_bound_mm <= 1. && q.upper_bound_mm >= 1.);
+}

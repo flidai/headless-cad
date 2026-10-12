@@ -301,7 +301,7 @@ fn convex_revolved_cones_frusta_and_mixed_pairs_preserve_global_checks() {
 }
 
 #[test]
-fn hollow_and_nonconvex_revolutions_fail_before_placement() {
+fn noncoaxial_hollow_and_nonconvex_revolutions_fail_explicitly() {
     for profile in [
         json!([[1, 0], [2, 0], [2, 4], [1, 4]]),
         json!([[0, 0], [2, 0], [1, 2], [2, 4], [0, 4]]),
@@ -310,7 +310,107 @@ fn hollow_and_nonconvex_revolutions_fail_before_placement() {
         v["features"][0] = json!({"op":"polygon","id":"p","points":profile});
         v["features"][1] = json!({"op":"revolve","id":"body","profile":"p"});
         assert!(
-            matches!(cad_build::build(&parse(v)),Err(BuildError::ClearanceCheckFailed {message,..}) if message.starts_with("pre-placement clearance admission:"))
+            matches!(cad_build::build(&parse(v)),Err(BuildError::ClearanceCheckFailed {message,..}) if !message.is_empty())
         );
     }
+}
+
+fn coaxial_pair() -> Value {
+    let mut v = value();
+    v["features"][0] = json!({"op":"circle","id":"p","radius":1});
+    v["features"].as_array_mut().unwrap().extend([
+        json!({"op":"circle","id":"ring_profile","radius":3,"inner_radius":2}),
+        json!({"op":"extrude","id":"ring","profile":"ring_profile","height":4}),
+    ]);
+    v["parts"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"id":"ring_part","feature":"ring"}));
+    v["assemblies"].as_array_mut().unwrap().insert(
+        1,
+        json!({"id":"ring_cell","instances":[{"id":"leaf/a","part":"ring_part"}]}),
+    );
+    v["assemblies"][2]["assemblies"][1]["assembly"] = json!("ring_cell");
+    v["assemblies"][2]["assemblies"][1]["transform"] = json!({"translation":[0,0,0]});
+    v["clearance_checks"][0]["min_clearance"] = json!(0.99999);
+    v
+}
+
+#[test]
+fn coaxial_shaft_inside_ring_is_native_and_globally_enforced() {
+    for (opposed, posed) in [(false, false), (true, false), (false, true), (true, true)] {
+        let mut v = coaxial_pair();
+        if opposed {
+            v["assemblies"][2]["assemblies"][1]["transform"] =
+                json!({"translation":[0,0,4],"rotation":[1,0,0,0]});
+        }
+        if posed {
+            let q = [0., (0.3_f64).sin(), 0., (0.3_f64).cos()];
+            v["assemblies"].as_array_mut().unwrap().push(json!({"id":"posed","assemblies":[{"id":"pose","assembly":"root","transform":{"translation":[10,-20,30],"rotation":q}}]}));
+            v["assembly_outputs"][0]["assembly"] = json!("posed");
+            v["clearance_checks"][0]["left_instance_path"] = json!(["pose", "left", "leaf/a"]);
+            v["clearance_checks"][0]["right_instance_path"] = json!(["pose", "right", "leaf/a"]);
+        }
+        let mut r = parse(v);
+        let mut engine = BuildEngine::default();
+        let b = engine.build_outputs(&r, &["body".into()]).unwrap();
+        let c = &b.clearance_checks["gap"];
+        assert_eq!(c.query.method, cad_kernel::ClearanceMethod::CoaxialMeridian);
+        assert!(c.lower_bound_mm <= 1. && c.upper_bound_mm >= 1.);
+        assert!(c.upper_bound_mm - c.lower_bound_mm < 1e-7);
+        assert!(b.assemblies.is_empty());
+        r.clearance_checks[0].min_clearance = 1.00001;
+        assert!(matches!(
+            engine.build_outputs(&r, &["body".into()]),
+            Err(BuildError::ClearanceCheckFailed {
+                lower_bound_mm: Some(_),
+                ..
+            })
+        ));
+        r.clearance_checks[0].min_clearance = 0.99999;
+        assert_eq!(
+            engine
+                .build_outputs(&r, &["body".into()])
+                .unwrap()
+                .stats
+                .computed_solids,
+            0
+        );
+    }
+}
+
+#[test]
+fn coaxial_query_rejects_overlap_contact_and_actual_axis_misalignment() {
+    for radius in [2., 2.5, 4.] {
+        let mut v = coaxial_pair();
+        v["features"][0]["radius"] = json!(radius);
+        assert!(matches!(
+            cad_build::build(&parse(v)),
+            Err(BuildError::ClearanceCheckFailed { .. })
+        ));
+    }
+    for transform in [
+        json!({"translation":[0.25,0,0]}),
+        json!({"rotation":[(0.001_f64).sin(),0,0,(0.001_f64).cos()]}),
+    ] {
+        let mut v = coaxial_pair();
+        v["assemblies"][2]["assemblies"][1]["transform"] = transform;
+        assert!(matches!(
+            cad_build::build(&parse(v)),
+            Err(BuildError::ClearanceCheckFailed { .. })
+        ));
+    }
+}
+
+#[test]
+fn coaxial_nonconvex_revolution_uses_filled_meridian_without_hull_substitution() {
+    let mut v = value();
+    v["features"][0] = json!({"op":"polygon","id":"p","points":[[0,0],[2,0],[1,2],[2,4],[0,4]]});
+    v["features"][1] = json!({"op":"revolve","id":"body","profile":"p"});
+    v["assemblies"][1]["assemblies"][1]["transform"] = json!({"translation":[0,0,7]});
+    v["clearance_checks"][0]["min_clearance"] = json!(2.99999);
+    let b = cad_build::build(&parse(v)).unwrap();
+    let q = &b.clearance_checks["gap"].query;
+    assert_eq!(q.method, cad_kernel::ClearanceMethod::CoaxialMeridian);
+    assert!(q.lower_bound_mm <= 3. && q.upper_bound_mm >= 3.);
 }

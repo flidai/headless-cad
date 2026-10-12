@@ -2258,7 +2258,8 @@ The supported domain is two nonempty, validated convex planar solids, recognized
 finite solid cylinders, or supported convex full-turn linear-meridian revolutions,
 including mixed pairs. Each operand is limited to 128 vertices, 256 edges and 128 single-loop
 faces; recipes admit 64 checks and ten million path-resolution work units.
-Other curved or nonconvex inputs (including annular tubes), contact/intersection,
+The convex path rejects other curved or nonconvex inputs (including annular tubes).
+A separate coaxial material-region path is described below. Contact/intersection,
 unresolved precision and resource excess fail explicitly. Failure does not classify collision or
 penetration depth. Only declared pairs are checked; this is not whole-assembly
 or continuous-motion certification and does not inflate manufactured tolerances.
@@ -2285,7 +2286,7 @@ cad build examples/cylinder_clearance.star --out-dir out/cylinder_clearance
 ```
 
 The example varies relative roller tilt, axial/radial offsets and the whole
-assembly pose. It also includes an intentionally unsupported `tube=1` case.
+assembly pose. It also includes an intentionally unsupported noncoaxial `tube=1` case.
 Clearance remains a nominal-geometry requirement, separate from dimensional
 manufacturing envelopes and continuous-motion collision certification.
 
@@ -2305,6 +2306,34 @@ cad build examples/revolved_clearance.star --out-dir out/revolved_clearance
 (waisted) and `shape=4` (hollow) deliberately exercise unsupported-input failures.
 The same source-owned minimum requirement, placement precision limits and bounded
 search apply. General curved/nonconvex clearance remains a separate capability.
+
+`coaxial_clearance.star` checks a shaft inside an actual hollow bearing and the
+axial gap to a spacer. It includes plain and stepped shafts, a tapered bore/shaft
+pair, and a stepped internal bore. The native query compares filled radial/axial
+material profiles, including concavity and holes in the resulting revolved solid.
+It rejects intersecting boundaries and material containment before measuring the
+remaining separation; a convex hull would incorrectly fill the bore.
+
+```sh
+cad build examples/coaxial_clearance.star --out-dir out/coaxial_clearance
+```
+
+The default stepped shaft has 1 mm nominal bore clearance and the spacer has a
+6 mm axial gap. `shape=0..3`, `slide`, `opposed`, `pose`, and `axial_gap` exercise
+profile and placement changes. `gap=0`, `oversize=1`, `eccentric=1`, and `tilt=1`
+exercise contact, material containment and unsupported noncoaxial arrangements.
+Small arithmetic alignment departures widen the interval; actual eccentricity or
+tilt is rejected rather than snapped into coaxial alignment.
+
+The generic native API is `ModelSnapshot::clearance`; the original
+`convex_clearance` API keeps its convex-only contract. Published clearance JSON
+uses schema 2 and `kind: native_geometric_clearance`. Each query records
+`method: convex_support | coaxial_meridian`; its `axis` is a witness direction,
+not a global separating plane for nested bodies. Coaxial admission allows at most
+128 faces, 256 loops, two loops per face, and the existing vertex/edge/reference
+budgets. The report displays the geometry method beside each checked pair.
+General noncoaxial hollow/nonconvex queries, continuous motion and manufacturing
+tolerance envelopes remain separate capabilities.
 
 ### Native planar edge chamfers
 

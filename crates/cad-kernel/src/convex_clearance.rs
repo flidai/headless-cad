@@ -7,7 +7,7 @@ pub const MAX_CLEARANCE_FACES: usize = 128;
 pub const MAX_CLEARANCE_CANDIDATES: usize = 200_000;
 pub const MAX_CLEARANCE_ITERATIONS: usize = 256;
 #[path = "convex_clearance_support.rs"]
-mod support;
+pub(crate) mod support;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConvexClearance {
