@@ -15,7 +15,7 @@ const path = require('node:path');
       const response=await page.goto(`${base}/modular_linear_stage/modular_linear_stage.${suffix}`);
       assert.ok(response.ok());
       if(suffix!=='preview.html') await page.waitForFunction(()=>window.cadGpuStats?.ready===true);
-      else await page.locator('#occurrence-select').selectOption('["carriage_front"]');
+      else await page.locator('#occurrence-select').selectOption('carriage_front');
       await page.locator('#recipe-toggle').click();
       assert.equal(await page.locator('#recipe-module option').count(),3);
       for(const label of ['recipe_modules/drive_parts.star','recipe_modules/stock.star']) {
