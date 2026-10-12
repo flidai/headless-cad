@@ -557,7 +557,8 @@ impl ModelSnapshot {
                     .map(|_| None)
                     .or_else(|_| crate::revolve::recognize(self, tolerance).map(|_| None))
                     .or_else(|_| crate::arc_prism::recognize(self, tolerance).map(|_| None))
-                    .or_else(|_| crate::bored_prism::recognize(self, tolerance).map(|_| None)),
+                    .or_else(|_| crate::bored_prism::recognize(self, tolerance).map(|_| None))
+                    .or_else(|_| crate::stepped_bore::recognize(self, tolerance).map(|_| None)),
             }
         } else {
             let report = self.validate(tolerance);

@@ -121,7 +121,9 @@ impl ModelSnapshot {
         let centroid = if self.has_curved_geometry() {
             // The validated circular caps have their exact area centroid at
             // the supporting plane origin, independent of tessellation.
-            if let Ok(g) = crate::bored_prism::recognize(self, tolerance) {
+            if let Ok(g) = crate::stepped_bore::recognize(self, tolerance) {
+                g.cap_centroid(face_id, tolerance)?
+            } else if let Ok(g) = crate::bored_prism::recognize(self, tolerance) {
                 g.cap_centroid(face_id, tolerance)?
             } else if let Some(g) = self.arc_prism_geometry(tolerance)? {
                 if face_id.0 < 2 {

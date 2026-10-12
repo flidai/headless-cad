@@ -416,6 +416,7 @@ impl ModelSnapshot {
                 .or_else(|_| crate::revolve::recognize(self, tol).map(|_| None))
                 .or_else(|_| crate::arc_prism::recognize(self, tol).map(|_| None))
                 .or_else(|_| crate::bored_prism::recognize(self, tol).map(|_| None))
+                .or_else(|_| crate::stepped_bore::recognize(self, tol).map(|_| None))
         } else {
             let r = self.validate(tol);
             if r.valid {

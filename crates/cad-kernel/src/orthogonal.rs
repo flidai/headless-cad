@@ -351,7 +351,8 @@ pub fn boolean(
         && crate::analytic::recognize(a, Some(tolerance)).is_err()
     {
         return crate::through_bore::cut(a, b, tolerance)
-            .or_else(|_| crate::bored_prism::cut(a, b, tolerance));
+            .or_else(|_| crate::bored_prism::cut(a, b, tolerance))
+            .or_else(|_| crate::stepped_bore::cut(a, b, tolerance));
     }
     if a.has_curved_geometry() || b.has_curved_geometry() {
         return crate::circular_boolean::boolean(a, b, operation, tolerance);

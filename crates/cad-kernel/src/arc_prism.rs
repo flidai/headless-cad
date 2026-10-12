@@ -883,6 +883,7 @@ impl ModelSnapshot {
             recognize(self, tol)
                 .map(Some)
                 .or_else(|_| crate::bored_prism::recognize(self, tol).map(|_| None))
+                .or_else(|_| crate::stepped_bore::recognize(self, tol).map(|_| None))
         } else {
             let report = self.validate(tol);
             if report.valid {

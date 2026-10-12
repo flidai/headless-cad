@@ -43,6 +43,8 @@ mod prism;
 mod profile_prism;
 mod revolve;
 mod simple_polygon;
+mod stepped_bore;
+pub use stepped_bore::MAX_STEPPED_BORE_SEGMENTS;
 mod tessellation;
 mod through_bore;
 mod transform;
@@ -342,6 +344,9 @@ impl ModelSnapshot {
     /// Empty models have volume zero. Validate deserialized or edited snapshots
     /// first: invalid references or unsupported integration terms yield NaN.
     pub fn volume(&self) -> f64 {
+        if let Ok(v) = stepped_bore::volume(self) {
+            return v;
+        }
         if let Ok(v) = bored_prism::volume(self) {
             return v;
         }

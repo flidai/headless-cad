@@ -18,12 +18,12 @@ pub struct BoredPrismGeometry {
     pub axis: [f64; 3],
     pub x_direction: [f64; 3],
     pub height: f64,
-    surrogate: ModelSnapshot,
+    pub(crate) surrogate: ModelSnapshot,
 }
 fn bad() -> KernelError {
     KernelError::Unsupported("blind bore requires a canonical right prism, a parallel solid cylinder opening exactly one cap, positive depth and remaining floor thickness, and separated bore projections".into())
 }
-fn arithmetic(
+pub(crate) fn arithmetic(
     m: &ModelSnapshot,
     tool: &CylinderGeometry,
     t: Tolerance,
@@ -54,7 +54,7 @@ fn arithmetic(
 }
 // This check distinguishes a true blind depth from a sub-tolerance gap. Axis-
 // aligned cap equality is literal; oblique identity has an arithmetic bound.
-fn interval(
+pub(crate) fn interval(
     g: &crate::through_bore::Stock,
     c: &CylinderGeometry,
     error: f64,
@@ -90,7 +90,7 @@ fn interval(
     }
     Ok((low, high, [bottom, top]))
 }
-fn disk_at(
+pub(crate) fn disk_at(
     c: &CylinderGeometry,
     g: &crate::through_bore::Stock,
     lo: f64,

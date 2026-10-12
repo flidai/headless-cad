@@ -1548,11 +1548,47 @@ This path supports parallel or opposite-axis solid cylinders in recognized
 polygon or line/arc right prisms, including separated prior blind/through cuts.
 The circular projections must be mutually clear, even when two opposite-side
 pockets would not meet in depth. Positive depth and remaining floor thickness
-must be numerically resolved. Fully enclosed cavities, overlapping/coaxial holes,
-skew cuts, drill-tip cones and general pockets remain unsupported.
+must be numerically resolved. The additional counterbore path below handles
+coaxial overlaps. Fully enclosed cavities, noncoaxial overlapping holes, skew
+cuts, drill-tip cones and general pockets remain unsupported.
 
 Independent STEP/STL checks cover identity and oblique direct cases plus three
 pallet configurations. `npm run test:blind-bore --prefix tools/preview-check`
 checks top and underside floor/cap picking and through-hole visibility across
 Canvas, embedded GPU and streaming GPU clients, plus nested selection and exact
 captured source. These prescribed layouts do not certify fits or load capacity.
+
+
+### Counterbored fastening fixture
+
+[counterbore.star](examples/counterbore.star) drills an annular seat around a
+through-hole. [counterbored_fixture.star](examples/counterbored_fixture.star)
+performs eighteen successive cuts to form six holes with counterbores on both
+sides of a plate. Two mirrored plates, twelve washers, six spacer sleeves, six
+headed fastener envelopes and six nut envelopes form a 32-occurrence assembly
+from five definitions. The hardware attaches to semantic annular shoulder datums.
+Changing counterbore depth moves the seats and attached hardware; unchanged
+washers, nuts, spacers and pilot-drilled stock remain reusable.
+
+`counterbore_radius` (6..8 mm), `counterbore_depth` (4..8 mm), and `plate_height`
+(18..24 mm) drive the example. Inspect `plate_inspection` to see exposed shoulders
+and central openings, or the assembled `counterbored_fixture`. Picking a part
+shows the exact captured Starlark. Fasteners are analytic envelopes; threads,
+fits and preload are not simulated.
+
+The kernel takes the union of coaxial drilling intervals as a sequence of
+nonoverlapping cylindrical sections. It supports drilling a small through-hole
+after a large blind cut, enlarging either end of an existing hole, and successive
+radial steps. Native shoulders are annular planar faces with shared circular
+boundaries. Semantic history maps surviving portions of shortened walls and
+shoulders, with explicit deletion when a feature is removed. Internal face
+indices may change when the hole boundary is rebuilt.
+
+Independent signed-slice integrals check full native and assembly moments over
+27 configurations. STEP re-import and closed-STL checks cover both cut orders,
+opposed counterbores, common oblique frames and three fixture configurations.
+`npm run test:counterbore --prefix tools/preview-check` checks annular shoulder
+picking and open pilot holes from both sides in all three viewers. Invalid cuts
+or removed required shoulders leave the previous published generation intact.
+Noncoaxial intersecting passages, conical countersinks and general pockets remain
+future work.

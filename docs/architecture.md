@@ -190,13 +190,14 @@ introduce process or network boundaries where isolation, parallel execution, or
 artifact distribution justifies them. No kernel dependency on a browser, GPU,
 window system, network, or language-model provider is permitted.
 
-### Three distinct graphs
+### Four distinct graphs
 
 | Graph | Nodes and edges | Responsibility |
 | --- | --- | --- |
 | Feature/build DAG | Typed operations, inputs, source spans, assertions | Incremental deterministic evaluation and failure provenance |
 | Topology and lineage | Vertices, oriented edge uses, loops, faces, shells, solids; generated/modified/split/merged/deleted relations | Solid correctness and persistent semantic references |
 | Assembly instance graph | Part definitions, nested instances, rigid transforms, joints, configurations | Reuse, placement, BOM, motion, and selective loading |
+| Derived display hierarchy | Shared part clusters, assembly proxies, refinement dependencies and page references | View-dependent coverage, streaming and bounded display residency; never authoritative geometry |
 
 The geometric topology is not necessarily a DAG: boundary loops and incidence
 are inherently cyclic. Constraints also form graphs with loops. An assembly is
@@ -205,6 +206,15 @@ instances; the modular rack reuses nested rows and carriages. Older examples can
 still use disjoint unions. Named part frames and deterministic part/rigid-module datum
 attachments are implemented; joints and nonlinear assembly constraint solving remain
 target work.
+
+Graph boundaries also define invalidation. A camera move changes display demand
+only. An occurrence placement edit updates assembly bounds and dependent queries,
+while reusing unchanged part geometry and display pages. A source dimension edit
+invalidates affected feature descendants, their topology witnesses, and derived
+assets. A meshing-policy change rebuilds display assets without changing design
+identity or native engineering results. Include these four cases in integration
+acceptance; caching must preserve the distinction even when all graphs live in
+one process.
 
 ## Authoring and AI-native execution
 
@@ -775,8 +785,8 @@ axis. Blind depth and remaining material must exceed the tolerance plus reserved
 arithmetic uncertainty. Full circular supports are checked against stock and
 terminating tool planes; tolerance is not a snapping policy. Circular projections
 must remain separated, including opposite-side pockets. This intentionally
-excludes coaxial counterbores, intersecting passages, enclosed cavities and
-arbitrary pocket profiles. The existing 32 combined profile-hole bound applies.
+excludes noncoaxial intersecting passages, enclosed cavities and arbitrary pocket
+profiles. Coaxial counterbores use the separate boundary family below. The existing 32 combined profile-hole bound applies.
 
 `blind_bore_pallet.star` exercises twelve consecutive machining features, both
 opening directions, retained floor references and a nested 26-occurrence assembly.
@@ -787,6 +797,48 @@ while independent STEP/STL and browser checks cover exports, floor visibility an
 native face selection. A required floor changed into a through-hole fails its
 engineering obligation before publication. General interacting material removal
 and manufacturing release gates remain unfinished.
+
+### Coaxial stepped drilling and counterbores
+
+A stepped-bore family represents each hole group as contiguous axial cylindrical
+sections. A new aligned cylinder updates the maximum removed radius over its
+axial interval, merges equal neighboring sections, and rejects unresolved radial
+steps or axial gaps. These disjoint sections integrate the union of cuts exactly;
+subtracting each complete tool volume would incorrectly count overlaps twice.
+Both through-then-counterbore and blind-then-through orderings are supported,
+along with counterbores from opposite caps and repeated radial steps.
+
+Native reconstruction retains the base prism and replaces the hole boundary with
+cylindrical walls and planar disk/annular shoulders. Recognition reconstructs and
+compares canonical boundary topology, certifies support planes and clearances,
+and derives properties without trusting construction metadata. A maximum-radius
+through-hole surrogate certifies separation between hole groups and outer profile
+boundaries. Display triangulation uses shared rings across walls, shoulders and
+caps. The display representation never decides the Boolean result.
+
+Stock face identity survives. Rebuilt hole faces use explicit geometric overlap
+lineage: retained cylindrical support and axial interval, or retained coplanar
+annular area with matching orientation. A wall can shorten or disappear;
+a shoulder can change its inner radius or be deleted. Numeric entity indices are
+not persistent design references. `bore_floor` identifies terminating tool planes;
+`bore_shoulder` distinguishes annular termination. Planar datum queries use the
+actual annular centroid and normal, enabling source-driven hardware attachment.
+
+The bounded domain permits up to 32 separated hole groups and 128 total axial
+sections. Cylindrical tools must open a stock cap; enclosed intervals, redundant
+cutters wholly inside existing voids, noncoaxial intersection, uncertain coaxiality,
+outer-profile contact and conical countersinks
+remain unsupported. Classification uses a separate arithmetic envelope and never
+snaps a dimensional offset into coaxial alignment.
+
+`counterbored_fixture.star` integrates eighteen machining features and twelve
+semantic shoulder datums into mirrored plates and a 32-occurrence fastening
+stack. Independent 27-case signed-slice moments, material tensors and attachment
+positions cover edits; STEP/STL oracles and browser selection cover downstream
+consumers. A removed required shoulder or unsupported intersection rejects the
+revision without replacing the prior published generation. This advances
+fastening workflows while leaving general interacting cuts and manufacturing
+release gates unfinished.
 
 ## Constraints and assemblies
 
@@ -1524,6 +1576,15 @@ configuration-aware quantities. Drawings and annotations have stable design
 references and testable revision behavior, not screenshot-only geometry. Manufacturing datum systems and tolerance semantics
 are distinct from the rigid attachment frames currently named `datums`.
 
+For a declared frame/fabrication workflow, add configuration-aware cut lists as
+derived manufacturing artifacts: stock profile, material, finished length, end
+treatments, quantity and source occurrence/revision. Group only manufacturing-
+equivalent members; equal display meshes alone do not establish equivalence.
+Source must declare stock allowances and process assumptions. Acceptance varies
+member length, material and suppression, then checks regrouping and quantities
+against the revised assembly. This is planned scope; the current BOM does not
+constitute a fabrication cut list or a stock-nesting optimizer.
+
 Evolve today's planar STEP/STL export toward analytic STEP import/export and
 assembly/PMI-capable AP242 subsets, with a published support matrix and round-trip
 loss reports. Add useful manufacturing and display formats through adapters;
@@ -1806,7 +1867,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores and coaxial counterbores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
