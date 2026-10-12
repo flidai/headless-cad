@@ -1586,6 +1586,16 @@ claims of symbolic precision. Independent box/prism formulas, mixed-material
 balance-arm fixtures and optional OCCT centroid/tensor comparisons verify them.
 Principal axes, uncertainty propagation and dynamics remain future work.
 
+The first exchange-fidelity producer now emits a per-output `.exchange.json`
+sidecar for full STEP/STL publications. Its versioned declarations distinguish
+preserved, approximate, omitted and inapplicable aspects, with source counts
+where the native body/assembly exposes them and unknown presence otherwise.
+Source output, recipe/context and export-byte digests bind the declaration to
+one generation; artifact verification also covers the report. Display-only
+publication emits no report for absent exchange files. This establishes the
+reporting boundary, not a manufacturing release gate: independent round-trip
+semantic checks, required-field policy enforcement and PMI remain unfinished.
+
 Introduce a versioned drawing/annotation IR containing view definitions,
 projection/section intent, semantic references, dimensions, tolerance standards,
 units and revision identity. Rendering consumes that IR; it does not infer

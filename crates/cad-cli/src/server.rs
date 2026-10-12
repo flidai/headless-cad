@@ -420,6 +420,7 @@ fn gallery(directory: &Dir) -> String {
         for (suffix, label) in [
             ("stream.json", "Stream metadata"),
             ("step", "STEP"),
+            ("exchange.json", "Exchange fidelity"),
             ("stl", "STL"),
             ("brep.json", "B-rep JSON"),
             ("assembly.json", "Assembly JSON"),
@@ -580,13 +581,21 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let nested = dir.path().join("nested");
         std::fs::create_dir(&nested).unwrap();
-        for suffix in ["preview.html", "preview.svg", "step", "stl", "brep.json"] {
+        for suffix in [
+            "preview.html",
+            "preview.svg",
+            "step",
+            "stl",
+            "brep.json",
+            "exchange.json",
+        ] {
             std::fs::write(nested.join(format!("part & test.{suffix}")), "artifact").unwrap();
         }
         let response = request(dir.path(), b"GET / HTTP/1.1\r\n\r\n");
         assert!(response.contains("nested/part &amp; test"));
         assert!(response.contains("/nested/part%20%26%20test.preview.html"));
         assert!(response.contains("/nested/part%20%26%20test.step"));
+        assert!(response.contains("/nested/part%20%26%20test.exchange.json"));
         assert!(response.contains("loading=\"lazy\""));
         assert!(response.contains("Recipes are the source of truth"));
     }

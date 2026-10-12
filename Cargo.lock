@@ -316,6 +316,7 @@ dependencies = [
  "cad-assembly",
  "cad-kernel",
  "cad-mesh",
+ "serde",
  "thiserror",
 ]
 

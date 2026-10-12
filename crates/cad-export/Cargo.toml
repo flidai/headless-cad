@@ -9,3 +9,4 @@ cad-mesh = { path = "../cad-mesh" }
 cad-assembly = { path = "../cad-assembly" }
 cad-kernel = { path = "../cad-kernel" }
 thiserror.workspace = true
+serde.workspace = true

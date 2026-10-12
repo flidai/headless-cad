@@ -758,6 +758,22 @@ directories or directories containing exclusively artifacts listed in their CAD
 manifest may be replaced. Unmanaged files are preserved by refusing replacement.
 Output names must be safe, noncolliding filenames.
 
+### Inspect exchange fidelity
+
+Full builds publish `<output>.exchange.json` beside each STEP/STL pair. The
+report distinguishes supported, approximate, omitted and inapplicable semantics
+for the current exporters. It binds the source output, captured recipe/context,
+and the exact export bytes with BLAKE3 digests. It is included in the generation's
+integrity inventory and the output's available files; display-only builds omit it.
+
+Read this report before treating an export as an engineering handoff. STEP and
+STL do not carry the same units, assembly structure or source intent. A native
+attachment datum is not manufacturing GD&T, and a modeling uncertainty value is
+not a dimensional tolerance. Unknown source provenance is reported explicitly.
+These are exporter declarations with source inspection, not an independent
+round-trip certificate. Required-field release policies and manufacturing PMI
+remain future work; `cad verify` checks bytes, not engineering completeness.
+
 ### Verify a published generation
 
 ```sh

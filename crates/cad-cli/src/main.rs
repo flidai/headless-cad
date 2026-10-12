@@ -9,6 +9,7 @@ use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 
 mod capabilities;
+mod exchange;
 mod integrity;
 mod server;
 mod watch;
@@ -1147,6 +1148,17 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     cad_export::to_stl_with_cache(model, tolerance, &mut mesh_cache)?,
                 ));
                 artifacts.push((
+                    format!("{name}.exchange.json"),
+                    exchange::report(
+                        name,
+                        &output.content_hash,
+                        &summary,
+                        &artifacts,
+                        cad_export::ExchangeSource::Body(model),
+                        tolerance,
+                    )?,
+                ));
+                artifacts.push((
                     format!("{name}.preview.svg"),
                     cad_preview::to_svg_with_cache(
                         model,
@@ -1265,6 +1277,17 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                         assembly,
                         recipe.tolerance.unwrap_or_default(),
                         &mut mesh_cache,
+                    )?,
+                ));
+                artifacts.push((
+                    format!("{name}.exchange.json"),
+                    exchange::report(
+                        name,
+                        &assembly.content_hash,
+                        &summary,
+                        &artifacts,
+                        cad_export::ExchangeSource::Assembly(assembly),
+                        recipe.tolerance.unwrap_or_default(),
                     )?,
                 ));
                 artifacts.push((
