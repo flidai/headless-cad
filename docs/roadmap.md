@@ -54,6 +54,16 @@ contain their transformed native coordinates.
 
 ## Next concrete implementation increments
 
+For scalable inspection, follow the architecture's
+[staged display gates](architecture.md#target-display-hierarchy-contract):
+M3a bounded-error part LOD, M3b paged assembly metadata, M3c cluster streaming,
+then M3d measured visibility acceleration. Each stage includes selection/source
+identity, degraded-detail behavior and bounded resources. WebGPU or meshlets
+alone do not close M3. In parallel, measure exact-body residency during a
+one-part edit and full release generation so viewer progress does not conceal
+headless build costs. Keep M2 geometry reliability, M4 constraints and M6
+manufacturing acceptance independent of display performance.
+
 Engineering property gates now enforce native volume, mass, centroid and central
 inertia bounds before publication, including selected-output builds.
 `mounted_drive_module.star` carries fixed mass and balance requirements; its

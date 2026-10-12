@@ -1,7 +1,7 @@
 # Target architecture: commercial-scale, AI-native headless CAD
 
 Status: target design, with an implementation baseline and release gates below.
-Updated: 2026-10-11. The project goal is active.
+Updated: 2026-10-12. The project goal is active.
 
 ## Product goal
 
@@ -30,6 +30,27 @@ modeling and automation must work offline without proprietary kernel licenses,
 paid AI services, or a vendor-hosted account.
 
 ## Architectural commitments
+
+### Decisions adopted from the feature brief
+
+The product target is an engineering team releasing a revised mechanical design
+from Git, with an inspectable chain from source intent to manufacturing evidence.
+The following decisions govern implementation priorities, not just the viewer:
+
+| Priority | Decision | Completion evidence |
+| --- | --- | --- |
+| Reliable engineering edits | Develop robust geometry, semantic references and incremental regeneration together | A changed bearing size survives the supported feature history or reports a precise unsupported/ambiguous obligation; no silently repaired dimensions |
+| Large designs on bounded hardware | Independently schedule and budget exact bodies, assembly metadata, display assets and query results | Measure cold opening, one-part revision and release generation separately; count loaded bodies and peak memory, not only frames per second |
+| Progressive GPU inspection | Build part LODs and paged metadata before a cluster-streaming backend; keep rendering replaceable | The staged M3 gates below pass with retained occurrence/source identity and explicit unresolved detail |
+| Mechanical design intent | Solve sketches and rigid-frame mechanisms through headless services | Report residuals, degrees of freedom, conflicts and branch changes; geometry is requested separately for interference checks |
+| Manufacturing and collaboration | Release drawings, BOM, validation and open exchange against one immutable revision | A revised release pack is reproducible offline and traceable to reviewed source and configuration |
+
+Treat software architecture and hardware capacity as coupled constraints. Lazy
+loading cannot eliminate the cost of building a new unique part, solving a hard
+constraint system or exporting an entire detailed assembly. Profile those jobs
+independently; faster display must not conceal an unbounded headless build.
+
+### Invariants
 
 1. **Code and recipes are authoritative.** Git stores source, parameters,
    dependency locks, design assertions, drawings' intent, and assembly intent.
@@ -98,6 +119,14 @@ known exclusions, test command, independent expected result, artifact revision,
 and measured performance where applicable. Each entry is planned, experimental,
 or validated for a stated release; passing one entry does not imply platform
 parity or completion of the project goal.
+
+The target evidence ledger is a versioned, machine-readable release input.
+Each capability record must include its ID, status, supported domain, exclusions,
+fixture, executable check, independent oracle, source/build revision and result
+artifact digest. Performance records additionally pin hardware and workload.
+CI must reject a transition to validated when required evidence is missing or
+belongs to another revision. This ledger is planned; prose milestones and test
+counts are not a substitute for implementing it.
 
 ## System decomposition
 
@@ -467,6 +496,14 @@ extends the corpus with chamfers, countersinks and a parameterized long taper.
 
 ## Constraints and assemblies
 
+Stage solver acceptance separately from today's attachment DAG: first a grounded
+four-bar closed loop, then coupled mechanisms, then flexible occurrences. The
+four-bar fixture must verify degrees of freedom, residual limits, contradictory
+constraints, singular positions and solution-branch continuity under parameter
+edits. Ordinary frame/joint solving must load zero exact bodies; collision checks
+are separately scoped queries. A fast successful pose alone does not pass this
+gate.
+
 The current M1 attachment increment resolves explicit named part frames without
 solving nonlinear constraints. Part definitions retain a map of local rigid
 `datums`; an attached leaf instance retains its target occurrence, optional
@@ -645,6 +682,25 @@ cluster can represent several faces: coarse picking returns an instance/region
 candidate and refines before claiming a particular semantic face.
 
 ### Target display hierarchy contract
+
+Implement this contract in independently reviewable stages, retaining the current
+portable and WebGL2 inspection paths until a replacement passes their identity
+and failure tests. Each stage requires an end-to-end fixture, not just an asset
+encoder or a successful screenshot:
+
+| Stage | Deliverable | Gate before proceeding |
+| --- | --- | --- |
+| M3a: part LOD | Shared coarse/fine meshes with conservative accumulated error and semantic mapping | Curved and thin-feature fixtures meet a declared 1-pixel target along a fixed camera trace, or visibly report unmet detail; picking and captured source remain generation-correct |
+| M3b: metadata paging | Paged occurrence/spatial hierarchy with bounded decoding and assembly proxies | First meaningful coverage does not expand all occurrences; a 100k-occurrence fixture stays within declared metadata and request budgets during rapid camera reversals |
+| M3c: cluster streaming | Shared part cluster hierarchies, crack-safe replacement and budgeted page residency | Partial/corrupt/out-of-order children preserve parent coverage; measured error and ownership survive refinement and eviction |
+| M3d: accelerated visibility | Conservative occlusion and optional GPU traversal | Compare visibility against an unculled reference across disocclusion, sections and selected objects; retain the path only with measured gains on supported hardware |
+
+The 1-pixel target is a proposed test configuration, not a claim about current
+rendering. Pin viewport, projection, trace, geometry and error metric; record
+achieved error and time to requested detail alongside frame times. Coarse
+coverage cannot count as detail completion. Establish detail-latency thresholds
+from the declared storage/network profile before accepting the stage. Cluster
+size and mesh-shader support are implementation choices, not product promises.
 
 The planned hierarchy is a derived, independently versioned artifact. It must
 not become the design database or introduce a dependency from the kernel to a
@@ -1081,6 +1137,12 @@ Epic documents hierarchical triangle clusters, view-dependent detail and demand
 streaming, while explicitly retaining practical content/hardware limits. These
 are useful display-design principles. We are not adopting Unreal/Nanite code or
 claiming that mesh virtualization provides an exact CAD kernel. [Epic Nanite overview](https://dev.epicgames.com/documentation/en-us/unreal-engine/nanite-virtualized-geometry-in-unreal-engine).
+
+Meshoptimizer supplies clustering and simplification building blocks, and its
+upstream documents a companion clustered-LOD library. Evaluate these behind the
+display-worker interface; adopting a clusterizer alone does not implement our
+streaming scheduler, CAD semantic mapping or conservative error contract.
+[Meshoptimizer documentation](https://meshoptimizer.org/).
 
 OCCT itself provides shape analysis, repair, tolerance handling, and status
 reporting. A blanket assumption that it lacks healing is incorrect; robustness
