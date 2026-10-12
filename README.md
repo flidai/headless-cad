@@ -2200,6 +2200,43 @@ requirements. These are manufacturing instructions, not measurements of produced
 parts, named fit classes, tolerance-stack analysis or GD&T. STEP currently carries
 geometry; these annotations remain in the revision-bound JSON/SVG deliverables.
 
+### Worst-case dimensional stacks
+
+Check a source-declared linear relationship between toleranced native dimensions:
+
+```python
+tolerance_stack(id = "diametral_clearance", terms = [
+    {"view":"pilot_limits", "dimension":"bore_size", "coefficient":1},
+    {"view":"pilot_limits", "dimension":"pin_size", "coefficient":-1},
+], min = 0.39, max = 0.45)
+```
+
+`bearing_clearance.star` extends the bore/pin drawing with this requirement.
+Each term references a dimension with an authored tolerance. Signed coefficients
+combine independent intervals; bounds may be negative for interference or other
+signed size relationships. At least one of `min` and `max` is required. Limits
+are 64 stacks, 32 terms per stack and 1024 terms total; duplicate references are
+rejected and coefficient magnitude cannot exceed one million.
+
+Every arithmetic step rounds outward over the represented binary64 source
+values. The complete resulting interval must satisfy the requirement, without
+kernel-tolerance slack. A boundary that cannot be established conservatively
+fails. Nominal is an approximate descriptive sum; acceptance uses the outward
+interval. The default example produces approximately 0.40–0.44 mm diametral
+size clearance. Increasing allowances can fail even though the nominal model
+and its rendered geometry are unchanged.
+
+```sh
+cad build examples/bearing_clearance.star --out-dir out/bearing_clearance
+```
+
+Open `tolerance-stacks.html` for a read-only report, also linked from the gallery.
+`tolerance-stacks.json` binds stack results to captured source and section-report
+digests. These checks are global during selected builds and cache hits; failures
+preserve the previous published generation. Captured bundles replay the check.
+The recipe owns the dimensional relationship: this does not establish alignment,
+collision clearance, statistical/RSS behavior, named fits or GD&T.
+
 ### Native planar edge chamfers
 
 ```python

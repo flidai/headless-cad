@@ -479,6 +479,20 @@ fn gallery(directory: &Dir) -> String {
                 ));
             }
         }
+        let stack_report = if folder.is_empty() {
+            "tolerance-stacks.html".to_owned()
+        } else {
+            format!("{folder}/tolerance-stacks.html")
+        };
+        if directory
+            .metadata(&stack_report)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!(
+                "<a href=\"{}\">Dimensional stacks</a>",
+                url(&stack_report)
+            ));
+        }
         output.push_str("</nav>");
         if let Some(views) = sections.get(folder) {
             output.push_str(

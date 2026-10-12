@@ -235,6 +235,46 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "Exactly1 semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "only one complete native circular section on the selected face; consistent center/radius/orientation, continuous full turn; no lines, partial arcs, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
+    let mut stack_term = object_spec(
+        "tolerance_stack_term",
+        vec![
+            arg(
+                "view",
+                T::Reference {
+                    target: "section_view",
+                },
+            ),
+            arg("dimension", T::String),
+            arg("coefficient", T::Number),
+        ],
+    );
+    stack_term.obligations.extend(["exact view/dimension IDs referencing a native linear/radius/diameter dimension with authored tolerance; no duplicate pair in a stack", "finite nonzero coefficient with absolute value <= 1000000; signed coefficient reverses bounds when negative"]);
+    let mut stack = object_spec(
+        "tolerance_stack",
+        vec![
+            arg("id", T::String),
+            arg("terms", array(object("tolerance_stack_term"), None)),
+            optional(
+                arg(
+                    "min",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+            optional(
+                arg(
+                    "max",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+        ],
+    );
+    stack.obligations.extend(["schema-2 recipe.tolerance_stacks; Starlark tolerance_stack(id,terms,min=None,max=None); strict objects and unknown-field rejection", "case-insensitive unique ASCII identifiers of length 1..128; 64 stacks, 1..32 terms each and 1024 terms total", "at least one finite required bound; signed min/max permitted and min<=max", "independent bounded interval arithmetic: recompute nominal plus signed deviations with outward rounding, outward multiply and accumulate; never reuse rounded absolute report limits as exact inputs", "all resulting bounds must fit required envelope without modeling-tolerance slack; overflow/nonfinite intermediates fail explicitly; global obligation on cache hits and selected builds", "source owns relationships; not root-sum-square statistics, correlation inference, GD&T, fit classes or geometric collision certification", "reports contain declaration, passed status, nominal_mm, lower_limit_mm, upper_limit_mm and native source/tolerance witnesses for every term"]);
     let mut dimensional_tolerance = object_spec(
         "dimension_tolerance",
         vec![
@@ -347,6 +387,8 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         sheet,
         viewport,
         dimensional_tolerance,
+        stack,
+        stack_term,
         cardinality,
         selector,
         assertion,

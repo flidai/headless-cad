@@ -47,6 +47,7 @@ struct GraphStore {
     exchange_requirements: RefCell<Vec<serde_json::Value>>,
     section_views: RefCell<Vec<serde_json::Value>>,
     drawing_sheets: RefCell<Vec<serde_json::Value>>,
+    tolerance_stacks: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     mechanisms: RefCell<Vec<serde_json::Value>>,
     motion_studies: RefCell<Vec<serde_json::Value>>,
@@ -630,6 +631,45 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "too many mechanism bindings"
         );
         bindings.push(serde_json::json!({"assembly":assembly,"instance":instance,"mechanism":mechanism,"link":link}));
+        Ok(NoneType)
+    }
+
+    /// Declare a source-owned independent worst-case linear dimensional stack.
+    fn tolerance_stack(
+        id: &str,
+        terms: Value,
+        min: Option<Value>,
+        max: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let stack = cad_build::ToleranceStack {
+            id: id.into(),
+            terms: serde_json::from_str(&terms.to_json()?)?,
+            min: min.filter(|v| !v.is_none()).map(number).transpose()?,
+            max: max.filter(|v| !v.is_none()).map(number).transpose()?,
+        };
+        stack.validate()?;
+        let graph = store(eval)?;
+        let mut stacks = graph.tolerance_stacks.borrow_mut();
+        anyhow::ensure!(
+            stacks.len() < cad_build::MAX_TOLERANCE_STACKS,
+            "too many tolerance stacks"
+        );
+        anyhow::ensure!(
+            !stacks.iter().any(|s| s["id"]
+                .as_str()
+                .is_some_and(|old| old.eq_ignore_ascii_case(id))),
+            "duplicate tolerance stack ID"
+        );
+        let count: usize = stacks
+            .iter()
+            .map(|s| s["terms"].as_array().map_or(0, Vec::len))
+            .sum();
+        anyhow::ensure!(
+            count + stack.terms.len() <= cad_build::MAX_TOLERANCE_STACK_TERMS_TOTAL,
+            "too many tolerance stack terms"
+        );
+        stacks.push(serde_json::to_value(stack)?);
         Ok(NoneType)
     }
 
@@ -1402,6 +1442,7 @@ pub fn from_starlark_with_modules(
     let exchange_requirements = graph.exchange_requirements.into_inner();
     let section_views = graph.section_views.into_inner();
     let drawing_sheets = graph.drawing_sheets.into_inner();
+    let tolerance_stacks = graph.tolerance_stacks.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let mechanisms = graph.mechanisms.into_inner();
     let motion_studies = graph.motion_studies.into_inner();
@@ -1409,7 +1450,7 @@ pub fn from_starlark_with_modules(
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() { 2 } else { 1 },
+        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -1427,6 +1468,9 @@ pub fn from_starlark_with_modules(
     }
     if !mechanism_bindings.is_empty() {
         value["mechanism_bindings"] = serde_json::json!(mechanism_bindings);
+    }
+    if !tolerance_stacks.is_empty() {
+        value["tolerance_stacks"] = serde_json::json!(tolerance_stacks);
     }
     if !drawing_sheets.is_empty() {
         value["drawing_sheets"] = serde_json::json!(drawing_sheets);

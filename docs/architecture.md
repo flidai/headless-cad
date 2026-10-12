@@ -2008,6 +2008,23 @@ bundles reproduce the annotations. This declares required sizes; it does not
 establish manufactured-part conformance, fit classes, stack analysis, GD&T or
 STEP PMI. Those remain distinct release requirements.
 
+Source-authored `tolerance_stack` declarations add worst-case linear requirements
+over toleranced native dimensions. Each term names a section view, dimension and
+signed coefficient; duplicate references are rejected. Independent input intervals
+are reconstructed from nominal and signed deviations, outward-rounded through
+addition, signed multiplication and accumulation, then compared to finite source
+bounds without numerical slack. Overflow fails explicitly. Nominal sums are
+approximate descriptive values and do not decide acceptance. Schema-2 preflight
+bounds work to 64 stacks, 32 terms each and 1024 terms total; coefficient magnitude
+is at most 1e6. All stacks evaluate after native sections on cache hits and selected
+builds. Reports retain each native value, tolerance witness and interval contribution.
+Publication binds the results to source context and section-report digests in JSON
+and a static inspection page. `bearing_clearance.star` extends the drawing fixture
+with a bore-minus-pin size requirement. Independent rational arithmetic checks
+must enclose exact represented source intervals and preserve generations on failure.
+This advances worst-case size analysis; correlations, statistical stacks, geometric
+alignment/interference, fit classes and GD&T remain separate requirements.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in

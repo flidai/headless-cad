@@ -15,6 +15,7 @@ mod exchange;
 mod integrity;
 mod section;
 mod server;
+mod tolerance_stacks;
 mod watch;
 
 #[derive(Debug)]
@@ -243,6 +244,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "property_assertions": build.property_assertions,
         "section_views": build.section_views,
         "drawing_sheets": build.drawing_sheets,
+        "tolerance_stacks": build.tolerance_stacks,
         "exchange_requirements": exchange::pending(&recipe.exchange_requirements),
         "exchange_policy_status": if recipe.exchange_requirements.is_empty() { "not_requested" } else { "pending_publication" },
         "sketch_reports": build.sketch_reports,
@@ -600,7 +602,7 @@ fn difference(before: &Value, after: &Value) -> Value {
         "before_bindings": before["mechanism_bindings"], "after_bindings": after["mechanism_bindings"],
         "before_context_hash": before["mechanism_context_hash"], "after_context_hash": after["mechanism_context_hash"],
     });
-    json!({"outputs":changes,"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -1606,6 +1608,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             artifacts.push((svg_file, svg_text));
         }
         drawing::publish(&build, &mut summary, &mut artifacts)?;
+        tolerance_stacks::publish(&build, &summary, &mut artifacts)?;
         summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
         let mut artifact_names = BTreeSet::new();
         for (name, _) in &artifacts {
@@ -1759,6 +1762,23 @@ fn main() {
                         report["output_name"] = json!(output);
                         report["diagnostic"] = json!(message);
                         report["actual_value_mm"] = json!(actual_value);
+                    }
+                    cad_build::BuildError::InvalidToleranceStack { id, message } => {
+                        report["code"] = json!("invalid_tolerance_stack");
+                        report["stack_id"] = json!(id);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::ToleranceStackFailed {
+                        id,
+                        message,
+                        lower_limit_mm,
+                        upper_limit_mm,
+                    } => {
+                        report["code"] = json!("tolerance_stack_failed");
+                        report["stack_id"] = json!(id);
+                        report["diagnostic"] = json!(message);
+                        report["lower_limit_mm"] = json!(lower_limit_mm);
+                        report["upper_limit_mm"] = json!(upper_limit_mm);
                     }
                     cad_build::BuildError::InvalidPropertyAssertion { id, .. } => {
                         report["code"] = json!("invalid_property_assertion");

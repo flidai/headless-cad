@@ -81,6 +81,13 @@ exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
 
+M6 now also includes bounded worst-case linear dimensional stacks, referencing
+native tolerance witnesses and enforcing the complete outward-rounded interval.
+`bearing_clearance.star` adds a size-clearance requirement and read-only report to
+the drawing workflow. Independent exact-rational comparisons, cache reuse, offline
+replay and failed-generation preservation cover this increment. General spatial
+clearance, statistical/correlated stacks, fit classes and GD&T remain open.
+
 M6 dimensional tolerances now attach explicit nominal and signed deviations to
 native linear/circular dimensions. `bearing_limits.star` adds bore, pin and pitch
 requirements to a source-owned A4 sheet. Nominal/native agreement remains a

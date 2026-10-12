@@ -28,6 +28,11 @@ pub fn solver_build_id() -> &'static str {
 
 mod assembly;
 mod demand;
+mod tolerance_stacks;
+pub use tolerance_stacks::{
+    ToleranceStack, ToleranceStackReport, ToleranceStackTerm, ToleranceStackTermReport,
+    MAX_TOLERANCE_STACKS, MAX_TOLERANCE_STACK_TERMS, MAX_TOLERANCE_STACK_TERMS_TOTAL,
+};
 mod dimension_tolerance;
 pub use dimension_tolerance::{DimensionTolerance, DimensionToleranceReport};
 mod drawing_sheets;
@@ -104,6 +109,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("section_views.rs").as_slice(),
             include_bytes!("drawing_sheets.rs").as_slice(),
             include_bytes!("dimension_tolerance.rs").as_slice(),
+            include_bytes!("tolerance_stacks.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -154,6 +160,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub drawing_sheets: Vec<DrawingSheet>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub tolerance_stacks: Vec<ToleranceStack>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanisms: Vec<MechanismDefinition>,
@@ -199,6 +207,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             drawing_sheets: Option<Vec<DrawingSheet>>,
             #[serde(default, deserialize_with = "present_vec")]
+            tolerance_stacks: Option<Vec<ToleranceStack>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             mechanisms: Option<Vec<MechanismDefinition>>,
@@ -217,6 +227,11 @@ impl<'de> Deserialize<'de> for Recipe {
         {
             return Err(serde::de::Error::custom(
                 "mechanisms require schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.tolerance_stacks.is_some() {
+            return Err(serde::de::Error::custom(
+                "tolerance stacks require schema version 2",
             ));
         }
         if raw.schema_version == 1 && raw.drawing_sheets.is_some() {
@@ -270,6 +285,7 @@ impl<'de> Deserialize<'de> for Recipe {
             exchange_requirements: raw.exchange_requirements.unwrap_or_default(),
             section_views: raw.section_views.unwrap_or_default(),
             drawing_sheets: raw.drawing_sheets.unwrap_or_default(),
+            tolerance_stacks: raw.tolerance_stacks.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
             mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
@@ -854,6 +870,7 @@ pub struct BuildResult {
     pub pending_exchange_requirements: Vec<ExchangeRequirement>,
     pub section_views: BTreeMap<String, SectionViewReport>,
     pub drawing_sheets: BTreeMap<String, DrawingSheetReport>,
+    pub tolerance_stacks: BTreeMap<String, ToleranceStackReport>,
     pub face_datums: ResolvedFaceDatums,
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
     pub mechanism_bindings: Vec<MechanismBindingReport>,
@@ -888,6 +905,15 @@ pub enum BuildError {
     SectionViewSchema,
     #[error("drawing sheets require recipe schema version 2")]
     DrawingSheetSchema,
+    #[error("invalid tolerance stack '{id}': {message}")]
+    InvalidToleranceStack { id: String, message: String },
+    #[error("tolerance stack '{id}' failed: {message}; interval [{lower_limit_mm:?}, {upper_limit_mm:?}]")]
+    ToleranceStackFailed {
+        id: String,
+        message: String,
+        lower_limit_mm: Option<f64>,
+        upper_limit_mm: Option<f64>,
+    },
     #[error("invalid drawing sheet '{id}': {message}")]
     InvalidDrawingSheet { id: String, message: String },
     #[error("invalid section view '{id}': {message}")]
@@ -1417,6 +1443,7 @@ impl BuildEngine {
         exchange_requirements::preflight(recipe)?;
         section_views::preflight(recipe)?;
         drawing_sheets::preflight(recipe)?;
+        tolerance_stacks::preflight(recipe)?;
         face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
@@ -1912,6 +1939,7 @@ impl BuildEngine {
             pending_exchange_requirements: recipe.exchange_requirements.clone(),
             section_views: BTreeMap::new(),
             drawing_sheets: BTreeMap::new(),
+            tolerance_stacks: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             motion_studies: mechanism_evaluation.motion_studies,
             mechanism_reports: mechanism_evaluation.reports,
@@ -1980,6 +2008,7 @@ impl BuildEngine {
             tolerance,
             &mut assertion_work_remaining,
         )?;
+        result.tolerance_stacks = tolerance_stacks::evaluate(recipe, &result.section_views)?;
         result.drawing_sheets = drawing_sheets::evaluate(recipe, &result.section_views)?;
         result.assemblies = assertion_assemblies
             .into_iter()
