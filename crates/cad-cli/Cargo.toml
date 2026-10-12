@@ -23,6 +23,10 @@ blake3.workspace = true
 clap = { version = "4", features = ["derive"] }
 tempfile = "3"
 cap-std = "4"
+rmcp = { version = "3.5.1", default-features = false, features = ["server", "transport-io"] }
+tokio = { version = "1", features = ["rt-multi-thread", "io-std", "io-util", "sync", "time", "macros"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = { version = "0.3", features = ["sink"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "1", features = ["fs"] }

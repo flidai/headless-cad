@@ -715,3 +715,18 @@ updates with transitive discovery and change reporting. Lock generation does not
 execute a design; native validation remains a separate build obligation. Package
 publication also retains the previous complete archive until a new archive has
 been staged and checked, with forced-failure and concurrent-reader regressions.
+
+
+### Local agent candidate workflow
+
+An experimental Linux stdio MCP adapter now connects capability discovery, confined
+source capture, root-source proposals, isolated compile/inspect/build workers, and
+manifest-bound artifact inspection. Recipes remain authoritative and the viewer
+remains read-only. Native failures can be returned to a client for repair without
+mutating source or accepted results. The protocol acceptance fixture exercises
+propose → native rejection → repair → build → verify → offline replay.
+
+This is session-local candidate execution, not completion of M7/R5. Durable job
+storage, hard OS memory/disk admission, module proposals, expected-base publication,
+remote authentication, idempotent delivery, and measured autonomous engineering
+success remain open. All five commercial product gates remain open.

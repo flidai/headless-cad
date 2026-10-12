@@ -26,6 +26,10 @@ crates are omitted from the table.
 | cap-std | 4.0.3 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli |
 | clap | 4.6.7 | MIT OR Apache-2.0 | cad-cli |
 | earcutr | 0.5.0 | ISC | cad-kernel; derived face triangulation |
+| futures-util | 0.3.34 | MIT OR Apache-2.0 | cad-cli; MCP transport |
+| rmcp | 3.5.1 | Apache-2.0 | cad-cli; official Rust MCP SDK |
+| tokio | 1.53.2 | MIT | cad-cli; local agent runtime |
+| tokio-util | 0.7.20 | MIT | cad-cli; bounded protocol framing |
 | robust | 1.2.0 | MIT OR Apache-2.0 | cad-kernel; adaptive orientation checks |
 | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli, Linux target |
 | serde | 1.0.229 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-cli, cad-export, cad-kernel, cad-mesh, cad-preview, cad-sketch |
@@ -34,6 +38,13 @@ crates are omitted from the table.
 | starlark | 0.14.2 | Apache-2.0 | cad-recipe |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | cad-build, cad-cli |
 | thiserror | 2.0.21 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-export, cad-kernel, cad-mesh, cad-preview, cad-recipe, cad-sketch |
+
+The local MCP adapter uses the official Apache-2.0 `rmcp` SDK and the permissively
+licensed Tokio/futures runtime. The pinned SDK manifest declares Apache-2.0; its
+upstream license also preserves MIT licensing for contributions whose relicensing
+consent is pending. Both texts and the transition notice are retained. It enables stdio/server support only, without HTTP
+or authentication features. New resolved dependency license texts are collected in
+[the agent dependency notices](third-party-agent-dependencies.txt).
 
 Direct dependencies use permissive licenses. Most offer Apache-2.0; `earcutr`
 uses ISC. Its pinned package license was checked locally and is included in

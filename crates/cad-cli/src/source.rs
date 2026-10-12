@@ -1,4 +1,6 @@
 //! Immutable, offline recipe source snapshots and strict local module locks.
+#[path = "agent_source.rs"]
+pub(super) mod agent_source;
 use super::*;
 use serde::{Deserialize, Serialize};
 use std::io::Read;

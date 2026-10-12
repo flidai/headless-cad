@@ -2896,3 +2896,55 @@ streaming scheduler, CAD semantic mapping or conservative error contract.
 OCCT itself provides shape analysis, repair, tolerance handling, and status
 reporting. A blanket assumption that it lacks healing is incorrect; robustness
 comparisons require a reproducible corpus. [OCCT Shape Healing](https://occt3d.com/dev/doc/overview/html/occt_user_guides__shape_healing.html).
+
+
+## Local agent candidate jobs
+
+The experimental `cad mcp --workspace <root>` adapter uses the official
+[Apache-2.0 Rust MCP SDK](https://github.com/modelcontextprotocol/rust-sdk).
+Stdio is the only transport; it adds no modeling endpoints to the read-only viewer.
+Its authoritative input is an immutable source snapshot, not prompts or browser
+state. A snapshot ID hashes its exact serialized source bundle. Root revisions
+name an existing parent snapshot and preserve its locked modules. Multiple
+candidate branches may share a parent; there is no implicit latest revision.
+Candidate creation performs source/lock validation, compilation checks the typed
+recipe, and inspect/build invoke native geometry and all global obligations.
+
+Source capture opens a workspace directory capability once. On Linux it opens
+every path component relative to an existing directory handle, refuses symlinks,
+opens nonblocking, and checks the opened handle is a regular file before reading.
+Root, lock, and modules are then frozen in memory. Renaming a parent cannot switch
+the directory handle to an outside path. Existing lock digests and source limits
+still apply. Other platforms fail closed for capture until equivalent handling is
+implemented. Revisions change root source only; module edits must be made in the
+workspace and explicitly locked before a new capture.
+
+One active tool call is admitted. Each evaluation launches the fixed current CAD
+executable without a shell, inherited environment, caller output directory, or
+caller cache directory. It consumes a replay bundle in a private temporary job
+root. Builds reuse existing atomic publication and integrity verification before
+exposing their inventory. The manifest hash binds subsequent verification, and
+artifact reads check the captured inventory digest. Failure or cancellation cannot
+replace a previous candidate or an accepted user release. Job IDs are session
+handles, not cross-session authentication tokens. `cad_jobs` lists retained job
+identities after a lost response or a completion/cancellation race. Cancellation
+is best effort once completion has committed a candidate.
+
+Session limits: 32 snapshots, 64 MiB captured-source retention, 16 jobs, 128 MiB
+per-job disk guard, 256 MiB retained-job disk guard, 60 seconds for build plus
+verification, 768 KiB worker stdout and 128 KiB stderr, 64 KiB artifact/source reads,
+16 MiB incoming JSON-RPC frames, 1 MiB tool JSON results, and 4096 incoming frames.
+Malformed/oversized frames or repeated request IDs terminate the stdio session.
+Requests must use unique IDs of at most 256 serialized bytes. Unknown tool arguments are rejected. Busy requests
+return a retryable diagnostic instead of queuing another worker. Cancellation
+signals the worker, which is killed and reaped by the polling supervisor. These
+are bounded buffers and polling guards, not hard RSS/disk quotas or a malicious
+native-code sandbox. Session exit removes the temporary jobs; there is no durable
+storage service or resumable job handle yet.
+
+This adapter advances R5 but does not close it. It does not write workspace source,
+publish active releases, solve constraints from natural language, or certify all
+assembly collisions. Still required: durable isolated jobs, hard resource admission,
+expected-base serialized compare-and-swap publication, client delivery reconciliation,
+and measured end-to-end autonomous task success. A scripted protocol fixture proves
+the propose/fail/repair/replay interface, not autonomous reasoning by an AI model.

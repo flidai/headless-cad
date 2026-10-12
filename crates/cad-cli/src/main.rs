@@ -1,3 +1,5 @@
+mod agent_jobs;
+mod agent_mcp;
 mod source;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
@@ -71,6 +73,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Expose isolated candidate recipe jobs to local MCP clients over stdio.
+    Mcp {
+        /// The only directory from which source snapshots may be captured.
+        #[arg(long)]
+        workspace: PathBuf,
+    },
     /// Verify published artifact bytes without evaluating a recipe.
     Verify {
         directory: PathBuf,
@@ -905,6 +913,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         return Err("parameter overrides apply only to recipe commands".into());
     }
     match &cli.command {
+        Command::Mcp { .. } => return Err("MCP requires stdio entry point".into()),
         Command::Capabilities {
             operation,
             object_type,
@@ -1645,6 +1654,17 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
 
 fn main() {
     let cli = Cli::parse();
+    if let Command::Mcp { workspace } = &cli.command {
+        if !cli.params.is_empty() || cli.cache_dir.is_some() {
+            eprintln!("MCP accepts parameters per job and owns its private cache");
+            std::process::exit(2);
+        }
+        if let Err(error) = agent_mcp::serve(workspace) {
+            eprintln!("MCP: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let svg = matches!(&cli.command,Command::Section {format,..} if format=="svg");
     let section_input = if let Command::Section {
         output,

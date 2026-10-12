@@ -78,6 +78,46 @@ For an unpacked archive, use its included `./cad` executable instead. Native
 archives target their build platform and libc; source installation is the
 portable route across operating systems.
 
+## Local AI agent interface (experimental)
+
+On Linux, expose a fixed workspace to an MCP client over stdio:
+
+```sh
+cad mcp --workspace /absolute/path/to/your/cad-project
+```
+
+The client launches `cad` with arguments `["mcp", "--workspace", "/absolute/path/to/your/cad-project"]`.
+Use `cad_snapshot` to capture a relative recipe and its locked modules, `cad_revise`
+to propose new root source, and `cad_evaluate` to compile, inspect, or build that
+immutable candidate. Native failures remain structured tool results so the client
+can repair a proposal and try again. `cad_read_source`, `cad_jobs`, `cad_job`,
+`cad_read_artifact`, and `cad_verify` provide captured source and integrity evidence;
+`cad_capabilities` describes native operations and session limits.
+
+Each worker runs the existing CAD executable in a private directory. Candidate
+jobs never modify your source or replace accepted outputs. Files and jobs are
+session-local and disappear when the MCP process exits; retrieve any artifacts
+you want to retain before closing the session. The viewer remains read-only.
+This first adapter is Linux-only for confined source capture, accepts numeric
+parameter overrides, and limits sessions to one active tool, 32 snapshots and 16
+jobs. Worker time/output/disk guards are not a hard OS memory sandbox. Hosted
+workers, durable job storage, module editing, and expected-base release publication
+remain open. See [the agent contract](docs/architecture.md#local-agent-candidate-jobs)
+for the precise boundary.
+
+From a source checkout, run the full rotating-drive client fixture after building
+the release binary:
+
+```sh
+python3 scripts/agent_drive_demo.py --out-dir out/agent_drive_demo
+```
+
+It downloads verified before/after deliveries through MCP, preserves an invalid
+proposal's native diagnostic, and replays captured source after the MCP process
+exits. Open `http://localhost:8080/agent_drive_demo/index.html` with the viewer
+server running. This scripted fixture tests the interface; it does not claim
+autonomous AI reasoning. Choose a new delivery directory for each run.
+
 ## Review a complete source revision
 
 The experimental bearing-drive walkthrough changes shaft diameter from 12 to
