@@ -6,6 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 mod deserialize;
 
+/// Independent convergence tolerance for angular equations, in radians.
+pub const ANGULAR_TOLERANCE_RADIANS: f64 = 1e-9;
 pub const MAX_POINTS: usize = 32;
 pub const MAX_CONSTRAINTS: usize = 128;
 pub const MAX_ITERATIONS: usize = 256;
@@ -34,11 +36,48 @@ pub struct Constraint {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ConstraintKind {
-    Fixed { point: String, position: [f64; 2] },
-    Coincident { a: String, b: String },
-    Horizontal { a: String, b: String },
-    Vertical { a: String, b: String },
-    Distance { a: String, b: String, value: f64 },
+    Fixed {
+        point: String,
+        position: [f64; 2],
+    },
+    Coincident {
+        a: String,
+        b: String,
+    },
+    Horizontal {
+        a: String,
+        b: String,
+    },
+    Vertical {
+        a: String,
+        b: String,
+    },
+    Distance {
+        a: String,
+        b: String,
+        value: f64,
+    },
+    /// Equality of the two endpoint-pair segment lengths.
+    EqualLength {
+        a: [String; 2],
+        b: [String; 2],
+    },
+    /// Unoriented parallelism (angles modulo pi).
+    Parallel {
+        a: [String; 2],
+        b: [String; 2],
+    },
+    /// Unoriented perpendicularity (angles modulo pi).
+    Perpendicular {
+        a: [String; 2],
+        b: [String; 2],
+    },
+    /// Directed angle from a to b, degrees in (-180, 180].
+    Angle {
+        a: [String; 2],
+        b: [String; 2],
+        degrees: f64,
+    },
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -52,11 +91,17 @@ pub enum SolveStatus {
 #[serde(deny_unknown_fields)]
 pub struct ConstraintResidual {
     pub id: String,
-    pub residual_mm: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub residual_mm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub residual_radians: Option<f64>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SolveReport {
+    pub schema_version: u32,
+    pub angular_tolerance_radians: f64,
+    pub max_angular_residual_radians: f64,
     pub solver_build_id: String,
     pub status: SolveStatus,
     pub tolerance_mm: f64,
@@ -64,6 +109,8 @@ pub struct SolveReport {
     pub iterations: usize,
     pub max_residual_mm: f64,
     pub rank: usize,
+    /// Conditioning of normalized linear/radian Jacobian rows, not a
+    /// world-coordinate error bound or a proof of global uniqueness.
     pub condition_bound: Option<f64>,
     pub degrees_of_freedom: usize,
     pub redundant_equations: usize,
@@ -130,6 +177,26 @@ pub fn validate(sketch: &Sketch) -> Result<(), SketchError> {
                 }
                 vec![point]
             }
+            ConstraintKind::EqualLength { a, b }
+            | ConstraintKind::Parallel { a, b }
+            | ConstraintKind::Perpendicular { a, b }
+            | ConstraintKind::Angle { a, b, .. } => {
+                if a[0] == a[1] || b[0] == b[1] {
+                    return Err(SketchError::Constraint {
+                        id: c.id.clone(),
+                        message: "segments require distinct endpoint IDs",
+                    });
+                }
+                if let ConstraintKind::Angle { degrees, .. } = &c.kind {
+                    if !degrees.is_finite() || *degrees <= -180. || *degrees > 180. {
+                        return Err(SketchError::Constraint {
+                            id: c.id.clone(),
+                            message: "directed angle degrees must be finite in (-180, 180]",
+                        });
+                    }
+                }
+                vec![&a[0], &a[1], &b[0], &b[1]]
+            }
             ConstraintKind::Coincident { a, b }
             | ConstraintKind::Horizontal { a, b }
             | ConstraintKind::Vertical { a, b }
@@ -168,6 +235,8 @@ enum Equation {
     Fixed(usize, f64),
     Delta(usize, usize),
     Distance(usize, usize, f64),
+    EqualLength([usize; 2], [usize; 2]),
+    Angle([usize; 2], [usize; 2], f64, f64),
 }
 struct System {
     ids: Vec<String>,
@@ -255,6 +324,30 @@ impl System {
                 ConstraintKind::Vertical { a, b } => {
                     equations.push(Equation::Delta(indices[a.as_str()], indices[b.as_str()]))
                 }
+                ConstraintKind::EqualLength { a, b } => equations.push(Equation::EqualLength(
+                    a.each_ref().map(|v| indices[v.as_str()]),
+                    b.each_ref().map(|v| indices[v.as_str()]),
+                )),
+                ConstraintKind::Parallel { a, b }
+                | ConstraintKind::Perpendicular { a, b }
+                | ConstraintKind::Angle { a, b, .. } => {
+                    let (target, period) = match c {
+                        ConstraintKind::Parallel { .. } => (0., std::f64::consts::PI),
+                        ConstraintKind::Perpendicular { .. } => {
+                            (std::f64::consts::FRAC_PI_2, std::f64::consts::PI)
+                        }
+                        ConstraintKind::Angle { degrees, .. } => {
+                            (degrees.to_radians(), std::f64::consts::TAU)
+                        }
+                        _ => unreachable!(),
+                    };
+                    equations.push(Equation::Angle(
+                        a.each_ref().map(|v| indices[v.as_str()]),
+                        b.each_ref().map(|v| indices[v.as_str()]),
+                        target,
+                        period,
+                    ));
+                }
                 ConstraintKind::Distance { a, b, value } => equations.push(Equation::Distance(
                     indices[a.as_str()],
                     indices[b.as_str()],
@@ -291,6 +384,59 @@ impl System {
                     row[b] = -1.;
                     x[a] - x[b]
                 }
+                Equation::EqualLength(a, b) | Equation::Angle(a, b, _, _) => {
+                    let u = [x[a[1]] - x[a[0]], x[a[1] + 1] - x[a[0] + 1]];
+                    let v = [x[b[1]] - x[b[0]], x[b[1] + 1] - x[b[0] + 1]];
+                    let lengths = [u[0].hypot(u[1]), v[0].hypot(v[1])];
+                    let angular = matches!(eq, Equation::Angle(..));
+                    let world = x
+                        .iter()
+                        .map(|v| v.abs() * self.scale)
+                        .fold(self.world_scale, f64::max);
+                    let angular_roundoff =
+                        256. * f64::EPSILON * world / self.scale / lengths[0].min(lengths[1]);
+                    let valid = lengths.iter().all(|d| *d > 64. * f64::EPSILON)
+                        && (!angular || angular_roundoff <= ANGULAR_TOLERANCE_RADIANS / 16.);
+                    if !valid {
+                        singular = true;
+                    }
+                    if let Equation::Angle(_, _, target, period) = *eq {
+                        let raw = (u[0] * v[1] - u[1] * v[0]).atan2(u[0] * v[0] + u[1] * v[1]);
+                        let residual = wrap_angle(raw - target, period);
+                        // At the residual branch cut there is no unique local derivative.
+                        if period / 2. - residual.abs() <= 1e-8 {
+                            singular = true;
+                        }
+                        if valid {
+                            for (ends, vector, length, sign) in
+                                [(a, u, lengths[0], -1.), (b, v, lengths[1], 1.)]
+                            {
+                                let derivative = [
+                                    -vector[1] / length / length * sign,
+                                    vector[0] / length / length * sign,
+                                ];
+                                for axis in 0..2 {
+                                    row[ends[1] + axis] += derivative[axis];
+                                    row[ends[0] + axis] -= derivative[axis];
+                                }
+                            }
+                        }
+                        residual
+                    } else {
+                        if valid {
+                            for (ends, vector, length, sign) in
+                                [(a, u, lengths[0], 1.), (b, v, lengths[1], -1.)]
+                            {
+                                for axis in 0..2 {
+                                    let d = sign * vector[axis] / length;
+                                    row[ends[1] + axis] += d;
+                                    row[ends[0] + axis] -= d;
+                                }
+                            }
+                        }
+                        lengths[0] - lengths[1]
+                    }
+                }
                 Equation::Distance(a, b, target) => {
                     let dx = x[a] - x[b];
                     let dy = x[a + 1] - x[b + 1];
@@ -316,8 +462,17 @@ impl System {
         }
     }
     fn max_residual(&self, e: &Evaluation) -> f64 {
+        self.max_residual_kind(e, false)
+    }
+    fn max_angular_residual(&self, e: &Evaluation) -> f64 {
+        self.max_residual_kind(e, true)
+    }
+    fn max_residual_kind(&self, e: &Evaluation, angular: bool) -> f64 {
         self.groups
             .iter()
+            .filter(|(_, range)| {
+                matches!(self.equations[range.start], Equation::Angle(..)) == angular
+            })
             .map(|(_, range)| {
                 range
                     .clone()
@@ -364,7 +519,10 @@ impl System {
             status,
             SolveStatus::FullyConstrained | SolveStatus::Underconstrained
         ) {
-            if e.singular || self.max_residual(&e) * self.scale > self.tolerance_mm {
+            if e.singular
+                || self.max_residual(&e) * self.scale > self.tolerance_mm
+                || self.max_angular_residual(&e) > ANGULAR_TOLERANCE_RADIANS
+            {
                 status = SolveStatus::NumericalFailure;
                 message=Some("returned world coordinates cannot certify convergence at the requested tolerance".into());
             } else {
@@ -382,6 +540,9 @@ impl System {
             message=Some("local Jacobian conditioning exceeds the supported bound; rank alone does not certify a stable solution".into());
         }
         SolveReport {
+            schema_version: 2,
+            angular_tolerance_radians: ANGULAR_TOLERANCE_RADIANS,
+            max_angular_residual_radians: self.max_angular_residual(&e),
             solver_build_id: SOLVER_BUILD_ID.into(),
             status,
             points,
@@ -395,16 +556,24 @@ impl System {
             constraint_residuals: self
                 .groups
                 .iter()
-                .map(|(id, range)| ConstraintResidual {
-                    id: id.clone(),
-                    residual_mm: range
+                .map(|(id, range)| {
+                    let angular = matches!(self.equations[range.start], Equation::Angle(..));
+                    let norm = range
                         .clone()
-                        .fold(0f64, |norm, i| norm.hypot(e.residuals[i] * self.scale)),
+                        .fold(0f64, |norm, i| norm.hypot(e.residuals[i]));
+                    ConstraintResidual {
+                        id: id.clone(),
+                        residual_mm: (!angular).then_some(norm * self.scale),
+                        residual_radians: angular.then_some(norm),
+                    }
                 })
                 .collect(),
             message,
         }
     }
+}
+fn wrap_angle(angle: f64, period: f64) -> f64 {
+    (angle + period / 2.).rem_euclid(period) - period / 2.
 }
 struct Evaluation {
     residuals: Vec<f64>,
@@ -418,7 +587,8 @@ impl Evaluation {
 }
 
 /// Column-pivoted Householder QR exposes local rank without squaring the
-/// condition number. The dimensionless analytic Jacobian has comparable units.
+/// condition number. Rows mix normalized linear coordinates and radians; this
+/// condition bound is not a world-coordinate error bound.
 #[allow(clippy::needless_range_loop)] // Explicit row/column indices express Householder updates.
 fn rank_condition(matrix: &[Vec<f64>], n: usize) -> (usize, Option<f64>) {
     let m = matrix.len();
@@ -564,9 +734,11 @@ fn solve_bounded(
     let mut damping = 1e-3_f64;
     for iteration in 0..=budget {
         if eval.singular {
-            return Ok(fail(&x,&eval,iteration,"a distance constraint has unresolved direction at coincident or numerically indistinguishable points"));
+            return Ok(fail(&x,&eval,iteration,"a segment direction is numerically unresolved or an angular residual lies on its wrap cut"));
         }
-        if system.max_residual(&eval) <= normalized_tolerance {
+        if system.max_residual(&eval) <= normalized_tolerance
+            && system.max_angular_residual(&eval) <= ANGULAR_TOLERANCE_RADIANS * 0.9
+        {
             let rank = rank(&eval.jacobian, x.len());
             let status = if rank == x.len() {
                 SolveStatus::FullyConstrained
@@ -643,7 +815,33 @@ fn solve_bounded(
             ));
         }
         let candidate = system.evaluate(&next);
-        if !candidate.singular && candidate.objective() < eval.objective() {
+        // Bound each vector's continuous rotation along the straight trial step.
+        // The sum bounds any angular excursion, including a cut crossing and
+        // return that endpoint-only residual comparisons would miss. Large
+        // rotations and zero-crossing segments are damped, never branch-flipped.
+        let crosses_cut = system.equations.iter().enumerate().any(|(i, eq)| {
+            if let Equation::Angle(a, b, _, period) = eq {
+                let mut excursion = 0.;
+                for ends in [a, b] {
+                    let u = [x[ends[1]] - x[ends[0]], x[ends[1] + 1] - x[ends[0] + 1]];
+                    let v = [
+                        next[ends[1]] - next[ends[0]],
+                        next[ends[1] + 1] - next[ends[0] + 1],
+                    ];
+                    let turn = (u[0] * v[1] - u[1] * v[0])
+                        .atan2(u[0] * v[0] + u[1] * v[1])
+                        .abs();
+                    if turn >= std::f64::consts::FRAC_PI_2 {
+                        return true;
+                    }
+                    excursion += turn;
+                }
+                eval.residuals[i].abs() + excursion >= period / 2. - 1e-8
+            } else {
+                false
+            }
+        });
+        if !candidate.singular && !crosses_cut && candidate.objective() < eval.objective() {
             x = next;
             eval = candidate;
             damping = (damping * 0.3).max(1e-12);
@@ -778,7 +976,8 @@ mod tests {
                         .iter()
                         .find(|c| c.id == "span")
                         .unwrap()
-                        .residual_mm;
+                        .residual_mm
+                        .unwrap();
                     assert!((reported - actual.abs()).abs() < 1e-12);
                 }
             }
@@ -915,7 +1114,7 @@ mod tests {
         assert!(r
             .constraint_residuals
             .iter()
-            .all(|r| r.residual_mm.is_finite()));
+            .all(|r| r.residual_mm.unwrap().is_finite()));
         let mut singular = free;
         singular.points[1].position = [0., 0.];
         assert_eq!(
@@ -1009,7 +1208,7 @@ mod tests {
         let r = solve(&s, 1e-6).unwrap();
         assert!(r.is_fully_constrained());
         let p = r.points["a"];
-        assert!((r.constraint_residuals[0].residual_mm - p[0].hypot(p[1])).abs() < 1e-20);
+        assert!((r.constraint_residuals[0].residual_mm.unwrap() - p[0].hypot(p[1])).abs() < 1e-20);
     }
 
     #[test]
@@ -1034,3 +1233,6 @@ mod tests {
         assert!(!r.solver_build_id.is_empty());
     }
 }
+
+#[cfg(test)]
+mod angular_tests;

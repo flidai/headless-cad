@@ -1,5 +1,11 @@
 //! Direct typed fields remain compatible with serde_json/arbitrary_precision.
 use crate::{Constraint, ConstraintKind};
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Endpoints {
+    Point(String),
+    Segment([String; 2]),
+}
 use serde::{
     de::{Error, MapAccess, Visitor},
     Deserialize,
@@ -13,8 +19,16 @@ impl<'de> Deserialize<'de> for Constraint {
                 f.write_str("a typed sketch constraint")
             }
             fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<Constraint, M::Error> {
-                let (mut id, mut kind, mut point, mut position, mut a, mut b, mut value) =
-                    (None, None, None, None, None, None, None);
+                let (
+                    mut id,
+                    mut kind,
+                    mut point,
+                    mut position,
+                    mut a,
+                    mut b,
+                    mut value,
+                    mut degrees,
+                ) = (None, None, None, None, None, None, None, None);
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
                         "id" => {
@@ -45,13 +59,19 @@ impl<'de> Deserialize<'de> for Constraint {
                             if a.is_some() {
                                 return Err(M::Error::duplicate_field("a"));
                             }
-                            a = Some(map.next_value::<String>()?);
+                            a = Some(map.next_value::<Endpoints>()?);
                         }
                         "b" => {
                             if b.is_some() {
                                 return Err(M::Error::duplicate_field("b"));
                             }
-                            b = Some(map.next_value::<String>()?);
+                            b = Some(map.next_value::<Endpoints>()?);
+                        }
+                        "degrees" => {
+                            if degrees.is_some() {
+                                return Err(M::Error::duplicate_field("degrees"));
+                            }
+                            degrees = Some(map.next_value::<f64>()?);
                         }
                         "value" => {
                             if value.is_some() {
@@ -62,7 +82,9 @@ impl<'de> Deserialize<'de> for Constraint {
                         _ => {
                             return Err(M::Error::unknown_field(
                                 &key,
-                                &["id", "kind", "point", "position", "a", "b", "value"],
+                                &[
+                                    "id", "kind", "point", "position", "a", "b", "value", "degrees",
+                                ],
                             ))
                         }
                     }
@@ -71,7 +93,7 @@ impl<'de> Deserialize<'de> for Constraint {
                 let kind = kind.ok_or_else(|| M::Error::missing_field("kind"))?;
                 let invalid = || M::Error::custom("fields do not match constraint kind");
                 let kind = if kind == "fixed" {
-                    if a.is_some() || b.is_some() || value.is_some() {
+                    if a.is_some() || b.is_some() || value.is_some() || degrees.is_some() {
                         return Err(invalid());
                     }
                     ConstraintKind::Fixed {
@@ -84,15 +106,44 @@ impl<'de> Deserialize<'de> for Constraint {
                     }
                     let a = a.ok_or_else(|| M::Error::missing_field("a"))?;
                     let b = b.ok_or_else(|| M::Error::missing_field("b"))?;
-                    match kind.as_str() {
-                        "distance" => ConstraintKind::Distance {
-                            a,
-                            b,
-                            value: value.ok_or_else(|| M::Error::missing_field("value"))?,
-                        },
-                        "coincident" if value.is_none() => ConstraintKind::Coincident { a, b },
-                        "horizontal" if value.is_none() => ConstraintKind::Horizontal { a, b },
-                        "vertical" if value.is_none() => ConstraintKind::Vertical { a, b },
+                    match (a, b) {
+                        (Endpoints::Point(a), Endpoints::Point(b)) if degrees.is_none() => {
+                            match kind.as_str() {
+                                "distance" => ConstraintKind::Distance {
+                                    a,
+                                    b,
+                                    value: value.ok_or_else(|| M::Error::missing_field("value"))?,
+                                },
+                                "coincident" if value.is_none() => {
+                                    ConstraintKind::Coincident { a, b }
+                                }
+                                "horizontal" if value.is_none() => {
+                                    ConstraintKind::Horizontal { a, b }
+                                }
+                                "vertical" if value.is_none() => ConstraintKind::Vertical { a, b },
+                                _ => return Err(invalid()),
+                            }
+                        }
+                        (Endpoints::Segment(a), Endpoints::Segment(b)) if value.is_none() => {
+                            match kind.as_str() {
+                                "equal_length" if degrees.is_none() => {
+                                    ConstraintKind::EqualLength { a, b }
+                                }
+                                "parallel" if degrees.is_none() => {
+                                    ConstraintKind::Parallel { a, b }
+                                }
+                                "perpendicular" if degrees.is_none() => {
+                                    ConstraintKind::Perpendicular { a, b }
+                                }
+                                "angle" => ConstraintKind::Angle {
+                                    a,
+                                    b,
+                                    degrees: degrees
+                                        .ok_or_else(|| M::Error::missing_field("degrees"))?,
+                                },
+                                _ => return Err(invalid()),
+                            }
+                        }
                         _ => return Err(invalid()),
                     }
                 };

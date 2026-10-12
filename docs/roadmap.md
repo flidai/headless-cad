@@ -30,13 +30,28 @@ revision reliability and manufacturing fidelity before comparing speed. Keep
 commercial baseline evidence optional so the Apache-licensed product and its
 open acceptance corpus remain independently usable.
 
+Use the five [product acceptance priorities](architecture.md#product-acceptance-priorities)
+when selecting work: trustworthy revisions, assembly scale, mechanical intent,
+manufacturing evidence and source-driven automation. Every increment declares
+which outcome it advances and an executable acceptance case. Keep the complete
+drive-module release workflow as the integration gate; rendering milestones do
+not close its modeling, solver or manufacturing obligations.
+
+M5 repair acceptance must additionally measure cumulative drift against the
+preserved source across chained and repeated repairs. Verify repeat-policy
+stability and authorized thin-wall/fit/clearance limits; per-step tolerance
+compliance alone does not pass this gate.
+M6 release policies declare required manufacturing semantics. Loss of required
+units, tolerances, datum references, revisions or occurrence mappings blocks
+release and is checked independently from exported solid validity.
+
 | Milestone | Deliverable and example progression | Acceptance evidence | Status |
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums with part/rigid-module attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
 | M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; convex line/arc path extrusion with circular holes implemented; concave arc paths, arcs in revolved meridians, partial revolution, general Booleans and generalized trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache and analytic whole-part LOD implemented; metadata paging, cluster LOD, part spatial indexes and hardware gates remain |
-| M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Dimensioned slope fixture → four-bar mechanism → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | In progress: bounded original Rust point sketch solver, fixed/coincident/horizontal/vertical/distance constraints, polygon extrusion, local rank/residual/conditioning reports and atomic failure handling; curves, sparse islands, branch continuation, conflict minimization and assembly solving remain |
+| M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Dimensioned slope fixture → four-bar mechanism → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | In progress: bounded original Rust point sketch solver, nine constraint kinds including equal length, parallel, perpendicular and directed angle; separate linear/angular tolerances, polygon extrusion, local rank/residual/conditioning reports and atomic failure handling; curves, sparse islands, branch continuation, conflict minimization and assembly solving remain |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
 | M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries and global recipe property assertions implemented; drawings, PMI, principal axes and configuration policies remain |
 | M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | Planned |
@@ -251,7 +266,20 @@ verify failed builds retain the prior published generation. Fully constrained
 means converged with supported local Jacobian rank and conditioning; it does not
 prove global uniqueness or branch continuity. Keep structural validation global,
 solve only demanded sketches, and retain solver evidence even on cache hits.
-Advance toward constrained curves, angles/tangency and explicit continuation
+The next implemented M4 increment adds equal-length, parallel, perpendicular
+and directed-angle equations. Schema-2 reports separate millimetre and radian
+residuals; angular tolerance is independently fixed at 1e-9 radians. Mixed
+normalized-linear/radian Jacobian conditioning is not a coordinate error bound.
+Zero/unresolved directions and angular residuals within 1e-8 radians of a wrap
+cut fail explicitly; candidate steps cannot silently cross that cut.
+`constrained_angle_fixture.star` combines an angle/perpendicular triangle with
+an equal-leg, parallel-edge trapezoid deck and associative side pads: nine
+occurrences, five definitions, span 50..80 mm, angle 15..45 degrees and deck top
+width 18..30 mm (defaults 60/30/24). Independent trigonometric native checks over
+27 configurations pass, as do nine browser cases and three independent STEP
+oracle cases. Conflicting angles return separately unit-labelled residuals and
+preserve all artifacts of the previous valid generation.
+Advance toward constrained curves, tangency and explicit continuation
 before claiming general sketch coverage; rigid assembly joints are a separate
 solver milestone.
 

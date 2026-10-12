@@ -1294,5 +1294,61 @@
       "volume_tolerance_mm3": 0.003,
       "linear_tolerance_mm": 1e-06
     }
+  },
+  "constrained_angle_fixture.star": {
+    "support": {
+      "volume_mm3": 62353.82907247957,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          60,
+          60,
+          34.64101615137754
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "deck": {
+      "volume_mm3": 5230.678732248809,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          36,
+          43.58898943540674,
+          4
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "constrained_angle_fixture": {
+      "volume_mm3": 106354.93249225608,
+      "solids": 9,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          80,
+          40.64101615137754
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }

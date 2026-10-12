@@ -2650,3 +2650,124 @@ fn sketch_diagnostics_and_failed_solves_preserve_last_valid_publication() {
         diff["sketches"]["support_sketch"]["after_hash"]
     );
 }
+
+#[test]
+fn angular_conflicts_report_separate_units_and_preserve_published_generation() {
+    let directory = tempfile::tempdir().unwrap();
+    let source_path = directory.path().join("angle.star");
+    let output = directory.path().join("out");
+    let source = fs::read_to_string(example("constrained_angle_fixture.star")).unwrap();
+    fs::write(&source_path, &source).unwrap();
+    let run = || {
+        cli(&[
+            "build",
+            source_path.to_str().unwrap(),
+            "--out-dir",
+            output.to_str().unwrap(),
+        ])
+    };
+    let valid = successful_json(run());
+    let report = &valid["sketch_reports"]["support_sketch"];
+    assert_eq!(report["schema_version"], 2);
+    assert_eq!(report["status"], "fully_constrained");
+    assert_eq!(report["angular_tolerance_radians"], 1e-9);
+    assert!(report["max_angular_residual_radians"].as_f64().unwrap() <= 1e-9);
+    assert!(
+        report["max_residual_mm"].as_f64().unwrap() <= report["tolerance_mm"].as_f64().unwrap()
+    );
+    let original = artifact_bytes(&output);
+    assert!(!original.is_empty());
+    // Two individually valid directed angles on the same endpoint pairs are
+    // incompatible. Keep structural validation valid so this exercises solving.
+    let conflicting = source.replacen(
+        "], outline = [\"a\",\"b\",\"c\"])",
+        "    {\"id\":\"angle_conflict\",\"kind\":\"angle\",\"a\":[\"a\",\"b\"],\"b\":[\"a\",\"c\"],\"degrees\":tilt_degrees+10},\n], outline = [\"a\",\"b\",\"c\"])",
+        1,
+    );
+    assert_ne!(conflicting, source);
+    fs::write(&source_path, &conflicting).unwrap();
+    let failed = run();
+    assert!(!failed.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+    assert_eq!(error["code"], "sketch_solve_failed", "{error}");
+    assert_eq!(error["feature"], "support_sketch");
+    assert_eq!(error["target_content_hash"].as_str().unwrap().len(), 64);
+    assert_ne!(
+        error["target_content_hash"],
+        valid["feature_hashes"]["support_sketch"]
+    );
+    let failed_report = &error["sketch"];
+    assert_eq!(failed_report["schema_version"], 2);
+    assert_eq!(failed_report["status"], "not_converged");
+    assert_eq!(failed_report["solver_build_id"], error["solver_build_id"]);
+    assert_eq!(failed_report["angular_tolerance_radians"], 1e-9);
+    let point = |id: &str| {
+        let p = &failed_report["points"][id];
+        [p[0].as_f64().unwrap(), p[1].as_f64().unwrap()]
+    };
+    let a = point("a");
+    let b = point("b");
+    let c = point("c");
+    let u = [b[0] - a[0], b[1] - a[1]];
+    let v = [c[0] - a[0], c[1] - a[1]];
+    let actual_angle = (u[0] * v[1] - u[1] * v[0]).atan2(u[0] * v[0] + u[1] * v[1]);
+    let residuals = failed_report["constraint_residuals"].as_array().unwrap();
+    let mut max_mm = 0f64;
+    let mut max_radians = 0f64;
+    for residual in residuals {
+        let angular = matches!(
+            residual["id"].as_str().unwrap(),
+            "incline" | "upright" | "angle_conflict"
+        );
+        let (field, absent) = if angular {
+            ("residual_radians", "residual_mm")
+        } else {
+            ("residual_mm", "residual_radians")
+        };
+        let value = residual[field].as_f64().unwrap();
+        assert!(value.is_finite() && value >= 0.);
+        assert!(residual.get(absent).is_none());
+        if angular {
+            max_radians = max_radians.max(value);
+        } else {
+            max_mm = max_mm.max(value);
+        }
+        if let Some(degrees) = match residual["id"].as_str().unwrap() {
+            "incline" => Some(30f64),
+            "angle_conflict" => Some(40f64),
+            _ => None,
+        } {
+            let independently_measured = ((actual_angle - degrees.to_radians()
+                + std::f64::consts::PI)
+                .rem_euclid(std::f64::consts::TAU)
+                - std::f64::consts::PI)
+                .abs();
+            assert!((value - independently_measured).abs() < 1e-12);
+        }
+    }
+    // Incompatible targets are ten degrees apart, so at least one independent
+    // angular witness must miss its target by five degrees or more.
+    assert!(max_radians >= 5f64.to_radians() - 1e-10);
+    assert!(
+        (failed_report["max_angular_residual_radians"]
+            .as_f64()
+            .unwrap()
+            - max_radians)
+            .abs()
+            < 1e-14
+    );
+    assert!((failed_report["max_residual_mm"].as_f64().unwrap() - max_mm).abs() < 1e-12);
+    assert_eq!(artifact_bytes(&output), original);
+    let checked = cli(&["check", source_path.to_str().unwrap()]);
+    assert!(!checked.status.success());
+    let check_error: serde_json::Value = serde_json::from_slice(&checked.stderr).unwrap();
+    assert_eq!(check_error["sketch"], error["sketch"]);
+    assert_eq!(artifact_bytes(&output), original);
+    fs::write(&source_path, &source).unwrap();
+    let restored = successful_json(run());
+    assert_eq!(restored["sketch_reports"], valid["sketch_reports"]);
+    assert_eq!(
+        fs::read(output.join("recipe.star")).unwrap(),
+        source.as_bytes()
+    );
+}

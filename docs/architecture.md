@@ -37,6 +37,28 @@ finishing the current prototype or display milestone does not complete it.
 
 ## Architectural commitments
 
+### Product acceptance priorities
+
+The commercial target is binding when choosing what to implement next. Evaluate
+each increment against these five product outcomes:
+
+1. **Trust a revision.** Change dimensions through a substantial feature history,
+   preserve semantic intent, and identify failed obligations before publication.
+2. **Work at assembly scale.** Inspect and revise a machine with bounded memory,
+   selective exact-body evaluation, shared definitions and progressive display.
+3. **Express mechanical intent.** Solve dimensions and mechanisms with explicit
+   residuals, degrees of freedom and branch behavior instead of hand-positioning
+   a visually plausible result.
+4. **Release manufacturing evidence.** Regenerate associated drawings, dimensions,
+   BOM and open exchange from the same validated source revision.
+5. **Automate through source.** Let humans and agents propose reviewable recipe
+   patches, consume structured failures and replay accepted builds offline.
+
+The two supplied briefs inform these outcomes and the display contract below.
+They do not make a particular cluster size, mesh-shader backend, silent healing
+policy or proprietary solver a requirement. Progress must advance both the
+drive-module engineering workflow and the separate assembly-scale workload.
+
 ### Decisions adopted from the feature brief
 
 The product target is an engineering team releasing a revised mechanical design
@@ -451,6 +473,14 @@ deviation, tolerance changes, and removed or merged features. Preserve an
 unmodified imported source. A near-coincident repair must not erase intentional
 clearance without a diagnostic and a policy that authorizes the deviation.
 
+Repair acceptance includes chained and repeated operations. Measure cumulative
+deviation against the preserved unmodified source, not only the preceding step.
+Reapplying the same policy must be idempotent within its declared numerical
+bound or report further changes explicitly. Test thin walls, fits and clearances
+against their authorized engineering limits after the complete chain; passing
+each operation's local tolerance is insufficient. A repair report cannot turn
+an unresolved deviation bound into a successful manufacturing release.
+
 ### Persistent topology references
 
 Use three explicit identity types: snapshot-local entity handles, persistent
@@ -686,14 +716,28 @@ independent imported STEP child placements. Both examples share the same
 physical volume formula but exercise different authored placement contracts.
 
 The first constraint service is now `cad-sketch`, independent of the geometric
-kernel. Named 2D point guesses and fixed, coincident, horizontal, vertical and
-distance equations feed a deterministic scaled/recentered local solve. Analytic
+kernel. Named 2D point guesses and nine equation kinds—fixed, coincident,
+horizontal, vertical, distance, equal length, parallel, perpendicular and directed
+angle—feed a deterministic scaled/recentered local solve. Segment equations name
+two endpoint-ID pairs. Directed angles are finite degrees in (-180, 180], from
+first segment to second; parallel/perpendicular relations are unoriented modulo
+π. Analytic
 Jacobians drive damped least squares; pivoted QR assesses local rank and a
-conditioning bound. A successful profile requires convergence within the stated
-millimetre tolerance, zero local degrees of freedom, supported conditioning and
+conditioning bound on the mixed normalized-linear/radian Jacobian; this bound
+is not a world-coordinate error estimate. A successful profile requires each
+linear residual within the stated millimetre tolerance and each angular residual
+within the separate 1e-9-radian tolerance, zero local degrees of freedom, supported conditioning and
 subsequent native polygon validity. Fixed/coincident errors use Euclidean norms.
 Residuals and rank describe the returned world coordinates, including arithmetic
-limits; unresolved precision fails explicitly. Limits are 32 points, 128
+limits; unresolved precision fails explicitly. Schema-2 reports expose
+`tolerance_mm`, `angular_tolerance_radians`, `max_residual_mm` (linear only) and
+`max_angular_residual_radians`; per-constraint records emit exactly one of
+`residual_mm` or `residual_radians`. Zero/numerically short segment directions
+are unresolved, and angular arithmetic must satisfy its own precision gate.
+Angular residuals within 1e-8 radians of the residual wrap cut fail explicitly;
+trial steps use a conservative continuous-vector-rotation bound to prevent cut
+crossing and return, including jumps invisible in endpoint residuals. Such steps
+are damped, never accepted as silent branch changes. Limits are 32 points, 128
 constraints, 256 iterations per solve and 128 demanded sketch features per build.
 
 The typed `sketch` feature retains source guesses, named constraints and oriented
@@ -709,12 +753,29 @@ This first solver reports local Jacobian DOF, not a proof of global freedom,
 consistency or unique solutions. Initial guesses select a branch; unchanged
 source is reproducible, but nearby edits do not yet have a branch-continuation
 guarantee. Nonconvergence and residual witnesses are not a minimal conflicting
-constraint set. Redundant equations can be consistent. Constrained arcs, angle
-and tangency equations, sparse island decomposition and assembly joints remain
+constraint set. Redundant equations can be consistent. Constrained arcs,
+tangency equations, sparse island decomposition and assembly joints remain
 target work. `constrained_slope_fixture.star` connects nonlinear sketch dimensions
 to an extruded support, an associative inclined seat and a nine-occurrence
 fixture. Independent three-side triangle formulas validate 27 configurations,
 native moments, material mass and attached deck placement.
+
+`constrained_angle_fixture.star` extends the corpus to an angle-driven right
+triangle, an equal-leg trapezoid with parallel edges, and face-datum side-pad
+attachments. Nine occurrences share five definitions. Its three parameters are
+span 50..80 mm, incline 15..45 degrees and trapezoid top width 18..30 mm; defaults
+are 60 mm, 30 degrees and 24 mm. Independent formulas use
+`H = span*tan(theta)` and `D = sqrt(44²-((36-top_width)/2)²)`:
+support volume is `30*span²*tan(theta)`, deck volume is `2*(36+top_width)*D`,
+and assembly volume adds rounded-base volume `480*span+8736`, two pads totaling
+160 mm³ and four bolts totaling `342π` mm³. Default transformed deck/pad bounds
+remain within the base/support envelope `[0,0,0]..[80,80,6+60*tan(30°)]`.
+The 27-configuration native suite and three-case independent STEP acceptance
+pass, including centroid/full inertia and deck/pad placements. Browser inspection
+passes three configurations in Canvas, embedded GPU and streaming GPU modes,
+with selected-deck recipe inspection and no exact-body downloads. Angular
+conflicts preserve the last valid published generation. These prescribed
+attachments do not establish assembly-joint or load-solving capability.
 
 Evolve this constraint service separately from geometric construction. The target 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
@@ -1127,6 +1188,13 @@ open-format support must state which entities, units, transforms, and metadata
 survive. glTF or mesh packages serve visualization; STL does not preserve CAD
 semantics. BOM/PLM/ERP adapters consume versioned identifiers and reports.
 
+A release policy declares required manufacturing semantics separately from
+advisory export losses. Losing a required unit, tolerance, datum reference,
+revision or occurrence mapping blocks that release even if the exported solid
+is geometrically valid. Independent round-trip checks compare these semantics
+as well as shape validity; successful display in another application is not
+manufacturing acceptance.
+
 ## Reproducibility, collaboration, and operations
 
 Keep source in Git and large immutable artifacts in a content-addressed store.
@@ -1364,7 +1432,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and convex line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
-| Sketches | Original Rust bounded 2D point solver, five constraint kinds, local rank/DOF/residual/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Constrained curves, angles/tangency, sparse islands, branch continuation, minimal conflict explanations |
+| Sketches | Original Rust bounded 2D point solver, nine constraint kinds, schema-2 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Constrained curves, tangency, sparse islands, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |

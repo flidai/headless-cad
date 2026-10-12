@@ -453,7 +453,7 @@ output(name = "bracket", feature = finished)
 | `rectangle(id, width, depth)` | Profile on XY, starting at the origin |
 | `polygon(id, points, holes=[])` | Simple CCW outer XY ring (convex or nonconvex) with optional simple CW holes; 256 total vertices, at most 32 holes |
 | `path(id, start, segments, circular_holes=[])` | Closed convex CCW line/arc profile; native arcs up to a half-turn, tangent joins and circular through-holes |
-| `sketch(id, points, constraints, outline, holes=[])` | Dimension-driven polygon profile; named point guesses, fixed/coincident/horizontal/vertical/distance constraints; requires a converged, locally fully constrained solution |
+| `sketch(id, points, constraints, outline, holes=[])` | Dimension-driven polygon profile; named point guesses, fixed/coincident/horizontal/vertical/distance/equal-length/parallel/perpendicular/directed-angle constraints; requires a converged, locally fully constrained solution |
 | `extrude(id, profile, height)` | Extrude a supported rectangle, polygon, circle or line/arc profile along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
 | `transform(id, body, offset, rotation)` | Rotate exact geometry using unit quaternion `[x,y,z,w]`, then translate; both default to identity |
@@ -1011,17 +1011,30 @@ Prescribed clearances are design intent, not a certified interference result.
 the headless builder. Each point has an `id` and a two-coordinate `position`
 initial guess. Each constraint has a unique `id` and a `kind`: `fixed` uses
 `point` and `position`; `coincident`, `horizontal` and `vertical` use `a` and `b`;
-`distance` adds a positive `value` in millimetres. `outline` lists named vertices
+`distance` adds a positive `value` in millimetres. Four segment constraints use
+endpoint-ID pairs such as `a = ["a", "b"]`, `b = ["b", "c"]`: `equal_length`,
+`parallel`, `perpendicular` and `angle`. Directed `angle` adds finite `degrees`
+in (-180, 180], measured from the first segment to the second; parallel and
+perpendicular relations are unoriented, modulo 180 degrees. `outline` lists named vertices
 in CCW order, and optional hole rings use CW order. Rings omit the closing point.
 The solved profile feeds `extrude`; sketch-driven revolution is not yet supported.
 
 The original Rust `cad-sketch` service uses analytic Jacobians and a bounded
 local nonlinear solve. It reports constraint residuals, local rank and degrees
 of freedom, redundant equation count, conditioning and implementation identity.
-Fixed/coincident residuals are Euclidean distances. Initial guesses select a
+Schema-2 reports separate `max_residual_mm` and
+`max_angular_residual_radians`; each constraint emits exactly one of
+`residual_mm` or `residual_radians`. Linear constraints use the requested
+`tolerance_mm`; angular constraints use the independent
+`angular_tolerance_radians = 1e-9`. Fixed/coincident residuals are Euclidean
+distances. The conditioning bound applies to the mixed normalized-linear/radian
+Jacobian, not to coordinate error. Initial guesses select a
 local branch; convergence does not prove a unique solution or continuity across
 edits. There is no automatic geometry repair or arbitrary placement of free
-points. Underconstrained, unconverged or numerically unresolved results cannot
+points. Zero or numerically unresolved segment directions fail explicitly.
+An angular residual within 1e-8 radians of its wrap cut is unresolved; trial
+steps that can cross that cut are damped rather than silently changing branches.
+Underconstrained, unconverged or numerically unresolved results cannot
 publish geometry; the previous generation remains available.
 
 Limits are 32 points, 128 constraints and 256 iterations per sketch, with at most
@@ -1040,8 +1053,22 @@ than a formula for the triangle apex. Independent circle-intersection formulas
 check 27 dimension combinations, support inertia, mass, bounds and deck placement.
 Changing one side length rebuilds the support extrusion and transform while
 reusing the deck, rails, base and bolts. The viewer remains an inspection client;
-changing dimensions requires a recipe build. Circles/arcs in constrained sketches,
-angles, tangency, branch-continuation policies and assembly joints remain future work.
+changing dimensions requires a recipe build.
+
+[constrained_angle_fixture.star](examples/constrained_angle_fixture.star) solves
+an inclined triangular support using an angle and perpendicularity, plus an
+equal-leg trapezoid deck using parallel edges. Its deck and two shared side pads
+follow solved face datums; a rounded base and four bolts complete nine occurrences
+using five definitions. Parameters are `span` (50..80 mm), `tilt_degrees`
+(15..45 degrees) and `deck_top_width` (18..30 mm), defaulting to 60, 30 and 24.
+Independent trigonometry gives support height `span*tan(tilt_degrees)` and deck
+height `sqrt(44²-((36-deck_top_width)/2)²)`. Native checks pass across 27 configurations; three configurations also pass
+independent STEP readback and all three browser clients (nine browser cases).
+Run `npm run test:angular-sketch --prefix tools/preview-check` for browser
+acceptance and `crates/cad-export/tools/check_angle_fixture_ocp.py` with the
+optional OCP environment for exchange acceptance. Circles/arcs
+in constrained sketches, tangency, branch-continuation policies and assembly
+joints remain future work.
 
 ### Native line and arc profiles
 
