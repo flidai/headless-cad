@@ -112,6 +112,19 @@ one-part edit and full release generation so viewer progress does not conceal
 headless build costs. Keep M2 geometry reliability, M4 constraints and M6
 manufacturing acceptance independent of display performance.
 
+Apply the architecture's [resource ownership contract](architecture.md#resource-ownership-across-the-product)
+across simultaneous build, inspection and export workloads; neither a display
+cache cap nor a mesh-cache retention cap establishes bounded process memory.
+Keep [GPU execution boundaries](architecture.md#gpu-and-portability) explicit:
+optional analytic rendering and compute acceleration require their own fidelity,
+failure and backend-identity evidence. They cannot replace native modeling or
+manufacturing gates and do not block the CPU-only headless product.
+M3 progressive publication must pin every display revision to one immutable
+design generation. M1 configuration work must implement explicit suppression
+participation and reject live references to suppressed occurrences. Hosted M7
+delivery must authorize the complete artifact/dependency graph in project scope;
+content-addressed storage alone does not establish tenant isolation.
+
 Engineering property gates now enforce native volume, mass, centroid and central
 inertia bounds before publication, including selected-output builds.
 `mounted_drive_module.star` carries fixed mass and balance requirements; its

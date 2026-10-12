@@ -942,9 +942,15 @@ independent tests cover unselected edits, one-tool regeneration and a 1,000-stat
 recipe with 40 unique tool variants.
 
 A configuration identity must include the pinned definition revision, resolved
-parameters, suppression rules and material overrides. Specify whether a
-suppressed occurrence contributes to geometry queries, BOM and manufacturing
-outputs; visibility alone must never change those engineering results.
+parameters, suppression rules and material overrides. In the target model,
+suppression removes an occurrence subtree from that configuration's evaluated
+assembly, constraints, geometry queries, mass rollups, BOM quantities and
+manufacturing outputs. References to suppressed occurrences fail explicitly
+unless their dependent features are also suppressed; they cannot use stale
+placements. An all-configurations inventory may list them as suppressed, with
+no quantity contribution to the active release. Record these participation rules
+and their schema version in query and release identities. Viewer hiding only
+changes inspection visibility and never changes engineering participation.
 Cross-level references use explicit instance paths and revision scope. Their
 dependency cycles are checked independently of cyclic mechanical constraints:
 a nonlinear solver is not a way to resolve a cyclic feature build.
@@ -1134,6 +1140,17 @@ in each result, alongside the workload and implementation revision.
 
 ### Streaming and cache contract
 
+Keep an immutable validated design generation separate from its derived display
+revisions. A later completed detail level publishes a new immutable display
+manifest referencing the same exact-geometry and source-generation digests.
+Only advance the display pointer after its required assets pass validation;
+do not rewrite engineering results or the design release. Camera demand may
+mix compatible levels within that pinned generation, but never geometry from a
+different source revision. Failed refinement leaves the previous complete
+display manifest available. Race tests must cover design changes arriving while
+an older generation's refinement job finishes. This is the target progressive
+publication contract, not a claim of asynchronous refinement in today's server.
+
 An immutable assembly manifest references versioned part manifests and display
 pages. Serve content-addressed blobs with range-capable HTTP where useful;
 transport is replaceable and does not require WebSockets. Small generation
@@ -1169,6 +1186,31 @@ cancelled finer level retains the last valid coverage. Partial refinement output
 must never masquerade as a complete level or invalidate a released generation.
 
 ### GPU and portability
+
+GPU acceleration is a replaceable execution choice, not a second source of
+geometric truth. Keep these responsibilities explicit:
+
+| Work | Target execution and authority | Acceptance boundary |
+| --- | --- | --- |
+| Modeling, topology and semantic history | Headless Rust kernel; CPU reference path required | Same supported-domain and numerical contracts with no graphics device present |
+| Constraints and engineering queries | Headless solver/query workers; optional acceleration behind their interfaces | Independently validate residuals, bounds and witnesses; a device failure cannot produce a successful partial result |
+| Meshing and hierarchy construction | Budgeted derived-asset workers; CPU or GPU implementations | Record implementation and error policy; certify boundaries and semantic mapping before publication |
+| Visibility, refinement, rasterization and display picking | Inspection renderer; portable baseline plus optional accelerated paths | Preserve occurrence/source identity, conservative coverage and explicit unresolved detail |
+
+An acceleration experiment must specify its reproducibility envelope before
+sharing caches with another backend. Bitwise-identical results and equivalent
+validated engineering results are different claims. Record backend and numerical
+policy in artifact identity whenever they can affect output; never reuse an
+uncertified result merely because the source recipe hash matches.
+
+Direct analytic GPU rendering is an optional display experiment for supported
+trimmed surfaces. It must handle trim boundaries, seams, depth ordering, section
+planes and selection ownership, and quantify device-precision error. Rendering
+a smooth cylinder alone does not establish those contracts. Keep a certified
+mesh fallback for unsupported surfaces or devices. Analytic pixels do not become
+STEP geometry, manufacturing measurements, or evidence that a Boolean succeeded.
+Compare this path with clustered meshes on the same camera trace, fidelity and
+hardware before adopting it; it is not a prerequisite for the commercial workflow.
 
 Target a Rust graphics backend such as `wgpu` with browser WebGPU and native
 backends, subject to a supported-device matrix. Baseline rendering must not
@@ -1352,6 +1394,40 @@ as well as shape validity; successful display in another application is not
 manufacturing acceptance.
 
 ## Reproducibility, collaboration, and operations
+
+### Resource ownership across the product
+
+The target runtime assigns each allocation and outstanding job to an explicit
+owner. Configure separate budgets rather than treating the viewer's geometry
+cache limit as a product-wide memory guarantee:
+
+| Owner | Budgeted resources | Behavior at the limit |
+| --- | --- | --- |
+| Build scheduler and exact-body store | Resident exact bodies, operation scratch, queued jobs and temporary artifacts | Spill or recompute only verified immutable intermediates; otherwise return a resource failure and retain the prior generation |
+| Constraint/query worker | Problem size, factorization/candidate scratch and iteration/work limits | Return unresolved or failed obligations with diagnostics; never certify an incomplete solve or negative interference result |
+| Display compiler | Tessellation/hierarchy scratch, output bytes and temporary disk | Retain complete published coverage; incomplete refinement is not a valid asset |
+| Inspection client | Decoded metadata, CPU meshes, request/decode staging and GPU allocations | Defer refinement, retain a valid proxy/parent, and expose unmet detail |
+| Artifact service | Disk retention, transfer concurrency and active-job/release pins | Apply backpressure and collect only unreferenced artifacts; retained releases remain reproducible |
+
+Every job reserves its working budget before starting expensive work and releases
+it on completion, failure or cancellation. Shared allocations are charged once
+to their storage owner while each consumer retains a demand/pin; cancelling one
+consumer cannot release another's live dependency. Add process-level peak-memory
+measurements and simultaneous build/inspection/export workloads to acceptance:
+component counters alone omit allocator overhead and overlapping scratch space.
+These are target contracts. Current generation-cache accounting and display
+limits cover only their documented scopes.
+
+### Revision and release lifecycle
+
+Hosted project authorization applies to source snapshots, manifests, meshes,
+reports and every referenced dependency. Knowing a content digest grants no
+access. Deduplication is a storage optimization, not permission inheritance:
+cross-project sharing cannot expose another project's geometry, recipe text or
+artifact-existence information. Authorize reads and job inputs in project scope,
+and bound delegated download access to that scope and lifetime. The present local
+artifact server is not an authenticated multi-tenant service. Gate hosted M7
+delivery with cross-project isolation and revoked-access tests.
 
 Keep source in Git and large immutable artifacts in a content-addressed store.
 Do not require binary geometry merges. Semantic diffs should explain changed
