@@ -1007,7 +1007,7 @@ Prescribed clearances are design intent, not a certified interference result.
 
 ### Dimension-driven sketches
 
-`sketch(id, points, constraints, outline, holes=[], circular_holes=[])` records design intent for
+`sketch(id, points, constraints, outline=None, holes=[], circular_holes=[], curve_outline=None)` records design intent for
 the headless builder. Each point has an `id` and a two-coordinate `position`
 initial guess. Each constraint has a unique `id` and a `kind`: `fixed` uses
 `point` and `position`; `coincident`, `horizontal` and `vertical` use `a` and `b`;
@@ -1067,7 +1067,7 @@ height `sqrt(44²-((36-deck_top_width)/2)²)`. Native checks pass across 27 conf
 independent STEP readback and all three browser clients (nine browser cases).
 Run `npm run test:angular-sketch --prefix tools/preview-check` for browser
 acceptance and `crates/cad-export/tools/check_angle_fixture_ocp.py` with the
-optional OCP environment for exchange acceptance. Constrained arc boundaries, circle-to-circle tangency, branch-continuation policies and assembly
+optional OCP environment for exchange acceptance. Independent arc variables, circle-to-circle tangency, branch-continuation policies and assembly
 joints remain future work.
 
 ### Constrained circular holes
@@ -1082,7 +1082,7 @@ constrained. Initial guesses still select a local solution branch.
 These circles remain analytic through native extrusion and STEP. Polygonal and
 circular holes share the 32-hole limit; unknown handles, zero radii, touching,
 intersecting or outside holes fail validation before publication. This does not
-yet introduce independent circle variables, circular outer boundaries or constrained arcs.
+yet introduce independent circle variables, circular outer boundaries or independent arc variables.
 Circle-to-line tangency is available through the point-handle contract below.
 
 [constrained_drill_jig.star](examples/constrained_drill_jig.star) combines a
@@ -1126,6 +1126,46 @@ three STEP cases check moments and hierarchy. Nine browser cases check 144
 bore/plate/clamp rays and captured source with `npm run test:tangent-sketch
 --prefix tools/preview-check`. Construction tangency does not certify physical
 contact, holding force, finite-segment contact or assembly constraints.
+
+### Curved outlines from solved points
+
+Use `curve_outline` instead of `outline` to describe an outer line/arc path by
+point identifiers. Each `line_to` names its end point; each `arc_to` names its
+centre and end point. The final end identifier must equal `start` explicitly.
+
+```python
+curve_outline = {"start":"a", "segments":[
+    {"kind":"line_to", "end":"b"},
+    {"kind":"arc_to", "center":"right_center", "end":"c"},
+    {"kind":"line_to", "end":"d"},
+    {"kind":"arc_to", "center":"left_center", "end":"a"},
+]}
+```
+
+All referenced points come from the fully constrained sketch. This first curved
+profile contract supports convex CCW outlines, counterclockwise arcs of at most
+a half turn, and circular through-holes. Polygonal holes, concave curves,
+clockwise/major arcs and sketch-driven revolutions remain unsupported.
+Curved profiles use bounded residual refinement after initial sketch convergence,
+without changing the declared acceptance tolerance or projecting coordinates.
+If refinement stagnates, the best fully certified snapshot is returned with its
+own iteration number. The builder then validates the native path before using
+cached solid geometry; even a converged sketch can fail this stricter geometry
+gate. Ordinary polygon sketches keep their original solve policy.
+
+[constrained_capsule_link.star](examples/constrained_capsule_link.star) uses a
+solved capsule outline and two bores in two shared link plates, with two shared
+spacers and two stepped pins. The six occurrences share three definitions.
+Parameters are `span` (40..80 mm), `outer_radius` (8..14 mm) and `bore_radius`
+(3..5 mm). Initial guesses are retained in the recipe. Placements and pin
+clearances are prescribed design intent, not mechanism or contact certification.
+Independent rectangle/semicircle integrals verify 27 configurations, full link
+inertia and assembly mass. Span edits rebuild one definition, outer-radius edits
+two and bore-radius edits three. Asymmetrically perturbed initial guesses are
+also tested; native geometry checks remain mandatory. Three independent STEP
+cases verify moments and assembly hierarchy; `npm run test:capsule-sketch
+--prefix tools/preview-check` checks nine browser cases and 126 visibility rays,
+including arc silhouettes, bores, pins and captured source.
 
 ### Native line and arc profiles
 

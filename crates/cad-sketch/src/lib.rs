@@ -787,10 +787,28 @@ fn linear_solve(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
 pub fn solve(sketch: &Sketch, tolerance: f64) -> Result<SolveReport, SketchError> {
     solve_bounded(sketch, tolerance, MAX_ITERATIONS)
 }
+/// Continue the same bounded solve toward arithmetic residuals for downstream
+/// analytic geometry. Acceptance tolerance is unchanged; coordinates are never
+/// projected. On stagnation, return the best fully world-certified report (with
+/// the iteration of that snapshot), which may still fail native geometry gates.
+pub fn solve_refined(sketch: &Sketch, tolerance: f64) -> Result<SolveReport, SketchError> {
+    let mut best = None;
+    let report = solve_policy(sketch, tolerance, MAX_ITERATIONS, true, &mut best)?;
+    Ok(best.unwrap_or(report))
+}
 fn solve_bounded(
     sketch: &Sketch,
     tolerance: f64,
     budget: usize,
+) -> Result<SolveReport, SketchError> {
+    solve_policy(sketch, tolerance, budget, false, &mut None)
+}
+fn solve_policy(
+    sketch: &Sketch,
+    tolerance: f64,
+    budget: usize,
+    refine: bool,
+    best: &mut Option<SolveReport>,
 ) -> Result<SolveReport, SketchError> {
     validate(sketch)?;
     if !tolerance.is_finite() || tolerance <= 0. {
@@ -828,7 +846,32 @@ fn solve_bounded(
             } else {
                 SolveStatus::Underconstrained
             };
-            return Ok(system.report(&x,&eval,status,iteration,if status==SolveStatus::Underconstrained{Some("converged equations have a rank-deficient local Jacobian; degrees of freedom are a local linearization".into())}else{None}));
+            let report=system.report(&x,&eval,status,iteration,if status==SolveStatus::Underconstrained{Some("converged equations have a rank-deficient local Jacobian; degrees of freedom are a local linearization".into())}else{None});
+            if refine && report.is_fully_constrained() {
+                let score = |r: &SolveReport| {
+                    r.constraint_residuals
+                        .iter()
+                        .map(|v| {
+                            v.residual_mm
+                                .map(|n| n / system.scale)
+                                .unwrap_or_else(|| v.residual_radians.unwrap())
+                                .powi(2)
+                        })
+                        .sum::<f64>()
+                };
+                if best
+                    .as_ref()
+                    .is_none_or(|previous| score(&report) < score(previous))
+                {
+                    *best = Some(report.clone());
+                }
+            }
+            if !refine
+                || !report.is_fully_constrained()
+                || eval.residuals.iter().all(|v| v.abs() <= 8. * f64::EPSILON)
+            {
+                return Ok(report);
+            }
         }
         if iteration == budget {
             return Ok(system.report(
@@ -1322,3 +1365,48 @@ mod angular_tests;
 
 #[cfg(test)]
 mod tangent_tests;
+
+#[cfg(test)]
+mod refinement_tests {
+    use super::*;
+    #[test]
+    fn polishing_preserves_acceptance_and_only_retains_world_certified_snapshots() {
+        let sketch:Sketch=serde_json::from_str(r#"{"points":[{"id":"a","position":[0,0]},{"id":"b","position":[10,0]},{"id":"c","position":[3,7]}],"constraints":[{"id":"a","kind":"fixed","point":"a","position":[0,0]},{"id":"b","kind":"fixed","point":"b","position":[10,0]},{"id":"left","kind":"distance","a":"a","b":"c","value":8},{"id":"right","kind":"distance","a":"b","b":"c","value":9}]}"#).unwrap();
+        let ordinary = solve(&sketch, 1e-7).unwrap();
+        let refined = solve_refined(&sketch, 1e-7).unwrap();
+        assert!(ordinary.is_fully_constrained() && refined.is_fully_constrained());
+        assert_eq!(refined.tolerance_mm, ordinary.tolerance_mm);
+        assert_eq!(
+            refined.angular_tolerance_radians,
+            ordinary.angular_tolerance_radians
+        );
+        assert!(refined.iterations <= MAX_ITERATIONS);
+        assert!(refined.max_residual_mm <= ordinary.max_residual_mm);
+        let cx = (64. + 100. - 81.) / 20.;
+        let cy = f64::sqrt(64. - cx * cx);
+        assert!((refined.points["c"][0] - cx).abs() < 1e-11);
+        assert!((refined.points["c"][1] - cy).abs() < 1e-11);
+        let mut best = None;
+        let _ = solve_policy(&sketch, 1e-7, ordinary.iterations, true, &mut best).unwrap();
+        let accepted = best.unwrap();
+        assert!(accepted.is_fully_constrained());
+        assert_eq!(accepted.iterations, ordinary.iterations);
+        assert_eq!(accepted.points, ordinary.points);
+        let mut free = sketch.clone();
+        free.constraints.clear();
+        let mut best = None;
+        let report = solve_policy(&free, 1e-7, MAX_ITERATIONS, true, &mut best).unwrap();
+        assert_eq!(report.status, SolveStatus::Underconstrained);
+        assert!(best.is_none());
+        let mut exact = sketch.clone();
+        exact.points.truncate(2);
+        exact.constraints.truncate(2);
+        assert_eq!(solve_refined(&exact, 1e-7).unwrap().iterations, 0);
+        let mut impossible = exact;
+        impossible.points[0].position = [1e12, 1e12];
+        assert_eq!(
+            solve_refined(&impossible, 1e-7).unwrap().status,
+            SolveStatus::NumericalFailure
+        );
+    }
+}

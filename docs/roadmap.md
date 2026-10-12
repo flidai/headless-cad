@@ -284,14 +284,24 @@ cylindrical through-holes in extrusion. `constrained_drill_jig.star` adds a
 six-occurrence, three-definition assembly; independent 27-case checks cover
 plate moments, assembly material properties and parameter/cache behavior.
 This is point-handle circle construction; independent circle variables,
-constrained arc boundaries and circle-to-circle tangency remain open.
+independent arc variables and circle-to-circle tangency remain open.
 Circle-to-line tangency now has explicit directed-line side selection and
 linear residual/error budgets. `tangent_bore_fixture.star` adds two opposed
 wedge-positioned bores to a seven-occurrence assembly, with 27 native cases,
 three independent STEP cases and nine browser cases (144 visibility rays).
-Advance toward constrained arcs, circle-to-circle tangency and explicit continuation
+Advance toward independent arc variables, circle-to-circle tangency and explicit continuation
 before claiming general sketch coverage; rigid assembly joints are a separate
 solver milestone.
+
+The curved-profile increment connects point constraints to native convex
+line/arc outer boundaries with circular holes. `constrained_capsule_link.star`
+combines two shared curved link plates, two spacers and two stepped pins. Its
+acceptance starts from perturbed guesses and compares nominal capsule moments,
+parameter edits, native validation, independent STEP and displayed bores/arcs.
+A sketch meeting its requested tolerance must still pass the stricter native
+arc-support consistency checks before publication. Bounded residual refinement
+preserves the requested acceptance policy and retains only fully certified
+snapshots; it never projects coordinates or weakens native validation.
 
 ## Example policy
 

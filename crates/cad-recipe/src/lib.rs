@@ -151,13 +151,15 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         number(value)
     }
 
-    /// Dimension-driven polygon profile. Positions are initial guesses; solving
+    /// Dimension-driven polygon or curved profile. Positions are initial guesses; solving
     /// belongs to the headless builder, never to Starlark evaluation or picking.
+    #[allow(clippy::too_many_arguments)]
     fn sketch(
         id: &str,
         points: Value,
         constraints: Value,
-        outline: Value,
+        outline: Option<Value>,
+        curve_outline: Option<Value>,
         holes: Option<Value>,
         circular_holes: Option<Value>,
         eval: &mut Evaluator,
@@ -168,8 +170,22 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             constraints.to_json()?
         ))
         .map_err(|error| anyhow::anyhow!("invalid sketch definition: {error}"))?;
-        let outline: Vec<String> = serde_json::from_str(&outline.to_json()?)
-            .map_err(|_| anyhow::anyhow!("sketch outline must contain point identifiers"))?;
+        anyhow::ensure!(
+            outline.is_some() != curve_outline.is_some(),
+            "sketch requires exactly one of outline or curve_outline"
+        );
+        let curve_outline: Option<cad_build::SketchPath> = curve_outline
+            .map(|value| -> anyhow::Result<_> {
+                serde_json::from_str(&value.to_json()?)
+                    .map_err(|error| anyhow::anyhow!("invalid sketch curve outline: {error}"))
+            })
+            .transpose()?;
+        let outline: Option<Vec<String>> = outline
+            .map(|value| -> anyhow::Result<_> {
+                serde_json::from_str(&value.to_json()?)
+                    .map_err(|_| anyhow::anyhow!("sketch outline must contain point identifiers"))
+            })
+            .transpose()?;
         let holes: Vec<Vec<String>> = match holes {
             Some(value) => serde_json::from_str(&value.to_json()?)
                 .map_err(|_| anyhow::anyhow!("sketch holes must contain point identifier rings"))?,
@@ -184,15 +200,27 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             holes.len() + circular_holes.len() <= MAX_POLYGON_HOLES,
             "too many sketch holes"
         );
-        let loops: Vec<Vec<String>> = std::iter::once(outline).chain(holes).collect();
+        anyhow::ensure!(
+            curve_outline.is_none() || holes.is_empty(),
+            "curved sketch outlines do not support polygon holes"
+        );
+        let loops: Vec<Vec<String>> = outline.into_iter().chain(holes).collect();
         anyhow::ensure!(
             loops.iter().all(|ring| ring.len() >= 3)
                 && loops.iter().map(Vec::len).sum::<usize>() <= MAX_POLYGON_POINTS,
             "sketch rings require at least 3 points and at most {MAX_POLYGON_POINTS} total vertices"
         );
-        store(eval)?.feature(serde_json::json!({
+        let mut feature = serde_json::json!({
             "op":"sketch", "id":id, "sketch":definition, "loops":loops, "circular_holes":circular_holes, "op_version":1
-        }))?;
+        });
+        if let Some(path) = curve_outline {
+            anyhow::ensure!(
+                !path.segments.is_empty() && path.segments.len() <= MAX_POLYGON_POINTS,
+                "sketch curve outline requires 1..={MAX_POLYGON_POINTS} segments"
+            );
+            feature["curve_outline"] = serde_json::to_value(path)?;
+        }
+        store(eval)?.feature(feature)?;
         Ok(id.to_owned())
     }
 

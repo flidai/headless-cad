@@ -753,7 +753,7 @@ This first solver reports local Jacobian DOF, not a proof of global freedom,
 consistency or unique solutions. Initial guesses select a branch; unchanged
 source is reproducible, but nearby edits do not yet have a branch-continuation
 guarantee. Nonconvergence and residual witnesses are not a minimal conflicting
-constraint set. Redundant equations can be consistent. Constrained arcs,
+constraint set. Redundant equations can be consistent. Independent arc variables,
 circle-to-circle tangency equations, sparse island decomposition and assembly joints remain
 target work. `constrained_slope_fixture.star` connects nonlinear sketch dimensions
 to an extruded support, an associative inclined seat and a nine-occurrence
@@ -807,8 +807,31 @@ swap, shared-endpoint derivative checks and conflicting constraints cover this
 contract. `tangent_bore_fixture.star` uses two opposed construction wedges to
 locate bores in a seven-occurrence plate/feet/clamps assembly. Native acceptance
 covers 27 configurations; separate STEP and browser oracles check moments,
-hierarchy, bores and source identity. Circle-to-circle tangency, constrained arc
-boundaries and assembly contact solving remain separate work.
+hierarchy, bores and source identity. Circle-to-circle tangency, independent arc
+variables and assembly contact solving remain separate work.
+
+Curved sketch profiles connect solved point references to the native convex
+line/arc path representation. `curve_outline` is mutually exclusive with polygon
+loops; it names a start point and ordered line endpoints or arc centre/endpoints.
+The final endpoint ID must equal the start ID. Structural checks cover all
+features, while numerical solving and native profile validation follow demanded
+outputs. Circular holes remain available, but polygon holes inside curved
+outlines are outside the current path contract. Native arcs retain analytic
+supports and shared endpoint topology through extrusion, transforms and STEP.
+Unsupported winding, concavity, major arcs and radius inconsistency are explicit
+failures, not a request to snap solved coordinates.
+
+The sketch service exposes bounded `solve_refined` for this consumer. It retains
+the original acceptance tolerance and all rank, conditioning and world-coordinate
+precision checks, but continues accepted least-squares steps towards arithmetic
+residuals. Only fully certified returned-world reports can become the retained
+best snapshot. Stagnation or the iteration cap returns that snapshot with its
+own iteration number; this does not certify stronger accuracy or guarantee that
+native arc validation will succeed. Polygon-only profiles retain `solve`.
+The kernel's arc-support consistency policy is unchanged. Independent capsule
+moments and mixed-material assembly checks cover 27 dimension configurations;
+fractional dimensions and asymmetric seed perturbations exercise compatibility
+between the nonlinear solve and native curved geometry.
 
 Evolve this constraint service separately from geometric construction. The target 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
@@ -1465,7 +1488,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and convex line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
-| Sketches | Original Rust bounded 2D point solver, ten constraint kinds, schema-2 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Constrained arcs, circle-to-circle tangency, sparse islands, branch continuation, minimal conflict explanations |
+| Sketches | Original Rust bounded 2D point solver, ten constraint kinds, schema-2 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, sparse islands, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |

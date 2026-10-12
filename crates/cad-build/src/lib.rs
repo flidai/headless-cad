@@ -193,6 +193,27 @@ pub struct SketchCircleHole {
     pub rim: String,
 }
 
+/// A closed outer path whose coordinates come from solved sketch points.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SketchPath {
+    pub start: String,
+    pub segments: Vec<SketchPathSegment>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum SketchPathSegment {
+    LineTo {
+        end: String,
+    },
+    ArcTo {
+        center: String,
+        end: String,
+        #[serde(default)]
+        clockwise: bool,
+    },
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Feature {
@@ -202,6 +223,8 @@ pub enum Feature {
         #[serde(skip_serializing_if = "Vec::is_empty")]
         circular_holes: Vec<SketchCircleHole>,
         loops: Vec<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        curve_outline: Option<SketchPath>,
         op_version: u32,
     },
     Path {
@@ -306,6 +329,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut segments = None;
                 let mut sketch = None;
                 let mut loops = None;
+                let mut curve_outline = None;
                 let mut holes = None;
                 let mut circular_holes = None;
                 let mut height = None;
@@ -338,6 +362,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "segments" => read_field!(segments, Vec<PathSegment>),
                         "sketch" => read_field!(sketch, Sketch),
                         "loops" => read_field!(loops, Vec<Vec<String>>),
+                        "curve_outline" => read_field!(curve_outline, SketchPath),
                         "holes" => read_field!(holes, Vec<Vec<[f64; 2]>>),
                         "circular_holes" => {
                             read_field!(circular_holes, Vec<sketch_profiles::InputHole>)
@@ -365,6 +390,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "segments",
                                     "sketch",
                                     "loops",
+                                    "curve_outline",
                                     "holes",
                                     "circular_holes",
                                     "height",
@@ -389,6 +415,7 @@ impl<'de> Deserialize<'de> for Feature {
                         "op_version",
                         "sketch",
                         "loops",
+                        "curve_outline",
                         "circular_holes",
                     ],
                     "path" => &[
@@ -451,7 +478,12 @@ impl<'de> Deserialize<'de> for Feature {
                             .into_iter()
                             .map(sketch_profiles::InputHole::into_sketch)
                             .collect::<Result<_, M::Error>>()?,
-                        loops: loops.ok_or_else(|| M::Error::missing_field("loops"))?,
+                        loops: match loops {
+                            Some(loops) => loops,
+                            None if curve_outline.is_some() => vec![],
+                            None => return Err(M::Error::missing_field("loops")),
+                        },
+                        curve_outline,
                     },
                     "path" => Feature::Path {
                         id,
@@ -884,6 +916,7 @@ fn hash_feature(
         Feature::Sketch {
             sketch,
             loops,
+            curve_outline,
             circular_holes,
             ..
         } => {
@@ -891,6 +924,12 @@ fn hash_feature(
             hash.update(
                 &serde_json::to_vec(&(sketch, loops)).expect("validated sketch serializes"),
             );
+            if let Some(path) = curve_outline {
+                hash.update(b"sketch_curve_outline");
+                hash.update(
+                    &serde_json::to_vec(path).expect("validated path references serialize"),
+                );
+            }
             if !circular_holes.is_empty() {
                 hash.update(b"sketch_circular_holes");
                 hash.update(
@@ -1211,9 +1250,16 @@ impl BuildEngine {
                     id,
                     sketch,
                     loops,
+                    curve_outline,
                     circular_holes,
                     ..
-                } => sketch_profiles::validate(id, sketch, loops, circular_holes)?,
+                } => sketch_profiles::validate(
+                    id,
+                    sketch,
+                    loops,
+                    curve_outline.as_ref(),
+                    circular_holes,
+                )?,
                 Feature::Circle {
                     id,
                     radius,
@@ -1358,12 +1404,20 @@ impl BuildEngine {
                 id,
                 sketch,
                 loops,
+                curve_outline,
                 circular_holes,
                 ..
             } = feature
             {
-                let (report, rings) =
-                    sketch_profiles::solve(id, sketch, loops, circular_holes, tolerance, &hash)?;
+                let (report, rings) = sketch_profiles::solve(
+                    id,
+                    sketch,
+                    loops,
+                    curve_outline.as_ref(),
+                    circular_holes,
+                    tolerance,
+                    &hash,
+                )?;
                 sketch_reports.insert(id.clone(), report);
                 solved_profiles.insert(id.clone(), rings);
             }
@@ -1390,16 +1444,20 @@ impl BuildEngine {
                         Feature::Extrude {
                             profile, height, ..
                         } => match &recipe.features[indices[profile.as_str()]] {
-                            Feature::Sketch { id, .. } => {
-                                let (rings, circular_holes) = &solved_profiles[id];
-                                cad_kernel::extrude_polygon_with_circular_holes(
-                                    &rings[0],
-                                    &rings[1..],
-                                    circular_holes,
-                                    *height,
-                                    tolerance,
-                                )
-                            }
+                            Feature::Sketch { id, .. } => match &solved_profiles[id] {
+                                sketch_profiles::SolvedProfile::Polygon { rings, circles } => {
+                                    cad_kernel::extrude_polygon_with_circular_holes(
+                                        &rings[0],
+                                        &rings[1..],
+                                        circles,
+                                        *height,
+                                        tolerance,
+                                    )
+                                }
+                                sketch_profiles::SolvedProfile::Path { path, circles } => {
+                                    cad_kernel::extrude_path(path, circles, *height, tolerance)
+                                }
+                            },
                             Feature::Path {
                                 path,
                                 circular_holes,

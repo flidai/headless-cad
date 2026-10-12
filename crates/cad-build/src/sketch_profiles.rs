@@ -11,12 +11,14 @@ pub(super) fn validate(
     id: &str,
     sketch: &Sketch,
     loops: &[Vec<String>],
+    curve_outline: Option<&SketchPath>,
     circular_holes: &[SketchCircleHole],
 ) -> Result<(), BuildError> {
     cad_sketch::validate(sketch).map_err(|e| invalid(id, e.to_string()))?;
-    if loops.is_empty()
-        || loops.len().saturating_add(circular_holes.len()) > MAX_POLYGON_HOLES + 1
-        || loops.iter().map(Vec::len).sum::<usize>() > MAX_POLYGON_POINTS
+    if curve_outline.is_none()
+        && (loops.is_empty()
+            || loops.len().saturating_add(circular_holes.len()) > MAX_POLYGON_HOLES + 1
+            || loops.iter().map(Vec::len).sum::<usize>() > MAX_POLYGON_POINTS)
     {
         return Err(invalid(
             id,
@@ -24,6 +26,48 @@ pub(super) fn validate(
         ));
     }
     let ids: BTreeSet<_> = sketch.points.iter().map(|p| p.id.as_str()).collect();
+    if let Some(path) = curve_outline {
+        if !loops.is_empty() {
+            return Err(invalid(
+                id,
+                "curve_outline cannot be combined with polygon loops or holes",
+            ));
+        }
+        if path.segments.is_empty()
+            || path.segments.len() > MAX_POLYGON_POINTS
+            || circular_holes.len() > MAX_POLYGON_HOLES
+        {
+            return Err(invalid(
+                id,
+                "curved sketch requires 1..256 segments and at most 32 circular holes",
+            ));
+        }
+        let mut referenced = vec![&path.start];
+        let mut last = &path.start;
+        for segment in &path.segments {
+            match segment {
+                SketchPathSegment::LineTo { end } => {
+                    referenced.push(end);
+                    last = end;
+                }
+                SketchPathSegment::ArcTo { center, end, .. } => {
+                    referenced.extend([center, end]);
+                    last = end;
+                }
+            }
+        }
+        if last != &path.start {
+            return Err(invalid(
+                id,
+                "curve_outline must close with the start point ID",
+            ));
+        }
+        for point in referenced {
+            if !ids.contains(point.as_str()) {
+                return Err(invalid(id, format!("unknown curve point '{point}'")));
+            }
+        }
+    }
     for hole in circular_holes {
         if hole.center == hole.rim {
             return Err(invalid(
@@ -75,17 +119,31 @@ pub(super) fn budget(recipe: &Recipe, wanted: &BTreeSet<&str>) -> Result<(), Bui
     Ok(())
 }
 type Rings = Vec<Vec<[f64; 2]>>;
-type SolvedProfile = (Rings, Vec<CircleHole>);
+pub(super) enum SolvedProfile {
+    Polygon {
+        rings: Rings,
+        circles: Vec<CircleHole>,
+    },
+    Path {
+        path: PlanarPath,
+        circles: Vec<CircleHole>,
+    },
+}
 pub(super) fn solve(
     id: &str,
     sketch: &Sketch,
     loops: &[Vec<String>],
+    curve_outline: Option<&SketchPath>,
     circular_holes: &[SketchCircleHole],
     tolerance: Tolerance,
     content_hash: &str,
 ) -> Result<(SolveReport, SolvedProfile), BuildError> {
-    let report =
-        cad_sketch::solve(sketch, tolerance.linear).map_err(|e| invalid(id, e.to_string()))?;
+    let solve = if curve_outline.is_some() {
+        cad_sketch::solve_refined
+    } else {
+        cad_sketch::solve
+    };
+    let report = solve(sketch, tolerance.linear).map_err(|e| invalid(id, e.to_string()))?;
     if !report.is_fully_constrained() {
         return Err(BuildError::SketchSolveFailed {
             feature: id.into(),
@@ -108,12 +166,42 @@ pub(super) fn solve(
             }
         })
         .collect();
+    if let Some(outline) = curve_outline {
+        let path = PlanarPath {
+            start: report.points[&outline.start],
+            segments: outline
+                .segments
+                .iter()
+                .map(|segment| match segment {
+                    SketchPathSegment::LineTo { end } => PathSegment::LineTo {
+                        end: report.points[end],
+                    },
+                    SketchPathSegment::ArcTo {
+                        center,
+                        end,
+                        clockwise,
+                    } => PathSegment::ArcTo {
+                        center: report.points[center],
+                        end: report.points[end],
+                        clockwise: *clockwise,
+                    },
+                })
+                .collect(),
+        };
+        cad_kernel::validate_path(&path, &circles, tolerance).map_err(|e| {
+            BuildError::PolygonProfile {
+                feature: id.into(),
+                message: e.to_string(),
+            }
+        })?;
+        return Ok((report, SolvedProfile::Path { path, circles }));
+    }
     cad_kernel::validate_polygon_with_circular_holes(&rings[0], &rings[1..], &circles, tolerance)
         .map_err(|e| BuildError::PolygonProfile {
         feature: id.into(),
         message: e.to_string(),
     })?;
-    Ok((report, (rings, circles)))
+    Ok((report, SolvedProfile::Polygon { rings, circles }))
 }
 
 // The feature discriminator may follow circular_holes in JSON. Decode typed

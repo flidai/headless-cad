@@ -1426,5 +1426,43 @@
       "volume_tolerance_mm3": 0.003,
       "linear_tolerance_mm": 1e-05
     }
+  },
+  "constrained_capsule_link.star": {
+    "link": {
+      "volume_mm3": 11309.026403552849,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -10,
+          -10,
+          0
+        ],
+        [
+          70,
+          10,
+          8
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-05
+    },
+    "constrained_capsule_link": {
+      "volume_mm3": 29146.282341265287,
+      "solids": 6,
+      "bounds_mm": [
+        [
+          -10,
+          -10,
+          0
+        ],
+        [
+          70,
+          10,
+          34
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }
