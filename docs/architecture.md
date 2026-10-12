@@ -37,6 +37,34 @@ finishing the current prototype or display milestone does not complete it.
 
 ## Architectural commitments
 
+### Delivery priorities and completion authority
+
+The commercial goal is the product contract. Use the following decision order
+when extending the implementation; completing a row advances the product but
+does not close the overall goal:
+
+| Track | Next architectural obligation | Required product evidence |
+| --- | --- | --- |
+| Reliable mechanical modeling | Extend supported operation composition with explicit tolerance, topology-lineage and failure contracts | An increasingly demanding drive-module revision passes independent geometry and engineering checks; failed edits retain the last valid generation |
+| Assembly scale | Bound exact-body residency and page assembly metadata independently of display meshes | Cold inspection, one-part edits and full exports each report their own loaded bodies, peak memory and completion time |
+| Progressive inspection | Advance from whole-part LOD to paged metadata, then crack-safe cluster refinement and conservative visibility | A pinned camera trace meets declared error/resource budgets while picks retain occurrence identity and actual captured Starlark source |
+| Mechanical intent | Expand sketch solving and introduce a separate rigid-frame joint solver | Parameter and motion changes report residuals, degrees of freedom, conflicts and branch behavior against independent expected results |
+| Manufacturing handoff | Preserve declared exchange semantics and add associative drawings, fits and GD&T | One revised source generation produces an independently checked release pack; required semantic loss blocks publication |
+| Team and agent workflows | Version the capability/job protocol and revision lifecycle | Human and agent patches follow the same reproducible validation path, with atomic publication and offline replay |
+
+These tracks can advance in parallel. Select increments by the engineering
+workflow they unblock and the evidence they add, rather than by how many new
+recipe functions or rendered components they introduce. Supporting-library
+adoption must preserve the original-kernel boundary, dependency license
+inventory and replaceable rendering interfaces.
+
+For each implementation increment, record the supported input domain, remaining
+exclusions, affected milestone and evidence revision. Keep proposed, implemented
+and independently validated status distinct. A test fixture establishes its
+stated domain; general kernel robustness requires broader adversarial and edit
+corpora. Changes to completion gates must be explicit architecture decisions,
+not an automatic consequence of a passing test run.
+
 ### Product acceptance priorities
 
 The commercial target is binding when choosing what to implement next. Evaluate
