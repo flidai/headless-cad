@@ -12,6 +12,10 @@ covers reliable revisions, large assemblies, mechanical constraints,
 manufacturing deliverables and reproducible human/AI workflows. The overall
 product goal remains active as these capabilities are implemented and validated.
 
+The [architecture decision](docs/architecture.md#architecture-decision-commercial-engineering-and-virtualized-inspection)
+turns the commercial-CAD and virtualized-geometry briefs into concrete subsystem
+contracts and acceptance obligations.
+
 Read the [target architecture](docs/architecture.md) and
 [milestone roadmap](docs/roadmap.md). First-party code is licensed under
 [Apache-2.0](LICENSE); dependencies retain their own licenses and notices.
@@ -351,8 +355,47 @@ These are deterministic placements; named frames can also be associated with
 supported planar faces using `face_datum`. `instrumented_cartridge.star` shows
 a sensor attached inside a reused, nested cartridge. Moving the cartridge
 repositions the sensor without rebuilding geometry. Upward references, multiple
-simultaneous mates, joints, DOF/residual reporting and collision checking remain
-unsupported.
+simultaneous mates, nonlinear constraint solving and collision checking remain
+unsupported. Prescribed one-axis joints are available as described below.
+
+### Prescribed revolute and prismatic joints
+
+An attached part or rigid subassembly can prescribe one bounded coordinate:
+
+```python
+instance(id = "slider", part = carriage, attach_to = "rail",
+         datum = "drive", target_datum = "drive",
+         joint = prismatic(position = travel, min = 20, max = 100))
+assembly_instance(id = "head", assembly = rotary_head,
+                  attach_to = "slider", source_path = ["hub"],
+                  datum = "axis", target_datum = "top",
+                  joint = revolute(angle = angle, min = -3.14, max = 3.14))
+```
+
+Prismatic positions are millimetres and revolute angles are radians. Motion is
+along/about local +Z after the existing attachment offset:
+`target_world * offset * joint_motion * inverse(source_datum)`. The coordinate
+and both inclusive limits must be finite. Joints require a complete attachment;
+free joints and cyclic attachment graphs are rejected. At most 1,024 prescribed
+joints may occur across all supplied reusable definitions. Structural validation
+includes unused definitions and selected-output builds.
+
+The strict JSON attachment field is `joint = {"kind":"revolute",
+"position":0.6,"min":-3.14,"max":3.14}` (or `kind:"prismatic"`); omitting it
+preserves fixed-attachment behavior. Reports retain limits, prescribed position,
+local-definition frames and unit-labelled placement residuals. The nominal joint
+has one intrinsic degree of freedom and zero remaining freedom after prescribing
+its coordinate; this is forward kinematics, not a nonlinear constraint solver.
+No collision, dynamics, loads or closed-loop consistency is certified. STEP
+carries the resulting occurrence placements, not native joint intent.
+
+`examples/jointed_linear_stage.star` combines a slider, a rotating rigid head,
+semantic datums and a section anchored to the moving carriage. Parameters are
+`travel` (20..100 mm), `angle` (-pi..pi radians), and `pose` (0, 1 or 2).
+Motion edits reuse unchanged part solids while changing assembly identity and
+resolved queries. The independent STEP/section checker is
+`crates/cad-export/tools/check_jointed_stage_ocp.py`; its acceptance is tracked
+separately from implementation and native tests.
 
 To attach a **whole rigid subassembly**, identify its mounting datum with a
 nonempty `source_path` relative to that subassembly:
@@ -1338,8 +1381,8 @@ height `sqrt(44²-((36-deck_top_width)/2)²)`. Native checks pass across 27 conf
 independent STEP readback and all three browser clients (nine browser cases).
 Run `npm run test:angular-sketch --prefix tools/preview-check` for browser
 acceptance and `crates/cad-export/tools/check_angle_fixture_ocp.py` with the
-optional OCP environment for exchange acceptance. Independent arc variables, circle-to-circle tangency, branch-continuation policies and assembly
-joints remain future work.
+optional OCP environment for exchange acceptance. Independent arc variables, circle-to-circle tangency, branch-continuation policies and
+nonlinear assembly joint solving remain future work.
 
 ### Constrained circular holes
 

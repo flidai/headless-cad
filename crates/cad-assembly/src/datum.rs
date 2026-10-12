@@ -1,9 +1,11 @@
 //! Deterministic sibling/descendant datum attachment; not a nonlinear solver.
 use super::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DatumAttachment {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub joint: Option<PrescribedJoint>,
     /// Target root occurrence ID in this definition.
     pub instance: String,
     /// Descendant occurrence IDs ending at a leaf; empty means a sibling leaf.
@@ -45,9 +47,11 @@ impl RigidTransform {
 }
 
 /// Attach a rigid child occurrence through a descendant part datum.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyAttachment {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub joint: Option<PrescribedJoint>,
     pub instance: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub target_path: Vec<String>,
@@ -185,6 +189,7 @@ fn preflight<'a>(
 ) -> Result<BTreeMap<String, Vec<usize>>, AssemblyError> {
     let mut orders = BTreeMap::new();
     let mut work = 0usize;
+    let mut joints = 0usize;
     for (id, d) in definitions {
         let mut dependencies = vec![None; d.instances.len() + d.assemblies.len()];
         let mut check = |i: usize,
@@ -220,6 +225,13 @@ fn preflight<'a>(
         };
         for (i, leaf) in d.instances.iter().enumerate() {
             if let Some(a) = &leaf.attachment {
+                if let Some(joint) = a.joint {
+                    joint.validate()?;
+                    joints += 1;
+                    if joints > MAX_PRESCRIBED_JOINTS {
+                        return Err(AssemblyError::ResourceLimit);
+                    }
+                }
                 check(
                     i,
                     &leaf.part,
@@ -232,6 +244,13 @@ fn preflight<'a>(
         }
         for (i, child) in d.assemblies.iter().enumerate() {
             if let Some(a) = &child.attachment {
+                if let Some(joint) = a.joint {
+                    joint.validate()?;
+                    joints += 1;
+                    if joints > MAX_PRESCRIBED_JOINTS {
+                        return Err(AssemblyError::ResourceLimit);
+                    }
+                }
                 if a.source_path.len() > 64 {
                     return Err(AssemblyError::ResourceLimit);
                 }
@@ -302,6 +321,13 @@ pub fn resolve_hierarchy_placements(
     definitions: &BTreeMap<String, AssemblyDefinition>,
     tolerance: Tolerance,
 ) -> Result<BTreeMap<String, AssemblyDefinition>, AssemblyError> {
+    Ok(resolve_with_reports(parts, definitions, tolerance)?.0)
+}
+pub(super) fn resolve_with_reports(
+    parts: &BTreeMap<String, BuiltPart>,
+    definitions: &BTreeMap<String, AssemblyDefinition>,
+    tolerance: Tolerance,
+) -> Result<(BTreeMap<String, AssemblyDefinition>, Vec<JointReport>), AssemblyError> {
     if !tolerance.is_valid() {
         return Err(AssemblyError::Tolerance);
     }
@@ -311,6 +337,7 @@ pub fn resolve_hierarchy_placements(
     }
     let index = occurrence_index(definitions);
     let orders = preflight(definitions, &index, |id| parts.get(id).map(|p| &p.datums))?;
+    #[allow(clippy::too_many_arguments)]
     fn visit(
         id: &str,
         parts: &BTreeMap<String, BuiltPart>,
@@ -319,6 +346,7 @@ pub fn resolve_hierarchy_placements(
         orders: &BTreeMap<String, Vec<usize>>,
         tolerance: Tolerance,
         memo: &mut BTreeMap<String, AssemblyDefinition>,
+        reports: &mut Vec<JointReport>,
     ) -> Result<(), AssemblyError> {
         if memo.contains_key(id) {
             return Ok(());
@@ -333,6 +361,7 @@ pub fn resolve_hierarchy_placements(
                 orders,
                 tolerance,
                 memo,
+                reports,
             )?;
         }
         let mut resolved = source.clone();
@@ -350,11 +379,27 @@ pub fn resolve_hierarchy_placements(
                         parts,
                         tolerance,
                     )?;
+                    let source_frame = &parts[&leaf.part].datums[&a.datum];
+                    let mut expected = destination.compose(&leaf.transform, tolerance)?;
+                    if let Some(joint) = a.joint {
+                        expected = expected.compose(&joint.motion(tolerance)?, tolerance)?;
+                    }
                     resolved.instances[i].transform =
-                        destination.compose(&leaf.transform, tolerance)?.compose(
-                            &parts[&leaf.part].datums[&a.datum].inverse(tolerance)?,
+                        expected.compose(&source_frame.inverse(tolerance)?, tolerance)?;
+                    if let Some(joint) = a.joint {
+                        reports.push(JointReport::checked(
+                            id,
+                            &leaf.id,
+                            "part",
+                            joint,
+                            resolved.instances[i]
+                                .transform
+                                .compose(source_frame, tolerance)?,
+                            destination,
+                            expected,
                             tolerance,
-                        )?;
+                        )?);
+                    }
                 }
                 resolved.instances[i].attachment = None;
             } else {
@@ -381,9 +426,26 @@ pub fn resolve_hierarchy_placements(
                         parts,
                         tolerance,
                     )?;
-                    resolved.assemblies[j].transform = destination
-                        .compose(&child.transform, tolerance)?
-                        .compose(&source_frame.inverse(tolerance)?, tolerance)?;
+                    let mut expected = destination.compose(&child.transform, tolerance)?;
+                    if let Some(joint) = a.joint {
+                        expected = expected.compose(&joint.motion(tolerance)?, tolerance)?;
+                    }
+                    resolved.assemblies[j].transform =
+                        expected.compose(&source_frame.inverse(tolerance)?, tolerance)?;
+                    if let Some(joint) = a.joint {
+                        reports.push(JointReport::checked(
+                            id,
+                            &child.id,
+                            "assembly",
+                            joint,
+                            resolved.assemblies[j]
+                                .transform
+                                .compose(&source_frame, tolerance)?,
+                            destination,
+                            expected,
+                            tolerance,
+                        )?);
+                    }
                 }
                 resolved.assemblies[j].attachment = None;
             }
@@ -392,6 +454,7 @@ pub fn resolve_hierarchy_placements(
         Ok(())
     }
     let mut memo = BTreeMap::new();
+    let mut reports = Vec::new();
     for id in definitions.keys() {
         visit(
             id,
@@ -401,9 +464,13 @@ pub fn resolve_hierarchy_placements(
             &orders,
             tolerance,
             &mut memo,
+            &mut reports,
         )?;
     }
-    Ok(memo)
+    reports.sort_by(|a, b| {
+        (&a.definition_id, &a.occurrence_id).cmp(&(&b.definition_id, &b.occurrence_id))
+    });
+    Ok((memo, reports))
 }
 /// Compatibility view of derived local leaves. Consumers needing child placements
 /// must use `resolve_hierarchy_placements` instead.

@@ -18,7 +18,7 @@ from check_step_metadata_ocp import command
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 RECIPE = ROOT / 'examples/modular_linear_stage.star'
 
-def assembly_section(path, plane):
+def assembly_section(path, plane, expected_solids=4):
     reader = STEPControl_Reader()
     require(reader.ReadFile(str(path)) == IFSelect_RetDone and reader.TransferRoots() == 1, 'STEP import')
     explorer = TopExp_Explorer(reader.OneShape(), TopAbs_SOLID)
@@ -26,7 +26,7 @@ def assembly_section(path, plane):
     while explorer.More():
         sections.append(shape_section(explorer.Current(), plane))
         explorer.Next()
-    require(len(sections) == 4, 'four STEP solid occurrences')
+    require(len(sections) == expected_solids, 'STEP solid occurrence count')
     area = sum(section['area'] for section in sections)
     require(area > 0, 'nonempty assembly section')
     center = [sum(section['area']*section['centroid'][i] for section in sections if section['centroid'] is not None)/area for i in range(2)]

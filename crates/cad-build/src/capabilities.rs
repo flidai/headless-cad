@@ -375,6 +375,7 @@ pub fn capability_catalog() -> CapabilityCatalog {
         exclusions,
     };
     let domains=vec![
+        domain("assembly.prescribed_joints",vec![],vec!["schema-2 datum attachments optionally prescribe revolute or prismatic motion; finite position and inclusive min/max limits", "motion is target datum times existing offset times joint motion about/along local +Z times inverse source datum", "part or rigid-module attachments form an acyclic dependency graph; immutable shared geometry; placement-only motion changes assembly identity", "structural joint limits are global even for selected body builds"],vec!["nonlinear or closed-loop solving, free joints, dynamics, collision/clearance certification"]),
         domain("query.planar_section",vec![],vec!["exact directed line/arc loops with native face provenance, area and centroid", "general planar solids; axis-transverse circular, annular, line/arc prism, blind/stepped/countersunk and revolution solids", "body and assembly occurrence frames; assembly areas sum occurrences, not union; declared views are global obligations"],vec!["oblique curved intersections; tangent/coplanar topology-event planes; implicit perturbation; manufacturing PMI"]),
         domain("profile.circle",vec!["feature.circle"],vec!["disk or concentric annulus, finite radii with resolved positive material thickness"],vec!["arbitrary circular-edge graphs"]),
         domain("profile.polygon",vec!["feature.rectangle","feature.polygon","feature.sketch"],vec!["simple CCW outer ring; simple CW polygon holes; circular holes strictly interior and disjoint", "rings implicitly closed without repeated endpoint; bounded predicate/integration arithmetic"],vec!["overlap, nesting, contacts, repair"]),
@@ -394,7 +395,7 @@ pub fn capability_catalog() -> CapabilityCatalog {
         domain("boolean.round_stock",vec!["feature.cut"],vec!["canonical solid circular or annular stock with a solid parallel or opposite-axis cylindrical tool", "contained circular through/blind drilling followed by separated or coaxial stepped cuts", "exact two-semicircle outer boundary adaptation; original outer-wall lineage splits into two faces, caps and untouched central bore retain lineage", "native circular support, analytic mass properties and common rigid placements"],vec!["tangent/crossing stock boundaries or existing bore; noncoaxial overlapping holes; enclosed cutter; skew or unresolved placement; general curved Boolean closure"]),
     ];
     CapabilityCatalog{schema_version:CAPABILITY_SCHEMA_VERSION,interface:"json_recipe_ir",recipe_schema_versions:vec![1,2],latest_recipe_schema_version:crate::RECIPE_SCHEMA_VERSION,units:"mm",default_linear_tolerance_mm:cad_kernel::Tolerance::default().linear,identities:ImplementationIdentities{assembly_build_id:cad_assembly::assembly_build_id(),catalog_build_id:catalog_build_id(),kernel_version:cad_kernel::KERNEL_VERSION,kernel_build_id:cad_kernel::KERNEL_BUILD_ID,executor_build_id:crate::executor_build_id(),sketch_solver_build_id:crate::solver_build_id()},operations,object_types,domains,
-        resource_limits:BTreeMap::from([("features_per_recipe",crate::MAX_FEATURES),("section_views_per_recipe",crate::MAX_SECTION_VIEWS),("section_dimensions_per_view",crate::MAX_SECTION_DIMENSIONS_PER_VIEW),("section_dimensions_per_recipe",crate::MAX_SECTION_DIMENSIONS),("section_view_geometry_work",crate::MAX_SECTION_VIEW_WORK),("exchange_requirements_per_recipe",crate::MAX_EXCHANGE_REQUIREMENTS),("demanded_sketches_per_build",128),("polygon_points_total",crate::MAX_POLYGON_POINTS),("stepped_bore_axial_sections",cad_kernel::MAX_STEPPED_BORE_SEGMENTS),("profile_holes_total",crate::MAX_POLYGON_HOLES),("sketch_points_total",cad_sketch::MAX_POINTS),("sketch_constraints_total",cad_sketch::MAX_CONSTRAINTS),("sketch_points_per_island",cad_sketch::MAX_ISLAND_POINTS),("sketch_constraints_per_island",cad_sketch::MAX_ISLAND_CONSTRAINTS),("solver_iterations_per_island",cad_sketch::MAX_ITERATIONS),("parts_per_recipe",crate::MAX_PARTS),("assemblies_per_recipe",crate::MAX_ASSEMBLIES),("instances_per_recipe",crate::MAX_INSTANCES),("outputs_per_recipe",crate::MAX_OUTPUTS)]),
+        resource_limits:BTreeMap::from([("prescribed_joints_per_recipe",cad_assembly::MAX_PRESCRIBED_JOINTS),("features_per_recipe",crate::MAX_FEATURES),("section_views_per_recipe",crate::MAX_SECTION_VIEWS),("section_dimensions_per_view",crate::MAX_SECTION_DIMENSIONS_PER_VIEW),("section_dimensions_per_recipe",crate::MAX_SECTION_DIMENSIONS),("section_view_geometry_work",crate::MAX_SECTION_VIEW_WORK),("exchange_requirements_per_recipe",crate::MAX_EXCHANGE_REQUIREMENTS),("demanded_sketches_per_build",128),("polygon_points_total",crate::MAX_POLYGON_POINTS),("stepped_bore_axial_sections",cad_kernel::MAX_STEPPED_BORE_SEGMENTS),("profile_holes_total",crate::MAX_POLYGON_HOLES),("sketch_points_total",cad_sketch::MAX_POINTS),("sketch_constraints_total",cad_sketch::MAX_CONSTRAINTS),("sketch_points_per_island",cad_sketch::MAX_ISLAND_POINTS),("sketch_constraints_per_island",cad_sketch::MAX_ISLAND_CONSTRAINTS),("solver_iterations_per_island",cad_sketch::MAX_ITERATIONS),("parts_per_recipe",crate::MAX_PARTS),("assemblies_per_recipe",crate::MAX_ASSEMBLIES),("instances_per_recipe",crate::MAX_INSTANCES),("outputs_per_recipe",crate::MAX_OUTPUTS)]),
         sketch_policy:SketchPolicy{report_schema_version:3,angular_tolerance_radians:cad_sketch::ANGULAR_TOLERANCE_RADIANS,max_condition_bound:cad_sketch::MAX_CONDITION_BOUND,acceptance:"fully_constrained only; linear residuals in mm and angular residuals in radians checked separately; condition bound is worst local normalized Jacobian condition, not coordinate accuracy"},
         validation_obligations:vec!["recipe units must be mm; schemas 1 and 2 accepted; assembly/assertion/datum fields require schema 2", "strict structural fields, unique identifiers, valid references, acyclic dependencies and aggregate resource budgets", "default tolerance is native Tolerance::default(); requested tolerance must be finite and positive", "numeric bounds, minimum feature clearances, canonical native topology and analytic mass properties validated; a declared family does not guarantee every parameter combination", "semantic face selections and property assertions must resolve; display meshes are derived, never authoritative", "unsupported operations fail explicitly; no implicit repair or dimensional snapping", "example paths are repository fixtures illustrating the domain, not a guarantee that arbitrary parameter edits succeed"],unsupported_operation_ids:vec!["feature.fillet","feature.loft","feature.sweep","feature.shell","feature.import_step","feature.general_boolean","assembly.solve_joints"]}
 }
@@ -524,6 +525,7 @@ fn envelope_objects(operations: &[OperationCapability]) -> Vec<ObjectSpec> {
             array_default("target_path", reference("occurrence_path_component")),
             arg("datum", reference("source_part_datum")),
             arg("target_datum", reference("target_part_datum")),
+            optional_null("joint", object("prescribed_joint")),
         ],
     );
     attachment.obligations.extend(["instance identifies target root occurrence within this assembly definition; target_path contains literal descendant occurrence IDs and must end at a part", "empty target_path targets a sibling leaf; bounded acyclic attachment dependencies, not a nonlinear assembly solver"]);
@@ -538,9 +540,30 @@ fn envelope_objects(operations: &[OperationCapability]) -> Vec<ObjectSpec> {
             ),
             arg("datum", reference("source_part_datum")),
             arg("target_datum", reference("target_part_datum")),
+            optional_null("joint", object("prescribed_joint")),
         ],
     );
     assembly_attachment.obligations.extend(["source_path is nonempty and ends at a part inside this child assembly; target_path resolves relative to the target root occurrence", "paths use literal occurrence IDs, not slash-encoded strings; depth/work/resource limits apply"]);
+    let mut joint = object_spec("prescribed_joint", vec![]);
+    joint.discriminator = Some("kind");
+    joint.variants = [("revolute", "rad"), ("prismatic", "mm")]
+        .into_iter()
+        .map(|(kind, unit)| ObjectVariant {
+            tag_value: kind,
+            arguments: ["position", "min", "max"]
+                .into_iter()
+                .map(|name| {
+                    let mut a = arg(name, T::Number);
+                    a.units = Some(unit);
+                    a.constraints.push("finite; min <= position <= max");
+                    a
+                })
+                .collect(),
+        })
+        .collect();
+    joint.obligations.extend(["only valid inside complete datum attachments; prescribed motion, not a solved degree of freedom", "axis +Z in the target datum after the existing offset transform; angular position and limits in radians, translation in millimetres", "unknown fields, nonfinite values and out-of-range positions reject globally"]);
+    attachment.obligations.push("optional prescribed joint composes after local offset and before inverse source datum; position does not change part geometry");
+    assembly_attachment.obligations.push("optional prescribed joint moves the child rigidly; repeated definition geometry remains shared");
     let mut part_instance = object_spec(
         "part_instance",
         vec![
@@ -576,6 +599,7 @@ fn envelope_objects(operations: &[OperationCapability]) -> Vec<ObjectSpec> {
     vec![
         recipe,
         feature,
+        joint,
         object_spec(
             "chamfer_face",
             vec![
@@ -800,6 +824,7 @@ mod tests {
             "assembly_instance",
             "datum_attachment",
             "assembly_attachment",
+            "prescribed_joint",
             "assembly_output",
         ] {
             assert!(catalog.object_types.iter().any(|o| o.id == id));

@@ -228,6 +228,7 @@ mod tests {
                     part: "part".into(),
                     transform: RigidTransform::default(),
                     attachment: Some(DatumAttachment {
+                        joint: None,
                         instance: "fixed".into(),
                         target_path: vec![],
                         datum: "mount".into(),

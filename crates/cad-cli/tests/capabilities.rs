@@ -531,6 +531,7 @@ fn focused_assembly_type_discovery_follows_nullable_inline_objects_not_reference
                 "assembly_instance",
                 "datum_attachment",
                 "part_instance",
+                "prescribed_joint",
                 "rigid_transform",
             ],
         ),
@@ -595,4 +596,58 @@ fn focused_discovery_rejects_unknown_ids_and_conflicting_flags_without_writes() 
     assert!(conflict.stdout.is_empty());
     assert!(!conflict.stderr.is_empty());
     assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn joint_discovery_describes_prescribed_attachments_without_claiming_a_solver() {
+    let dir = tempfile::tempdir().unwrap();
+    let result = cli(dir.path(), &["capabilities"]);
+    assert!(result.status.success());
+    let catalog: Value = serde_json::from_slice(&result.stdout).unwrap();
+    let objects = catalog["object_types"].as_array().unwrap();
+    let joint = objects
+        .iter()
+        .find(|o| o["id"] == "prescribed_joint")
+        .unwrap();
+    assert_eq!(joint["discriminator"], "kind");
+    assert_eq!(joint["variants"].as_array().unwrap().len(), 2);
+    for (kind, unit) in [("revolute", "rad"), ("prismatic", "mm")] {
+        let variant = joint["variants"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["tag_value"] == kind)
+            .unwrap();
+        for name in ["position", "min", "max"] {
+            let arg = variant["arguments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|a| a["name"] == name)
+                .unwrap();
+            assert_eq!(arg["units"], unit);
+            assert_eq!(arg["required"], true);
+        }
+    }
+    for name in ["datum_attachment", "assembly_attachment"] {
+        let object = objects.iter().find(|o| o["id"] == name).unwrap();
+        assert!(object["arguments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["name"] == "joint" && a["required"] == false));
+    }
+    assert!(catalog["unsupported_operation_ids"]
+        .as_array()
+        .unwrap()
+        .contains(&Value::String("assembly.solve_joints".into())));
+    assert_eq!(
+        catalog["resource_limits"]["prescribed_joints_per_recipe"],
+        1024
+    );
+    assert!(catalog["domains"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["id"] == "assembly.prescribed_joints"));
 }

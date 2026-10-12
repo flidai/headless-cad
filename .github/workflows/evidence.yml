@@ -6,6 +6,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - case: prescribed-joints
+            capability: assembly.prescribed-joints
           - case: counterbore
             capability: machining.counterbore-fixture
           - case: round-stock

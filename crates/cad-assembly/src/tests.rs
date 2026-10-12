@@ -854,6 +854,7 @@ fn attached(id: &str, target: &str) -> Instance {
         part: "plate".into(),
         transform: RigidTransform::default(),
         attachment: Some(DatumAttachment {
+            joint: None,
             target_path: vec![],
             instance: target.into(),
             datum: "origin".into(),

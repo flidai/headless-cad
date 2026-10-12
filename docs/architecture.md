@@ -87,46 +87,48 @@ stated domain; general kernel robustness requires broader adversarial and edit
 corpora. Changes to completion gates must be explicit architecture decisions,
 not an automatic consequence of a passing test run.
 
-### Product acceptance priorities
+### Architecture decision: commercial engineering and virtualized inspection
 
-The commercial target is binding when choosing what to implement next. Evaluate
-each increment against these five product outcomes:
+Decision accepted from the supplied commercial-CAD and virtualized-geometry
+briefs on 2026-10-12. The competitive reference is Autodesk-class mechanical
+engineering. FreeCAD feature parity is not a release target. This decision keeps
+the Apache-2.0, original Rust kernel, headless execution and source-authoritative
+contracts binding as the product grows.
 
-1. **Trust a revision.** Change dimensions through a substantial feature history,
-   preserve semantic intent, and identify failed obligations before publication.
-2. **Work at assembly scale.** Inspect and revise a machine with bounded memory,
-   selective exact-body evaluation, shared definitions and progressive display.
-3. **Express mechanical intent.** Solve dimensions and mechanisms with explicit
-   residuals, degrees of freedom and branch behavior instead of hand-positioning
-   a visually plausible result.
-4. **Release manufacturing evidence.** Regenerate associated drawings, dimensions,
-   BOM and open exchange from the same validated source revision.
-5. **Automate through source.** Let humans and agents propose reviewable recipe
-   patches, consume structured failures and replay accepted builds offline.
+The implementation sequence below turns the briefs into owned boundaries. Each
+row needs a versioned artifact or API contract and an executable acceptance
+fixture before its capability can be declared complete.
 
-The two supplied briefs inform these outcomes and the display contract below.
-They do not make a particular cluster size, mesh-shader backend, silent healing
-policy or proprietary solver a requirement. Progress must advance both the
-drive-module engineering workflow and the separate assembly-scale workload.
-
-### Decisions adopted from the feature brief
-
-The product target is an engineering team releasing a revised mechanical design
-from Git, with an inspectable chain from source intent to manufacturing evidence.
-The following decisions govern implementation priorities, not just the viewer:
-
-| Priority | Decision | Completion evidence |
+| Boundary | Required artifact or API | Next acceptance obligation |
 | --- | --- | --- |
-| Reliable engineering edits | Develop robust geometry, semantic references and incremental regeneration together | A changed bearing size survives the supported feature history or reports a precise unsupported/ambiguous obligation; no silently repaired dimensions |
-| Large designs on bounded hardware | Independently schedule and budget exact bodies, assembly metadata, display assets and query results | Measure cold opening, one-part revision and release generation separately; count loaded bodies and peak memory, not only frames per second |
-| Progressive GPU inspection | Build part LODs and paged metadata before a cluster-streaming backend; keep rendering replaceable | The staged M3 gates below pass with retained occurrence/source identity and explicit unresolved detail |
-| Mechanical design intent | Solve sketches and rigid-frame mechanisms through headless services | Report residuals, degrees of freedom, conflicts and branch changes; geometry is requested separately for interference checks |
-| Manufacturing and collaboration | Release drawings, BOM, validation and open exchange against one immutable revision | A revised release pack is reproducible offline and traceable to reviewed source and configuration |
+| Exact modeling and regeneration | Immutable native body snapshots, semantic lineage and structured operation failures | Revise a bearing housing through a substantial feature history; validate geometry independently and preserve the prior generation on failure |
+| Exact-body residency | Budgeted job admission and body-handle loading, independent of display requests | Measure a one-part edit, full export and an oversized unique operation; reject a resource overrun before publication without weakening tolerances |
+| Assembly and display virtualization | Paged occurrence hierarchy plus shared, content-addressed part display pages | Start overview without expanding all occurrences or loading exact bodies; separately bound metadata, decoding, CPU and GPU residency |
+| Progressive detail | Conservative error bounds, crack-safe cluster replacement and semantic selection mappings | Follow the M3a–M3d gates below; retain parent coverage during missing/corrupt pages and preserve occurrence/source identity through refinement |
+| Mechanical intent | Rigid-frame joint requests and unit-labelled residual/DOF reports | Progress from prescribed open-chain positions to solved loops, singularity and conflict diagnostics; run geometry-based interference checks separately |
+| Manufacturing release | Revision-bound drawing, BOM, material and open-exchange manifests | Regenerate and independently inspect one complete drive-module release after a consequential design revision |
+| Human and AI collaboration | Reviewable source patches, locked dependencies, isolated jobs and atomic publication | Replay the same accepted revision offline; neither viewer state nor a paid AI service may be required to reproduce it |
 
-Treat software architecture and hardware capacity as coupled constraints. Lazy
-loading cannot eliminate the cost of building a new unique part, solving a hard
-constraint system or exporting an entire detailed assembly. Profile those jobs
-independently; faster display must not conceal an unbounded headless build.
+The viewer remains an inspection client. Selecting a part exposes its captured
+Starlark and provenance; fetching finer display pages does not execute modeling
+operations. A coarse aggregate may require selection refinement before a precise
+part or face can be identified. Engineering dimensions come from native queries,
+never a convenient display LOD.
+
+GPU work initially belongs to derived display processing and visibility. A
+meshlet encoder is only one component: paging, cancellation, conservative error,
+coverage, selection and memory accounting must work together. `wgpu` and
+`meshoptimizer` remain replaceable candidates subject to version, license and
+corpus evaluation. No mesh-shader feature or fixed cluster size is a product
+prerequisite. An analytic GPU preview is an optional display path, not an exact
+modeling implementation.
+
+Software architecture and hardware capacity are coupled constraints. Lazy loading
+cannot eliminate the cost of building a new unique part, solving a difficult
+constraint system or exporting a detailed machine. Profile these jobs separately;
+fast display cannot close an unbounded modeling or manufacturing gate. Controlled
+repair must report its geometric deviations; silent healing is not an acceptance
+strategy.
 
 ### Invariants
 
@@ -298,8 +300,7 @@ are inherently cyclic. Constraints also form graphs with loops. An assembly is
 not a Boolean union of its parts. Fixtures and enclosures use explicit part
 instances; the modular rack reuses nested rows and carriages. Older examples can
 still use disjoint unions. Named part frames and deterministic part/rigid-module datum
-attachments are implemented; joints and nonlinear assembly constraint solving remain
-target work.
+attachments are implemented. Prescribed revolute/prismatic motion is implemented; nonlinear assembly constraint solving remains target work.
 
 Graph boundaries also define invalidation. A camera move changes display demand
 only. An occurrence placement edit updates assembly bounds and dependent queries,
@@ -1124,8 +1125,8 @@ attachments consume these resolved frames without requiring a nonlinear solver.
 `surface_mount.star` changes a ramp slope and moves/turns an attached plate;
 independent slope equations check the plate's placement across parameter edits.
 `instrumented_cartridge.star` exercises a sensor targeting a housing datum
-inside a reused nested cartridge. General cross-boundary mating, joints,
-multiple constraints, and DOF/residual solving remain separate future work.
+inside a reused nested cartridge. General cross-boundary mating, simultaneous
+constraints and nonlinear DOF/residual solving remain separate future work.
 
 The attachment acceptance corpus checks noncommuting own/target datum frames,
 resolved targets with their own attachments, repeated child definitions, literal
@@ -1189,8 +1190,8 @@ consistency or unique solutions. Initial guesses select a branch; unchanged
 source is reproducible, but nearby edits do not yet have a branch-continuation
 guarantee. Nonconvergence and residual witnesses are not a minimal conflicting
 constraint set. Redundant equations can be consistent. Independent arc variables,
-circle-to-circle tangency equations, sparse solving within large connected islands and assembly joints remain
-target work. `constrained_slope_fixture.star` connects nonlinear sketch dimensions
+circle-to-circle tangency equations, sparse solving within large connected islands
+and nonlinear assembly joint solving remain target work. `constrained_slope_fixture.star` connects nonlinear sketch dimensions
 to an extruded support, an associative inclined seat and a nine-occurrence
 fixture. Independent three-side triangle formulas validate 27 configurations,
 native moments, material mass and attached deck placement.
@@ -1210,7 +1211,7 @@ pass, including centroid/full inertia and deck/pad placements. Browser inspectio
 passes three configurations in Canvas, embedded GPU and streaming GPU modes,
 with selected-deck recipe inspection and no exact-body downloads. Angular
 conflicts preserve the last valid published generation. These prescribed
-attachments do not establish assembly-joint or load-solving capability.
+attachments do not establish nonlinear assembly-joint or load-solving capability.
 
 Sketch profiles now accept circular through-holes defined by solved centre and
 rim point references. The builder derives each radius from those returned points,
@@ -1296,6 +1297,25 @@ Evolve this constraint service separately from geometric construction. The targe
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
 solution branches, and convergence limits. Preserve branch/continuation intent
 across small parameter edits; diagnose underconstrained sketches explicitly.
+
+The current prescribed-joint increment evaluates acyclic forward kinematics.
+Optional `joint` attachment records are strict tagged revolute/prismatic objects
+with `position`, `min` and `max`; angles are radians and translations millimetres.
+The transform order is target datum, existing offset, local +Z joint motion,
+then inverse source datum. Both part and rigid-subassembly attachments support
+this composition, including semantic face datums and nested target paths.
+Finite inclusive limits and a 1,024-joint aggregate definition cap are checked
+globally, even when publishing a selected body. Motion edits retain part-solid
+cache identity and change assembly identity. Reports expose local-definition
+frames, unit-labelled recomposition residuals, intrinsic one-axis freedom and
+zero remaining freedom for the prescribed coordinate. These values are not a
+Jacobian-rank analysis or proof of collision-free motion. STEP preserves resolved
+placements; native joint intent remains in the recipe/assembly artifacts.
+Native/build/recipe tests cover this contract. The jointed linear-stage fixture
+passes 27 independent-formula configurations and three independently imported
+STEP configurations, including moving sections. Rejected limit edits preserve
+all previously published artifact bytes. These checks establish this bounded
+domain, not general mechanism solving.
 
 The assembly solver operates on rigid frames, named attachment datums, joint
 parameters, and sparse constraints. It must not need full solid data to solve
@@ -2291,12 +2311,18 @@ new solids for an unselected-tool edit and one for the selected tool.
 
 ## Implemented baseline and remaining work
 
+Prescribed revolute/prismatic joints now have native, recipe/build, product and
+independent STEP acceptance for the bounded acyclic contract above. Motion,
+material properties and moving sections are checked across multiple coordinates
+and rigid poses; failed limit edits preserve the published generation. Nonlinear
+closed-loop solving, dynamics and collision certification remain open.
+
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters and locked local modules with captured replay bundles; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Remote package resolution, unit types, source maps, full public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM; bounded prescribed revolute/prismatic motion | Nonlinear/closed-loop joint constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |

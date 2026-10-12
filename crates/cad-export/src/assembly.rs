@@ -706,6 +706,7 @@ mod tests {
                     id: "attached".into(),
                     part: "child".into(),
                     attachment: Some(DatumAttachment {
+                        joint: None,
                         instance: "target".into(),
                         target_path: Vec::new(),
                         datum: "mount".into(),
@@ -801,6 +802,7 @@ mod tests {
                         ..Default::default()
                     },
                     attachment: Some(DatumAttachment {
+                        joint: None,
                         instance: "fixed".into(),
                         target_path: vec![],
                         datum: "foot".into(),
@@ -819,6 +821,7 @@ mod tests {
                     ..Default::default()
                 },
                 attachment: Some(DatumAttachment {
+                    joint: None,
                     instance: "holder".into(),
                     target_path: vec!["target".into()],
                     datum: "foot".into(),
@@ -923,6 +926,7 @@ mod tests {
                         ..Default::default()
                     },
                     attachment: Some(AssemblyAttachment {
+                        joint: None,
                         instance: "base".into(),
                         target_path: vec![],
                         source_path: vec!["leaf".into()],

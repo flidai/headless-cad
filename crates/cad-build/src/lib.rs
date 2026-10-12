@@ -53,7 +53,8 @@ mod selection;
 pub use assembly::{MAX_ASSEMBLIES, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS, MAX_PARTS};
 pub use cad_assembly::{
     validate_datums, AssemblyAttachment, AssemblyDefinition, AssemblyInstance, AssemblyOutput,
-    DatumAttachment, Instance, Material, PartDefinition, PartMetadata, RigidTransform,
+    DatumAttachment, Instance, JointReport, Material, PartDefinition, PartMetadata,
+    PrescribedJoint, RigidTransform, MAX_PRESCRIBED_JOINTS,
 };
 pub use selection::{
     FaceCardinality, FaceLineageStep, FaceResolution, FaceResolutionStatus, FaceSelector,

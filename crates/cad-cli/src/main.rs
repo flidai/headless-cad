@@ -222,6 +222,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
             "assembly_definitions": assembly.hierarchy.len(),
             "instances": assembly.instance_count(),
             "bom": bom,
+            "joints": assembly.joint_reports(recipe.tolerance.unwrap_or_default())?,
             "topology": { "solids": assembly.solid_count() },
             "validation": { "valid": true, "scope": "individual definitions and rigid placements; interference not checked" },
         }));

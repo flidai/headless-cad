@@ -4,10 +4,13 @@
 //! a Boolean union. Material volume is the sum per occurrence. Rotated geometry
 //! remains local to its definition and does not expand the kernel's supported
 //! modeling domain. Nested reusable definitions retain local placements and explicit
-//! occurrence paths. Assembly constraints are not implemented.
+//! occurrence paths. Acyclic datum attachments support prescribed local-Z joints;
+//! free-coordinate and closed-loop constraint solving are not implemented.
 mod bom;
 mod mass_properties;
 pub use mass_properties::AssemblyMassProperties;
+mod joint;
+pub use joint::{JointReport, PrescribedJoint, JOINT_ANGULAR_TOLERANCE_RAD, MAX_PRESCRIBED_JOINTS};
 mod datum;
 pub use datum::{
     resolve_definition_instances, resolve_hierarchy_instances, resolve_hierarchy_placements,
@@ -37,6 +40,7 @@ pub fn assembly_build_id() -> &'static str {
         hash.update(include_bytes!("bom.rs"));
         hash.update(include_bytes!("mass_properties.rs"));
         hash.update(include_bytes!("datum.rs"));
+        hash.update(include_bytes!("joint.rs"));
         hash.update(include_bytes!("../Cargo.toml"));
         hash.update(include_bytes!("../../../Cargo.lock"));
         hash.update(cad_kernel::KERNEL_BUILD_ID.as_bytes());
@@ -583,3 +587,6 @@ impl BuiltAssembly {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod joint_tests;

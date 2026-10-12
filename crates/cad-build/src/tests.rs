@@ -1189,6 +1189,7 @@ fn subassembly_attachment_preflight_rejects_bad_sources_and_mixed_cycles_before_
     }
     let mut cycle = recipe.clone();
     cycle.assemblies[1].instances[0].attachment = Some(DatumAttachment {
+        joint: None,
         instance: "mounted".into(),
         target_path: vec!["leaf".into()],
         datum: "origin".into(),
@@ -1242,6 +1243,7 @@ fn datum_and_attachment_errors_fail_even_in_unused_definitions_before_geometry()
             }
             _ => {
                 recipe.assemblies[0].instances[1].attachment = Some(DatumAttachment {
+                    joint: None,
                     instance: "attached".into(),
                     target_path: Vec::new(),
                     datum: "mount".into(),

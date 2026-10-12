@@ -120,6 +120,18 @@ def resolved_placements(hierarchy, parts):
                 own = placement_matrix(parts[instance["part"]]["datums"][attachment["datum"]])
             else:
                 own = datum_frame(instance["assembly"], attachment["source_path"], attachment["datum"])
+            joint = attachment.get("joint")
+            if joint:
+                position = joint["position"]
+                require(all(math.isfinite(joint[k]) for k in ("position", "min", "max"))
+                        and joint["min"] <= position <= joint["max"], "invalid prescribed coordinate")
+                if joint["kind"] == "revolute":
+                    c, s = math.cos(position), math.sin(position)
+                    motion = [[c, -s, 0, 0], [s, c, 0, 0], [0, 0, 1, 0]]
+                else:
+                    require(joint["kind"] == "prismatic", "unknown joint kind")
+                    motion = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, position]]
+                placement = multiply(placement, motion)
             placement = multiply(multiply(target, placement), inverse(own))
         active.remove(key)
         resolved[key] = placement

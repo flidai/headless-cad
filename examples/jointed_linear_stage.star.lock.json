@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "modules": {
+    "recipe_modules/drive_parts.star": {
+      "blake3": "8ac4e5e76a564d4a3cd73171a76bd1129c86886aceddd902e1d8882017834da6"
+    },
+    "recipe_modules/stock.star": {
+      "blake3": "40c5418f8821c7a73ec4cbbb6bfa71878ca2bd3b06542a8d9eeaa3280dd61489"
+    }
+  }
+}

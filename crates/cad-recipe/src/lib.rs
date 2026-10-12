@@ -129,6 +129,17 @@ fn occurrence_path(value: Value, name: &str) -> anyhow::Result<Vec<String>> {
     Ok(path)
 }
 
+fn parse_joint(value: Option<Value>) -> anyhow::Result<Option<cad_build::PrescribedJoint>> {
+    value
+        .filter(|v| !v.is_none())
+        .map(|v| {
+            let joint: cad_build::PrescribedJoint = serde_json::from_str(&v.to_json()?)?;
+            joint.validate()?;
+            Ok(joint)
+        })
+        .transpose()
+}
+
 fn register_instance(
     id: &str,
     reference_key: &str,
@@ -852,6 +863,38 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// Prescribed rotation around attachment-local +Z, in radians; no nonlinear solve.
+    fn revolute<'v>(
+        angle: Value<'v>,
+        min: Value<'v>,
+        max: Value<'v>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        let joint = cad_build::PrescribedJoint::Revolute {
+            position: number(angle)?,
+            min: number(min)?,
+            max: number(max)?,
+        };
+        joint.validate()?;
+        Ok(heap.alloc(serde_json::to_value(joint)?))
+    }
+
+    /// Prescribed translation along attachment-local +Z, in millimetres.
+    fn prismatic<'v>(
+        position: Value<'v>,
+        min: Value<'v>,
+        max: Value<'v>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        let joint = cad_build::PrescribedJoint::Prismatic {
+            position: number(position)?,
+            min: number(min)?,
+            max: number(max)?,
+        };
+        joint.validate()?;
+        Ok(heap.alloc(serde_json::to_value(joint)?))
+    }
+
     /// A named local rigid frame; attach it to a part with part(datums={...}).
     fn datum<'v>(
         offset: Option<Value<'v>>,
@@ -985,12 +1028,18 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         datum: Option<&str>,
         target_datum: Option<&str>,
         target_path: Option<Value>,
+        joint: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
         anyhow::ensure!(
             target_path.is_none()
                 || (attach_to.is_some() && datum.is_some() && target_datum.is_some()),
             "instance '{id}' target_path requires attach_to, datum and target_datum"
+        );
+        let joint = parse_joint(joint)?;
+        anyhow::ensure!(
+            joint.is_none() || (attach_to.is_some() && datum.is_some() && target_datum.is_some()),
+            "instance '{id}' joint requires complete attachment arguments"
         );
         let target_path = target_path
             .map(|value| occurrence_path(value, "target_path"))
@@ -1003,6 +1052,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 datum: datum.into(),
                 target_datum: target_datum.into(),
                 target_path,
+                joint,
             }),
             _ => {
                 anyhow::bail!("instance '{id}' requires attach_to, datum and target_datum together")
@@ -1031,8 +1081,18 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         datum: Option<&str>,
         target_datum: Option<&str>,
         target_path: Option<Value>,
+        joint: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
+        let joint = parse_joint(joint)?;
+        anyhow::ensure!(
+            joint.is_none()
+                || (attach_to.is_some()
+                    && source_path.is_some()
+                    && datum.is_some()
+                    && target_datum.is_some()),
+            "assembly_instance '{id}' joint requires complete attachment arguments"
+        );
         let attachment = match (attach_to, source_path, datum, target_datum) {
             (None, None, None, None) => {
                 anyhow::ensure!(target_path.is_none(), "assembly_instance '{id}' target_path requires attachment arguments");
@@ -1044,7 +1104,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 let target_path = target_path.map(|value| occurrence_path(value, "target_path")).transpose()?.unwrap_or_default();
                 Some(serde_json::to_value(cad_build::AssemblyAttachment {
                     instance: instance.into(), source_path, target_path,
-                    datum: datum.into(), target_datum: target_datum.into(),
+                    datum: datum.into(), target_datum: target_datum.into(), joint,
                 })?)
             }
             _ => anyhow::bail!("assembly_instance '{id}' requires attach_to, source_path, datum and target_datum together"),

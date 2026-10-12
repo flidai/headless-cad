@@ -248,6 +248,31 @@
         "module-product",
         "module-independent"
       ]
+    },
+    {
+      "id": "assembly.prescribed-joints",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "assembly.prescribed_joints"
+      ],
+      "supported_domain": "Bounded prescribed revolute/prismatic coordinates composed through acyclic part and rigid-subassembly datum attachments; jointed linear stage with travel 20..100 mm and angle -pi..pi radians, plus three rigid fixture poses. Native forward-kinematic, cache and publication checks; independent STEP placement/geometry and moving-section checks are required by this envelope.",
+      "exclusions": [
+        "Nonlinear or closed-loop constraint solving",
+        "Dynamics, force and load analysis",
+        "Collision or clearance certification",
+        "Flexible occurrences and free joint coordinates",
+        "STEP preservation of native joint intent"
+      ],
+      "fixture": "examples/jointed_linear_stage.star",
+      "checks": [
+        "joint-native",
+        "joint-build",
+        "joint-recipe",
+        "joint-product",
+        "joint-cli",
+        "joint-independent"
+      ]
     }
   ],
   "checks": [
@@ -689,6 +714,87 @@
         "cad-cli",
         "--test",
         "lock"
+      ]
+    },
+    {
+      "id": "joint-native",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-assembly",
+        "joint_tests"
+      ]
+    },
+    {
+      "id": "joint-build",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-build",
+        "--test",
+        "joints"
+      ]
+    },
+    {
+      "id": "joint-recipe",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-recipe",
+        "--test",
+        "joints"
+      ]
+    },
+    {
+      "id": "joint-product",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "jointed_linear_stage"
+      ]
+    },
+    {
+      "id": "joint-cli",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "joints"
+      ]
+    },
+    {
+      "id": "joint-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_jointed_stage_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/jointed_stage"
       ]
     }
   ]
