@@ -106,7 +106,7 @@ fn nearest_intervals(a: [f64; 2], b: [f64; 2]) -> (f64, f64) {
         (v, v)
     }
 }
-fn radial(axis: [f64; 3], v: [f64; 3]) -> Option<[f64; 3]> {
+pub(crate) fn radial(axis: [f64; 3], v: [f64; 3]) -> Option<[f64; 3]> {
     let p = cross(axis, cross(v, axis));
     let n = norm(p);
     (n > 64. * f64::EPSILON).then(|| mul(p, 1. / n))
@@ -215,7 +215,7 @@ pub(crate) fn query(
     Err(bad())
 }
 
-fn original_stock(
+pub(crate) fn original_stock(
     m: &ModelSnapshot,
     g: &Envelope,
     t: Tolerance,

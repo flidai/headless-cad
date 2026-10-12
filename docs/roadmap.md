@@ -792,3 +792,9 @@ rings and eleven named motion checks. Radius edits update material accounting
 and drawings; independent STEP comparisons cover every occurrence. This combines
 existing bounded capabilities in the main assembly without expanding the
 named-pair collision scope or claiming manufacturing release.
+
+Nested bore clearance extends the rounded-housing workflow to a coaxial shaft
+with a real keyseat. Admission requires a uniquely aligned through bore and a
+certified material region around the chosen witnesses. This is a bounded static
+clearance capability; eccentric shafts, general contact, manufactured fit and
+load-bearing design remain open.

@@ -9,6 +9,7 @@ mod parallel;
 pub enum ClearanceMethod {
     ConvexSupport,
     ConvexTrimWitness,
+    BoreTrimWitness,
     CoaxialMeridian,
     ParallelAnnular,
     NativeTrimWitness,
@@ -251,6 +252,11 @@ impl ModelSnapshot {
     }
     /// Certified positive material clearance. Unsupported/contact cases fail closed.
     pub fn clearance(&self, other: &Self, t: Tolerance) -> Result<SolidClearance, KernelError> {
+        if crate::bore_trim_clearance::is_candidate(self, other, t) {
+            if let Ok(q) = crate::bore_trim_clearance::query(self, other, t) {
+                return Ok(q);
+            }
+        }
         if self.validate_convex_clearance_operand(t).is_ok()
             && other.validate_convex_clearance_operand(t).is_ok()
         {

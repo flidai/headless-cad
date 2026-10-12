@@ -2912,3 +2912,11 @@ mounting drawing. Its material assertions include the removed corner volume;
 the retained 24-part assembly keeps its eleven named clearance checks and
 nine-member rotation group. The viewer remains an inspector of the captured
 recipe and evidence. These nominal dimensions do not certify manufactured fit.
+
+`examples/rounded_bearing_fit.star` pairs a rounded, through-bored housing with
+a genuinely keyed shaft. Its static `bore_trim_witness` certificate checks the
+nominal running gap using containing geometry for the lower bound and surviving
+native surface witnesses for the upper bound. Two mounting holes remain real
+voids. Captured recipes, STEP export and bore/journal dimensions support review;
+this example does not establish load capacity, retention or a manufactured fit.
+The optional OCCT test is `tools/check-rounded-bearing-fit.py`.

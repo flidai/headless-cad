@@ -158,6 +158,25 @@ fn segments(path: &PlanarPath, tol: Tolerance) -> Result<Vec<Segment>, KernelErr
     path_validation::simple(&result, tol, error)?;
     Ok(result)
 }
+
+/// Conservative radial clearance from a point inside a validated outer path.
+/// The arc distance routine handles trimmed arcs, including interior extrema.
+pub(crate) fn path_boundary_distance(
+    path: &PlanarPath,
+    point: [f64; 2],
+    tol: Tolerance,
+    error: f64,
+) -> Result<f64, KernelError> {
+    let segments = segments(path, tol)?;
+    if !path_validation::inside(&segments, point, error)? {
+        return Err(bad());
+    }
+    let distance = segments
+        .iter()
+        .map(|s| path_validation::distance(s, point, error))
+        .fold(f64::INFINITY, f64::min);
+    Ok((distance - 4. * error).max(0.))
+}
 pub fn validate_path(
     path: &PlanarPath,
     holes: &[CircleHole],

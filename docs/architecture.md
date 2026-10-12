@@ -3130,3 +3130,30 @@ annotations together. Independent references use OCCT edge fillets followed by
 actual bore subtraction, retaining the original retained-drive oracle unchanged.
 Existing eleven named motion pairs retain their scope; the new plate geometry
 does not imply a general collision certificate for the assembly.
+
+
+### Nested bore clearance in rounded housings
+
+`bore_trim_witness` handles an arithmetic-coaxial solid shaft and one uniquely
+aligned circular through bore in a recognized convex rounded right prism.
+The shaft may retain a canonical finite keyseat or supported stepped meridian.
+A containing annular housing and uncut shaft meridian provide the nominal
+lower distance bound, with explicit allowances for native support and frame
+reconstruction. The artificial annulus exterior cannot supply an upper witness.
+
+A guarded disk around the selected bore must lie inside the housing exterior
+and avoid every other hole. The candidate housing point must be on its bore
+wall or cap within this region. A certified untouched shaft ray supplies the
+other boundary point; the returned interval charges both native reconstruction
+errors. This admits a shoulder-to-cap gap smaller than the radial running gap.
+Unresolved alignment, material membership, contact and wide numerical intervals
+fail closed. External separated geometry can still use the existing convex
+trim-witness method; neither path turns removed bore material into a solid.
+
+The bearing-fit example retains two real mounting holes and a finite keyseat,
+with standalone bore and journal dimensions and one named static pair. Its
+independent oracle constructs actual OCCT fillets, bores, cylindrical/stepped
+stock and keyseat subtraction, checks bidirectional STEP differences and native
+witness distance to imported boundaries, and exercises failed-publication
+preservation. These are nominal geometry certificates, not load or tolerance
+certification for manufactured bearings.

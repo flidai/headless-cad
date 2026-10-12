@@ -43,6 +43,7 @@ pub(super) fn publish(
             cad_kernel::ClearanceMethod::ParallelAnnular => "Parallel annuli",
             cad_kernel::ClearanceMethod::NativeTrimWitness => "Native trimmed surfaces",
             cad_kernel::ClearanceMethod::ConvexTrimWitness => "Drilled rounded prisms",
+            cad_kernel::ClearanceMethod::BoreTrimWitness => "Shaft in rounded bore",
         };
         html.push_str(&format!(
             "<tr><td>{}</td><td>{}<br>{}</td><td>{}</td><td>[{}, {}]</td><td>{}</td><td>{}</td><td>{}</td></tr>",

@@ -10,7 +10,7 @@ fn unsupported() -> KernelError {
 
 pub(crate) struct HoledEnvelope {
     outer: ModelSnapshot,
-    geometry: ArcPrismGeometry,
+    pub(crate) geometry: ArcPrismGeometry,
     hole_error: f64,
 }
 

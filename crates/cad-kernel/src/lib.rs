@@ -30,6 +30,7 @@
 
 mod analytic;
 mod arc_prism;
+mod bore_trim_clearance;
 mod bored_prism;
 mod circular_boolean;
 mod convex_clearance;
