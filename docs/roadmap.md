@@ -521,3 +521,9 @@ checks mass/sections across parameter revisions. This advances source-driven tea
 and agent workflows; remote package resolution, source-span navigation and hosted
 worker isolation remain open. Module-only edits must rebind publication evidence
 even when the compiled geometry is unchanged.
+
+The local source-library workflow now includes explicit `cad lock` creation and
+updates with transitive discovery and change reporting. Lock generation does not
+execute a design; native validation remains a separate build obligation. Package
+publication also retains the previous complete archive until a new archive has
+been staged and checked, with forced-failure and concurrent-reader regressions.

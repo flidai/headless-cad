@@ -352,6 +352,11 @@ The initial local module contract now uses explicit in-memory Starlark bundles.
 The CLI verifies a strict adjacent `<recipe>.lock.json` with BLAKE3-pinned
 transitive `.star` sources before evaluation. All labels are relative to the root
 project, with no network fetching or ambient interpreter filesystem access.
+`cad lock` explicitly discovers and pins the transitive local import graph without
+executing Starlark or geometry. It reports changed dependencies, rejects invalid
+or cyclic graphs, and atomically replaces a valid lock only after source capture
+checks. Ordinary builds never repin. Review and commit source and lock changes
+together; lock generation establishes byte identity, not engineering validity.
 A captured `recipe.bundle.json` is replayable through the ordinary CLI without
 its original working tree; source identities include module bytes, and watch
 tracks dependency changes. Canvas and GPU inspectors expose the captured modules

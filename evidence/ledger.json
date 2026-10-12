@@ -233,7 +233,7 @@
       "domain_ids": [
         "solid.chamfer"
       ],
-      "supported_domain": "Explicit digest-pinned local Starlark module bundles with transitive load validation, shared graph/parameters, bounded interpreter work, captured offline replay and read-only source inspection. Linear-stage fixture combines semantic planar chamfers and drilled carriages across 27 configurations with three independent STEP/replay cases.",
+      "supported_domain": "Explicit lock creation/update and digest-pinned local Starlark module bundles with transitive load validation, shared graph/parameters, bounded interpreter work, captured offline replay and read-only source inspection. Linear-stage fixture combines semantic planar chamfers and drilled carriages across 27 configurations with three independent STEP/replay cases.",
       "exclusions": [
         "Remote package resolution and network fetches",
         "Automatic feature-to-module source spans",
@@ -243,6 +243,7 @@
       "fixture": "examples/modular_linear_stage.star",
       "checks": [
         "module-recipe",
+        "module-lock",
         "module-cli",
         "module-product",
         "module-independent"
@@ -674,6 +675,20 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/modular_stage"
+      ]
+    },
+    {
+      "id": "module-lock",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "lock"
       ]
     }
   ]

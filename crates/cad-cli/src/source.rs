@@ -272,3 +272,175 @@ impl Snapshot {
         }
     }
 }
+
+fn existing_lock(path: &Path) -> Result<Option<(String, Lock)>, Box<dyn Error>> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    if !metadata.file_type().is_file() {
+        return Err("lock destination must be a regular file, never a symlink".into());
+    }
+    let text = bounded(path, MAX_FILE)?;
+    let lock: Lock = serde_json::from_str(&text)?;
+    if lock.schema_version != 1 {
+        return Err("unsupported existing module lock schema".into());
+    }
+    for (name, entry) in &lock.modules {
+        label(name)?;
+        if entry.blake3.len() != 64
+            || !entry
+                .blake3
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err("existing lock contains invalid BLAKE3 digest".into());
+        }
+    }
+    Ok(Some((text, lock)))
+}
+
+/// Explicitly pin syntax-discovered local imports. No Starlark evaluation occurs.
+pub(super) fn lock_recipe(path: &Path) -> Result<Value, Box<dyn Error>> {
+    use std::io::Write;
+    if !path.extension().is_some_and(|v| v == "star") {
+        return Err("lock requires a .star recipe".into());
+    }
+    let root = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."))
+        .canonicalize()?;
+    let lock_path = root.join(format!(
+        "{}.lock.json",
+        path.file_name()
+            .ok_or("recipe filename missing")?
+            .to_string_lossy()
+    ));
+    let prior = existing_lock(&lock_path)?;
+    let root_text = bounded(path, MAX_FILE)?;
+    let root_real = path.canonicalize()?;
+    let mut captured = vec![(path.to_path_buf(), root_real, root_text.clone())];
+    let mut modules = BTreeMap::new();
+    let mut visiting = BTreeSet::new();
+    let mut total = root_text.len();
+    struct Discovery<'a> {
+        root: &'a Path,
+        visiting: &'a mut BTreeSet<String>,
+        modules: &'a mut BTreeMap<String, ModuleLock>,
+        captured: &'a mut Vec<(PathBuf, PathBuf, String)>,
+        total: &'a mut usize,
+    }
+    impl Discovery<'_> {
+        fn visit(&mut self, name: &str) -> Result<(), Box<dyn Error>> {
+            label(name)?;
+            if self.modules.contains_key(name) {
+                return Ok(());
+            }
+            if !self.visiting.insert(name.to_owned()) {
+                return Err(format!("module import cycle at '{name}'").into());
+            }
+            if self.modules.len().saturating_add(self.visiting.len()) > MAX_MODULES {
+                return Err("module count limit exceeded".into());
+            }
+            let logical = self.root.join(name);
+            let real = logical.canonicalize()?;
+            if !real.starts_with(self.root) {
+                return Err(format!("module '{name}' symlink escapes recipe directory").into());
+            }
+            let text = bounded(&real, MAX_FILE)?;
+            *self.total = self.total.saturating_add(text.len());
+            if *self.total > MAX_TOTAL {
+                return Err("recipe source bundle size limit exceeded".into());
+            }
+            let loads = cad_recipe::starlark_loads(name, &text)?;
+            self.captured.push((logical, real, text.clone()));
+            for dependency in loads {
+                self.visit(&dependency)?;
+            }
+            self.visiting.remove(name);
+            self.modules.insert(
+                name.to_owned(),
+                ModuleLock {
+                    blake3: blake3::hash(text.as_bytes()).to_hex().to_string(),
+                },
+            );
+            Ok(())
+        }
+    }
+    let loads = cad_recipe::starlark_loads(&path.to_string_lossy(), &root_text)?;
+    let mut discovery = Discovery {
+        root: &root,
+        visiting: &mut visiting,
+        modules: &mut modules,
+        captured: &mut captured,
+        total: &mut total,
+    };
+    for name in loads {
+        discovery.visit(&name)?;
+    }
+    let empty = BTreeMap::new();
+    let previous = prior
+        .as_ref()
+        .map(|(_, lock)| &lock.modules)
+        .unwrap_or(&empty);
+    let added: Vec<_> = modules
+        .keys()
+        .filter(|name| !previous.contains_key(*name))
+        .cloned()
+        .collect();
+    let changed: Vec<_> = modules
+        .iter()
+        .filter(|(name, entry)| previous.get(*name).is_some_and(|old| old != *entry))
+        .map(|(name, _)| name.clone())
+        .collect();
+    let removed: Vec<_> = previous
+        .keys()
+        .filter(|name| !modules.contains_key(*name))
+        .cloned()
+        .collect();
+    let text = serde_json::to_string_pretty(&Lock {
+        schema_version: 1,
+        modules: modules.clone(),
+    })? + "\n";
+    // Source paths include canonical targets and authored aliases. A lock cannot
+    // replace an input file through any of those names.
+    for (logical, real, _) in &captured {
+        if real == &lock_path || protected_paths(logical)?.contains(&lock_path) {
+            return Err("lock destination overlaps a recipe source".into());
+        }
+    }
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let temporary = root.join(format!(
+        ".cad-lock-{}-{}.tmp",
+        std::process::id(),
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)?;
+    let publish = (|| -> Result<(), Box<dyn Error>> {
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+        // Best-effort concurrent-edit guard immediately before atomic rename.
+        for (logical, real, bytes) in &captured {
+            if logical.canonicalize()? != *real || bounded(logical, MAX_FILE)? != *bytes {
+                return Err("recipe sources changed while locking; retry".into());
+            }
+        }
+        if existing_lock(&lock_path)? != prior {
+            return Err("module lock changed concurrently; retry".into());
+        }
+        fs::rename(&temporary, &lock_path)?;
+        Ok(())
+    })();
+    if publish.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    publish?;
+    Ok(
+        json!({"schema_version":1,"command":"lock","lock_path":lock_path,"module_count":modules.len(),"source_bytes":total,"added":added,"changed":changed,"removed":removed,"updated":prior.as_ref().is_none_or(|(old,_)|old != &text),"evaluated_recipe":false}),
+    )
+}

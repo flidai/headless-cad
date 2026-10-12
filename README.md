@@ -57,7 +57,9 @@ and regenerated without losing any design information.
 
 To run directly from the repository, replace `cad` with
 `cargo run --locked -p cad-cli --` in the commands below. Build a distribution
-archive for the current platform with `./scripts/package.sh`.
+archive for the current platform with `./scripts/package.sh`. The script stages
+and checks the complete archive before replacing the previous distribution, so
+readers retain the old archive if packaging fails.
 For an unpacked archive, use its included `./cad` executable instead. Native
 archives target their build platform and libc; source installation is the
 portable route across operating systems.
@@ -2021,9 +2023,21 @@ The adjacent `modular_linear_stage.star.lock.json` pins each transitive module:
 {"schema_version":1,"modules":{"recipe_modules/drive_parts.star":{"blake3":"<64 lowercase hexadecimal characters>"}}}
 ```
 
+Create or explicitly update the transitive pins after reviewing a source edit:
+
+```sh
+cad lock examples/modular_linear_stage.star
+```
+
+This command parses imports without evaluating modeling code, reports added,
+changed and removed module pins, and atomically replaces a valid lockfile. Commit
+the reviewed module edits and lockfile together in Git. Invalid imports, cycles
+or unreadable sources leave the previous lock untouched; malformed or symlinked
+lock destinations require correction before updating.
+
 Module labels are relative to the root recipe directory, including loads inside
-other modules. Include every transitive module in the lockfile. Builds verify the
-pinned bytes before evaluation; they never fetch dependencies or update pins.
+other modules. The lock command includes every transitive module. Builds verify
+the pinned bytes before evaluation; they never fetch dependencies or update pins.
 Cycles, unsafe paths, missing modules and digest mismatches fail without replacing
 the previous generation. The Rust API accepts an explicit in-memory module map;
 ordinary source-string evaluation cannot read files on its own.

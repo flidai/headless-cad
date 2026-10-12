@@ -155,6 +155,8 @@ enum Command {
     Validate { model: PathBuf },
     /// Compare output hashes, volumes, and bounds for two recipes.
     Diff { before: PathBuf, after: PathBuf },
+    /// Explicitly pin transitive local Starlark imports without evaluating the recipe.
+    Lock { recipe: PathBuf },
     /// Compile a .star or .json recipe into the versioned JSON feature graph.
     Compile { recipe: PathBuf },
     /// Evaluate a recipe and report geometry, provenance, and validation as JSON.
@@ -841,6 +843,15 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         }
         return Ok(integrity::verify(directory, manifest_hash.as_deref())?);
     }
+    if let Command::Lock { recipe } = &cli.command {
+        if !cli.params.is_empty() || cli.cache_dir.is_some() {
+            return Err(
+                "lock does not accept --param or --cache-dir; it parses imports without evaluation"
+                    .into(),
+            );
+        }
+        return source::lock_recipe(recipe);
+    }
     let parameters = parameters(&cli.params)?;
     if !parameters.is_empty()
         && matches!(
@@ -869,7 +880,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                     "argument_catalog_representation": "json_recipe_ir",
                     "workflow": "Author a recipe, compile Starlark to the typed JSON IR, check geometry and obligations, review inspect/diff results, then build artifacts.",
                     "source_authority": "Git-versioned recipes and explicit parameter overrides",
-                    "modules": {"scope":"local locked Starlark only; no network","lockfile":"<recipe-filename>.lock.json","lock_schema":{"schema_version":1,"modules":{"lib/example.star":{"blake3":"64 lowercase hexadecimal characters"}}},"labels":"canonical project-root-relative .star paths; symlink escape rejected","maximum_modules":32,"maximum_starlark_root_bytes":1048576,"maximum_module_bytes":1048576,"maximum_replay_json_bytes":67108864,"maximum_bundle_source_bytes":8388608,"captured_artifact":"recipe.bundle.json","replay":"cad build recipe.bundle.json (supply original --param overrides)","parameter_overrides":"not stored in source bundle; replay using original explicit --param overrides from manifest recipe_source.parameter_overrides","identity":"source_bundle_hash binds root language/source and labeled module bytes; root recipe_source_hash retains root-only meaning"},
+                    "modules": {"scope":"local locked Starlark only; no network","pin_command":"cad lock recipe.star (explicit create/update, never implicit during build)","lockfile":"<recipe-filename>.lock.json","lock_schema":{"schema_version":1,"modules":{"lib/example.star":{"blake3":"64 lowercase hexadecimal characters"}}},"labels":"canonical project-root-relative .star paths; symlink escape rejected","maximum_modules":32,"maximum_starlark_root_bytes":1048576,"maximum_module_bytes":1048576,"maximum_replay_json_bytes":67108864,"maximum_bundle_source_bytes":8388608,"captured_artifact":"recipe.bundle.json","replay":"cad build recipe.bundle.json (supply original --param overrides)","parameter_overrides":"not stored in source bundle; replay using original explicit --param overrides from manifest recipe_source.parameter_overrides","identity":"source_bundle_hash binds root language/source and labeled module bytes; root recipe_source_hash retains root-only meaning"},
                     "viewer": "read_only_inspection",
                     "feasibility": "The catalog describes supported domains; only evaluation and validation can certify a particular input."
                 },
@@ -886,6 +897,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                     "trust": "Hashes verify integrity, not authenticity; pin the manifest hash through a trusted channel."
                 },
                 "recipe_commands": [
+                    {"name":"lock", "publishes_artifacts":false,"writes_source_lock":true,"evaluates_geometry":false,"evaluates_recipe":false,"purpose":"Explicitly discover and pin transitive local imports to adjacent schema1 lock; no implicit build repins; invalid inputs preserve old lock.","parameters_and_cache":"not accepted","concurrent_edits":"best-effort captured-source and prior-lock recheck before atomic rename"},
                     {"name":"compile", "publishes_artifacts":false, "evaluates_geometry":false, "purpose":"Compile authoring syntax to recipe IR; this alone does not validate geometry."},
                     {"name":"check", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Evaluate all outputs and native geometry/engineering validation; exchange obligations remain pending until full publication."},
                     {"name":"inspect", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Report output geometry, provenance, scope and checks; optional --output selects the demanded closure."},
