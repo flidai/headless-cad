@@ -29,6 +29,12 @@ release inventories must cover dependencies and redistributed assets. Essential
 modeling and automation must work offline without proprietary kernel licenses,
 paid AI services, or a vendor-hosted account.
 
+Goal reaffirmed on 2026-10-12 from the commercial-CAD and virtualized-geometry
+briefs: this is a product-level engineering ambition, covering the kernel,
+regeneration, assemblies, manufacturing and team workflows. The project goal
+remains active until a declared commercial workflow passes its release gates;
+finishing the current prototype or display milestone does not complete it.
+
 ## Architectural commitments
 
 ### Decisions adopted from the feature brief
@@ -733,11 +739,41 @@ prevent refinement, expose the reduced detail rather than claiming the error
 target was met. Small screen coverage alone cannot justify dropping a thin part
 or an engineering-critical overlay.
 
+Distinguish **part cluster LOD** from **assembly HLOD**. Part clusters refine
+regions inside one shared geometric definition. Assembly HLOD may aggregate
+many occurrences for distant coverage, but must retain a generation-pinned
+mapping to the represented occurrence subtree. An aggregate cannot impersonate
+one part or face. Picking it requests display/metadata refinement and exposes
+unresolved selection until ownership is known; it never evaluates a recipe.
+Hiding, isolating, selecting or sectioning a member must invalidate any aggregate
+that cannot express the requested visibility correctly. Keep a conservative
+proxy while its replacement loads. Materials, transparency and critical-edge
+policies also constrain aggregation; reducing draw calls cannot override them.
+
+A cluster hierarchy can be a DAG with shared boundary/replacement dependencies,
+not merely a tree in which each child can be swapped independently. Define the
+active refinement frontier as complete surface coverage with no duplicate
+parent/child coverage and compatible shared boundaries. Test mixed refinement
+levels across adjacent faces, shared pages and different instances of one part,
+including cancellation and eviction halfway through a replacement. This is a
+derived display graph, separate from the feature, topology and assembly graphs.
+Validate acyclic, bounded refinement dependencies before traversal; malformed
+cycles or shared-child ownership cannot cause unbounded work or duplicate picks.
+
 Maintain separate occurrence and part-level spatial hierarchies. Start with
 frustum traversal; add conservative occlusion only after tests cover disocclusion,
 camera changes, selected objects and stale depth. Unique geometry, depth
 complexity and request latency still affect cost: this architecture does not
 promise constant work for arbitrary assemblies.
+
+Occlusion evidence must account for the displayed approximation's displacement
+and quantization bounds. A coarse mesh that closes a real opening, or a bounding
+proxy, cannot be treated as an exact opaque occluder. Cull only with conservative
+evidence; otherwise retain the potentially visible geometry. Bind that evidence
+to the camera, clipping/section planes, visibility configuration, display level
+and source generation, and invalidate it when those inputs change. Acceptance
+includes views through thin openings and newly exposed section interiors,
+compared with an unculled reference.
 
 Page assembly metadata and spatial nodes as well as mesh data. A root manifest
 must not require expanding every nested occurrence before first coverage.
@@ -772,6 +808,17 @@ bytes, upload staging and resident GPU allocations separately; release them only
 when decoding work and GPU use have completed. A digest validates bytes, not the
 allocation sizes claimed by an untrusted descriptor: validate decoded counts and
 indices before allocating or uploading.
+
+Budget display **construction and storage**, as well as runtime residency.
+Meshing and hierarchy workers declare time, peak memory, temporary disk and
+output-byte limits. Record hierarchy bytes relative to the finest mesh, build
+time per unique definition and deduplication across instances. A placement-only
+edit reuses part hierarchies; a geometry edit invalidates that definition's
+display artifacts and affected assembly bounds/aggregates without rebuilding
+unrelated parts. An interrupted display build cannot replace the last complete
+manifest with partial pages. Benchmark cold cache, single-definition edits and
+cache eviction: cheap opening achieved through unbounded preprocessing or disk
+growth does not pass the large-assembly gate.
 
 ### GPU and portability
 

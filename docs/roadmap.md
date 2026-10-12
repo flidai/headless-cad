@@ -67,7 +67,13 @@ For scalable inspection, follow the architecture's
 M3a bounded-error part LOD, M3b paged assembly metadata, M3c cluster streaming,
 then M3d measured visibility acceleration. Each stage includes selection/source
 identity, degraded-detail behavior and bounded resources. WebGPU or meshlets
-alone do not close M3. In parallel, measure exact-body residency during a
+alone do not close M3. Separate within-part cluster refinement from assembly
+HLOD aggregation: aggregate selection must resolve actual occurrence ownership,
+and hide/isolate/section changes must preserve correct coverage. Track display
+preprocessing time, temporary disk, hierarchy storage amplification and
+single-definition invalidation alongside viewer memory and frame times. These
+are planned acceptance obligations, not capabilities of today's whole-part LOD.
+In parallel, measure exact-body residency during a
 one-part edit and full release generation so viewer progress does not conceal
 headless build costs. Keep M2 geometry reliability, M4 constraints and M6
 manufacturing acceptance independent of display performance.
