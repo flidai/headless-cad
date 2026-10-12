@@ -840,7 +840,34 @@ including pending reservations, not total browser or driver memory. Frustum
 culling uses an occurrence bounding-volume hierarchy in both GPU modes, skipping
 off-screen groups before checking individual parts. Original occurrence and face
 IDs remain stable. All occurrence metadata is still loaded at startup; metadata
-paging, geometric LOD and occlusion culling remain future work. The streaming viewer needs HTTP(S) and Web Crypto; localhost works.
+paging, cluster streaming and occlusion culling remain future work. The streaming
+viewer needs HTTP(S) and Web Crypto; localhost works.
+
+Curved parts now have up to three shared display levels, built with native
+tessellation policies of 0.5, 0.1 and 0.01 mm. The streamed viewer loads a coarse
+surface first and refines toward a one-physical-pixel geometric detail target,
+including a conservative numerical allowance. It keeps the current surface
+while a replacement loads, uses intermediate detail when the budget permits,
+and reports unmet detail when memory, unavailable assets or the finest level
+limit refinement. Pixel coverage and depth quantization are outside that target.
+Planar parts reuse one mesh. The embedded GPU and Canvas previews retain their
+fixed detail. Exact geometry, STEP/STL and engineering checks do not depend on
+the camera or selected display level.
+
+`examples/spindle_line.star` combines tapered housings, shafts, retainer rings
+and drilled bases in 12 reusable stations. Its six unique meshes serve 48 part
+occurrences. Inspect the overview, then zoom into a housing or bore to see
+progressive detail. Larger configurations use `--display-only`; station count
+and housing variants independently vary reuse and unique geometry.
+
+```sh
+cad build examples/spindle_line.star --display-only --param stations=1000 --param columns=40 --param variants=12 --out-dir out/spindle_scale
+CAD_BROWSER=/path/to/chromium node tools/preview-check/lod-benchmark.cjs
+```
+
+The benchmark expects `out` served on port 8080; `CAD_LOD_URL` overrides its URL.
+It records cold coarse coverage and refinement into one station, verifies the
+picked retainer face, and distinguishes software rendering from hardware gates.
 
 `examples/workcell_line.star` demonstrates 12 stations, 60 occurrences and 15 part
 definitions with datum-mounted triangular tools. Its independently expected

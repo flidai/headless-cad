@@ -818,10 +818,49 @@ node and occurrence test counts expose pruning separately from frame timing.
 
 This first hierarchy still loads and indexes all occurrence metadata at startup.
 It does not page metadata, index triangles inside a part, perform occlusion
-culling, or generate geometric LOD/meshlets. Those remain target work; overview
+culling, or generate meshlets. Those remain target work; overview
 views may still visit every occurrence. A hierarchy over display bounds is not
 an authoritative interference or clearance query index.
 The embedded `.gpu.html` remains available and also uses frustum culling.
+
+The first M3a increment adds whole-part LOD for supported analytic geometry.
+Schema-2 streaming manifests retain `mesh_assets` as the finest compatibility
+representation and add `mesh_lods`, with up to three coarse-to-fine descriptors
+per geometric hash. Native tessellation policies request 0.5, 0.1 and 0.01 mm;
+each descriptor carries its actual `geometric_error_mm`, bound to the verified
+payload's tessellation error. Planar parts have zero chord approximation and one
+asset. Identical payloads deduplicate. Native bounds and semantic face IDs remain
+invariant; generation is bounded at 150,000 faces and 600,000 face points across
+levels, in addition to the existing finest-level limits.
+
+The orthographic viewer shares one active level across occurrences of a part.
+It bootstraps coarse coverage, converts geometric error to physical framebuffer
+pixels and adds conservative CPU/float32 arithmetic allowances. Refinement
+targets one pixel, with a 0.8-pixel downgrade threshold to reduce oscillation.
+This is a geometric detail policy, not certification of raster coverage, depth
+quantization or the complete rendered image. All-planar scenes retain the
+single-level streaming path; they make no adaptive-detail claim.
+
+Refinement reserves both the current fallback and incoming level. Only after
+hash verification, error/count/bounds validation and upload does a replacement
+take over. If the requested level cannot fit, try an affordable intermediate;
+otherwise retain the current surface and report unmet detail. An explicit budget
+reduction below current residency can require proxies. Request cancellation
+rejects obsolete completions, and blocked refinement settles without waiting
+forever for an unattainable allocation. Finest-detail limits and numerical
+allowances can also leave the target unmet at extreme zoom. No display request
+loads exact bodies or recomputes engineering evidence.
+
+Independent radial-deviation tests cover circle and conical meshes; browser
+acceptance covers annular cap/bore picking, repeated-part sharing, delayed,
+missing and obsolete refinement, intermediate budgets and forged error metadata.
+An independent thin-annulus fixture retains a 0.2 mm wall gap, all four semantic
+faces, shared watertight triangle edges and the expected polygon-annulus volume
+at every level. None of those display volumes replaces the native volume.
+`spindle_line.star` combines tapered housing variants and shared drilled bases,
+shafts and rings. This is bounded whole-part refinement; metadata paging,
+cluster transitions, full screen-space error certification and hardware scale
+gates remain open.
 
 Streaming requires HTTP(S), WebGL2 and Web Crypto (localhost is supported).
 Content-addressed assets are verified individually; unavailable assets remain
@@ -1097,7 +1136,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
-| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache and proxy fallback | Paged assembly/part spatial indexes, occlusion, bounded-error LOD/meshlets, GPU generation refresh, sections/overlays |
+| Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
 | Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; recipe property assertions with pinned evidence and global validation | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 

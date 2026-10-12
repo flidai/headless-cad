@@ -1072,5 +1072,39 @@
         ]
       ]
     }
+  },
+  "spindle_line.star": {
+    "spindle_line": {
+      "volume_mm3": 774502.2650766651,
+      "solids": 48,
+      "bounds_mm": [
+        [
+          -35,
+          -35,
+          0
+        ],
+        [
+          335,
+          235,
+          60
+        ]
+      ]
+    },
+    "service_station": {
+      "volume_mm3": 62559.51045864027,
+      "solids": 4,
+      "bounds_mm": [
+        [
+          -35,
+          -35,
+          0
+        ],
+        [
+          35,
+          35,
+          60
+        ]
+      ]
+    }
   }
 }

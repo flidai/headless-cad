@@ -3,8 +3,8 @@
 //! viewer retains shared meshes with a larger occurrence budget. Neither browser
 //! viewer loads or evaluates the exact B-rep.
 use super::{
-    render_html, render_html_template, render_svg, scene_with_tolerance, Face, PreviewError,
-    RecipeContext, Scene,
+    render_html, render_html_template, render_svg, scene_with_policy, scene_with_tolerance, Face,
+    PreviewError, RecipeContext, Scene,
 };
 use cad_assembly::{BuiltAssembly, Instance};
 use cad_kernel::Tolerance;
@@ -33,6 +33,8 @@ struct AssemblyScene {
     meshes: BTreeMap<String, Scene>,
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     mesh_assets: BTreeMap<String, MeshAssetDescriptor>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    mesh_lods: BTreeMap<String, Vec<MeshAssetDescriptor>>,
     definitions: BTreeMap<String, Definition>,
     instances: Vec<Instance>,
     instance_paths: BTreeMap<String, Vec<String>>,
@@ -64,7 +66,7 @@ pub struct StreamBundle {
     pub assets: Vec<DisplayMeshAsset>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 struct MeshAssetDescriptor {
     url: String,
     sha256: String,
@@ -74,6 +76,7 @@ struct MeshAssetDescriptor {
     points: usize,
     vertices: usize,
     gpu_bytes: usize,
+    geometric_error_mm: f64,
 }
 
 #[cfg(test)]
@@ -172,6 +175,7 @@ fn assembly_scene_with_tolerance(
         content_hash: assembly.content_hash.clone(),
         meshes,
         mesh_assets: BTreeMap::new(),
+        mesh_lods: BTreeMap::new(),
         definitions,
         instances: assembly.instances.clone(),
         instance_paths: assembly.instance_paths.clone(),
@@ -311,48 +315,62 @@ pub fn to_assembly_stream_bundle_with_tolerance(
     scene.schema_version = 2;
     scene.portable_preview_available = Some(portable_preview_available);
     let mut assets = BTreeMap::<String, String>::new();
-    for (hash, mesh) in std::mem::take(&mut scene.meshes) {
-        // Explicit triangulation is mandatory for holes and concave faces. An
-        // envelope makes older fan-only clients reject the payload, even when
-        // its triangle count happens to equal a fan's n - 2 count.
-        let content = if mesh
-            .faces
-            .iter()
-            .any(|face| face.semantic_face_id.is_some())
-        {
-            serde_json::to_string(&serde_json::json!({"schema_version": 3, "mesh": &mesh}))?
-        } else if mesh.faces.iter().any(|face| face.triangles.is_some()) {
-            serde_json::to_string(&serde_json::json!({"schema_version": 2, "mesh": &mesh}))?
-        } else {
-            serde_json::to_string(&mesh)?
-        };
-        let sha256: String = Sha256::digest(content.as_bytes())
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        let name = format!("mesh-{sha256}.display.json");
-        let descriptor = MeshAssetDescriptor {
-            url: name.clone(),
-            sha256,
-            byte_length: content.len(),
-            bounds: mesh.bounds,
-            faces: mesh.faces.len(),
-            points: mesh.faces.iter().map(|face| face.points.len()).sum(),
-            vertices: mesh.vertices,
-            gpu_bytes: mesh
-                .faces
-                .iter()
-                .map(|face| face.triangle_indices().len() * 3 * 7 * 4)
-                .sum(),
-        };
-        if let Some(previous) = assets.insert(name, content.clone()) {
-            if previous != content {
-                return Err(PreviewError::Assembly(
-                    "display payload SHA-256 collision".into(),
-                ));
+    let source_models: BTreeMap<_, _> = assembly
+        .parts
+        .values()
+        .map(|part| (part.content_hash.as_str(), &part.result.model))
+        .collect();
+    let mut total_faces = 0usize;
+    let mut total_points = 0usize;
+    for (hash, fine) in std::mem::take(&mut scene.meshes) {
+        let model = source_models[hash.as_str()];
+        let mut meshes = Vec::new();
+        if model.has_curved_geometry() {
+            for chordal_error in [0.5, 0.1] {
+                meshes.push(scene_with_policy(
+                    model,
+                    tolerance,
+                    cad_kernel::TessellationPolicy {
+                        chordal_error,
+                        ..Default::default()
+                    },
+                )?);
             }
         }
-        scene.mesh_assets.insert(hash, descriptor);
+        meshes.push(fine);
+        let mut descriptors: Vec<MeshAssetDescriptor> = Vec::new();
+        for mesh in meshes {
+            total_faces += mesh.faces.len();
+            total_points += mesh
+                .faces
+                .iter()
+                .map(|face| face.points.len())
+                .sum::<usize>();
+            if total_faces > 3 * MAX_FACES || total_points > 3 * MAX_POINTS {
+                return Err(PreviewError::Assembly(
+                    "LOD display meshes exceed 150,000 faces or 600,000 face points".into(),
+                ));
+            }
+            let (descriptor, content) = mesh_asset(&mesh)?;
+            if let Some(previous) = assets.insert(descriptor.url.clone(), content.clone()) {
+                if previous != content {
+                    return Err(PreviewError::Assembly(
+                        "display payload SHA-256 collision".into(),
+                    ));
+                }
+            }
+            if descriptors
+                .last()
+                .is_none_or(|previous| previous.sha256 != descriptor.sha256)
+            {
+                descriptors.push(descriptor);
+            }
+        }
+        scene.mesh_assets.insert(
+            hash.clone(),
+            descriptors.last().expect("fine mesh exists").clone(),
+        );
+        scene.mesh_lods.insert(hash, descriptors);
     }
     Ok(StreamBundle {
         scene_json: serde_json::to_string_pretty(&scene)?,
@@ -362,6 +380,42 @@ pub fn to_assembly_stream_bundle_with_tolerance(
             .map(|(name, content)| DisplayMeshAsset { name, content })
             .collect(),
     })
+}
+
+fn mesh_asset(mesh: &Scene) -> Result<(MeshAssetDescriptor, String), PreviewError> {
+    // Envelopes require clients to respect native semantic faces and explicit triangulation.
+    let content = if mesh
+        .faces
+        .iter()
+        .any(|face| face.semantic_face_id.is_some())
+    {
+        serde_json::to_string(&serde_json::json!({"schema_version": 3, "mesh": mesh}))?
+    } else if mesh.faces.iter().any(|face| face.triangles.is_some()) {
+        serde_json::to_string(&serde_json::json!({"schema_version": 2, "mesh": mesh}))?
+    } else {
+        serde_json::to_string(mesh)?
+    };
+    let sha256: String = Sha256::digest(content.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let descriptor = MeshAssetDescriptor {
+        url: format!("mesh-{sha256}.display.json"),
+        sha256,
+        byte_length: content.len(),
+        bounds: mesh.bounds,
+        faces: mesh.faces.len(),
+        points: mesh.faces.iter().map(|face| face.points.len()).sum(),
+        vertices: mesh.vertices,
+        gpu_bytes: mesh
+            .faces
+            .iter()
+            .map(|face| face.triangle_indices().len() * 3 * 7 * 4)
+            .sum(),
+        // Planar facets have no chord approximation; this is not a floating-point accuracy claim.
+        geometric_error_mm: mesh.tessellation_error_mm.unwrap_or(0.0),
+    };
+    Ok((descriptor, content))
 }
 
 fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
@@ -525,6 +579,11 @@ mod tests {
         assert_eq!(metadata["meshes"], serde_json::json!({}));
         assert_eq!(metadata["instances"].as_array().unwrap().len(), 2);
         let descriptor = &metadata["mesh_assets"]["shared-geometry"];
+        assert_eq!(
+            metadata["mesh_lods"]["shared-geometry"],
+            serde_json::json!([descriptor])
+        );
+        assert_eq!(descriptor["geometric_error_mm"], 0.0);
         let asset = &bundle.assets[0];
         assert_eq!(descriptor["byte_length"], asset.content.len());
         assert_eq!(descriptor["faces"], 6);
@@ -571,6 +630,163 @@ mod tests {
         assert_eq!(bundle.scene_json, repeated.scene_json);
         assert_eq!(bundle.html, repeated.html);
         assert_eq!(bundle.assets[0].content, repeated.assets[0].content);
+    }
+
+    #[test]
+    fn analytic_lods_bound_circle_and_cone_sagitta_and_preserve_native_faces() {
+        let tolerance = Tolerance::default();
+        for result in [
+            cad_kernel::extrude_circle(20.0, 10.0, tolerance).unwrap(),
+            cad_kernel::revolve_polygon(&[[4., 0.], [20., 0.], [10., 10.], [4., 10.]], tolerance)
+                .unwrap(),
+        ] {
+            let original = result.model.clone();
+            let mut assembly = fixture();
+            for part in assembly.parts.values_mut() {
+                part.result = Arc::new(result.clone());
+            }
+            // Recompute assembly identity and bounds from the changed definition.
+            let assembly = BuiltAssembly::new(
+                assembly.assembly_id,
+                assembly.parts,
+                assembly.instances,
+                tolerance,
+            )
+            .unwrap();
+            let recipe = RecipeContext {
+                language: "starlark".into(),
+                source: "# native LOD fixture".into(),
+                source_name: "lod.star".into(),
+                output_name: "pair".into(),
+                feature_id: "pair".into(),
+                parameters: BTreeMap::new(),
+                content_hash: assembly.content_hash.clone(),
+                recipe_context_hash: "source".into(),
+                property_assertions: Default::default(),
+            };
+            let bundle = to_assembly_stream_bundle(&assembly, &recipe, false).unwrap();
+            let metadata: serde_json::Value = serde_json::from_str(&bundle.scene_json).unwrap();
+            let levels = metadata["mesh_lods"]["shared-geometry"].as_array().unwrap();
+            assert_eq!(levels.len(), 3);
+            assert_eq!(bundle.assets.len(), 3); // Two definitions and occurrences still share each LOD.
+            assert_eq!(metadata["mesh_assets"]["shared-geometry"], levels[2]);
+            let mut previous_count = 0;
+            let mut previous_error = f64::INFINITY;
+            for (level, requested_error) in levels.iter().zip([0.5, 0.1, 0.01]) {
+                let error = level["geometric_error_mm"].as_f64().unwrap();
+                assert!(error <= requested_error && error < previous_error);
+                let count = level["faces"].as_u64().unwrap();
+                assert!(count > previous_count);
+                previous_count = count;
+                previous_error = error;
+                let asset = bundle
+                    .assets
+                    .iter()
+                    .find(|asset| asset.name == level["url"].as_str().unwrap())
+                    .unwrap();
+                let hash: String = Sha256::digest(asset.content.as_bytes())
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect();
+                assert_eq!(level["sha256"], hash);
+                assert_eq!(level["byte_length"], asset.content.len());
+                let payload: serde_json::Value = serde_json::from_str(&asset.content).unwrap();
+                let mut semantic_faces = std::collections::BTreeSet::new();
+                let mut max_sagitta = 0.0_f64;
+                for face in payload["mesh"]["faces"].as_array().unwrap() {
+                    semantic_faces.insert(face["semantic_face_id"].as_u64().unwrap() as usize);
+                    let points: Vec<[f64; 3]> =
+                        serde_json::from_value(face["points"].clone()).unwrap();
+                    for (a, b) in points
+                        .iter()
+                        .zip(points.iter().cycle().skip(1))
+                        .take(points.len())
+                    {
+                        let radius = a[0].hypot(a[1]);
+                        if radius > 0.
+                            && (a[2] - b[2]).abs() < 1e-10
+                            && (radius - b[0].hypot(b[1])).abs() < 1e-10
+                        {
+                            let midpoint_radius = ((a[0] + b[0]) / 2.).hypot((a[1] + b[1]) / 2.);
+                            let sagitta = radius - midpoint_radius;
+                            assert!(sagitta <= error + 1e-12);
+                            max_sagitta = max_sagitta.max(sagitta);
+                        }
+                    }
+                }
+                assert!(max_sagitta > 0.);
+                assert_eq!(semantic_faces, (0..original.faces.len()).collect());
+            }
+            assert_eq!(result.model, original);
+            assert_eq!(assembly.parts["block"].result.model, original);
+        }
+    }
+
+    #[test]
+    fn thin_annulus_keeps_closed_shared_boundaries_at_every_lod() {
+        let tolerance = Tolerance::default();
+        let result = cad_kernel::extrude_annulus(16., 15.8, 0.4, tolerance).unwrap();
+        let original = result.model.clone();
+        for chordal_error in [0.5, 0.1, 0.01] {
+            let scene = scene_with_policy(
+                &result.model,
+                tolerance,
+                cad_kernel::TessellationPolicy {
+                    chordal_error,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+            let mut semantic = std::collections::BTreeSet::new();
+            let mut edges = BTreeMap::<([u64; 3], [u64; 3]), usize>::new();
+            let mut volume = 0.;
+            let mut bottom_angles = BTreeMap::<i64, (f64, f64)>::new();
+            for face in &scene.faces {
+                semantic.insert(face.semantic_face_id.unwrap());
+                for p in &face.points {
+                    if p[2] == 0. {
+                        let angle = (p[1].atan2(p[0]) * 1e10).round() as i64;
+                        let r = p[0].hypot(p[1]);
+                        let pair = bottom_angles.entry(angle).or_insert((f64::INFINITY, 0.));
+                        pair.0 = pair.0.min(r);
+                        pair.1 = pair.1.max(r);
+                    }
+                }
+                for triangle in face.triangle_indices() {
+                    let [a, b, c] = triangle.map(|i| face.points[i]);
+                    volume += (a[0] * (b[1] * c[2] - b[2] * c[1])
+                        + a[1] * (b[2] * c[0] - b[0] * c[2])
+                        + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                        / 6.;
+                    for (a, b) in [(a, b), (b, c), (c, a)] {
+                        let mut pair = [
+                            a.map(|v| if v == 0. { 0 } else { v.to_bits() }),
+                            b.map(|v| if v == 0. { 0 } else { v.to_bits() }),
+                        ];
+                        pair.sort();
+                        *edges.entry((pair[0], pair[1])).or_default() += 1;
+                    }
+                }
+            }
+            assert_eq!(semantic, (0..4).collect());
+            assert!(edges.values().all(|&incidence| incidence == 2));
+            for &(inner, outer) in bottom_angles.values() {
+                assert!((outer - inner - 0.2).abs() < 1e-12);
+            }
+            let n = bottom_angles.len() as f64;
+            let expected = n / 2.
+                * (16_f64.powi(2) - 15.8_f64.powi(2))
+                * (std::f64::consts::TAU / n).sin()
+                * 0.4;
+            assert!(volume > 0. && (volume - expected).abs() < 1e-10);
+        }
+        assert_eq!(result.model, original);
+        assert!(
+            (result.model.volume()
+                - std::f64::consts::PI * (16_f64.powi(2) - 15.8_f64.powi(2)) * 0.4)
+                .abs()
+                < 1e-10
+        );
     }
 
     #[test]

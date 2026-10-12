@@ -29,7 +29,7 @@ large workcell benchmark; neither substitutes for the other's release gates.
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums with part/rigid-module attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
 | M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with convex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta implemented; arcs, apex singularities, partial revolution, nonconvex hole rings, general Booleans and generalized trim/seam handling remain |
-| M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache implemented; LOD, metadata paging, part spatial indexes and hardware gates remain |
+| M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache and analytic whole-part LOD implemented; metadata paging, cluster LOD, part spatial indexes and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
 | M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries and global recipe property assertions implemented; drawings, PMI, principal axes and configuration policies remain |
@@ -40,8 +40,9 @@ architectural priorities. Nested assemblies now share definitions and display
 meshes. The opt-in WebGL2 viewer uses GPU instancing; Canvas remains a portable
 fallback. The GPU client now also supports metadata-first selective mesh loading,
 occurrence-BVH frustum culling and bounded geometry residency with visible proxies.
-Paged metadata, part spatial hierarchies, bounded-error LOD and hardware
-performance gates remain. Numerical kernel development continues in parallel through M2; GPU display work does not block headless geometry or substitute for it.
+Analytic parts now refine through up to three native tessellation levels with
+explicit unmet-detail reporting. Paged metadata, part spatial hierarchies, cluster
+LOD and hardware performance gates remain. Numerical kernel development continues in parallel through M2; GPU display work does not block headless geometry or substitute for it.
 
 M1 instance transforms describe placement and display reuse. The M2 `transform`
 operation now bakes rigid rotations and translations into exact geometry for
@@ -53,6 +54,13 @@ adds two transformed tools with cap/wall lineage assertions; manufacturing files
 contain their transformed native coordinates.
 
 ## Next concrete implementation increments
+
+The first M3a increment now streams whole-part analytic LOD, preserving current
+surfaces while finer assets load and exposing unmet detail under resource or
+precision limits. `spindle_line.star` combines tapered housing variants with
+shared drilled bases, shafts and rings. Continue toward metadata paging and
+cluster refinement; a working part-LOD viewer does not close the hardware or
+full error-certification gates.
 
 For scalable inspection, follow the architecture's
 [staged display gates](architecture.md#target-display-hierarchy-contract):

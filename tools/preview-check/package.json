@@ -24,7 +24,8 @@
     "test:revolve": "node revolve-check.cjs",
     "test:cone": "node cone-check.cjs",
     "test:attachments": "node attachment-check.cjs",
-    "test:properties": "node property-checks.cjs"
+    "test:properties": "node property-checks.cjs",
+    "test:lod": "node lod-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

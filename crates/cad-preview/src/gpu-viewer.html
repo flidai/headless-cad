@@ -98,14 +98,31 @@ try { start(); } catch (error) { fail(error); }
 function start() {
   if (!compactScene || compactScene.kind !== 'assembly') throw Error('This GPU artifact requires a compact assembly scene.');
   const streamed = compactScene.schema_version === 2 && compactScene.mesh_assets != null;
-  const assets = streamed ? compactScene.mesh_assets : {};
+  const assets = streamed ? {...compactScene.mesh_assets} : {};
+  const lodEnabled = streamed && compactScene.mesh_lods != null && Object.values(compactScene.mesh_lods).some(list => !Array.isArray(list) || list.length !== 1 || list[0].geometric_error_mm !== 0);
+  const levels = new Map(), owners = new Map(), active = new Map(), desired = new Map(), precisionCache = new Map();
   const instances = compactScene.instances, definitions = compactScene.definitions;
   const meshes = compactScene.meshes;
   const keys = Object.keys(streamed ? assets : meshes).sort();
+  for (const hash of keys) {
+    const descriptors = lodEnabled ? compactScene.mesh_lods[hash] : [assets[hash]];
+    if (lodEnabled && (!Array.isArray(descriptors) || !descriptors.length || descriptors.length > 3)) throw Error('Invalid bounded LOD manifest.');
+    const list = [];
+    for (let level = 0; level < descriptors.length; level++) {
+      const descriptor = descriptors[level], key = lodEnabled && descriptors.length > 1 ? hash + ':' + level : hash;
+      if (lodEnabled && (!Number.isFinite(descriptor.geometric_error_mm) || descriptor.geometric_error_mm < 0
+        || level && descriptor.geometric_error_mm > descriptors[level-1].geometric_error_mm
+        || JSON.stringify(descriptor.bounds) !== JSON.stringify(assets[hash].bounds))) throw Error('Invalid LOD error order or bounds.');
+      if (streamed) assets[key] = descriptor;
+      owners.set(key, hash); list.push(key);
+    }
+    if (lodEnabled && descriptors.at(-1).sha256 !== assets[hash].sha256) throw Error('Finest LOD must match the compatibility mesh.');
+    levels.set(hash, list);
+  }
   if (instances.length > 100000 || keys.length > 10000) throw Error('Display metadata exceeds occurrence or mesh limits.');
   document.getElementById('title').textContent = compactScene.assembly_id || 'Assembly';
   document.getElementById('display-policy').textContent = streamed
-    ? 'Visible meshes load by verified immutable hash. Striped boxes are bounds proxies, not geometry. Reload after rebuilding; no automatic refresh or LOD.'
+    ? 'Visible meshes load by verified immutable hash. Striped boxes are bounds proxies, not geometry. Reload after rebuilding; no automatic refresh. ' + (lodEnabled ? 'Adaptive part detail targets one physical framebuffer pixel including a conservative shader rounding allowance. Pixel coverage and depth quantization are not included.' : 'This artifact has one display level.')
     : 'All display assets are embedded. Offscreen occurrences are culled. Reload after rebuilding; no automatic refresh or LOD.';
   const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, preserveDrawingBuffer: false });
   if (!gl) throw Error('WebGL2 is unavailable in this browser. Use the portable preview when included, or a WebGL2-capable browser.');
@@ -148,7 +165,7 @@ function start() {
   const resident = new Map(), inflight = new Map(), failures = new Map(), waiters = [];
   let rendering = false, scheduled = false;
   const records = [], byMesh = new Map(keys.map(key => [key, []]));
-  for (const hash of keys) {
+  for (const hash of streamed ? [...levels.values()].flat() : keys) {
     const descriptor = streamed ? assets[hash] : meshes[hash];
     if (!validBounds(descriptor.bounds)) throw Error('Invalid local display bounds.');
     if (streamed) {
@@ -170,7 +187,7 @@ function start() {
     const local = descriptor.bounds, center = local ? local[0].map((v, i) => v + (local[1][i] - v) / 2) : [0, 0, 0];
     const half = local ? local[0].map((v, i) => (local[1][i] - v) / 2) : [0, 0, 0];
     const q = instance.transform.rotation, t = instance.transform.translation;
-    if (!Array.isArray(q) || q.length !== 4 || !q.every(Number.isFinite) || !finite3(t)) throw Error('Invalid display placement.');
+    if (!Array.isArray(q) || q.length !== 4 || !q.every(Number.isFinite) || Math.abs(Math.hypot(...q)-1)>1e-8 || !finite3(t)) throw Error('Invalid rigid display placement.');
     const record = { index, hash: definition.mesh, q, center: add(rotate(q, center), t), half,
       axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(axis => rotate(q, axis)), empty: local === null };
     if (!finite3(record.center)) throw Error('Nonfinite placed display bounds.');
@@ -241,6 +258,7 @@ function validFaceTopology(face){
 function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.find(s=>s>i)??face.points.length;return i+1===end?starts.findLast(s=>s<=i):i+1}
   function validateMesh(mesh, descriptor) {
     if (!mesh || !Array.isArray(mesh.faces) || mesh.faces.length > 50000 || !validBounds(mesh.bounds)) throw Error('Invalid mesh payload.');
+    if (descriptor && descriptor.geometric_error_mm !== undefined && descriptor.geometric_error_mm !== (mesh.tessellation_error_mm ?? 0)) throw Error('Mesh payload disagrees with declared geometric error.');
     let points = 0, gpuBytes = 0; const ids = new Set();
     for (const face of mesh.faces) {
       if (!Number.isInteger(face.id) || face.id < 0 || face.id >= 16777215 || ids.has(face.id)
@@ -314,6 +332,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
   function cull() {
+    precisionCache.clear();
     visible = new Map(); visibleIndices = [];
     stats.cullNodeTests = stats.cullLeafTests = stats.cullOccurrenceTests = stats.cullPrunedNodes = 0;
     const planes = [[basis.right, camera.halfHeight * aspect], [basis.up, camera.halfHeight], [basis.eye, depthRange]];
@@ -366,7 +385,8 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
     stats.gpuBytes = stats.bufferBytes + pixelWidth * pixelHeight * 12;
     stats.gpuBytesKind = 'estimated buffers and picking targets; residentBytes separately budgets encoded mesh bytes plus geometry VBOs';
     stats.loadingCount = inflight.size; stats.residentKeys = [...resident.keys()].sort();
-    stats.proxyCount = streamed ? visibleIndices.filter(i => !resident.has(records[i].hash)).length : 0;
+    stats.proxyCount = streamed ? visibleIndices.filter(i => !resident.has(activeKey(records[i].hash))).length : 0;
+    refreshLodStats();
     stats.assetErrors = Object.fromEntries(failures);
     status.textContent = `${instances.length.toLocaleString()} occurrences · ${stats.visibleCount.toLocaleString()} visible · ${stats.meshCount} mesh definitions · ${resident.size} resident · ${stats.proxyCount} bounds proxies`;
     const notice = document.getElementById('stream-status');
@@ -375,6 +395,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
       notice.textContent = `${(stats.residentBytes/1048576).toFixed(2)} / ${(budget/1048576).toFixed(2)} MiB geometry budget · ${inflight.size} loading. `
         + (failures.size ? 'Some immutable assets are unavailable or failed verification. Bounds proxies remain visible; rebuild/reload to retry. ' : '')
         + (selected >= 0 && records[selected] && charge(records[selected].hash) > budget ? 'Selected mesh exceeds the geometry budget; its bounds proxy remains visible. ' : '')
+        + (lodEnabled && stats.unmetDetailCount ? `${stats.unmetDetailCount} visible part definitions below the detail target (loading, budget, precision or finest available level). ` : '')
         + (stats.proxyCount ? 'Striped bounds boxes are occurrence candidates, not exact surfaces. Click a box to prioritize its mesh.' : 'Visible meshes are available.');
     }
   }
@@ -385,6 +406,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
   }
   function plan() {
     if (!streamed) return;
+    if (lodEnabled) { planLods(); return; }
     const next = new Set(); let total = 0;
     const selectedHash = selected >= 0 && records[selected] ? records[selected].hash : null;
     const candidates = [...visible.keys()].sort((a,b) => Number(b === selectedHash) - Number(a === selectedHash) || a.localeCompare(b));
@@ -408,6 +430,90 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
       if (required <= budget && wanted.has(hash) === false && !visible.has(hash)) continue;
       destroy(group); resident.delete(hash); required -= charge(hash);
     }
+    pump();
+  }
+  function activeKey(hash) { return lodEnabled ? active.get(hash) : hash; }
+  // Float32 roundoff allowance for recentered vertex storage, quaternion rotation,
+  // relative translation, camera basis and projection. 512 ulps of the sum of
+  // magnitudes is deliberately larger than the shader's <100 scalar operations.
+  // This is a rendering estimate, not a certified rasterization/Hausdorff bound;
+  // depth quantization, pixel coverage and implementation-specific raster rules
+  // are outside the screen-space tessellation target.
+  function precisionPixels(hash) {
+    if (precisionCache.has(hash)) return precisionCache.get(hash);
+    let magnitude = 0, sourceMagnitude = 0;
+    for (const index of visible.get(hash) || []) {
+      const r = records[index], local = r.half.reduce((a,b)=>a+b,0);
+      magnitude = Math.max(magnitude, local + sub(r.center,camera.target).reduce((a,b)=>a+Math.abs(b),0));
+      const localBounds = assets[hash].bounds;
+      sourceMagnitude = Math.max(sourceMagnitude, [...(localBounds || []).flat(), ...instances[index].transform.translation, ...camera.target].reduce((sum,value)=>sum+Math.abs(value),0));
+    }
+    const result = (magnitude * 512 * Math.pow(2,-23) + sourceMagnitude * 64 * Number.EPSILON) * pixelHeight / (2 * camera.halfHeight);
+    precisionCache.set(hash,result); return result;
+  }
+  function errorPixels(hash, key) {
+    return assets[key].geometric_error_mm * pixelHeight / (2 * camera.halfHeight) + precisionPixels(hash);
+  }
+  function refreshLodStats() {
+    if (!lodEnabled) return;
+    stats.detailTargetPixels = 1;
+    stats.screenErrorKind = 'tessellation bound plus conservative float32 shader allowance; excludes raster coverage and depth quantization';
+    stats.activeLodLevels = {}; stats.activeLodErrors = {}; stats.desiredLodLevels = {};
+    stats.maxScreenErrorPixels = 0; stats.maxPrecisionErrorPixels = 0; stats.unmetDetailCount = 0;
+    for (const hash of visible.keys()) {
+      const key = active.get(hash), list = levels.get(hash), precision = precisionPixels(hash);
+      stats.desiredLodLevels[hash] = desired.get(hash);
+      stats.maxPrecisionErrorPixels = Math.max(stats.maxPrecisionErrorPixels,precision);
+      if (!key || !resident.has(key)) { stats.unmetDetailCount++; continue; }
+      const error = errorPixels(hash,key);
+      stats.activeLodLevels[hash] = list.indexOf(key);
+      stats.activeLodErrors[hash] = {geometricErrorMm:assets[key].geometric_error_mm, screenErrorPixels:error, precisionErrorPixels:precision};
+      stats.maxScreenErrorPixels = Math.max(stats.maxScreenErrorPixels,error);
+      if (error > 1) stats.unmetDetailCount++;
+    }
+  }
+  function planLods() {
+    const selectedHash = selected >= 0 && records[selected] ? records[selected].hash : null;
+    const candidates = [...visible.keys()].sort((a,b)=>Number(b===selectedHash)-Number(a===selectedHash)||a.localeCompare(b));
+    const next = new Set();
+    // Evict only nonvisible cache entries for working space. A visible fallback
+    // remains resident until its verified replacement has been fully uploaded.
+    for (const [key,group] of resident) if (!visible.has(owners.get(key))) {
+      destroy(group); resident.delete(key); if(active.get(owners.get(key))===key)active.delete(owners.get(key));
+    }
+    // An explicit budget reduction can make the existing working set illegal.
+    // Drop lowest-priority parts only in that case, never to fund refinement.
+    let residentTotal = residentBytes();
+    for (const hash of candidates.slice().reverse()) {
+      if (residentTotal <= budget) break;
+      const key = active.get(hash);
+      if (key && resident.has(key)) { residentTotal -= charge(key); destroy(resident.get(key)); resident.delete(key); active.delete(hash); }
+    }
+    let reserved = residentBytes();
+    for (const hash of candidates) {
+      const list=levels.get(hash), current=active.get(hash);
+      let level=list.findIndex(key=>errorPixels(hash,key)<=1);
+      if(level<0)level=list.length-1;
+      const prior=desired.get(hash);
+      if(prior!==undefined && level<prior && errorPixels(hash,list[level])>.8)level=prior;
+      desired.set(hash,level);
+      // Always bootstrap the smallest representation before requesting detail.
+      let target=current ? list[level] : list[0];
+      if(target===current)continue;
+      if (current && level > list.indexOf(current)) {
+        // A medium level can be attainable even when the requested finest
+        // replacement plus its retained fallback cannot fit the budget.
+        target = null;
+        for(let candidate=level;candidate>list.indexOf(current);candidate--) {
+          if(!failures.has(list[candidate]) && reserved+charge(list[candidate])<=budget){target=list[candidate];break;}
+        }
+      }
+      if(target && !failures.has(target) && reserved+charge(target)<=budget){next.add(target);reserved+=charge(target);}
+    }
+    wanted=next;
+    // Per-request cancellation avoids discarding unrelated completed downloads
+    // merely because another part advances from bootstrap to refinement.
+    for(const [key,entry] of inflight)if(!wanted.has(key)&&!entry.cancelled){entry.cancelled=true;entry.controller.abort();stats.abortedRequests++;}
     pump();
   }
   async function readBounded(response, expected, entry) {
@@ -448,8 +554,12 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
       const mesh = [2,3].includes(payload.schema_version) ? payload.mesh : payload;
       validateMesh(mesh, descriptor);
       if (entry.cancelled || entry.epoch !== epoch || !wanted.has(hash)) return;
-      const group = upload(mesh, hash, byMesh.get(hash).length);
+      const group = upload(mesh, hash, byMesh.get(owners.get(hash) || hash).length);
       resident.set(hash, group); entry.reserved = 0;
+      if (lodEnabled) {
+        const owner = owners.get(hash), previous = active.get(owner); active.set(owner, hash);
+        if (previous && previous !== hash && resident.has(previous)) { destroy(resident.get(previous)); resident.delete(previous); }
+      }
     } catch (error) {
       if (!entry.cancelled && entry.epoch === epoch && error.name !== 'AbortError') {
         const text = `${hash}: ${message(error)}`;
@@ -457,7 +567,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
       }
     } finally {
       if (inflight.get(hash) === entry) inflight.delete(hash);
-      refreshStats(); pump(); scheduleRender(); settle();
+      refreshStats(); if (lodEnabled) planLods(); else pump(); scheduleRender(); settle();
     }
   }
   function pump() {
@@ -503,7 +613,7 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
     gl.uniform1i(uniforms.uPick,picking?1:0);gl.uniform1f(uniforms.uSelected,selected);
     let calls=0;const proxies=[];
     for(const [hash,indices] of visible) {
-      if(resident.has(hash)) {if(drawGroup(resident.get(hash),indices,false))calls++;}
+      if(resident.has(activeKey(hash))) {if(drawGroup(resident.get(activeKey(hash)),indices,false))calls++;}
       else if(streamed)proxies.push(...indices);
     }
     if(proxyGroup&&drawGroup(proxyGroup,proxies,true))calls++;

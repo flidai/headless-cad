@@ -120,14 +120,18 @@ fn scene_with_tolerance(
     model: &ModelSnapshot,
     tolerance: Tolerance,
 ) -> Result<Scene, PreviewError> {
+    scene_with_policy(model, tolerance, cad_kernel::TessellationPolicy::default())
+}
+
+fn scene_with_policy(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    policy: cad_kernel::TessellationPolicy,
+) -> Result<Scene, PreviewError> {
     let invalid = PreviewError::Geometry;
     if model.has_curved_geometry() {
-        let mesh = cad_kernel::tessellate_analytic(
-            model,
-            tolerance,
-            cad_kernel::TessellationPolicy::default(),
-        )
-        .map_err(|_| PreviewError::Geometry("analytic display tessellation failed"))?;
+        let mesh = cad_kernel::tessellate_analytic(model, tolerance, policy)
+            .map_err(|_| PreviewError::Geometry("analytic display tessellation failed"))?;
         let mut crease_edges = std::collections::BTreeSet::new();
         let faces = mesh
             .patches
