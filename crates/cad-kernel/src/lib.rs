@@ -30,6 +30,7 @@
 
 mod analytic;
 mod arc_prism;
+mod circular_boolean;
 mod convex_intersection;
 mod face_frame;
 mod mass_properties;

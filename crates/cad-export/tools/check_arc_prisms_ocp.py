@@ -59,7 +59,7 @@ def expected(name):
     return v,[cx,cy,h/2],[[ix,ixy,0],[ixy,iy,0],[0,0,iz]]
 
 
-def mesh(path,exact):
+def mesh(path,exact,absolute_error=None):
     points=[];normals=[]
     for line in path.read_text().splitlines():
         f=line.split()
@@ -79,7 +79,7 @@ def mesh(path,exact):
             a,b=p[i],p[(i+1)%3];key=tuple(sorted((a,b)))
             count,sign=incidence.get(key,(0,0));incidence[key]=(count+1,sign+(1 if a<b else -1))
     assert all(value==(2,0) for value in incidence.values())
-    assert abs(v-exact)/exact<.002,(path,v,exact)
+    assert abs(v-exact) < (.002*exact if absolute_error is None else absolute_error),(path,v,exact)
 
 
 def main():

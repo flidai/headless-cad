@@ -18,7 +18,8 @@ STEP and STL. Modeling currently supports **orthogonal solids and simple polygon
 outlines and simple polygonal through-holes, plus true circular extrusions, simple concave line/arc profiles and stepped/tapered revolutions**: slotted brackets, open trays, triangular ramps, and polygonal
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
-Union and cut remain orthogonal-only; intersection also supports bounded,
+Union, cut and intersection support orthogonal solids and a bounded analytic
+branch for two parallel solid cylinders. Intersection also supports bounded,
 well-conditioned convex planar solids, including rotated inputs.
 
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
@@ -922,7 +923,11 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 - Native positive-Z extrusion with authoritative polygonal caps and planar walls.
 - Translation of supported solids; rigid exact transforms within the domain above.
   Unions, cuts, intersections, open pockets,
-  through-slots, and separated multiple solids in the orthogonal domain only.
+  through-slots, and separated multiple solids in the orthogonal domain.
+- Two parallel solid cylinders support analytic intersection over a common axial
+  interval, union with matching intervals, and through-cuts. Contact and uncertain
+  separation fail explicitly; arbitrary curved operands and chained lens/crescent
+  results are outside this Boolean branch.
 - General planar validation supports one strictly convex solid with supporting
   outward face planes, or one matched-cap right prism with a simple outer ring and simple holes.
   Multiple general solids are explicitly
@@ -954,7 +959,7 @@ creates an authoritative cylinder with three faces, three edges and two seam
 vertices. Native transforms, mass properties, cap datums, STEP and inspection
 preserve its circular geometry. See [shaft_stack.star](examples/shaft_stack.star)
 for a shaft, flange and end cap attached through face datums, plus a separately
-rotated shaft. These are separate solid parts; curved Booleans are not yet supported.
+rotated shaft. These are separate solid parts; general curved Booleans remain unsupported.
 
 ```sh
 cad build examples/shaft_stack.star --out-dir out/shaft_stack
@@ -1405,3 +1410,32 @@ orientation, assembly placement and closed STL output. `npm run
 test:concave-profile --prefix tools/preview-check` checks 12 browser views and
 706 independent visibility rays, including isolated jaw recesses and captured
 source inspection.
+
+### Twin-lobe fixture with native curved Booleans
+
+[twin_lobe_fixture.star](examples/twin_lobe_fixture.star) unions two circular
+blanks into a base and partitions a second layer into two crescents and a lens.
+Two shared annular bosses complete six occurrences from five definitions.
+`left_radius` (20..24 mm), `spacing` (26..34 mm) and `depth` (6..10 mm) drive
+geometry edits. Isolated `left_lobe`, `overlap` and `union_base` outputs expose
+the trimmed boundaries; picking a part shows the captured Starlark source.
+
+The original Rust kernel intersects circles analytically and constructs native
+trimmed cylinder faces. Source-wall references survive splitting, including the
+inward wall of a cut. Independent circular-segment integrals check volume,
+centroid and full inertia over 27 configurations, plus assembly mass and cache
+invalidation. Tangent contact, partial-depth cuts and unresolved cap offsets
+reject the revision and preserve all previously published artifacts.
+
+This branch accepts two recognized solid cylinders with parallel or opposite
+axes. Union requires matching axial intervals; intersection uses their common
+interval; a cutting cylinder must cover the left operand axially. Annular
+operands, arbitrary curved bodies, disconnected curved unions and further
+Booleans on the resulting lens/crescent are unsupported. Modeling never uses
+the display mesh. This fixture is a prescribed layout, not a fit/contact proof.
+
+Independent STEP acceptance covers three recipe configurations plus six direct
+Boolean cases, including operations on obliquely transformed operands.
+`npm run test:circular-boolean --prefix tools/preview-check` checks nine browser
+views and 2,169 visibility samples across Canvas, embedded GPU and streaming GPU
+clients, with exact captured source and no exact-geometry downloads.

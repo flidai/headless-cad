@@ -350,8 +350,9 @@ The initial general planar validator accepts one strictly convex solid: closed
 oriented topology, convex planar faces, positive volume, and strict supporting
 face half-spaces must agree. Multiple general solids in one snapshot are
 explicitly unsupported. The existing orthogonal validator still handles its
-nonconvex and disconnected domain. Union/cut remain orthogonal-only; intersection
-now also supports conditioned convex planar inputs as described below.
+nonconvex and disconnected domain. This planar branch retains orthogonal-only union/cut; intersection
+also supports conditioned convex planar inputs as described below. A separate
+parallel-cylinder Boolean branch is described below.
 Assembly placement can rotate and reuse polygon solids without baking those
 rotations into Boolean operands. `examples/angled_fixture.star` exercises this
 boundary with triangular ramps, hexagonal seats, and an orthogonally cut base.
@@ -439,8 +440,8 @@ curves and plane/cylinder surfaces, two circular boundary edges, and one periodi
 seam used in both directions. The validator certifies this canonical solid-cylinder
 and concentric annular families and rigid placements; it does not yet certify
 arbitrary reordered curved B-reps, curved intersections or general trimming. Volume, centroid, inertia,
-bounds and cap datum frames come from the analytic boundary. Wall datum frames
-and curved Booleans are explicit unsupported outcomes.
+bounds and cap datum frames come from the analytic boundary. Wall datum frames and general curved Booleans remain unsupported; the bounded
+parallel-cylinder branch below extends Boolean support.
 
 `shaft_stack.star` attaches a shaft, flange and end cap through cap datums and
 exports a separately rotated shaft. STEP uses analytic circles/cylinders and seam
@@ -536,7 +537,7 @@ samples across shoulder and wall faces. Sloped profiles support regular conical
 frusta and conical ends terminating at the axis.
 Positive polynomial coefficients integrate annular-frustum moments without
 subtracting nearly equal fourth powers. Partial turns, arcs in revolved meridians, general trim
-topology and curved Booleans remain future work.
+topology and general curved Booleans remain future work.
 `stepped_spindle.star` exercises connected solids, parameter edits and analytic
 STEP alongside an exploded assembly inspection view.
 
@@ -642,6 +643,43 @@ and concave outlines retain the
 existing bounded segment/hole counts, support consistency and mandatory mesh
 coverage checks. This broadens right-prism profiles, not general curved Boolean
 operations, arc-shaped inner loops, fit verification or joint solving.
+
+### Bounded parallel-cylinder Booleans
+
+The native Boolean dispatcher now recognizes two solid circular cylinders with
+parallel or opposite axes. It computes transverse circle intersections and
+constructs trimmed line/arc-prism topology, without mesh classification. Union
+requires matching axial intervals; intersection takes a resolved nonzero common
+interval; difference requires a tool spanning the left operand. Strict
+containment can produce an eccentric circular hole. Clearly disjoint intersection
+is empty and difference is unchanged; disconnected union remains unsupported.
+Annular inputs, arbitrary arc prisms, chained lens/crescent operands, partial-depth
+cuts and skew axes are outside this branch. Tangency and uncertain separation
+fail explicitly instead of generating nonmanifold contacts or snapping geometry.
+
+Every source face has explicit surviving or deleted lineage. Exterior arcs
+longer than a half-turn split into two native faces with the same source wall.
+Cut walls inherit the tool wall with inward orientation; cut caps inherit the
+left operand. Intersection caps inherit the source support defining that axial
+limit; matching union/intersection caps can carry both contributors. Tests cover
+partial overlaps, opposite-axis cap roles and common oblique transformations.
+
+Support agreement uses a scale-dependent arithmetic envelope of 4,096 machine
+epsilons, which must fit within one sixteenth of the linear modeling tolerance.
+Axis agreement has a separate 128-epsilon gate. Axis-aligned cap coordinates
+require literal equality; oblique reconstruction permits only arithmetic-envelope
+agreement and certifies the resulting world supports against their contributors.
+This is a floating-point consistency policy, not a proof of mathematical
+coplanarity. It does not use the larger modeling tolerance to merge nearby caps.
+Nonzero separations too small to resolve return a numerical/unsupported result.
+
+`twin_lobe_fixture.star` composes union, two through-cuts and intersection into
+a six-occurrence, five-definition tooling layout. Independent unequal-circle
+segment integrals check 27 configurations, native volume/centroid/full inertia,
+assembly material moments and selective invalidation. Publication tests preserve
+the previous generation after tangent, partial-depth and unresolved-cap edits.
+This advances the bearing-housing geometry track without closing general curved
+intersection, contact, fits or manufacturing-release obligations.
 
 ## Constraints and assemblies
 
@@ -1661,8 +1699,8 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
-| References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
+| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

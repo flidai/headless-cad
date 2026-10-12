@@ -332,6 +332,12 @@ fn neighbor(mut cell: [usize; 3], direction: usize, shape: [usize; 3]) -> Option
 /// (48 input planes maximum) through analytic supporting-plane reconstruction.
 /// Unresolved near-coincidence, ill-conditioned plane triples, and tangent or
 /// lower-dimensional intersections in that general domain are explicit errors.
+/// Two solid circular cylinders additionally support trimmed analytic circle
+/// arrangements: parallel axes, common axial interval for union, and a through
+/// tool for difference. Intersection may trim the axial interval. Annular inputs,
+/// disconnected curved unions, skew axes and unresolved contacts are unsupported.
+/// Oblique support identity is arithmetic-certified, not a real-number equality
+/// proof; modeling tolerance never merges cap planes or cylinder supports.
 pub fn boolean(
     a: &ModelSnapshot,
     b: &ModelSnapshot,
@@ -341,9 +347,7 @@ pub fn boolean(
     validated(a, tolerance)?;
     validated(b, tolerance)?;
     if a.has_curved_geometry() || b.has_curved_geometry() {
-        return Err(KernelError::Unsupported(
-            "Booleans with analytic curved surfaces are not yet supported".into(),
-        ));
+        return crate::circular_boolean::boolean(a, b, operation, tolerance);
     }
     let rectangles = (rectangular_faces(a), rectangular_faces(b));
     if matches!(operation, BooleanOp::Intersection)

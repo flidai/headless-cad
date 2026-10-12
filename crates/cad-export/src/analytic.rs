@@ -769,3 +769,48 @@ mod concave_arc_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod circular_boolean_tests {
+    use super::*;
+    use cad_kernel::{boolean, extrude_circle, transform, BooleanOp};
+    #[test]
+    fn transformed_operand_boolean_arcs_export_without_false_periodic_seams() {
+        let t = Tolerance::default();
+        let q = [0.5, 0.5, 0., 0.5_f64.sqrt()];
+        let a = transform(
+            &extrude_circle(22., 8., t).unwrap().model,
+            [12., -7., 4.],
+            q,
+            t,
+        )
+        .unwrap()
+        .model;
+        let local_b = transform(
+            &extrude_circle(18., 8., t).unwrap().model,
+            [30., 0., 0.],
+            [0., 0., 0., 1.],
+            t,
+        )
+        .unwrap()
+        .model;
+        let b = transform(&local_b, [12., -7., 4.], q, t).unwrap().model;
+        for op in [
+            BooleanOp::Union,
+            BooleanOp::Intersection,
+            BooleanOp::Difference,
+        ] {
+            let model = boolean(&a, &b, op, t).unwrap().model;
+            let step = to_step(&model, t).unwrap();
+            assert!(!step.contains("SEAM_CURVE("));
+            assert!(!step.contains("PCURVE("));
+            assert!(step.contains("CYLINDRICAL_SURFACE("));
+            let inward = step
+                .lines()
+                .filter(|line| line.contains("ADVANCED_FACE(") && line.ends_with(",.F.);"))
+                .count();
+            assert_eq!(inward, usize::from(op == BooleanOp::Difference));
+            assert!(to_stl(&model, t).unwrap().contains("facet normal"));
+        }
+    }
+}

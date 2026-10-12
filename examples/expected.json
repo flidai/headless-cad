@@ -1540,5 +1540,79 @@
       "volume_tolerance_mm3": 0.01,
       "linear_tolerance_mm": 1e-05
     }
+  },
+  "twin_lobe_fixture.star": {
+    "left_lobe": {
+      "volume_mm3": 10723.87369878595,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -22,
+          -22,
+          0
+        ],
+        [
+          17.666666666666668,
+          22,
+          8
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "overlap": {
+      "volume_mm3": 1440.3730559137275,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          12,
+          -13.110640292864757,
+          0
+        ],
+        [
+          22,
+          13.110640292864757,
+          8
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "union_base": {
+      "volume_mm3": 9433.440928445347,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -22,
+          -22,
+          0
+        ],
+        [
+          48,
+          22,
+          4
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "twin_lobe_fixture": {
+      "volume_mm3": 28601.91568008066,
+      "solids": 6,
+      "bounds_mm": [
+        [
+          -22,
+          -22,
+          0
+        ],
+        [
+          48,
+          22,
+          16
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }
