@@ -235,6 +235,24 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "Exactly1 semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "only one complete native circular section on the selected face; consistent center/radius/orientation, continuous full turn; no lines, partial arcs, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
+    let mut clearance = object_spec(
+        "clearance_check",
+        vec![
+            arg("id", T::String),
+            arg("output", reference("assembly_output")),
+            arg(
+                "left_instance_path",
+                array(reference("occurrence_path_component"), None),
+            ),
+            arg(
+                "right_instance_path",
+                array(reference("occurrence_path_component"), None),
+            ),
+            arg("min_clearance", T::Number),
+        ],
+    );
+    clearance.arguments[4].units = Some("mm");
+    clearance.obligations.extend(["schema-2 recipe.clearance_checks; Starlark clearance_check(id,output,left_instance_path,right_instance_path,min_clearance); strict object, unknown fields rejected", "at most 64 checks; case-insensitive unique ASCII letters/digits/underscore/hyphen IDs of length 1..128; finite strictly positive minimum", "two distinct exact leaf paths of length 1..64, nonempty trimmed components at most 1024 bytes; bounded 10000000 aggregate path-component resolution work", "assembly output only; global native dependency and check even on selected builds and cache hits; not a viewer or display-mesh query", "only validated single strictly convex planar solids; curved/nonconvex/multiple/empty/contact/overlap or unresolved inputs fail explicitly", "before placement, each operand is capped at 128 vertices, 256 edges, 128 single-loop faces/loops and 512 loop-edge references; kernel candidate limit is 200000", "native closest-witness upper bound and support-gap lower bound, widened by explicit occurrence-placement arithmetic envelope; lower bound must meet minimum without tolerance slack", "report retains assembly/part/feature identity, exact paths and frames, raw kernel query and placement-adjusted bounds; no penetration depth, general collision or manufacturing-tolerance inference"]);
     let mut stack_term = object_spec(
         "tolerance_stack_term",
         vec![
@@ -389,6 +407,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         dimensional_tolerance,
         stack,
         stack_term,
+        clearance,
         cardinality,
         selector,
         assertion,

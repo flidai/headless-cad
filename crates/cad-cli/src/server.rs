@@ -493,6 +493,20 @@ fn gallery(directory: &Dir) -> String {
                 url(&stack_report)
             ));
         }
+        let clearance_report = if folder.is_empty() {
+            "clearance-checks.html".to_owned()
+        } else {
+            format!("{folder}/clearance-checks.html")
+        };
+        if directory
+            .metadata(&clearance_report)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!(
+                "<a href=\"{}\">Geometric clearance</a>",
+                url(&clearance_report)
+            ));
+        }
         output.push_str("</nav>");
         if let Some(views) = sections.get(folder) {
             output.push_str(

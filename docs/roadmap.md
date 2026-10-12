@@ -81,6 +81,13 @@ exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
 
+Geometric clearance now has a separate bounded native convex-planar query and
+source-owned occurrence-pair obligation. `clearance_station.star` exercises nested
+rotations and oblique jaws; independent STEP minimum-distance and witness checks
+are required alongside native numerical and failed-publication tests. This advances
+engineering validation beyond size-only stacks, while curved/nonconvex queries,
+whole-assembly pair traversal and continuous-motion collisions remain open.
+
 M6 now also includes bounded worst-case linear dimensional stacks, referencing
 native tolerance witnesses and enforcing the complete outward-rounded interval.
 `bearing_clearance.star` adds a size-clearance requirement and read-only report to

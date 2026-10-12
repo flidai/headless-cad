@@ -1,0 +1,166 @@
+use cad_build::{BuildEngine, BuildError, Recipe};
+use serde_json::{json, Value};
+fn value() -> Value {
+    json!({"schema_version":2,"units":"mm","features":[{"op":"rectangle","id":"p","width":2,"depth":3},{"op":"extrude","id":"body","profile":"p","height":4}],"outputs":[{"name":"body","feature":"body"}],"parts":[{"id":"block","feature":"body"}],
+ "assemblies":[{"id":"cell","instances":[{"id":"leaf/a","part":"block"}]},{"id":"root","assemblies":[{"id":"left","assembly":"cell"},{"id":"right","assembly":"cell","transform":{"translation":[5,7,0]}}]}],"assembly_outputs":[{"name":"pair","assembly":"root"}],
+ "clearance_checks":[{"id":"gap","output":"pair","left_instance_path":["left","leaf/a"],"right_instance_path":["right","leaf/a"],"min_clearance":4.9999}]})
+}
+fn parse(v: Value) -> Recipe {
+    serde_json::from_value(v).unwrap()
+}
+#[test]
+fn diagonal_euclidean_clearance_is_global_and_retains_exact_occurrence_witnesses() {
+    let mut r = parse(value());
+    let mut engine = BuildEngine::default();
+    let first = engine.build_outputs(&r, &["body".into()]).unwrap();
+    assert!(first.assemblies.is_empty());
+    assert!(first.scope.validation_roots.contains(&"body".into()));
+    let gap = &first.clearance_checks["gap"];
+    assert_eq!(gap.status, "passed");
+    assert!(gap.lower_bound_mm < 5. && gap.upper_bound_mm > 5.);
+    assert!(gap.upper_bound_mm - gap.lower_bound_mm < 1e-7);
+    assert_eq!(gap.left.instance_path, ["left", "leaf/a"]);
+    assert_eq!(gap.right.instance_path, ["right", "leaf/a"]);
+    assert_eq!(gap.left.feature_id, "body");
+    assert_eq!(gap.left.part_content_hash, first.feature_hashes["body"]);
+    assert!(gap.placement_uncertainty_mm > 0.);
+    let a = gap.query.left_point;
+    let b = gap.query.right_point;
+    let distance = ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
+    assert!((distance - 5.).abs() < 1e-8);
+    r.clearance_checks[0].min_clearance = 5.001;
+    assert!(
+        matches!(engine.build_outputs(&r,&["body".into()]),Err(BuildError::ClearanceCheckFailed{lower_bound_mm:Some(lo),upper_bound_mm:Some(hi),..}) if lo<5.&&hi>5.)
+    );
+    r.clearance_checks[0].min_clearance = 4.5;
+    let second = engine.build_outputs(&r, &["body".into()]).unwrap();
+    assert_eq!(second.stats.computed_solids, 0);
+    assert_eq!(first.feature_hashes, second.feature_hashes);
+}
+#[test]
+fn global_rigid_pose_and_swapping_paths_preserve_native_distance() {
+    let mut v = value();
+    let q = [
+        0.,
+        0.,
+        std::f64::consts::FRAC_1_SQRT_2,
+        std::f64::consts::FRAC_1_SQRT_2,
+    ];
+    v["assemblies"][1]["assemblies"][0]["transform"] =
+        json!({"translation":[10,-20,30],"rotation":q});
+    v["assemblies"][1]["assemblies"][1]["transform"] =
+        json!({"translation":[3,-15,30],"rotation":q});
+    let mut r = parse(v);
+    let a = cad_build::build(&r).unwrap();
+    let gap = &a.clearance_checks["gap"];
+    assert!(gap.lower_bound_mm < 5. && gap.upper_bound_mm > 5.);
+    let c = &mut r.clearance_checks[0];
+    std::mem::swap(&mut c.left_instance_path, &mut c.right_instance_path);
+    let b = cad_build::build(&r).unwrap();
+    assert!((gap.lower_bound_mm - b.clearance_checks["gap"].lower_bound_mm).abs() < 1e-8);
+}
+#[test]
+fn explicit_curved_nonconvex_contact_and_unresolved_domains_fail() {
+    for offset in [[2., 0., 0.], [1., 0., 0.], [2. + 1e-9, 0., 0.]] {
+        let mut v = value();
+        v["assemblies"][1]["assemblies"][1]["transform"]["translation"] = json!(offset);
+        assert!(matches!(
+            cad_build::build(&parse(v)),
+            Err(BuildError::ClearanceCheckFailed { .. })
+        ));
+    }
+    let mut v = value();
+    v["features"][0] = json!({"op":"circle","id":"p","radius":1});
+    assert!(matches!(
+        cad_build::build(&parse(v)),
+        Err(BuildError::ClearanceCheckFailed { .. })
+    ));
+    let mut v = value();
+    v["features"][0] =
+        json!({"op":"polygon","id":"p","points":[[0,0],[2,0],[2,1],[1,1],[1,3],[0,3]]});
+    assert!(matches!(
+        cad_build::build(&parse(v)),
+        Err(BuildError::ClearanceCheckFailed { .. })
+    ));
+    let mut v = value();
+    v["assemblies"][1]["assemblies"][0]["transform"] = json!({"translation":[1e8,0,0]});
+    v["assemblies"][1]["assemblies"][1]["transform"]["translation"] = json!([1e8 + 5., 7., 0.]);
+    assert!(cad_build::build(&parse(v)).is_err());
+}
+#[test]
+fn literal_leaf_paths_and_declaration_domain_are_strict() {
+    for path in [
+        json!(["left/leaf/a"]),
+        json!(["left"]),
+        json!(["left", "leaf", "a"]),
+    ] {
+        let mut v = value();
+        v["clearance_checks"][0]["left_instance_path"] = path;
+        assert!(matches!(
+            cad_build::build(&parse(v)),
+            Err(BuildError::ClearanceCheckFailed { .. })
+        ));
+    }
+    for (field, invalid) in [
+        ("output", json!("body")),
+        ("min_clearance", json!(0)),
+        ("left_instance_path", json!([])),
+        ("left_instance_path", json!(["right", "leaf/a"])),
+    ] {
+        let mut v = value();
+        v["clearance_checks"][0][field] = invalid;
+        v["features"][0]["width"] = json!(-1);
+        assert!(matches!(
+            cad_build::build(&parse(v)),
+            Err(BuildError::InvalidClearanceCheck { .. })
+        ));
+    }
+    for invalid in [
+        json!(null),
+        json!([["gap", "pair", ["a"], ["b"], 1]]),
+        json!([{"id":"x","output":"pair","left_instance_path":["a"],"right_instance_path":["b"],"min_clearance":1,"extra":true}]),
+    ] {
+        let mut v = value();
+        v["clearance_checks"] = invalid;
+        assert!(serde_json::from_value::<Recipe>(v).is_err());
+    }
+    let mut v =
+        json!({"schema_version":1,"units":"mm","features":[],"outputs":[],"clearance_checks":[]});
+    assert!(serde_json::from_value::<Recipe>(v.clone()).is_err());
+    v["schema_version"] = json!(2);
+    assert!(serde_json::from_value::<Recipe>(v).is_ok());
+    let mut r = parse(value());
+    let check = r.clearance_checks[0].clone();
+    r.clearance_checks = (0..65)
+        .map(|i| {
+            let mut c = check.clone();
+            c.id = format!("check{i}");
+            c
+        })
+        .collect();
+    assert!(matches!(
+        cad_build::build(&r),
+        Err(BuildError::ResourceLimit {
+            resource: "clearance checks",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn oversized_source_operand_is_rejected_before_placement() {
+    let mut v = value();
+    let points: Vec<_> = (0..65)
+        .map(|i| {
+            let a = std::f64::consts::TAU * i as f64 / 65.;
+            [10. * a.cos(), 10. * a.sin()]
+        })
+        .collect();
+    v["features"][0] = json!({"op":"polygon","id":"p","points":points});
+    // Placement would independently exceed the precision budget. Admission must
+    // reject the oversized source before inspecting/materializing that placement.
+    v["assemblies"][1]["assemblies"][0]["transform"] = json!({"translation":[1e8,0,0]});
+    assert!(
+        matches!(cad_build::build(&parse(v)), Err(BuildError::ClearanceCheckFailed {message,..}) if message.starts_with("pre-placement clearance limit:"))
+    );
+}

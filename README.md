@@ -2237,6 +2237,41 @@ preserve the previous published generation. Captured bundles replay the check.
 The recipe owns the dimensional relationship: this does not establish alignment,
 collision clearance, statistical/RSS behavior, named fits or GD&T.
 
+### Native geometric clearance
+
+Check the minimum geometric separation of two exact leaf occurrences:
+
+```python
+clearance_check(id = "jaw_separation", output = "clearance_station",
+    left_instance_path = ["cell", "fixed"],
+    right_instance_path = ["cell", "moving"], min_clearance = 2)
+```
+
+`clearance_station.star` uses two shared pentagonal jaws with independent local
+rotation and a rotated parent assembly. Native vertex/face and edge/edge candidates
+produce feasible witnesses. A separate all-vertex support calculation certifies
+a lower distance bound; witness separation supplies the upper bound. Placement
+arithmetic widens the interval. Acceptance uses the lower bound, not the visual
+mesh, bounding-box distance or an unverified candidate estimate.
+
+The initial supported domain is two nonempty, validated, single convex planar
+solids. Each operand is limited to 128 vertices, 256 edges and 128 single-loop
+faces; recipes admit 64 checks and ten million path-resolution work units.
+Curved and nonconvex inputs, contact/intersection, unresolved precision
+and resource excess fail explicitly. Failure does not classify collision or
+penetration depth. Only declared pairs are checked; this is not whole-assembly
+or continuous-motion certification and does not inflate manufactured tolerances.
+
+```sh
+cad build examples/clearance_station.star --out-dir out/clearance_station
+```
+
+The gallery links `clearance-checks.html`, a static inspector with distances,
+occurrence paths and native witnesses. JSON records source context, part/assembly
+hashes, frames and both distance bounds. Checks run globally during selected
+builds and cache hits. Placement-only edits reuse part geometry; failed checks
+preserve the previous generation and captured bundles replay the obligations.
+
 ### Native planar edge chamfers
 
 ```python

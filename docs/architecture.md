@@ -2025,6 +2025,25 @@ must enclose exact represented source intervals and preserve generations on fail
 This advances worst-case size analysis; correlations, statistical stacks, geometric
 alignment/interference, fit classes and GD&T remain separate requirements.
 
+Native geometric clearance is separate from manufacturing-size stacks. The
+`clearance_check` source declaration names an assembly output, two distinct exact
+leaf paths and a positive minimum separation. Its global demand includes the
+referenced assembly even during selected builds. The bounded original-kernel query
+admits validated single convex planar solids (128 vertices, 256 edges and 128
+single-loop faces per operand; 200,000 candidate pairs per query) and uses native vertex/face and
+edge/edge distance candidates. Feasible witness points give an upper bound;
+an independently evaluated all-vertex support gap gives a lower bound. A result
+requires a strictly separated interval no wider than the query accuracy. Numerical
+and placement uncertainty widen bounds; large-coordinate loss is rejected rather
+than hidden by rebasing. The build accepts only a lower bound at least the required
+minimum, retaining paths, frames, model hashes and native witnesses. Source-bound
+JSON and static HTML publish atomically with geometry. `clearance_station.star`
+exercises oblique convex jaws and independently rotated nested placements.
+Unsupported curves/nonconvexity, contact, intersection and unresolved calculations
+fail explicitly; failure is not a collision classification. Complete assembly
+pair traversal, curved minimum-distance queries, penetration depth, motion sweeps
+and manufactured tolerance envelopes remain separate implementation obligations.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in
@@ -2494,7 +2513,7 @@ pin/bar solver has its own bounded acceptance contract above.
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback; experimental verified metadata paging with adaptive LOD and captured-source picking | Total decoded-memory and hardware/detail-latency gates, within-part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
-| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; source-bound native planar sections with occurrence-aware SVG; recipe property assertions with pinned evidence and global validation | Broader sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
+| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; source-bound native planar sections with occurrence-aware SVG, source-authored sheets and dimensional tolerances; outward-rounded worst-case size stacks; bounded native convex occurrence-pair clearance; recipe property assertions with pinned evidence and global validation | General curved/nonconvex and motion clearance, projected drawings, fits/GD&T/PMI, material property libraries, configurations, principal axes and dynamics |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
 The current working commands are in [README.md](../README.md).
