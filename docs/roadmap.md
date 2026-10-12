@@ -362,6 +362,14 @@ moments, selective invalidation and failed-publication obligations cover this
 machining sequence. Advance toward crossing cuts and blind pockets; isolated
 through-bores do not establish general material-removal capability.
 
+The AI-native authoring interface now exposes a versioned feature capability
+catalog through the CLI and Rust SDK, with JSON IR argument shapes, geometry
+domains, exclusions, limits and implementation identities. Parser alignment,
+example compilation, side-effect-free discovery and source-correction/replay
+acceptance cover this boundary. Native operation failures identify the failing
+feature as structured data. This advances automation infrastructure; it does not
+close hosted M7 services, full assembly schemas or actual AI design acceptance.
+
 ## Example policy
 
 Every new modeling tool must have a small isolating recipe and at least one

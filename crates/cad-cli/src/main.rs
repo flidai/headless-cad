@@ -60,6 +60,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Describe supported recipe operations, limits and headless workflows as JSON.
+    Capabilities,
     /// Integrate volume, centroid and central inertia from exact output geometry.
     Properties {
         recipe: PathBuf,
@@ -770,12 +772,53 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
     if !parameters.is_empty()
         && matches!(
             cli.command,
-            Command::Init { .. } | Command::Validate { .. } | Command::Serve { .. }
+            Command::Init { .. }
+                | Command::Validate { .. }
+                | Command::Serve { .. }
+                | Command::Capabilities
         )
     {
         return Err("parameter overrides apply only to recipe commands".into());
     }
     match &cli.command {
+        Command::Capabilities => {
+            if cli.cache_dir.is_some() {
+                return Err("capabilities does not use a geometry cache; omit --cache-dir".into());
+            }
+            let mut document = serde_json::to_value(cad_build::capabilities::capability_catalog())?;
+            document["cli"] = json!({
+                "version": env!("CARGO_PKG_VERSION"),
+                "authoring": {
+                    "languages": ["starlark", "json_recipe_ir"],
+                    "argument_catalog_representation": "json_recipe_ir",
+                    "workflow": "Author a recipe, compile Starlark to the typed JSON IR, check geometry and obligations, review inspect/diff results, then build artifacts.",
+                    "source_authority": "Git-versioned recipes and explicit parameter overrides",
+                    "viewer": "read_only_inspection",
+                    "feasibility": "The catalog describes supported domains; only evaluation and validation can certify a particular input."
+                },
+                "recipe_commands": [
+                    {"name":"compile", "publishes_artifacts":false, "evaluates_geometry":false, "purpose":"Compile authoring syntax to recipe IR; this alone does not validate geometry."},
+                    {"name":"check", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Evaluate all outputs and validation obligations."},
+                    {"name":"inspect", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Report output geometry, provenance, scope and checks; optional --output selects the demanded closure."},
+                    {"name":"select", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Resolve a source face role through feature history; deletion and ambiguity are explicit."},
+                    {"name":"properties", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Measure a named output independently of display LOD; assemblies sum occurrences."},
+                    {"name":"bom", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Report assembly component quantities and material properties."},
+                    {"name":"diff", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Compare two recipe revisions and their resolved results."},
+                    {"name":"build", "publishes_artifacts":true, "evaluates_geometry":true, "purpose":"Atomically publish a validated generation with captured source and open exports."},
+                    {"name":"watch", "publishes_artifacts":true, "evaluates_geometry":true, "purpose":"Long-lived recipe watcher; rebuild complete generations after source edits and preserve the last successful generation on failure."}
+                ],
+                "execution": {
+                    "capabilities_has_side_effects": false,
+                    "optional_geometry_cache": "Recipe evaluation commands can write --cache-dir; publishes_artifacts refers only to generation publication.",
+                    "failure_channel": "runtime_errors_stderr_json",
+                    "usage_errors": "CLI argument parsing errors use human-readable stderr",
+                    "success_channel": "stdout_json",
+                    "failure_exit_status": "nonzero",
+                    "global_obligations_apply_to_selected_outputs": true
+                }
+            });
+            return Ok(document);
+        }
         Command::Bom { recipe, assembly } => {
             let source = fs::read(recipe)?;
             let recipe = load_source(recipe, std::str::from_utf8(&source)?, &parameters)?;
@@ -1390,9 +1433,14 @@ fn main() {
                     cad_build::BuildError::EmptyOutputSelection => {
                         report["code"] = json!("empty_output_selection");
                     }
-                    cad_build::BuildError::Kernel { feature, .. } => {
+                    cad_build::BuildError::Kernel { feature, message } => {
                         report["code"] = json!("kernel_operation_failed");
                         report["feature"] = json!(feature);
+                        report["diagnostic"] = json!(message);
+                        report["snapshot"] = json!({
+                            "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
+                            "executor_build_id": cad_build::executor_build_id(),
+                        });
                     }
                     cad_build::BuildError::Dimension { feature, parameter } => {
                         report["feature"] = json!(feature);

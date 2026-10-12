@@ -264,6 +264,33 @@ validation, and publishes only a complete generation. Untrusted hosted recipes
 run in isolated processes with CPU, memory, filesystem, and network limits; the
 current Starlark interpreter limits alone are not this service boundary.
 
+### Implemented capability discovery
+
+`cad capabilities` and `cad_build::capability_catalog()` expose a deterministic
+schema-1 catalog of current JSON IR feature operations, argument shapes, nested
+profile/sketch types, supported geometry domains, exclusions and resource limits.
+Implementation identities pin the catalog, kernel, executor and sketch solver;
+the catalog fingerprint also changes when its own contract source changes. The CLI
+adds its version, authoring guidance and recipe-command publication semantics.
+Discovery requires no recipe, geometry, network or cache. Numeric/resource values
+use implementation constants where available; executable parser-alignment and
+example-compilation tests guard the curated contract against drift.
+
+This is capability discovery, not a complete JSON Schema, a solver for input
+feasibility or the target release-evidence ledger. Assembly authoring, locked
+module resolution, source-span mappings and hosted job controls are not implied
+by the feature catalog. Every input still passes structural and geometric
+validation. Starlark call syntax remains distinct from JSON IR argument names.
+
+The CLI retains `kernel_operation_failed` and the failing feature for native
+operation failures, and now adds diagnostic text and implementation identities. It does not yet
+retain a typed kernel failure subtype in the executor's public error. A protocol
+acceptance test follows discovery, successful compilation, rejected geometry,
+an explicit source patch, successful checks and deterministic artifact replay
+without a model service or viewer mutation. That is infrastructure evidence;
+an actual agent proposing and repairing a design remains a separate acceptance
+obligation in the commercial workflow.
+
 ### Engineering assertions as build obligations
 
 Schema-2 `assert_property` records a named output, a typed property with explicit
@@ -1728,7 +1755,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 
 | Area | Implemented now | Target work |
 | --- | --- | --- |
-| Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
+| Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned feature capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through-bores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |

@@ -14,6 +14,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
+pub mod capabilities;
+pub use capabilities::{capability_catalog, CapabilityCatalog, CAPABILITY_SCHEMA_VERSION};
+
 mod sketch_profiles;
 pub use cad_sketch::{
     Constraint, ConstraintKind, IslandReport, LineSide, Sketch, SketchPoint, SolveReport,

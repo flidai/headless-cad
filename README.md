@@ -54,6 +54,43 @@ For an unpacked archive, use its included `./cad` executable instead. Native
 archives target their build platform and libc; source installation is the
 portable route across operating systems.
 
+## Discover operations for automation
+
+```sh
+cad capabilities
+cad compile examples/machined_bearing_support.star
+cad check examples/machined_bearing_support.star
+```
+
+`capabilities` returns a deterministic, versioned JSON catalog without reading a
+recipe, evaluating geometry or creating a cache. It identifies the running
+catalog/kernel/executor/solver implementations, supported recipe schema versions,
+operation arguments,
+nested profile/sketch types, geometry domains, exclusions and resource limits.
+Rust clients use `cad_build::capability_catalog()` for the same modeling catalog;
+the CLI adds command and authoring-workflow metadata. Neither `--param` nor
+`--cache-dir` applies to discovery.
+
+Argument names describe the **JSON recipe IR**, not Starlark signatures. Use
+`compile` to inspect the IR of a source recipe. The catalog is a planning aid,
+not a complete JSON Schema or a guarantee that a particular geometry will work;
+`check` evaluates the supported domain and all validation obligations. The scope
+is current feature/profile/sketch operations. Full assembly authoring schemas,
+release policies and a hosted agent protocol remain future work.
+
+Runtime failures return JSON on stderr and a nonzero exit status. Native operation
+failures retain `code: "kernel_operation_failed"` and a `feature` identifier,
+and now include diagnostic text and implementation identities. The diagnostic remains explanatory text; callers
+should dispatch on structured fields rather than parse it. CLI usage/parser
+errors still use human-readable stderr. Successful commands return JSON on stdout.
+
+An agent proposes a source patch, checks it, inspects the revision and publishes
+with `build`; it does not issue modeling calls through the viewer. Acceptance
+replays a proposed partial-depth cut, checks its feature-specific failure, applies
+an explicit source correction, and rebuilds matching native/STEP/STL artifacts
+in fresh processes. This verifies the headless protocol and deterministic replay,
+not an AI model's reasoning or a completed autonomous design benchmark.
+
 ## Serve and watch locally
 
 From a source checkout, one command builds all examples, watches their recipes,
