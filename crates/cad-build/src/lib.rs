@@ -1150,12 +1150,81 @@ pub enum BuildError {
     Kernel { feature: String, message: String },
 }
 
+/// Persistent in-memory cache limits. Logical bytes are the serialized result
+/// length, not allocated bytes or a process memory limit.
+pub const DEFAULT_CACHE_MAX_ENTRIES: usize = 1_024;
+pub const DEFAULT_CACHE_MAX_LOGICAL_BYTES: u64 = 128 * 1024 * 1024;
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct CacheUsage {
+    pub max_entries: usize,
+    pub max_logical_bytes: u64,
+    pub entries: usize,
+    pub logical_bytes: u64,
+    pub pinned_entries: usize,
+    pub pinned_logical_bytes: u64,
+    /// Possible only after lowering limits while external results pin entries.
+    pub over_budget_entries: usize,
+    pub over_budget_logical_bytes: u64,
+    pub evictions: u64,
+    pub skipped_retention: u64,
+}
+
+struct CachedSolid {
+    result: Arc<OperationResult>,
+    logical_bytes: u64,
+    last_used: u64,
+}
+
+#[derive(Default)]
+struct LogicalByteCounter(u64);
+
+impl std::io::Write for LogicalByteCounter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0 = self
+            .0
+            .checked_add(bytes.len() as u64)
+            .ok_or_else(|| std::io::Error::other("serialized result length overflow"))?;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+fn logical_result_bytes(result: &OperationResult) -> Option<u64> {
+    let mut counter = LogicalByteCounter::default();
+    serde_json::to_writer(&mut counter, result).ok()?;
+    Some(counter.0)
+}
+
 /// Geometry cache. Disk caching is optional and best effort: corrupt, stale, or
 /// inaccessible cache entries are misses and never prevent a geometry build.
-#[derive(Default)]
 pub struct BuildEngine {
-    solids: HashMap<String, Arc<OperationResult>>,
+    solids: HashMap<String, CachedSolid>,
     cache_dir: Option<PathBuf>,
+    cache_max_entries: usize,
+    cache_max_logical_bytes: u64,
+    cache_logical_bytes: u64,
+    cache_clock: u64,
+    cache_evictions: u64,
+    cache_skipped_retention: u64,
+}
+
+impl Default for BuildEngine {
+    fn default() -> Self {
+        Self {
+            solids: HashMap::new(),
+            cache_dir: None,
+            cache_max_entries: DEFAULT_CACHE_MAX_ENTRIES,
+            cache_max_logical_bytes: DEFAULT_CACHE_MAX_LOGICAL_BYTES,
+            cache_logical_bytes: 0,
+            cache_clock: 0,
+            cache_evictions: 0,
+            cache_skipped_retention: 0,
+        }
+    }
 }
 
 pub fn build(recipe: &Recipe) -> Result<BuildResult, BuildError> {
@@ -1426,6 +1495,99 @@ struct CacheEntry {
 }
 
 impl BuildEngine {
+    /// Configure persistent in-memory reuse. Zero disables new retention,
+    /// while builds and the optional disk cache continue normally. Lowering
+    /// limits on an existing engine may temporarily leave pinned entries over
+    /// budget; they are evicted after external references are dropped.
+    pub fn with_cache_limits(mut self, max_entries: usize, max_logical_bytes: u64) -> Self {
+        self.cache_max_entries = max_entries;
+        self.cache_max_logical_bytes = max_logical_bytes;
+        self.trim_cache(0, 0);
+        self
+    }
+
+    pub fn cache_usage(&self) -> CacheUsage {
+        let mut pinned_entries = 0;
+        let mut pinned_logical_bytes = 0u64;
+        for cached in self.solids.values() {
+            if Arc::strong_count(&cached.result) > 1 {
+                pinned_entries += 1;
+                pinned_logical_bytes = pinned_logical_bytes.saturating_add(cached.logical_bytes);
+            }
+        }
+        CacheUsage {
+            max_entries: self.cache_max_entries,
+            max_logical_bytes: self.cache_max_logical_bytes,
+            entries: self.solids.len(),
+            logical_bytes: self.cache_logical_bytes,
+            pinned_entries,
+            pinned_logical_bytes,
+            over_budget_entries: self.solids.len().saturating_sub(self.cache_max_entries),
+            over_budget_logical_bytes: self
+                .cache_logical_bytes
+                .saturating_sub(self.cache_max_logical_bytes),
+            evictions: self.cache_evictions,
+            skipped_retention: self.cache_skipped_retention,
+        }
+    }
+
+    fn trim_cache(&mut self, incoming_bytes: u64, incoming_entries: usize) -> bool {
+        while self
+            .solids
+            .len()
+            .checked_add(incoming_entries)
+            .is_none_or(|total| total > self.cache_max_entries)
+            || self
+                .cache_logical_bytes
+                .checked_add(incoming_bytes)
+                .is_none_or(|total| total > self.cache_max_logical_bytes)
+        {
+            let oldest = self
+                .solids
+                .iter()
+                .filter(|(_, cached)| Arc::strong_count(&cached.result) == 1)
+                .min_by(|(left_hash, left), (right_hash, right)| {
+                    left.last_used
+                        .cmp(&right.last_used)
+                        .then_with(|| left_hash.cmp(right_hash))
+                })
+                .map(|(hash, _)| hash.clone());
+            let Some(oldest) = oldest else {
+                return false;
+            };
+            let removed = self.solids.remove(&oldest).expect("selected cached solid");
+            self.cache_logical_bytes -= removed.logical_bytes;
+            self.cache_evictions += 1;
+        }
+        true
+    }
+
+    fn retain_solid(&mut self, hash: String, result: &Arc<OperationResult>) -> bool {
+        if self.cache_max_entries == 0 || self.cache_max_logical_bytes == 0 {
+            self.cache_skipped_retention += 1;
+            return false;
+        }
+        let Some(bytes) = logical_result_bytes(result) else {
+            self.cache_skipped_retention += 1;
+            return false;
+        };
+        if bytes > self.cache_max_logical_bytes || !self.trim_cache(bytes, 1) {
+            self.cache_skipped_retention += 1;
+            return false;
+        }
+        self.cache_clock = self.cache_clock.saturating_add(1);
+        self.cache_logical_bytes += bytes;
+        self.solids.insert(
+            hash,
+            CachedSolid {
+                result: Arc::clone(result),
+                logical_bytes: bytes,
+                last_used: self.cache_clock,
+            },
+        );
+        true
+    }
+
     pub fn with_cache_dir(cache_dir: impl Into<PathBuf>) -> Self {
         Self {
             cache_dir: Some(cache_dir.into()),
@@ -1555,6 +1717,9 @@ impl BuildEngine {
         recipe: &Recipe,
         requested: Option<&[String]>,
     ) -> Result<BuildResult, BuildError> {
+        // A caller may have dropped prior BuildResults since the last build.
+        // Revisit deferred evictions before any cache lookup.
+        self.trim_cache(0, 0);
         if !matches!(recipe.schema_version, 1 | 2) {
             return Err(BuildError::SchemaVersion(recipe.schema_version));
         }
@@ -1817,6 +1982,10 @@ impl BuildEngine {
         let mut solved_profiles = BTreeMap::new();
         let mut hashes = BTreeMap::new();
         let mut evaluated: HashMap<String, Arc<OperationResult>> = HashMap::new();
+        // Results skipped by the persistent cache still share geometry among
+        // equal hashes within this one build. Evaluated features already own
+        // these Arcs; this map only provides hash lookup.
+        let mut transient_results: HashMap<String, Arc<OperationResult>> = HashMap::new();
         let mut stats = BuildStats::default();
         let mut selection_graph =
             selection::SelectionGraph::new(recipe, order.clone(), HashMap::new());
@@ -1938,14 +2107,21 @@ impl BuildEngine {
                 solved_profiles.insert(id.clone(), rings);
             }
             if feature.is_solid() {
-                let result = if let Some(cached) = self.solids.get(&hash) {
+                self.cache_clock = self.cache_clock.saturating_add(1);
+                let result = if let Some(cached) = self.solids.get_mut(&hash) {
+                    stats.cache_hits += 1;
+                    cached.last_used = self.cache_clock;
+                    Arc::clone(&cached.result)
+                } else if let Some(cached) = transient_results.get(&hash) {
                     stats.cache_hits += 1;
                     Arc::clone(cached)
                 } else if let Some(cached) = self.disk_read(&hash, tolerance) {
                     stats.cache_hits += 1;
                     stats.disk_cache_hits += 1;
                     let result = Arc::new(cached);
-                    self.solids.insert(hash.clone(), Arc::clone(&result));
+                    if !self.retain_solid(hash.clone(), &result) {
+                        transient_results.insert(hash.clone(), Arc::clone(&result));
+                    }
                     result
                 } else {
                     let operation = match feature {
@@ -2071,7 +2247,9 @@ impl BuildEngine {
                     }
                     self.disk_write(&hash, &result);
                     let result = Arc::new(result);
-                    self.solids.insert(hash.clone(), Arc::clone(&result));
+                    if !self.retain_solid(hash.clone(), &result) {
+                        transient_results.insert(hash.clone(), Arc::clone(&result));
+                    }
                     stats.computed_solids += 1;
                     result
                 };

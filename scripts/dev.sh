@@ -21,13 +21,14 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 mkdir -p out
+# Keep the last complete generations available while examples regenerate.
+"$cad_binary" serve out "$@" &
+children+=("$!")
 for recipe in examples/*.star; do
   name="$(basename "$recipe" .star)"
   "$cad_binary" build "$recipe" --out-dir "out/$name" --cache-dir .cad-cache >/dev/null
   "$cad_binary" watch "$recipe" --out-dir "out/$name" --cache-dir .cad-cache &
   children+=("$!")
 done
-"$cad_binary" serve out "$@" &
-children+=("$!")
 # Stop the complete development session if any long-lived child exits.
 wait -n "${children[@]}"

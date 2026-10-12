@@ -842,3 +842,17 @@ the prior generation; shared assets retain exact byte checks. A many-unique-part
 release comparison measures RSS and export equivalence. This advances export
 residency without claiming bounds on exact bodies, single artifact producers or
 preview bundles; assembly-scale admission and release gates remain open.
+
+Accepted local candidates now have an offline replay walkthrough: after agent
+exit, captured source, locked modules, explicit parameters and output scope rebuild
+with the same pinned executable. Exact geometry/engineering artifact comparison
+and a test with the original workspace and state unavailable cover this boundary.
+This is local reproducibility evidence; external release delivery and the full
+agent-lifecycle gate remain open.
+
+Persistent exact-geometry reuse now has configurable entry/logical-byte limits,
+unpinned least-recently-used eviction and explicit pinned-excess accounting.
+Repeated revisions in one Rust engine no longer accumulate unlimited cache-owned
+entries. Within-build sharing and disk reuse remain available. This is cache
+lifecycle control; producer admission, live intermediate residency and total-memory
+bounds remain open.

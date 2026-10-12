@@ -57,6 +57,117 @@ fn cache_invalidates_inputs_and_policy_but_not_names() {
 }
 
 #[test]
+fn cache_limit_evicts_cache_owned_results_across_repeated_builds() {
+    let mut engine = BuildEngine::default().with_cache_limits(1, u64::MAX);
+    let mut input = recipe();
+    let first = engine.build(&input).unwrap();
+    let first_hash = first.outputs["plate"].content_hash.clone();
+    assert_eq!(engine.cache_usage().entries, 1);
+    assert_eq!(engine.cache_usage().pinned_entries, 1);
+    drop(first);
+    if let Feature::Rectangle { width, .. } = &mut input.features[0] {
+        *width = 90.0;
+    }
+    let second = engine.build(&input).unwrap();
+    assert_eq!(second.stats.computed_solids, 1);
+    assert_eq!(engine.cache_usage().entries, 1);
+    assert_eq!(engine.cache_usage().evictions, 1);
+    drop(second);
+    if let Feature::Rectangle { width, .. } = &mut input.features[0] {
+        *width = 80.0;
+    }
+    let again = engine.build(&input).unwrap();
+    assert_eq!(again.stats.computed_solids, 1);
+    assert_eq!(again.outputs["plate"].content_hash, first_hash);
+    assert_eq!(engine.cache_usage().evictions, 2);
+}
+
+#[test]
+fn pinned_results_block_retention_without_blocking_builds() {
+    let mut engine = BuildEngine::default().with_cache_limits(1, u64::MAX);
+    let mut input = recipe();
+    let held = engine.build(&input).unwrap();
+    if let Feature::Rectangle { width, .. } = &mut input.features[0] {
+        *width = 90.0;
+    }
+    let alternate = engine.build(&input).unwrap();
+    let usage = engine.cache_usage();
+    assert_eq!(
+        (usage.entries, usage.pinned_entries, usage.evictions),
+        (1, 1, 0)
+    );
+    assert_eq!(usage.skipped_retention, 1);
+    assert_eq!(alternate.stats.computed_solids, 1);
+    assert_eq!(
+        alternate.outputs["plate"].result.model.volume(),
+        90.0 * 40.0 * 6.0
+    );
+    drop(alternate);
+    drop(held);
+    let rebuilt = engine.build(&input).unwrap();
+    assert_eq!(rebuilt.stats.computed_solids, 1);
+    assert_eq!(engine.cache_usage().evictions, 1);
+    assert_eq!(engine.cache_usage().entries, 1);
+}
+
+#[test]
+fn lowering_limits_reports_pinned_excess_until_next_build() {
+    let mut engine = BuildEngine::default();
+    let held = engine.build(&recipe()).unwrap();
+    let mut engine = engine.with_cache_limits(0, 0);
+    let usage = engine.cache_usage();
+    assert_eq!((usage.entries, usage.over_budget_entries), (1, 1));
+    assert!(usage.over_budget_logical_bytes > 0);
+    assert_eq!(usage.pinned_entries, 1);
+    drop(held);
+    let rebuilt = engine.build(&recipe()).unwrap();
+    assert_eq!(rebuilt.stats.computed_solids, 1);
+    let usage = engine.cache_usage();
+    assert_eq!((usage.entries, usage.over_budget_entries), (0, 0));
+    assert_eq!(usage.evictions, 1);
+}
+
+#[test]
+fn disabled_retention_still_deduplicates_within_build_and_uses_disk_cache() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut input = recipe();
+    input.features.push(Feature::Rectangle {
+        id: "other_outline".into(),
+        width: 80.0,
+        depth: 40.0,
+        op_version: 1,
+    });
+    input.features.push(Feature::Extrude {
+        id: "other_plate".into(),
+        profile: "other_outline".into(),
+        height: 6.0,
+        op_version: 1,
+    });
+    input.outputs.push(Output {
+        name: "other".into(),
+        feature: "other_plate".into(),
+    });
+    let mut first = BuildEngine::with_cache_dir(directory.path()).with_cache_limits(0, 0);
+    let built = first.build(&input).unwrap();
+    assert_eq!(
+        (built.stats.computed_solids, built.stats.cache_hits),
+        (1, 1)
+    );
+    assert!(Arc::ptr_eq(
+        &built.outputs["plate"].result,
+        &built.outputs["other"].result
+    ));
+    assert_eq!(first.cache_usage().entries, 0);
+    let mut second = BuildEngine::with_cache_dir(directory.path()).with_cache_limits(0, 0);
+    let reloaded = second.build(&input).unwrap();
+    assert_eq!(
+        (reloaded.stats.disk_cache_hits, reloaded.stats.cache_hits),
+        (1, 2)
+    );
+    assert_eq!(second.cache_usage().entries, 0);
+}
+
+#[test]
 fn identical_solids_share_geometry_but_keep_logical_provenance() {
     let mut input = recipe();
     input.features.push(Feature::Rectangle {

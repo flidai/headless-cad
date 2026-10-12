@@ -1619,7 +1619,8 @@ and selected publication replaces a complete selected generation rather than
 merging artifacts from different scopes.
 
 This is dependency-based execution, not yet bounded exact-body residency:
-evaluated intermediates and the engine's memory cache remain resident. Source
+evaluated intermediates remain resident, and live results can pin cached bodies.
+The engine's persistent memory cache now has separate reuse limits described below. Source
 compilation, structural validation and global obligations still have full-recipe
 cost. Benchmark a one-part edit inside a large assembly as well as opening its
 viewer. `workcell_line.star` provides a separately requested service station;
@@ -3379,3 +3380,62 @@ sequential measurement, not a throughput guarantee or a total-memory bound.
 The [drive-module comparison](evidence/export-spool-drive.json) also preserves
 geometry, assembly placement, clearance, rotation, dimension and tolerance results;
 section comparisons exclude only explicitly recorded implementation identities.
+
+### Offline replay of an accepted candidate
+
+The recovery walkthrough's `--replay-accepted` option binds the accepted revision
+to its successful job, snapshot and manifest digest, then verifies the downloaded
+generation against that digest. After closing the agent, it rebuilds using only
+the captured root source or locked module bundle, the manifest's explicit numeric
+parameter overrides and output scope. A fresh working directory and cache prevent
+reuse of workspace geometry. The original source filename is preserved because it
+participates in source identity.
+
+Both agent sessions and replay use the same privately copied executable. SHA-256
+checks its bytes before and after replay; the acceptance record's BLAKE3 executable
+identity remains separate provenance. The helper does not independently authenticate
+an acceptance record supplied outside the local store. It currently requires full
+generations with native BRep and STEP, and compares the deterministic artifact set
+(native/exchange/source JSON, STEP, STL, SVG and Starlark) by exact SHA-256 bytes.
+Source context, output scope and named engineering manifest fields must also agree.
+Whole manifest bytes and browser HTML are excluded from the comparison.
+
+The independent integration test accepts a selected assembly from two locked
+modules with nondefault parameters, downloads a sealed stream, closes the agent,
+and removes the original workspace and state paths before replay. Changed source,
+parameters, selection, receipt binding or executable pins refuse. This advances
+local source reproducibility; external synchronization, approval authenticity and
+the commercial agent-lifecycle gate remain separate requirements.
+
+The retained [accepted-drive replay evidence](evidence/accepted-offline-replay-local.json)
+records 114 byte-identical artifacts (17,271,042 bytes), 27 matching semantic
+manifest fields, and native verification of both generations. The client made
+956 protocol calls across the two agent sessions. The executable is pinned in
+the report; the record is local test evidence, not independent authentication of
+an externally supplied acceptance receipt.
+
+### Persistent exact-geometry cache lifecycle
+
+A reused Rust `BuildEngine` defaults to at most 1,024 retained entries and 128 MiB
+of logical serialized-result bytes. `with_cache_limits` changes these reuse limits;
+`cache_usage` reports configured limits, retained and pinned entries/bytes,
+evictions, skipped retention and any excess after reducing limits. A counting
+writer measures serialized length without retaining another complete JSON string.
+These are logical charges, not measurements of heap allocations or process RSS.
+
+Cache hits refresh recency. Insertion evicts the least recently used entries whose
+result is owned only by the cache. A result too large to retain, or blocked by
+pinned entries, still completes normally and can use the existing disk cache.
+Within-build hash reuse remains active even when persistent retention is disabled,
+so repeated definitions still share immutable geometry. Lowering limits while
+external results hold entries reports the excess; subsequent builds trim entries
+after those references are dropped. Zero disables new retention rather than
+invalidating live results.
+
+Tests cover distinct edits, recency, live-result pins, reduced limits, disabled
+retention with duplicate geometry, disk reuse and failed builds. Current CLI watch
+builds already create a fresh engine each time; this lifecycle primarily serves
+Rust callers that reuse an engine across revisions. Current-build intermediates,
+external results, producer scratch space, disk-cache parsing and exports remain
+outside this cache policy. It is not exact-operation admission and does not close
+R1/R2 or the assembly-scale gate.

@@ -193,6 +193,19 @@ Builds spool completed exports into a private stage and publish only after the
 complete generation verifies. This reduces memory retained across many outputs;
 individual exporters and exact-body residency still have separate limits.
 
+Add `--replay-accepted` alongside `--accept-revisions` to rebuild accepted revision
+B after the agent has stopped. The walkthrough uses a pinned executable, verifies
+the accepted manifest, restores captured source or locked modules with the recorded
+parameters and output selection, and compares native geometry and engineering
+artifacts in a fresh directory. It also uses sealed streaming delivery. The
+comparison excludes whole manifests and browser HTML; this is reproducibility
+evidence for a local candidate, not manufacturing certification.
+
+Rust applications reusing `BuildEngine` get a bounded persistent geometry cache
+(1,024 entries / 128 MiB of serialized-result logical bytes by default).
+`with_cache_limits` configures it and `cache_usage` reports retention, pins and
+evictions. This controls cache reuse, not live build geometry or total process RAM.
+
 ## Review a complete source revision
 
 The experimental bearing-drive walkthrough changes shaft diameter from 12 to

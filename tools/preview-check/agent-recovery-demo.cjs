@@ -28,6 +28,15 @@ const assert=require('node:assert/strict');
    assert.ok(report.deliveries.every(d=>d.mode==='verified_generation_stream' && d.bytes>0 && d.read_calls>0));
    assert.match(await page.locator('body').innerText(),/Both delivery streams passed a final integrity check/);
   }
+  if (report.offline_replay) {
+   const replay=report.offline_replay;
+   assert.equal(replay.valid,true);
+   assert.equal(replay.accepted_revision_id,report.acceptances[1].revision.revision_id);
+   assert.equal(replay.accepted_manifest_digest,report.acceptances[1].revision.manifest_digest);
+   assert.ok(replay.compared_files.some(f=>f.name.endsWith('.brep.json')));
+   assert.ok(replay.compared_files.some(f=>f.name.endsWith('.step')));
+   assert.match(await page.locator('body').innerText(),/Offline replay of accepted revision B/);
+  }
   await page.screenshot({path:'/tmp/cad-agent-recovery-demo.png',fullPage:true});
   for(const [name,diameter] of [['before',12],['after',14]]) {
    const source=await(await page.request.get(`${base}/${name}/recipe.star`)).text();
