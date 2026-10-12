@@ -361,7 +361,9 @@ pub fn boolean(
     if a.has_curved_geometry() || b.has_curved_geometry() {
         let result = crate::circular_boolean::boolean(a, b, operation, tolerance);
         return if operation == BooleanOp::Difference {
-            result.or_else(|_| crate::round_stock::cut(a, b, tolerance))
+            result
+                .or_else(|_| crate::round_stock::cut(a, b, tolerance))
+                .or_else(|_| crate::keyseat::cut(a, b, tolerance))
         } else {
             result
         };

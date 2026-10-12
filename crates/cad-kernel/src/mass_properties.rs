@@ -106,6 +106,9 @@ impl ModelSnapshot {
         if !tolerance.is_valid() {
             return Err(KernelError::InvalidTolerance);
         }
+        if let Ok(g) = crate::keyseat::recognize(self, tolerance) {
+            return g.properties(tolerance);
+        }
         if let Ok(g) = crate::stepped_bore::recognize(self, tolerance) {
             return g.properties(tolerance);
         }

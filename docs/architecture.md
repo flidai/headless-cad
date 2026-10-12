@@ -1117,6 +1117,32 @@ and property assertions plus exchange requirements gate publication. These
 checks advance the drive-module workflow without certifying threads, fits,
 preload, loads or a complete manufacturing release.
 
+### Finite external shaft keyseats
+
+The bounded cylinder/box difference domain extends machining across a curved
+outer boundary. A solid circular cylinder admits one finite rectangular keyseat
+with positive radial floor, floor corners strictly within the stock circle and
+both pocket ends strictly between the shaft caps. Recover and certify the box
+supports relative to the shaft frame before construction; no geometric snapping
+or polygonal replacement of the round journals is permitted.
+
+The exact boundary uses planar caps/pocket walls, split cylindrical outer patches,
+and shared circular-arc/linear edges. Native material properties integrate the
+removed circular strip over the axial interval, independently of tessellation.
+The source cylinder wall maps to its surviving patches; cap lineage survives,
+and named `keyseat_floor`, `keyseat_side_negative`, `keyseat_side_positive`,
+`keyseat_start` and `keyseat_end` roles expose machining intent downstream.
+
+Acceptance requires independent cylinder-minus-box STEP geometry, analytical
+volume/centroid/inertia, watertight derived STL, rigid-frame and scale variants,
+malformed native-boundary rejection, selected-output/global assertions, failed
+publication preservation and source replay. `keyed_shaft.star` is the isolating
+fixture. Native transverse sections and planar face datums are supported; oblique
+sections and clearance queries on keyed bodies remain unsupported. A matching
+internal hub keyway and a real axial-retention arrangement
+remain required before incorporating a complete keyed drive into the reference
+engineering workflow. This domain does not claim general curved Boolean closure.
+
 ## Constraints and assemblies
 
 Stage assembly-solver acceptance separately from today's attachment DAG: first a grounded

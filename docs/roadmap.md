@@ -293,6 +293,16 @@ rejected-edit recovery and captured-source replay. Simplified fastener envelopes
 and a drive-disc blank must stay explicit; axial retention and torque transfer
 are not established by positive clearance or by the display alone.
 
+The finite shaft-keyseat increment adds a curved-boundary machining operation
+needed by the drive module: a rectangular pocket through the cylindrical exterior
+with intact journals at both ends. The isolating `keyed_shaft.star` fixture and
+independent cylinder-minus-box oracle validate the geometry before assembly use.
+This does not complete the torque path. Next geometry obligations are a matching
+internal hub keyway and composition with a stepped shaft/retention groove; the
+mechanical layout also needs flanged bushings, a thrust washer/retainer and a
+reviewed endplay stack. Do not replace these with a visual key overlapping uncut
+material, an unattached collar, or an unvalidated friction claim.
+
 ## Next concrete implementation increments
 
 Published generations now carry a payload digest/size inventory, with a separate

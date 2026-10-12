@@ -189,7 +189,9 @@ fn scene_with_policy_and_cache(
                             crease_edges.insert(edge.0);
                             edge.0
                         }
-                        None => model.edges.len() - 1,
+                        // A derived triangulation edge must never alias a real
+                        // boundary, including the last native edge.
+                        None => model.edges.len(),
                     })
                     .collect();
                 Face {
@@ -634,6 +636,40 @@ fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn derived_keyseat_edges_do_not_alias_native_boundary_edges() {
+        use cad_kernel::{boolean, extrude_circle, extrude_rectangle, translate, BooleanOp};
+        let t = Tolerance::default();
+        let shaft = extrude_circle(6., 40., t).unwrap().model;
+        let tool = translate(
+            &extrude_rectangle(4., 4., 14., t).unwrap().model,
+            [4., -2., 10.],
+            t,
+        )
+        .unwrap()
+        .model;
+        let model = boolean(&shaft, &tool, BooleanOp::Difference, t)
+            .unwrap()
+            .model;
+        let mesh =
+            cad_kernel::tessellate_analytic(&model, t, cad_kernel::TessellationPolicy::default())
+                .unwrap();
+        let scene = super::scene(&model).unwrap();
+        assert!(scene.crease_edges.contains(&(model.edges.len() - 1)));
+        let mut derived = 0;
+        for (patch, face) in mesh.patches.iter().zip(&scene.faces) {
+            for (native, edge) in patch.boundary_edges.iter().zip(&face.edges) {
+                if let Some(native) = native {
+                    assert_eq!(*edge, native.0);
+                    assert!(scene.crease_edges.contains(edge));
+                } else {
+                    derived += 1;
+                    assert!(!scene.crease_edges.contains(edge));
+                }
+            }
+        }
+        assert!(derived > 0);
+    }
     use super::*;
     use cad_kernel::{extrude_rectangle, EdgeId, Tolerance};
 

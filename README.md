@@ -2443,6 +2443,34 @@ budgets. Unsupported intermediate geometry or a path that cannot be certified
 within its budget fails without replacing the last valid generation. Combined
 screw motion, coupled moving bodies and arbitrary trajectories remain unsupported.
 
+### Finite keyseats in round shafts
+
+```sh
+cad build examples/keyed_shaft.star --out-dir out/keyed_shaft
+```
+
+A bounded `cut` branch removes a rectangular keyseat from a solid circular
+cylinder while retaining round journals at both ends. In the shaft's recovered
+frame, the cutter spans `x = a..outside`, `y = -b..b`, and `z = start..end`.
+The radial floor must satisfy `a > 0` and `a² + b² < radius²`; both axial ends
+must stay strictly inside the shaft. The cylindrical exterior and pocket walls
+remain native analytic geometry, with derived STEP/STL and preview artifacts.
+
+The example exposes width, depth, axial position/length, shaft dimensions, scale
+and output pose. Semantic assertions retain the pocket floor/end walls and both
+journal caps through placement. This domain has flat pocket ends and sharp
+corners; rounded milling ends, repeated seats, stepped/annular stock and matching
+internal hub keyways require additional operations. Native properties and transverse
+sections are supported; current clearance queries do not yet admit keyed bodies.
+A shaft keyseat alone does not establish a complete torque-transfer or retention design.
+
+The independent `tools/check-keyseat.py` acceptance suite covers 12 scale/pose,
+shallow-cut and authored-example cases, plus three failed-publication preservation
+cases. It checks native and STEP volume, centroid and inertia, both directed solid
+differences against an independently constructed cylinder-minus-box, and oriented
+watertight STL within its declared chordal error bound. The browser regression
+checks native floor-face picking and captured recipe source.
+
 ### Native planar edge chamfers
 
 ```python

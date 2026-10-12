@@ -33,6 +33,7 @@ mod arc_prism;
 mod bored_prism;
 mod circular_boolean;
 mod convex_clearance;
+mod keyseat;
 mod rotation_clearance;
 mod solid_clearance;
 pub use rotation_clearance::{
@@ -298,6 +299,9 @@ impl ModelSnapshot {
 
     /// Axis-aligned bounds; an empty snapshot has infinite/inverted bounds.
     pub fn bounds(&self) -> Bounds {
+        if let Ok(bounds) = keyseat::bounds(self) {
+            return bounds;
+        }
         let mut result = Bounds {
             min: [f64::INFINITY; 3],
             max: [f64::NEG_INFINITY; 3],
@@ -364,6 +368,9 @@ impl ModelSnapshot {
     /// Empty models have volume zero. Validate deserialized or edited snapshots
     /// first: invalid references or unsupported integration terms yield NaN.
     pub fn volume(&self) -> f64 {
+        if let Ok(v) = keyseat::volume(self) {
+            return v;
+        }
         if let Ok(v) = stepped_bore::volume(self) {
             return v;
         }
