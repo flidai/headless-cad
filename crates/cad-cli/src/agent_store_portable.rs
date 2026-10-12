@@ -92,6 +92,26 @@ impl AgentStore {
     pub(crate) fn read_job_file(&self, _: &str, _: &[&str], _: usize) -> Result<Vec<u8>> {
         unavailable()
     }
+    pub(crate) fn artifact_chunk_proof(
+        &self,
+        _: &str,
+        _: &str,
+        _: u64,
+        _: &str,
+    ) -> Result<(Vec<[u8; 32]>, bool)> {
+        unavailable()
+    }
+    pub(crate) fn read_verified_artifact_blocks(
+        &self,
+        _: &str,
+        _: &str,
+        _: u64,
+        _: &[[u8; 32]],
+        _: usize,
+        _: usize,
+    ) -> Result<Vec<u8>> {
+        unavailable()
+    }
     pub(crate) fn persist_receipt(
         &self,
         _: &str,

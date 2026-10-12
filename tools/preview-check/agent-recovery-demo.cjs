@@ -23,6 +23,11 @@ const assert=require('node:assert/strict');
    assert.equal(report.stale_acceptance.code,'agent_request_failed');
    assert.match(await page.locator('body').innerText(),/stale proposal was refused/);
   }
+  if (report.deliveries?.some(d=>d.mode==='verified_generation_stream')) {
+   assert.equal(report.deliveries.length,2);
+   assert.ok(report.deliveries.every(d=>d.mode==='verified_generation_stream' && d.bytes>0 && d.read_calls>0));
+   assert.match(await page.locator('body').innerText(),/Both delivery streams passed a final integrity check/);
+  }
   await page.screenshot({path:'/tmp/cad-agent-recovery-demo.png',fullPage:true});
   for(const [name,diameter] of [['before',12],['after',14]]) {
    const source=await(await page.request.get(`${base}/${name}/recipe.star`)).text();

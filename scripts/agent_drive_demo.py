@@ -14,6 +14,7 @@ import queue
 import subprocess
 import tempfile
 import threading
+import time
 
 
 class Client:
@@ -65,16 +66,25 @@ class Client:
                            'snapshot_id': result.get('snapshot_id')})
         return result
 
-    def download(self, job, destination):
+    def download(self, job, destination, stream=False):
+        started=time.perf_counter()
+        delivery_stream=self.tool('cad_open_generation_stream',{'job_id':job['job_id'],'manifest_digest':job['manifest_hash']}) if stream else None
         destination.mkdir()
+        read_calls=0
         for artifact in job['artifacts']:
             name = artifact['name']
             assert name and Path(name).name == name and name not in ('.', '..')
             offset = 0
             with (destination / name).open('wb') as file:
                 while True:
-                    chunk = self.tool('cad_read_artifact', {'job_id': job['job_id'], 'name': name,
-                                                           'offset': offset, 'max_bytes': 65536})
+                    read_args={'name':name,'offset':offset,'max_bytes':65536}
+                    if stream:
+                        read_args['stream_id']=delivery_stream['stream_id']
+                        chunk=self.tool('cad_read_generation_stream',read_args)
+                    else:
+                        read_args['job_id']=job['job_id']
+                        chunk=self.tool('cad_read_artifact',read_args)
+                    read_calls+=1
                     assert chunk['blake3'] == artifact['blake3'] and chunk['offset'] == offset
                     data = chunk['text'].encode()
                     file.write(data)
@@ -84,6 +94,12 @@ class Client:
                         assert offset == artifact['bytes']
                         break
                     assert data
+        if stream:
+            closed=self.tool('cad_close_generation_stream',{'stream_id':delivery_stream['stream_id']})
+            assert closed['closed'] and closed['sealed'] and closed['manifest_digest']==job['manifest_hash']
+        return {'mode':'verified_generation_stream' if stream else 'whole_job_check_per_read',
+                'seconds':time.perf_counter()-started,'read_calls':read_calls,
+                'bytes':sum(a['bytes'] for a in job['artifacts']),'artifacts':len(job['artifacts'])}
 
     def close(self):
         try:

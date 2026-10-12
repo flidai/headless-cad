@@ -151,6 +151,9 @@ fn agent_proposes_diagnoses_repairs_verifies_and_replays_without_workspace_write
         "cad_job",
         "cad_read_artifact",
         "cad_verify",
+        "cad_open_generation_stream",
+        "cad_read_generation_stream",
+        "cad_close_generation_stream",
         "cad_release",
         "cad_accept",
     ] {
@@ -181,11 +184,30 @@ fn agent_proposes_diagnoses_repairs_verifies_and_replays_without_workspace_write
     );
     assert_eq!(capabilities["agent_session"]["request_id_required"], false);
     assert_eq!(
+        capabilities["agent_session"]["generation_stream"]["available"],
+        false
+    );
+    assert_eq!(
         capabilities["agent_session"]["release_publication"],
         "unavailable"
     );
     client.tool("cad_release", json!({}), true);
     client.tool("cad_accept", json!({"request_id":"no-state","job_id":"job_0000000000000001","manifest_digest":"0".repeat(64),"expected_base_revision":null}), true);
+    client.tool(
+        "cad_open_generation_stream",
+        json!({"job_id":"job_0000000000000001","manifest_digest":"0".repeat(64)}),
+        true,
+    );
+    client.tool(
+        "cad_read_generation_stream",
+        json!({"stream_id":"missing","name":"manifest.json","max_bytes":65536}),
+        true,
+    );
+    client.tool(
+        "cad_close_generation_stream",
+        json!({"stream_id":"missing"}),
+        true,
+    );
     let snapshots = client.tool("cad_snapshots", json!({}), false);
     assert_eq!(snapshots["snapshots"].as_array().unwrap().len(), 1);
     assert_eq!(

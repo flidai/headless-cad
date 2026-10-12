@@ -24,6 +24,9 @@ pub const MAX_RETAINED_BYTES: u64 = 256 * 1024 * 1024;
 pub const MAX_STDOUT_BYTES: usize = 768 * 1024;
 pub const MAX_STDERR_BYTES: usize = 128 * 1024;
 pub const MAX_READ_BYTES: usize = 64 * 1024;
+pub const STREAM_BLOCK_BYTES: usize = 64 * 1024;
+pub const MAX_OPEN_STREAMS: usize = 1;
+pub const MAX_STREAM_METADATA_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_JOB_REPORT_BYTES: usize = 900 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(60);
 type Result<T> = std::result::Result<T, String>;
@@ -45,6 +48,19 @@ struct Job {
     report: Value,
     artifacts: BTreeMap<String, (u64, String)>,
 }
+struct ArtifactStreamProof {
+    length: u64,
+    hash: String,
+    blocks: Vec<[u8; 32]>,
+    utf8_valid: bool,
+}
+struct GenerationStream {
+    id: String,
+    job_id: String,
+    manifest_digest: String,
+    artifacts: BTreeMap<String, ArtifactStreamProof>,
+    total_bytes: u64,
+}
 enum JobDirectory {
     Temporary(tempfile::TempDir),
     Durable {
@@ -65,6 +81,7 @@ pub struct AgentJobs {
     jobs: BTreeMap<String, Job>,
     sequence: u64,
     store: Option<AgentStore>,
+    stream: Option<GenerationStream>,
 }
 impl AgentJobs {
     pub fn new() -> Result<Self> {
@@ -73,6 +90,7 @@ impl AgentJobs {
             jobs: BTreeMap::new(),
             sequence: 0,
             store: None,
+            stream: None,
         })
     }
     pub fn new_durable(
@@ -129,6 +147,7 @@ impl AgentJobs {
             jobs,
             sequence,
             store: Some(store),
+            stream: None,
         })
     }
     pub fn recovered_snapshots(&self) -> Result<BTreeMap<String, (Snapshot, Option<String>)>> {
@@ -616,6 +635,187 @@ impl AgentJobs {
         }
         Ok(
             json!({"job_id":id,"name":name,"offset":offset,"next_offset":end,"total_bytes":length,"blake3":hash,"text":&text[offset..end],"eof":end==text.len()}),
+        )
+    }
+    pub fn open_stream(&mut self, job_id: &str, manifest_digest: &str) -> Result<Value> {
+        let store = self
+            .store
+            .as_ref()
+            .ok_or("generation streams require durable state")?;
+        if manifest_digest.len() != 64
+            || !manifest_digest
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        {
+            return Err("manifest_digest must be lowercase BLAKE3 hex".into());
+        }
+        let job = self.jobs.get(job_id).ok_or("unknown session job")?;
+        if job.directory.is_none()
+            || job.report["mode"] != "build"
+            || job.report["worker"]["success"] != true
+            || job.report["manifest_hash"] != manifest_digest
+        {
+            return Err("stream requires a successful matching build".into());
+        }
+        if let Some(active) = &self.stream {
+            if active.job_id != job_id || active.manifest_digest != manifest_digest {
+                return Err("one generation stream is already active".into());
+            }
+            store.verify_job_seal(job_id)?;
+            return Ok(
+                json!({"stream_id":active.id,"job_id":active.job_id,"manifest_digest":active.manifest_digest,"artifact_count":active.artifacts.len(),"total_bytes":active.total_bytes,"chunk_bytes":STREAM_BLOCK_BYTES}),
+            );
+        }
+        store.verify_job_seal(job_id)?;
+        let mut artifacts = BTreeMap::new();
+        let mut total = 0u64;
+        let mut metadata = 1024usize;
+        if job.artifacts.len() > 10000 {
+            return Err("stream artifact count exceeded".into());
+        }
+        for (name, (length, hash)) in &job.artifacts {
+            safe_name(name)?;
+            total = total.checked_add(*length).ok_or("stream byte overflow")?;
+            if total > MAX_JOB_BYTES {
+                return Err("stream generation byte limit exceeded".into());
+            }
+            let blocks = length.div_ceil(STREAM_BLOCK_BYTES as u64) as usize;
+            let charge = name
+                .len()
+                .checked_add(256)
+                .and_then(|n| n.checked_add(blocks.checked_mul(64)?))
+                .ok_or("stream metadata overflow")?;
+            metadata = metadata
+                .checked_add(charge)
+                .ok_or("stream metadata overflow")?;
+            if metadata > MAX_STREAM_METADATA_BYTES {
+                return Err("stream metadata limit exceeded".into());
+            }
+            let (digests, utf8_valid) = store.artifact_chunk_proof(job_id, name, *length, hash)?;
+            if digests.len() != blocks {
+                return Err("stream block count mismatch".into());
+            }
+            artifacts.insert(
+                name.clone(),
+                ArtifactStreamProof {
+                    length: *length,
+                    hash: hash.clone(),
+                    blocks: digests,
+                    utf8_valid,
+                },
+            );
+        }
+        store.verify_job_seal(job_id)?;
+        let mut random = [0u8; 16];
+        fs::File::open("/dev/urandom")
+            .map_err(|e| e.to_string())?
+            .read_exact(&mut random)
+            .map_err(|e| e.to_string())?;
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut id = String::with_capacity(32);
+        for byte in random {
+            id.push(HEX[(byte >> 4) as usize] as char);
+            id.push(HEX[(byte & 15) as usize] as char);
+        }
+        let stream = GenerationStream {
+            id,
+            job_id: job_id.to_owned(),
+            manifest_digest: manifest_digest.to_owned(),
+            artifacts,
+            total_bytes: total,
+        };
+        let response = json!({"stream_id":stream.id,"job_id":stream.job_id,"manifest_digest":stream.manifest_digest,"artifact_count":stream.artifacts.len(),"total_bytes":stream.total_bytes,"chunk_bytes":STREAM_BLOCK_BYTES});
+        self.stream = Some(stream);
+        Ok(response)
+    }
+    pub fn read_stream(
+        &self,
+        stream_id: &str,
+        name: &str,
+        offset: usize,
+        max_bytes: usize,
+    ) -> Result<Value> {
+        if max_bytes == 0 || max_bytes > MAX_READ_BYTES {
+            return Err("invalid stream read budget".into());
+        }
+        safe_name(name)?;
+        let stream = self.stream.as_ref().ok_or("no active generation stream")?;
+        if stream.id != stream_id {
+            return Err("unknown generation stream".into());
+        }
+        let proof = stream
+            .artifacts
+            .get(name)
+            .ok_or("artifact is not in stream inventory")?;
+        if !proof.utf8_valid {
+            return Err("artifact is not UTF-8 text".into());
+        }
+        let store = self
+            .store
+            .as_ref()
+            .ok_or("generation streams require durable state")?;
+        let length =
+            usize::try_from(proof.length).map_err(|_| "artifact length exceeds platform limit")?;
+        if offset > length {
+            return Err("offset exceeds artifact length".into());
+        }
+        if offset == length {
+            store.read_verified_artifact_blocks(
+                &stream.job_id,
+                name,
+                proof.length,
+                &proof.blocks,
+                0,
+                0,
+            )?;
+            return Ok(
+                json!({"stream_id":stream.id,"job_id":stream.job_id,"name":name,"offset":offset,"next_offset":offset,"total_bytes":proof.length,"blake3":proof.hash,"text":"","eof":true}),
+            );
+        }
+        let requested_end = offset.saturating_add(max_bytes).min(length);
+        let first = offset / STREAM_BLOCK_BYTES;
+        let last = if requested_end < length {
+            requested_end / STREAM_BLOCK_BYTES
+        } else {
+            (requested_end - 1) / STREAM_BLOCK_BYTES
+        };
+        let verified = store.read_verified_artifact_blocks(
+            &stream.job_id,
+            name,
+            proof.length,
+            &proof.blocks,
+            first,
+            last,
+        )?;
+        let base = first * STREAM_BLOCK_BYTES;
+        let start = offset - base;
+        if verified[start] & 0xc0 == 0x80 {
+            return Err("offset must be a UTF-8 boundary".into());
+        }
+        let mut end = requested_end;
+        while end < length && verified[end - base] & 0xc0 == 0x80 {
+            end -= 1;
+        }
+        if end == offset {
+            return Err("read budget is too small for the next UTF-8 character".into());
+        }
+        let text = std::str::from_utf8(&verified[start..end - base])
+            .map_err(|_| "artifact is not UTF-8 text")?;
+        Ok(
+            json!({"stream_id":stream.id,"job_id":stream.job_id,"name":name,"offset":offset,"next_offset":end,"total_bytes":proof.length,"blake3":proof.hash,"text":text,"eof":end==length}),
+        )
+    }
+    pub fn close_stream(&mut self, stream_id: &str) -> Result<Value> {
+        if self.stream.as_ref().is_none_or(|s| s.id != stream_id) {
+            return Err("unknown generation stream".into());
+        }
+        let stream = self.stream.take().ok_or("no active generation stream")?;
+        self.store
+            .as_ref()
+            .ok_or("generation streams require durable state")?
+            .verify_job_seal(&stream.job_id)?;
+        Ok(
+            json!({"stream_id":stream.id,"closed":true,"job_id":stream.job_id,"manifest_digest":stream.manifest_digest,"sealed":true}),
         )
     }
 }

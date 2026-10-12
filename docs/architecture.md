@@ -3280,3 +3280,52 @@ source revisions, rejects a stale proposal and recovers both acceptance records
 alongside all candidate artifacts. This advances R5 without closing the commercial
 release gate; external delivery, retention management and autonomous engineering
 acceptance remain open.
+
+
+### Verified generation delivery streams
+
+Durable sessions may open one generation stream against a successful build's
+exact manifest digest. Open checks the complete stored job, reads only its
+receipt-listed artifacts through no-follow handles, verifies each whole-file
+digest and derives 64 KiB block digests. A second full seal completes admission.
+The random 128-bit stream token and proof map stay in session memory. Repeating
+open for the same job/digest rechecks the seal and returns the same token; another
+job refuses until close. Restart invalidates every token.
+
+Stream reads authenticate complete blocks covering the requested byte range,
+check the file length before/after reading and preserve UTF-8 boundaries. They
+return at most 64 KiB of text. Incremental UTF-8 validation at open covers code
+points split across blocks; invalid text artifacts refuse text reads. Replacing
+a regular file with identical bytes preserves content identity, while symlinks,
+length changes and changed requested blocks refuse. The server does not retain
+the generation's entire byte contents in memory.
+
+Proof metadata has an explicit 8 MiB logical accounting limit, one active stream,
+10,000 artifact entries and at most 128 MiB of inventoried content. Rounded block
+counts are bounded by total bytes divided by block size plus artifact count;
+many small files still consume proof entries. Accounting includes conservative
+per-entry and per-block overhead; it is not a measured total process-RSS budget.
+Reads allocate only a bounded number of proof blocks.
+
+A stream read proves the bytes it returns, rather than rescanning unrelated
+artifacts. Closing consumes the token and rechecks the complete job; clients must
+require successful close before publishing their downloaded generation. A failed
+close leaves the token invalid and the delivery unpublished. Existing
+`cad_read_artifact` preserves its per-call whole-job seal behavior. `cad_verify`
+and accepted-head checks remain full-generation integrity boundaries.
+
+Real MCP tests cover Unicode boundary reads, multiple-block reconstruction,
+same-content replacement, altered read/unread blocks, symlink/length changes,
+unrelated-artifact mutation caught at close, stream capacity and token expiry.
+`tools/bench-agent-stream.py` measures both protocols against the same retained
+drive job and independently compares every delivered file using SHA-256 before
+native verification. Local transport timings do not close hosted delivery,
+network-recovery, exact-body scheduling or assembly-scale release gates.
+
+The retained [local stream benchmark](evidence/agent-stream-local.json) delivered
+138 identical artifacts (25,345,877 bytes, 475 chunk reads) in 39.04 seconds through
+the original path and 0.93 seconds through the stream on this Linux x86-64 worker.
+Both copies passed native integrity verification and independent SHA-256 byte
+comparison. The report pins executable bytes and manifest identity. This observed
+approximately 42× improvement is not a general performance guarantee: cache state
+and concurrent background activity were not controlled.

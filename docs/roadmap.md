@@ -826,3 +826,11 @@ after restart. The full drive walkthrough exercises two accepted source revision
 and one stale rejection. This is local review state with bounded history, not
 manufacturing certification, distributed history or external delivery. Those
 requirements and all five commercial release gates remain open.
+
+
+A bounded, session-scoped generation stream now supports larger local artifact
+deliveries. Whole-file verification establishes block proofs; reads authenticate
+requested chunks and a final full seal gates client publication. The original
+per-read integrity path remains available. Identical-byte delivery comparisons
+and mutation/restart tests are required evidence; hosted transfer, resumable
+external synchronization and the commercial lifecycle gate remain open.

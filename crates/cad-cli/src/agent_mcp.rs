@@ -93,6 +93,26 @@ struct Verify {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct OpenGenerationStream {
+    job_id: String,
+    manifest_digest: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReadGenerationStream {
+    stream_id: String,
+    name: String,
+    #[serde(default)]
+    offset: usize,
+    max_bytes: usize,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CloseGenerationStream {
+    stream_id: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Accept {
     request_id: String,
     job_id: String,
@@ -124,11 +144,14 @@ fn tools() -> Vec<Tool> {
         Tool::new("cad_job", "Read a completed retained job report.", schema(json!({"job_id":s}), &["job_id"])),
         Tool::new("cad_read_artifact", "Read a bounded UTF-8 artifact chunk from a job's verified inventory. Offset and length are bytes.", schema(json!({"job_id":s,"name":s,"offset":{"type":"integer","minimum":0},"max_bytes":{"type":"integer","minimum":1,"maximum":65536}}), &["job_id","name","max_bytes"])),
         Tool::new("cad_verify", "Verify a candidate against the expected manifest digest.", schema(json!({"job_id":s,"manifest_digest":s}), &["job_id","manifest_digest"])),
+        Tool::new("cad_open_generation_stream", "Open one bounded session stream for a durable verified generation. Pins the manifest digest and checks the whole job and artifact inventory. Returned chunks are bound to the opened digest; unrelated later changes are caught on close or cad_verify, not on every read. Publish downloaded data only after successful close.", schema(json!({"job_id":s,"manifest_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}), &["job_id","manifest_digest"])),
+        Tool::new("cad_read_generation_stream", "Read a named UTF-8 artifact chunk from an open durable generation stream. Each touched block is checked against the digest captured at open; offset and max_bytes are bytes. An unrelated later change is caught on close or cad_verify. Publish downloaded data only after successful close.", schema(json!({"stream_id":s,"name":s,"offset":{"type":"integer","minimum":0},"max_bytes":{"type":"integer","minimum":1,"maximum":65536}}), &["stream_id","name","max_bytes"])),
+        Tool::new("cad_close_generation_stream", "Close a durable generation stream and recheck the whole retained job. The token is consumed on success or failure. Only a successful sealed close completes a download for publication.", schema(json!({"stream_id":s}), &["stream_id"])),
         Tool::new("cad_release", "Read the current locally accepted candidate revision. Requires durable --state-dir. This is not a manufacturing release or external delivery.", schema(json!({}), &[])),
         Tool::new("cad_accept", "Accept a verified completed build as the next local revision only when expected_base_revision matches the current revision. Requires durable --state-dir and an idempotency request_id. Does not change recipe source or deliver a manufacturing release.", schema(json!({"request_id":{"type":"string","minLength":1,"maxLength":128},"job_id":s,"manifest_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"},"expected_base_revision":{"type":["string","null"],"pattern":"^[0-9a-f]{64}$"}}), &["request_id","job_id","manifest_digest","expected_base_revision"])),
     ].into_iter().map(|mut t| {
         let mut a=ToolAnnotations::default();
-        if t.name == "cad_release" { a.read_only_hint=Some(true); }
+        if t.name == "cad_release" || t.name == "cad_read_generation_stream" { a.read_only_hint=Some(true); }
         a.destructive_hint=Some(t.name == "cad_accept");
         a.open_world_hint=Some(false);
         t.annotations=Some(a);
@@ -180,6 +203,13 @@ impl State {
                     cancel,
                 )?;
                 report["agent_session"] = json!({"transport":"stdio","source_capture_platform":"linux","publication":if self.durable {"immutable_candidates_and_local_expected_base_acceptance"} else {"immutable_candidate_only"},"viewer":"read_only","maximum_snapshots":MAX_SNAPSHOTS,"maximum_snapshot_bytes":MAX_SNAPSHOT_BYTES,"maximum_jobs":crate::agent_jobs::MAX_JOBS,"maximum_job_bytes":crate::agent_jobs::MAX_JOB_BYTES,"maximum_retained_job_bytes":crate::agent_jobs::MAX_RETAINED_BYTES,"maximum_acceptance_records":crate::agent_store::MAX_ACCEPTANCES,"maximum_frame_bytes":MAX_FRAME,"maximum_response_bytes":MAX_RESPONSE,"maximum_session_frames":4096,"worker_timeout_seconds":60,"maximum_active_tools":1,"hard_os_memory_sandbox":false,"worker_process_admission":crate::worker_limits::policy(),"retention":if self.durable {"durable_state_directory"} else {"until_process_exit"},"durable_state_enabled":self.durable,"request_id_required":self.durable,"request_id_max_bytes":128,"request_id_controls_allowed":false,"evaluate_request_id":if self.durable {"required; same payload reuses recorded outcome; interrupted intents require a new key"} else {"unsupported"},"snapshot_parentage":"first_observed_parent", "release_publication":if self.durable {"local_expected_base_only"} else {"unavailable"},"manufacturing_release":false,"external_delivery":false});
+                report["agent_session"]["generation_stream"] = json!({
+                    "available":self.durable,
+                    "maximum_open_streams":crate::agent_jobs::MAX_OPEN_STREAMS,
+                    "chunk_bytes":crate::agent_jobs::STREAM_BLOCK_BYTES,
+                    "maximum_metadata_bytes":crate::agent_jobs::MAX_STREAM_METADATA_BYTES,
+                    "completion":"successful_close_required_before_client_publication",
+                });
                 Ok(report)
             }
             "cad_snapshot" => {
@@ -285,6 +315,28 @@ impl State {
                 let a: Verify = decode(args)?;
                 self.jobs.verify(&a.job_id, &a.manifest_digest, cancel)
             }
+            "cad_open_generation_stream" => {
+                if !self.durable {
+                    return Err("cad_open_generation_stream requires --state-dir".into());
+                }
+                let a: OpenGenerationStream = decode(args)?;
+                self.jobs.open_stream(&a.job_id, &a.manifest_digest)
+            }
+            "cad_read_generation_stream" => {
+                if !self.durable {
+                    return Err("cad_read_generation_stream requires --state-dir".into());
+                }
+                let a: ReadGenerationStream = decode(args)?;
+                self.jobs
+                    .read_stream(&a.stream_id, &a.name, a.offset, a.max_bytes)
+            }
+            "cad_close_generation_stream" => {
+                if !self.durable {
+                    return Err("cad_close_generation_stream requires --state-dir".into());
+                }
+                let a: CloseGenerationStream = decode(args)?;
+                self.jobs.close_stream(&a.stream_id)
+            }
             "cad_release" => {
                 let _: Empty = decode(args)?;
                 if !self.durable {
@@ -343,7 +395,7 @@ fn result(value: Result<Value, String>) -> CallToolResponse {
 }
 impl ServerHandler for CadServer {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions("Experimental original Rust headless CAD. Capture source, create candidate revisions, evaluate and inspect native evidence. Source recipes are authoritative. Jobs are immutable candidates: ephemeral by default, durable only when launched with --state-dir. Durable evaluation requires an explicit request_id; interrupted requests never rerun automatically. Durable mode can accept a verified candidate into a local revision with an explicit expected base; it does not write source or deliver a manufacturing release. Viewer is read-only. One active tool call; limits enforced, not an OS memory sandbox.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions("Experimental original Rust headless CAD. Capture source, create candidate revisions, evaluate and inspect native evidence. Source recipes are authoritative. Jobs are immutable candidates: ephemeral by default, durable only when launched with --state-dir. Durable evaluation requires an explicit request_id; interrupted requests never rerun automatically. Durable generation streams pin a verified manifest; read chunks check touched blocks, and only successful close checks the whole job after transfer. Publish downloaded data only after successful close. Durable mode can accept a verified candidate into a local revision with an explicit expected base; it does not write source or deliver a manufacturing release. Viewer is read-only. One active tool call; limits enforced, not an OS memory sandbox.")
     }
     async fn list_tools(
         &self,

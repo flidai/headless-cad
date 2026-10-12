@@ -179,6 +179,16 @@ python scripts/agent_recovery_demo.py --cad target/release/cad \
 Open `http://localhost:8080/agent_acceptance_demo/index.html` with the viewer
 server running. Use fresh state and delivery directories for each run.
 
+For larger durable deliveries, `cad_open_generation_stream` pins a verified job
+and manifest. Read inventoried files through `cad_read_generation_stream`, then
+require `cad_close_generation_stream` to return `sealed: true` before publishing
+the delivery. Reads authenticate their bytes; the final seal detects unrelated
+artifact changes since open. Only one stream is active per session, and tokens
+expire on close or process exit. `cad_read_artifact` retains its full-job check
+on each call. Add `--stream-artifacts` to the walkthrough command above to use
+the streaming path. [The delivery benchmark](tools/bench-agent-stream.py) compares
+both paths for the same retained job and checks identical SHA-256 file inventories.
+
 ## Review a complete source revision
 
 The experimental bearing-drive walkthrough changes shaft diameter from 12 to

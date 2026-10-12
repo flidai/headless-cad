@@ -886,3 +886,207 @@ fn acceptance_quota_survives_restart_and_preserves_idempotent_replay() {
         64
     );
 }
+
+fn streaming_fixture(workspace: &Path) -> String {
+    // An actual captured UTF-8 recipe spans more than two proof blocks.
+    let source = format!(
+        "{}{}",
+        "# stream comment 🙂 0123456789\n".repeat(6000),
+        ACCEPT_SOURCE
+    );
+    assert!(source.len() > 2 * 65536);
+    fs::write(workspace.join("box.star"), &source).unwrap();
+    source
+}
+fn stream_open(client: &mut Client, job: &Value) -> Value {
+    client.tool(
+        "cad_open_generation_stream",
+        json!({"job_id":job["job_id"],"manifest_digest":job["manifest_hash"]}),
+        false,
+    )
+}
+fn stream_read(
+    client: &mut Client,
+    stream: &Value,
+    name: &str,
+    offset: usize,
+    max_bytes: usize,
+    error: bool,
+) -> Value {
+    client.tool(
+        "cad_read_generation_stream",
+        json!({"stream_id":stream["stream_id"],"name":name,"offset":offset,"max_bytes":max_bytes}),
+        error,
+    )
+}
+#[test]
+fn generation_stream_preserves_utf8_bytes_and_session_identity() {
+    let workspace = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    let source = streaming_fixture(workspace.path());
+    let mut client = Client::start(workspace.path(), state.path());
+    let job = acceptance_build(&mut client, "stream-build");
+    client.tool(
+        "cad_open_generation_stream",
+        json!({"job_id":job["job_id"],"manifest_digest":"0".repeat(64)}),
+        true,
+    );
+    let stream = stream_open(&mut client, &job);
+    assert_eq!(stream["chunk_bytes"], 65536);
+    assert_eq!(
+        stream["artifact_count"],
+        job["artifacts"].as_array().unwrap().len()
+    );
+    assert_eq!(stream_open(&mut client, &job), stream);
+    let second = acceptance_build(&mut client, "other-job");
+    client.tool(
+        "cad_open_generation_stream",
+        json!({"job_id":second["job_id"],"manifest_digest":second["manifest_hash"]}),
+        true,
+    );
+    stream_read(&mut client, &stream, "../source.json", 0, 100, true);
+    stream_read(&mut client, &stream, "not-listed", 0, 100, true);
+    stream_read(&mut client, &stream, "recipe.star", 0, 65537, true);
+    let unicode = source.find('🙂').unwrap();
+    stream_read(&mut client, &stream, "recipe.star", unicode + 1, 10, true);
+    stream_read(&mut client, &stream, "recipe.star", unicode, 1, true);
+    let mut recovered = String::new();
+    while recovered.len() < source.len() {
+        let chunk = stream_read(
+            &mut client,
+            &stream,
+            "recipe.star",
+            recovered.len(),
+            65535,
+            false,
+        );
+        assert_eq!(chunk["offset"], recovered.len());
+        assert_eq!(chunk["stream_id"], stream["stream_id"]);
+        recovered.push_str(chunk["text"].as_str().unwrap());
+        assert_eq!(chunk["next_offset"], recovered.len());
+        assert_eq!(chunk["eof"], recovered.len() == source.len());
+    }
+    assert_eq!(source, recovered);
+    // Identity is the verified content, not a mutable pathname's inode.
+    let generation = state
+        .path()
+        .join("jobs")
+        .join(job["job_id"].as_str().unwrap())
+        .join("generation");
+    let replacement = state.path().join("same-content");
+    fs::write(&replacement, source.as_bytes()).unwrap();
+    fs::rename(&replacement, generation.join("recipe.star")).unwrap();
+    assert_eq!(
+        stream_read(&mut client, &stream, "recipe.star", 0, 100, false)["text"],
+        source[..100].to_string()
+    );
+    client.tool(
+        "cad_close_generation_stream",
+        json!({"stream_id":"not-the-active-token"}),
+        true,
+    );
+    let end = stream_read(
+        &mut client,
+        &stream,
+        "recipe.star",
+        source.len(),
+        65536,
+        false,
+    );
+    assert_eq!(end["text"], "");
+    assert_eq!(end["eof"], true);
+    let closed = client.tool(
+        "cad_close_generation_stream",
+        json!({"stream_id":stream["stream_id"]}),
+        false,
+    );
+    assert_eq!(closed["closed"], true);
+    assert_eq!(closed["sealed"], true);
+    stream_read(&mut client, &stream, "recipe.star", 0, 100, true);
+    let reopened = stream_open(&mut client, &job);
+    assert_ne!(reopened["stream_id"], stream["stream_id"]);
+    drop(client);
+    let mut client = Client::start(workspace.path(), state.path());
+    stream_read(&mut client, &reopened, "recipe.star", 0, 100, true);
+    let new = stream_open(&mut client, &job);
+    assert_ne!(new["stream_id"], reopened["stream_id"]);
+    client.tool(
+        "cad_close_generation_stream",
+        json!({"stream_id":new["stream_id"]}),
+        false,
+    );
+}
+
+#[test]
+fn generation_stream_authenticates_changed_blocks_and_requires_final_seal() {
+    use std::os::unix::fs::symlink;
+    for variant in [
+        "unread_block",
+        "already_read_block",
+        "length",
+        "symlink",
+        "other_file",
+    ] {
+        let workspace = tempfile::tempdir().unwrap();
+        let state = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        streaming_fixture(workspace.path());
+        let mut client = Client::start(workspace.path(), state.path());
+        let job = acceptance_build(&mut client, "stream-tamper");
+        let stream = stream_open(&mut client, &job);
+        stream_read(&mut client, &stream, "recipe.star", 0, 100, false);
+        let generation = state
+            .path()
+            .join("jobs")
+            .join(job["job_id"].as_str().unwrap())
+            .join("generation");
+        let target = generation.join("recipe.star");
+        let mut bytes = fs::read(&target).unwrap();
+        let offset = if variant == "unread_block" { 65536 } else { 0 };
+        match variant {
+            "unread_block" | "already_read_block" => {
+                bytes[offset] = if bytes[offset] == b'X' { b'Y' } else { b'X' };
+                fs::write(&target, bytes).unwrap();
+            }
+            "length" => {
+                fs::OpenOptions::new()
+                    .append(true)
+                    .open(&target)
+                    .unwrap()
+                    .write_all(b"\n")
+                    .unwrap();
+            }
+            "symlink" => {
+                let file = outside.path().join("same-bytes");
+                fs::write(&file, bytes).unwrap();
+                fs::remove_file(&target).unwrap();
+                symlink(file, &target).unwrap();
+            }
+            "other_file" => {
+                fs::write(generation.join("box.step"), "unrelated artifact corrupted").unwrap()
+            }
+            _ => unreachable!(),
+        }
+        // Reads authenticate requested bytes, not every other artifact in the generation.
+        stream_read(
+            &mut client,
+            &stream,
+            "recipe.star",
+            offset,
+            100,
+            variant != "other_file",
+        );
+        client.tool(
+            "cad_close_generation_stream",
+            json!({"stream_id":stream["stream_id"]}),
+            true,
+        );
+        // Even a failed close consumes the token.
+        stream_read(&mut client, &stream, "recipe.star", 0, 100, true);
+        client.tool(
+            "cad_open_generation_stream",
+            json!({"job_id":job["job_id"],"manifest_digest":job["manifest_hash"]}),
+            true,
+        );
+    }
+}

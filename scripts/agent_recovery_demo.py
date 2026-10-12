@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--state-dir',type=Path,required=True)
     parser.add_argument('--out-dir',type=Path,required=True)
     parser.add_argument('--accept-revisions',action='store_true',help='Also exercise durable expected-base candidate acceptance')
+    parser.add_argument('--stream-artifacts',action='store_true',help='Download through a verified generation stream and require a successful final seal')
     args=parser.parse_args()
     cad,workspace,state=args.cad.resolve(),args.workspace.resolve(),args.state_dir.absolute()
     destination=args.out_dir.absolute()
@@ -64,10 +65,11 @@ def main():
         assert second.tool('cad_evaluate',rejected_args,error=True)==rejected
         conflict=second.tool('cad_evaluate',{**after_args,'params':{'shaft_diameter':15}},error=True)
         assert len(second.tool('cad_jobs',{})['jobs'])==3
+        deliveries=[]
         for name,job in [('before',before),('after',after)]:
             verified=second.tool('cad_verify',{'job_id':job['job_id'],'manifest_digest':job['manifest_hash']})
             assert verified['success'],verified
-            second.download(job,stage/name)
+            deliveries.append(second.download(job,stage/name,stream=args.stream_artifacts))
             run(cad,'verify',stage/name)
         if args.accept_revisions:
             assert second.tool('cad_accept',accept_before)==accepted_before
@@ -77,7 +79,7 @@ def main():
     finally:second.close()
     assert hashlib.sha256(source_path.read_bytes()).hexdigest()==original_hash
     evidence={'valid':True,'source_workspace_unchanged':True,'durable_jobs':3,'recovered_retry_results':3,
-              'acceptances':acceptances,'stale_acceptance':stale_acceptance,
+              'acceptances':acceptances,'stale_acceptance':stale_acceptance,'deliveries':deliveries,
               'snapshots':discovered,'before_job':before['job_id'],'after_job':after['job_id'],
               'rejected_job':rejected,'conflicting_retry':conflict,'trace':trace,
               'scope':'One local writer; local accepted candidate records only, no external release delivery, hosted service or autonomous AI reasoning claim'}
@@ -88,6 +90,9 @@ def main():
         page=page.replace('Recover a drive revision','Accept and recover a drive revision')
         page=page.replace('Release acceptance and hosted operation remain separate work.','Local acceptance checks the expected prior revision. Manufacturing release, external delivery and hosted operation remain separate work.')
         page=page.replace('</html>','<section><h2>Accepted revisions</h2><p>Revision A was accepted first. A stale proposal was refused. Revision B was accepted with A as its expected base. Both acceptance results and the current head survived restart.</p><p>Recipes remain authoritative; acceptance records identify verified candidates without changing source files.</p></section></html>')
+        (stage/'index.html').write_text(page)
+    if args.stream_artifacts:
+        page=(stage/'index.html').read_text().replace('</html>','<section><h2>Verified delivery</h2><p>Artifact chunks match the captured generation. Both delivery streams passed a final integrity check before these pages were published.</p></section></html>')
         (stage/'index.html').write_text(page)
     publish_new(stage,destination)
     print(json.dumps({'valid':True,'directory':str(destination),'index':str(destination/'index.html'),'durable_jobs':3,'protocol_calls':len(trace)}))

@@ -721,6 +721,123 @@ impl AgentStore {
         }
         read_bounded(&dir, name, limit)
     }
+    pub(crate) fn artifact_chunk_proof(
+        &self,
+        id: &str,
+        name: &str,
+        expected_len: u64,
+        expected_hash: &str,
+    ) -> Result<(Vec<[u8; 32]>, bool)> {
+        let job = self.open_job_dir(id)?;
+        let generation = dir_at(&job, "generation")?;
+        if name.is_empty() || name.contains(['/', '\\']) || name == "." || name == ".." {
+            return Err("invalid artifact name".into());
+        }
+        let mut file = file_at(&generation, name)?;
+        if expected_len > agent_jobs::MAX_JOB_BYTES
+            || file.metadata().map_err(|e| e.to_string())?.len() != expected_len
+        {
+            return Err("artifact length changed".into());
+        }
+        let mut full = blake3::Hasher::new();
+        let mut chunks = Vec::new();
+        let mut remaining = expected_len;
+        let mut buffer = [0u8; agent_jobs::STREAM_BLOCK_BYTES];
+        let mut utf8_pending = Vec::with_capacity(3);
+        let mut utf8_valid = true;
+        while remaining > 0 {
+            let length = (remaining as usize).min(buffer.len());
+            file.read_exact(&mut buffer[..length])
+                .map_err(|e| e.to_string())?;
+            let block = &buffer[..length];
+            full.update(block);
+            chunks.push(*blake3::hash(block).as_bytes());
+            if utf8_valid {
+                let mut combined = Vec::with_capacity(utf8_pending.len() + length);
+                combined.extend_from_slice(&utf8_pending);
+                combined.extend_from_slice(block);
+                match std::str::from_utf8(&combined) {
+                    Ok(_) => utf8_pending.clear(),
+                    Err(error) if error.error_len().is_none() => {
+                        utf8_pending.clear();
+                        utf8_pending.extend_from_slice(&combined[error.valid_up_to()..]);
+                        if utf8_pending.len() > 3 {
+                            utf8_valid = false;
+                        }
+                    }
+                    Err(_) => utf8_valid = false,
+                }
+            }
+            remaining -= length as u64;
+        }
+        if !utf8_pending.is_empty() {
+            utf8_valid = false;
+        }
+        if file.read(&mut buffer[..1]).map_err(|e| e.to_string())? != 0
+            || file.metadata().map_err(|e| e.to_string())?.len() != expected_len
+        {
+            return Err("artifact length changed".into());
+        }
+        if full.finalize().to_hex().as_str() != expected_hash {
+            return Err("artifact digest mismatch".into());
+        }
+        Ok((chunks, utf8_valid))
+    }
+    pub(crate) fn read_verified_artifact_blocks(
+        &self,
+        id: &str,
+        name: &str,
+        expected_len: u64,
+        hashes: &[[u8; 32]],
+        first: usize,
+        last: usize,
+    ) -> Result<Vec<u8>> {
+        use std::os::unix::fs::FileExt;
+        let job = self.open_job_dir(id)?;
+        let generation = dir_at(&job, "generation")?;
+        if name.is_empty() || name.contains(['/', '\\']) || name == "." || name == ".." {
+            return Err("invalid artifact name".into());
+        }
+        let file = file_at(&generation, name)?;
+        if file.metadata().map_err(|e| e.to_string())?.len() != expected_len {
+            return Err("artifact length changed".into());
+        }
+        if expected_len == 0 {
+            if !hashes.is_empty() || first != 0 || last != 0 {
+                return Err("invalid empty artifact proof".into());
+            }
+            return Ok(Vec::new());
+        }
+        if first > last || last >= hashes.len() || last - first > 2 {
+            return Err("artifact block range exceeds limit".into());
+        }
+        let mut out = Vec::with_capacity((last - first + 1) * agent_jobs::STREAM_BLOCK_BYTES);
+        for (index, expected_hash) in hashes.iter().enumerate().take(last + 1).skip(first) {
+            let start = (index as u64)
+                .checked_mul(agent_jobs::STREAM_BLOCK_BYTES as u64)
+                .ok_or("artifact block offset overflow")?;
+            let length = (expected_len - start).min(agent_jobs::STREAM_BLOCK_BYTES as u64) as usize;
+            let mut block = vec![0u8; length];
+            let mut consumed = 0usize;
+            while consumed < length {
+                let n = file
+                    .read_at(&mut block[consumed..], start + consumed as u64)
+                    .map_err(|e| e.to_string())?;
+                if n == 0 {
+                    return Err("artifact shortened while reading".into());
+                }
+                consumed += n;
+            }
+            if blake3::hash(&block).as_bytes() != expected_hash {
+                return Err("artifact block digest mismatch".into());
+            }
+            out.extend_from_slice(&block);
+        }
+        if file.metadata().map_err(|e| e.to_string())?.len() != expected_len {
+            return Err("artifact length changed".into());
+        }
+        Ok(out)
+    }
     pub(crate) fn seal_job(&self, id: &str) -> Result<(u64, String)> {
         let dir = self.open_job_dir(id)?;
         let mut hash = blake3::Hasher::new();
