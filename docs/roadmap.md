@@ -69,7 +69,9 @@ semantic round-trip evidence and complete manufacturing release remain open.
 STEP now preserves authored part numbers, descriptions and revisions while
 retaining internal definition identities and shared geometry. Independent decoded
 field checks cover duplicate part numbers, revision edits and nested occurrences;
-materials, datum intent and PMI mapping remain open.
+material names and explicitly dimensioned density also have independent STEP
+and XCAF checks, including density-only revisions with unchanged geometry.
+Datum intent, PMI and full material specifications remain open.
 M6 release policies declare required manufacturing semantics. Loss of required
 units, tolerances, datum references, revisions or occurrence mappings blocks
 release and is checked independently from exported solid validity.

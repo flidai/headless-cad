@@ -31,6 +31,9 @@ jobs:
       - name: Check STEP metadata with independent importer
         if: matrix.case == 'round-stock'
         run: python crates/cad-export/tools/check_step_metadata_ocp.py --cad target/release/cad
+      - name: Check STEP materials with independent importer
+        if: matrix.case == 'round-stock'
+        run: python crates/cad-export/tools/check_step_materials_ocp.py --cad target/release/cad
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.case }}-engineering-evidence

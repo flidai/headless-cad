@@ -83,7 +83,7 @@ assert_property(id = "assembly_mass", output = "round_bearing_cartridge", proper
 def require_handoff():
     for aspect in ["geometry", "units", "modeling_tolerance"]:
         require_exchange(id = "flange_step_" + aspect, output = "flange", format = "step", aspect = aspect)
-    for aspect in ["geometry", "units", "assembly_definitions", "assembly_hierarchy", "occurrence_paths", "occurrence_placements", "part_numbers", "part_revisions", "part_descriptions"]:
+    for aspect in ["geometry", "units", "assembly_definitions", "assembly_hierarchy", "occurrence_paths", "occurrence_placements", "part_numbers", "part_revisions", "part_descriptions", "material_names", "material_density"]:
         require_exchange(id = "cartridge_step_" + aspect, output = "round_bearing_cartridge", format = "step", aspect = aspect)
 
 require_handoff()

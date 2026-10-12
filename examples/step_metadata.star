@@ -1,5 +1,5 @@
 # Shared engineering part numbers do not merge distinct definition revisions.
-# STEP carries these three metadata fields; materials and datums remain sidecars.
+# STEP carries these three metadata fields; datums remain sidecars.
 revision_edit = param(name = "revision_edit", default = 0)
 if_invalid = revision_edit != 0 and revision_edit != 1
 def validate_parameters():

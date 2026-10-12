@@ -77,6 +77,45 @@ fn product(
     (definition, shape)
 }
 
+// Descriptive and numeric material properties are attached to the logical
+// PRODUCT_DEFINITION, never inferred from a display color or geometry hash.
+fn material_properties(
+    step: &mut Step,
+    definition: usize,
+    context: usize,
+    material: &cad_assembly::Material,
+) {
+    // Keep the source value in kg/m^3. A conversion-based kilogram avoids
+    // readers that ignore SI mass prefixes while normalizing material density.
+    let name = step.add(format!(
+        "DESCRIPTIVE_REPRESENTATION_ITEM({},'')",
+        string(&material.name)
+    ));
+    let gram = step.add("(MASS_UNIT() NAMED_UNIT(*) SI_UNIT($,.GRAM.))".into());
+    let conversion = step.add(format!("MEASURE_WITH_UNIT(MASS_MEASURE(1000.),#{gram})"));
+    let dimensions = step.add("DIMENSIONAL_EXPONENTS(0.,1.,0.,0.,0.,0.,0.)".into());
+    let mass = step.add(format!(
+        "(CONVERSION_BASED_UNIT('kilogram',#{conversion}) MASS_UNIT() NAMED_UNIT(#{dimensions}))"
+    ));
+    let length = step.add("(LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT($,.METRE.))".into());
+    let mass_element = step.add(format!("DERIVED_UNIT_ELEMENT(#{mass},1.)"));
+    let length_element = step.add(format!("DERIVED_UNIT_ELEMENT(#{length},-3.)"));
+    let unit = step.add(format!("DERIVED_UNIT((#{mass_element},#{length_element}))"));
+    let density_item = step.add(format!(
+        "MEASURE_REPRESENTATION_ITEM('mass density',NUMERIC_MEASURE({}),#{unit})",
+        real(material.density_kg_per_m3)
+    ));
+    for (label, item) in [("material name", name), ("density", density_item)] {
+        let representation = step.add(format!("REPRESENTATION('{label}',(#{item}),#{context})"));
+        let property = step.add(format!(
+            "PROPERTY_DEFINITION('material property','{label}',#{definition})"
+        ));
+        step.add(format!(
+            "PROPERTY_DEFINITION_REPRESENTATION(#{property},#{representation})"
+        ));
+    }
+}
+
 /// Export reusable part definitions and assembly occurrences with their placements.
 /// Each part is validated in its native frame. No Boolean union is performed.
 pub fn assembly_to_step(
@@ -171,6 +210,9 @@ pub fn assembly_to_step(
         step.add(format!(
             "SHAPE_DEFINITION_REPRESENTATION(#{shape},#{representation})"
         ));
+        if let Some(material) = &part.metadata.material {
+            material_properties(&mut step, definition, context, material);
+        }
         definitions.insert(name, (definition, representation));
     }
     for (parent, definition) in &resolved {
@@ -446,6 +488,95 @@ mod tests {
         for (actual, expected) in placed.into_iter().zip([26., -2., -3.]) {
             assert!((actual - expected).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn materials_are_definition_scoped_and_preserve_density_dimensions() {
+        let t = Tolerance::default();
+        let base = two_instances();
+        let plain = base.parts["block"].clone();
+        let mut left = plain.clone();
+        left.metadata.material = Some(cad_assembly::Material {
+            name: "alloy'Ω".into(),
+            density_kg_per_m3: 7800.,
+        });
+        let mut right = left.clone();
+        right.metadata.material.as_mut().unwrap().density_kg_per_m3 = 2700.;
+        let parts = BTreeMap::from([
+            ("left".into(), left),
+            ("right".into(), right),
+            ("plain".into(), plain),
+        ]);
+        let instances = ["left", "right", "plain", "left"]
+            .into_iter()
+            .enumerate()
+            .map(|(i, part)| Instance {
+                id: format!("i{i}"),
+                part: part.into(),
+                attachment: None,
+                transform: RigidTransform {
+                    translation: [i as f64 * 10., 0., 0.],
+                    ..Default::default()
+                },
+            })
+            .collect();
+        let model = BuiltAssembly::new("materials".into(), parts, instances, t).unwrap();
+        let step = assembly_to_step(&model, t).unwrap();
+        assert_eq!(
+            step.matches("PROPERTY_DEFINITION('material property'")
+                .count(),
+            4
+        );
+        assert_eq!(
+            step.matches(r"DESCRIPTIVE_REPRESENTATION_ITEM('alloy''\X2\03A9\X0\','')")
+                .count(),
+            2
+        );
+        assert!(step.contains("NUMERIC_MEASURE(7800.)"));
+        assert!(step.contains("NUMERIC_MEASURE(2700.)"));
+        assert_eq!(
+            step.matches("DIMENSIONAL_EXPONENTS(0.,1.,0.,0.,0.,0.,0.)")
+                .count(),
+            2
+        );
+        assert_eq!(
+            step.matches("MEASURE_WITH_UNIT(MASS_MEASURE(1000.)")
+                .count(),
+            2
+        );
+        assert_eq!(step.matches("SI_UNIT($,.METRE.)").count(), 2);
+        assert_eq!(
+            step.lines()
+                .filter(|l| l.contains("DERIVED_UNIT_ELEMENT(") && l.ends_with(",-3.);"))
+                .count(),
+            2
+        );
+        assert_eq!(
+            step.lines()
+                .filter(|l| l.contains("DERIVED_UNIT_ELEMENT(") && l.ends_with(",1.);"))
+                .count(),
+            2
+        );
+        assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 4);
+        let absent = assembly_to_step(&base, t).unwrap();
+        assert!(!absent.contains("DESCRIPTIVE_REPRESENTATION_ITEM"));
+        assert!(!absent.contains("PROPERTY_DEFINITION('material property'"));
+    }
+
+    #[test]
+    fn material_density_is_not_rescaled_or_rounded_by_the_producer() {
+        let mut step = Step::default();
+        material_properties(
+            &mut step,
+            1,
+            2,
+            &cad_assembly::Material {
+                name: "trace".into(),
+                density_kg_per_m3: f64::from_bits(1),
+            },
+        );
+        let numeric = format!("NUMERIC_MEASURE({})", real(f64::from_bits(1)));
+        assert!(step.entities.iter().any(|e| e.contains(&numeric)));
     }
 
     #[test]

@@ -147,9 +147,9 @@ pub fn exchange_fidelity(
         ("part_numbers", count_metadata(|m| m.part_number.is_some()), "Part definitions with a part-number value: STEP PRODUCT.id carries the value; PRODUCT.name retains the internal definition ID. STL does not carry engineering part numbers."),
         ("part_descriptions", count_metadata(|m| m.description.is_some()), "Part definitions with an engineering description: STEP PRODUCT.description carries the value. STL does not carry descriptions."),
         ("part_revisions", count_metadata(|m| m.revision.is_some()), "Part definitions with a metadata revision: STEP PRODUCT_DEFINITION_FORMATION.id carries the value. STL does not carry revisions. This is not a Git or recipe revision."),
-        ("material_names", count_metadata(|m| m.material.is_some()), "Part definitions with a material name; not mapped to STEP or STL. BOM exports carry material metadata separately."),
-        ("material_density", count_metadata(|m| m.material.is_some()), "Part definitions with density in kg/m3; not mapped to STEP or STL. Neither format receives the source material mass/inertia report."),
-    ] { add(aspect, if matches!(aspect, "part_numbers" | "part_descriptions" | "part_revisions") { mapped(count) } else { omitted(count) }, Some(count), detail); }
+        ("material_names", count_metadata(|m| m.material.is_some()), "Part definitions with a material name: STEP descriptive material properties carry the supplied name per logical definition; STL does not. This is user-supplied metadata, not a certified material library."),
+        ("material_density", count_metadata(|m| m.material.is_some()), "Part definitions with density: STEP numeric material properties carry the unchanged kg/m3 value with explicit mass^1 length^-3 derived units (conversion-based kilogram and metre). STL does not carry density. Neither format receives the source material mass/inertia report."),
+    ] { add(aspect, mapped(count), Some(count), detail); }
     let datums = assembly.map_or(0, |a| a.parts.values().map(|p| p.datums.len()).sum());
     add("datums", omitted(datums), Some(datums), "Named resolved datum frames summed once per part definition; these names and frames are not exported. A body snapshot does not contain datum fields.");
     let attachments = assembly.map_or(0, |a| {
@@ -300,7 +300,11 @@ mod tests {
             assert_eq!(entry(&step_report, aspect).source_count, Some(1));
             let supported = matches!(
                 aspect,
-                "part_numbers" | "part_descriptions" | "part_revisions"
+                "part_numbers"
+                    | "part_descriptions"
+                    | "part_revisions"
+                    | "material_names"
+                    | "material_density"
             );
             assert_eq!(
                 entry(&step_report, aspect).status,
@@ -322,7 +326,7 @@ mod tests {
         assert!(step.contains("UNCERTAINTY_MEASURE_WITH_UNIT"));
         assert!(step.contains("PRODUCT('ENGINEERING-PN','part','engineering description'"));
         assert!(step.contains("PRODUCT_DEFINITION_FORMATION('REV-17'"));
-        assert!(!step.contains("Steel"));
+        assert!(step.contains("DESCRIPTIVE_REPRESENTATION_ITEM('Steel','')"));
 
         let stl = crate::assembly_to_stl(&a, t).unwrap();
         assert_eq!(stl.lines().filter(|l| l.starts_with("solid ")).count(), 2);

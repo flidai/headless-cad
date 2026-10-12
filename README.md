@@ -797,8 +797,29 @@ python crates/cad-export/tools/check_step_metadata_ocp.py --cad target/release/c
 
 Use the optional OCP environment described below. Fidelity reports and source
 requirements now recognize these three fields as supported for STEP. STL still
-omits them. Materials, density, attachment datums, manufacturing PMI and recipe
-history remain outside this STEP mapping.
+omits them. Attachment datums, manufacturing PMI and recipe history remain
+outside this STEP mapping.
+
+### STEP material handoff
+
+Assembly STEP carries material names and explicit density units per logical part
+definition. Density values retain native kg/m³ units through a conversion-based
+kilogram and a derived mass/length³ unit. Repeated occurrences reuse the same
+material-bearing definition; a part without material remains unassigned.
+
+[step_materials.star](examples/step_materials.star) exercises Unicode names,
+shared geometry with different materials, repeated nested occurrences and an
+unassigned part. The independent oracle checks decoded STEP units and imported
+OCCT/XCAF material assignments, then changes density and verifies unchanged
+geometry/STL alongside the expected native mass change:
+
+```sh
+python crates/cad-export/tools/check_step_materials_ocp.py --cad target/release/cad
+```
+
+`material_names` and `material_density` can be required for STEP publication.
+STL omits both. This mapping carries names and scalar density, not a complete
+material specification, mechanical properties, or manufacturing certification.
 
 ### Require exchange semantics before publication
 
@@ -809,7 +830,7 @@ require_exchange(id = "units", output = "plate", format = "step", aspect = "unit
 require_exchange(id = "solid", output = "plate", format = "step", aspect = "geometry")
 ```
 
-See [exchange_contract.star](examples/exchange_contract.star) and the twelve STEP
+See [exchange_contract.star](examples/exchange_contract.star) and the fourteen STEP
 requirements in [round_bearing_cartridge.star](examples/round_bearing_cartridge.star).
 `cad capabilities --type exchange_requirement` lists the accepted formats and
 aspects. A requirement passes only when the exporter declares the aspect

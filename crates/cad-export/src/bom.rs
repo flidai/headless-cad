@@ -1,7 +1,7 @@
 //! UTF-8 RFC 4180 bill-of-materials export. Text is preserved verbatim, including
 //! formula-like prefixes: spreadsheet consumers must import textual columns as
-//! text. Missing mass is an empty field, never an inferred zero. Material metadata
-//! is not currently mapped into STEP; this CSV and the BOM JSON carry that data.
+//! text. Missing mass is an empty field, never an inferred zero. STEP carries supplied material names and densities; this CSV and the BOM JSON
+//! additionally carry measured quantities and mass summaries.
 use crate::ExportError;
 
 const HEADER: &str = "part_id,part_number,revision,description,material,density_kg_per_m3,quantity,unit_volume_mm3,total_volume_mm3,unit_mass_kg,total_mass_kg\r\n";

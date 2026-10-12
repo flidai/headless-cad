@@ -262,6 +262,8 @@ fn reports_distinguish_exchange_mapping_from_native_metadata_and_manufacturing_i
             ("occurrence_paths", 2),
             ("occurrence_placements", 2),
             ("part_numbers", 1),
+            ("material_names", 1),
+            ("material_density", 1),
         ] {
             let entry = aspect(report, name);
             assert_eq!(
@@ -274,15 +276,9 @@ fn reports_distinguish_exchange_mapping_from_native_metadata_and_manufacturing_i
             );
             assert_eq!(entry["source_count"], count);
         }
-        for (name, count) in [
-            ("material_names", 1),
-            ("material_density", 1),
-            ("datums", 2),
-        ] {
-            let entry = aspect(report, name);
-            assert_eq!(entry["status"], "not_carried");
-            assert_eq!(entry["source_count"], count);
-        }
+        let datums = aspect(report, "datums");
+        assert_eq!(datums["status"], "not_carried");
+        assert_eq!(datums["source_count"], 2);
         assert_eq!(
             aspect(report, "manufacturing_pmi")["status"],
             "not_applicable"
@@ -311,7 +307,7 @@ fn reports_distinguish_exchange_mapping_from_native_metadata_and_manufacturing_i
     assert_eq!(step.matches("PRODUCT(").count(), 3);
     assert_eq!(step.matches("NEXT_ASSEMBLY_USAGE_OCCURRENCE(").count(), 3);
     assert!(step.contains("PRODUCT('EVIDENCE-42','piece'"));
-    assert!(!step.contains("Test steel"));
+    assert!(step.contains("DESCRIPTIVE_REPRESENTATION_ITEM('Test steel','')"));
     let stl = fs::read_to_string(out.join("machine.stl")).unwrap();
     assert_eq!(
         stl.lines()

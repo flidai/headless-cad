@@ -1640,10 +1640,21 @@ parts: the OCCT/XCAF oracle otherwise merges their definitions. Occurrences of
 one definition still reuse its representation; native geometry/cache sharing
 remains independent. Absent fields keep
 the legacy export defaults and remain absent in the fidelity source counts.
-Materials, density, datum intent and manufacturing PMI are still omitted. Native
+Datum intent and manufacturing PMI are still omitted. Native
 and independent OCCT checks cover escaped/Unicode fields, definition reuse,
 revision-only edits and round-cartridge handoffs; geometry and placements must
 remain unchanged on metadata-only edits.
+
+Material properties now attach to each logical STEP product definition: a
+descriptive name and a numeric density with explicit mass/length³ dimensions.
+Conversion-based kilograms preserve the native kg/m³ value without producer
+rescaling; independent checks decode units and read OCCT/XCAF assignments.
+Missing material remains absent, including beside reused geometrically identical
+parts. Density-only edits must preserve native geometry and placed STL while
+changing engineering identity and the independently expected mass. STEP fidelity
+and publication requirements cover these two fields; STL omits them. This does
+not carry a full material model or manufacturing certification. The small
+`step_materials.star` fixture and round-cartridge handoff exercise this mapping.
 
 The mapping follows OCCT's [product field reader/writer](https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/master/src/DataExchange/TKDESTEP/RWStepBasic/RWStepBasic_RWProduct.cxx)
 and [product formation reader/writer](https://raw.githubusercontent.com/Open-Cascade-SAS/OCCT/master/src/DataExchange/TKDESTEP/RWStepBasic/RWStepBasic_RWProductDefinitionFormation.cxx).
