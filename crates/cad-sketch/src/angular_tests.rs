@@ -70,7 +70,7 @@ fn directed_angles_independent_coordinates_scales_and_permutations() {
                 assert!((actual - want).abs() < scale * 1e-8);
             }
             assert!(r.max_angular_residual_radians <= ANGULAR_TOLERANCE_RADIANS);
-            assert_eq!(r.schema_version, 2);
+            assert_eq!(r.schema_version, 3);
             let mut shuffled = s.clone();
             shuffled.points.reverse();
             shuffled.constraints.reverse();

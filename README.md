@@ -1023,7 +1023,7 @@ The solved profile feeds `extrude`; sketch-driven revolution is not yet supporte
 The original Rust `cad-sketch` service uses analytic Jacobians and a bounded
 local nonlinear solve. It reports constraint residuals, local rank and degrees
 of freedom, redundant equation count, conditioning and implementation identity.
-Schema-2 reports separate `max_residual_mm` and
+Schema-3 reports separate `max_residual_mm` and
 `max_angular_residual_radians`; each constraint emits exactly one of
 `residual_mm` or `residual_radians`. Linear constraints use the requested
 `tolerance_mm`; angular constraints use the independent
@@ -1038,13 +1038,41 @@ steps that can cross that cut are damped rather than silently changing branches.
 Underconstrained, unconverged or numerically unresolved results cannot
 publish geometry; the previous generation remains available.
 
-Limits are 32 points, 128 constraints and 256 iterations per sketch, with at most
-128 demanded sketches per build. All definitions are structurally checked;
+Sketches support up to 256 points and 1,024 constraints, partitioned by shared
+point references into independent constraint islands. Each island retains the
+32-point, 128-constraint and 256-iteration limits; there are at most 128 demanded
+sketches per build. All island sizes are checked before numerical work. A large
+connected component still fails explicitly; this is not yet a general sparse
+solver for large connected sketches. All definitions are structurally checked;
 selected builds solve their dependency closure and global validation obligations.
 Cached solids do not bypass solving or discard diagnostics. Build/check manifests
 contain `sketch_reports`, keyed by feature ID and paired with `feature_hashes`;
 failure JSON includes the affected feature, input hash, solver identity and report.
 These are numerical results under the declared tolerance, not symbolic coordinates.
+
+Schema-3 `islands` records expose sorted point/constraint IDs, status, residual
+maxima, rank, degrees of freedom, iteration count and conditioning for each group.
+Each group has its own numerical origin and scale. Overall rank, degrees of
+freedom, redundant equations and snapshot iterations are sums; residual maxima
+are maxima. `condition_bound` is the worst local bound, present only when every
+island has one; it is not the condition number of a globally scaled Jacobian.
+A failed island blocks geometry publication while reports retain healthy groups.
+The solver fingerprint invalidates prior geometry cache entries. Recipe schema
+remains 2; old solve-report readers must explicitly upgrade to schema 3.
+
+[modular_bore_plate.star](examples/modular_bore_plate.star) exercises 30 circular
+bores in a 180×150 mm plate, with 64 points in 34 islands. Thirty annular guide
+instances share one definition; the plate and two feet complete 33 occurrences
+using three definitions. Parameters are `pitch` (22..28 mm), `bore_radius`
+(3..5 mm) and `thickness` (6..10 mm). Independent array formulas check 27 designs
+for volume, centroid, full inertia and material mass. Pitch edits rebuild only
+the plate and move the guide occurrences; radius edits rebuild two definitions.
+Three independent STEP cases verify moments and assembly hierarchy. Run
+`npm run test:islands-sketch --prefix tools/preview-check` for nine browser cases
+and 2,160 bore/guide/plate visibility checks. One local full release publication
+measured 3.36 s and 46,484 KiB peak process RSS; this is a single shared-host
+observation, not a performance guarantee. Its scope, binary/source identities
+and environment are in [the measurement record](docs/benchmarks/islands-modular-bore-local.json).
 
 [constrained_slope_fixture.star](examples/constrained_slope_fixture.star) solves
 a triangle from three side lengths, then seats a deck and two shared rails on

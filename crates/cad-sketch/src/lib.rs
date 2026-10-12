@@ -5,11 +5,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
 mod deserialize;
+mod islands;
 
 /// Independent convergence tolerance for angular equations, in radians.
 pub const ANGULAR_TOLERANCE_RADIANS: f64 = 1e-9;
-pub const MAX_POINTS: usize = 32;
-pub const MAX_CONSTRAINTS: usize = 128;
+pub const MAX_POINTS: usize = 256;
+pub const MAX_ISLAND_POINTS: usize = 32;
+pub const MAX_CONSTRAINTS: usize = 1024;
+pub const MAX_ISLAND_CONSTRAINTS: usize = 128;
 pub const MAX_ITERATIONS: usize = 256;
 /// Conservative local Jacobian conditioning bound required for full acceptance.
 pub const MAX_CONDITION_BOUND: f64 = 1e8;
@@ -121,7 +124,24 @@ pub struct ConstraintResidual {
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct IslandReport {
+    pub id: String,
+    pub point_ids: Vec<String>,
+    pub constraint_ids: Vec<String>,
+    pub status: SolveStatus,
+    pub iterations: usize,
+    pub rank: usize,
+    pub degrees_of_freedom: usize,
+    pub redundant_equations: usize,
+    pub condition_bound: Option<f64>,
+    pub max_residual_mm: f64,
+    pub max_angular_residual_radians: f64,
+    pub message: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SolveReport {
+    pub islands: Vec<IslandReport>,
     pub schema_version: u32,
     pub angular_tolerance_radians: f64,
     pub max_angular_residual_radians: f64,
@@ -132,8 +152,9 @@ pub struct SolveReport {
     pub iterations: usize,
     pub max_residual_mm: f64,
     pub rank: usize,
-    /// Conditioning of normalized linear/radian Jacobian rows, not a
-    /// world-coordinate error bound or a proof of global uniqueness.
+    /// Worst local-island normalized linear/radian Jacobian condition bound,
+    /// present only when all islands have a bound. This is not global system
+    /// conditioning, a coordinate error bound, or a uniqueness proof.
     pub condition_bound: Option<f64>,
     pub degrees_of_freedom: usize,
     pub redundant_equations: usize,
@@ -147,8 +168,14 @@ impl SolveReport {
 }
 #[derive(Debug, Error)]
 pub enum SketchError {
-    #[error("sketch supports 1..=32 points and at most 128 constraints")]
+    #[error("sketch supports 1..=256 points and at most 1024 constraints")]
     ResourceLimit,
+    #[error("constraint island '{island}' has {points} points and {constraints} constraints; limits are 32 points and 128 constraints")]
+    IslandResourceLimit {
+        island: String,
+        points: usize,
+        constraints: usize,
+    },
     #[error("invalid or duplicate {kind} identifier '{id}'")]
     Identifier { kind: &'static str, id: String },
     #[error("constraint '{constraint}' references missing point '{point}'")]
@@ -253,6 +280,7 @@ pub fn validate(sketch: &Sketch) -> Result<(), SketchError> {
             }
         }
     }
+    islands::partition(sketch)?;
     Ok(())
 }
 
@@ -622,7 +650,8 @@ impl System {
             message=Some("local Jacobian conditioning exceeds the supported bound; rank alone does not certify a stable solution".into());
         }
         SolveReport {
-            schema_version: 2,
+            schema_version: 3,
+            islands: vec![],
             angular_tolerance_radians: ANGULAR_TOLERANCE_RADIANS,
             max_angular_residual_radians: self.max_angular_residual(&e),
             solver_build_id: SOLVER_BUILD_ID.into(),
@@ -785,17 +814,16 @@ fn linear_solve(mut a: Vec<Vec<f64>>, mut b: Vec<f64>) -> Option<Vec<f64>> {
     Some(x)
 }
 pub fn solve(sketch: &Sketch, tolerance: f64) -> Result<SolveReport, SketchError> {
-    solve_bounded(sketch, tolerance, MAX_ITERATIONS)
+    islands::solve(sketch, tolerance, false)
 }
 /// Continue the same bounded solve toward arithmetic residuals for downstream
 /// analytic geometry. Acceptance tolerance is unchanged; coordinates are never
 /// projected. On stagnation, return the best fully world-certified report (with
 /// the iteration of that snapshot), which may still fail native geometry gates.
 pub fn solve_refined(sketch: &Sketch, tolerance: f64) -> Result<SolveReport, SketchError> {
-    let mut best = None;
-    let report = solve_policy(sketch, tolerance, MAX_ITERATIONS, true, &mut best)?;
-    Ok(best.unwrap_or(report))
+    islands::solve(sketch, tolerance, true)
 }
+#[cfg(test)]
 fn solve_bounded(
     sketch: &Sketch,
     tolerance: f64,
@@ -811,6 +839,20 @@ fn solve_policy(
     best: &mut Option<SolveReport>,
 ) -> Result<SolveReport, SketchError> {
     validate(sketch)?;
+    if sketch.points.len() > MAX_ISLAND_POINTS || sketch.constraints.len() > MAX_ISLAND_CONSTRAINTS
+    {
+        return Err(SketchError::IslandResourceLimit {
+            island: sketch
+                .points
+                .iter()
+                .map(|p| p.id.as_str())
+                .min()
+                .unwrap_or("")
+                .into(),
+            points: sketch.points.len(),
+            constraints: sketch.constraints.len(),
+        });
+    }
     if !tolerance.is_finite() || tolerance <= 0. {
         return Err(SketchError::InvalidTolerance);
     }
@@ -1153,9 +1195,13 @@ mod tests {
         }
         let r = solve(&s, 1e-7).unwrap();
         assert!(r.is_fully_constrained());
-        assert_eq!(r.rank, 64);
-        assert_eq!(r.redundant_equations, 192);
-        assert!(r.iterations <= MAX_ITERATIONS);
+        assert_eq!(r.rank, MAX_POINTS * 2);
+        assert_eq!(r.redundant_equations, MAX_CONSTRAINTS * 2 - MAX_POINTS * 2);
+        assert_eq!(r.islands.len(), MAX_POINTS);
+        assert!(r
+            .islands
+            .iter()
+            .all(|island| island.iterations <= MAX_ITERATIONS));
         s.constraints.push(fixed("overflow", "p0", 0., 0.));
         assert!(matches!(validate(&s), Err(SketchError::ResourceLimit)));
     }
@@ -1410,3 +1456,6 @@ mod refinement_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod island_tests;

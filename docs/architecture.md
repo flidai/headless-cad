@@ -729,7 +729,7 @@ linear residual within the stated millimetre tolerance and each angular residual
 within the separate 1e-9-radian tolerance, zero local degrees of freedom, supported conditioning and
 subsequent native polygon validity. Fixed/coincident errors use Euclidean norms.
 Residuals and rank describe the returned world coordinates, including arithmetic
-limits; unresolved precision fails explicitly. Schema-2 reports expose
+limits; unresolved precision fails explicitly. Schema-3 reports expose
 `tolerance_mm`, `angular_tolerance_radians`, `max_residual_mm` (linear only) and
 `max_angular_residual_radians`; per-constraint records emit exactly one of
 `residual_mm` or `residual_radians`. Zero/numerically short segment directions
@@ -737,8 +737,11 @@ are unresolved, and angular arithmetic must satisfy its own precision gate.
 Angular residuals within 1e-8 radians of the residual wrap cut fail explicitly;
 trial steps use a conservative continuous-vector-rotation bound to prevent cut
 crossing and return, including jumps invisible in endpoint residuals. Such steps
-are damped, never accepted as silent branch changes. Limits are 32 points, 128
-constraints, 256 iterations per solve and 128 demanded sketch features per build.
+are damped, never accepted as silent branch changes. Global limits are 256 points and
+1,024 constraints; every connected constraint island is limited to 32 points,
+128 constraints and 256 iterations. At most 128 sketch features are demanded per
+build. Components are preflighted before any numerical solve; unsupported large
+connected systems return an island-specific resource error.
 
 The typed `sketch` feature retains source guesses, named constraints and oriented
 point-ID rings. Every definition receives structural validation, while only the
@@ -754,7 +757,7 @@ consistency or unique solutions. Initial guesses select a branch; unchanged
 source is reproducible, but nearby edits do not yet have a branch-continuation
 guarantee. Nonconvergence and residual witnesses are not a minimal conflicting
 constraint set. Redundant equations can be consistent. Independent arc variables,
-circle-to-circle tangency equations, sparse island decomposition and assembly joints remain
+circle-to-circle tangency equations, sparse solving within large connected islands and assembly joints remain
 target work. `constrained_slope_fixture.star` connects nonlinear sketch dimensions
 to an extruded support, an associative inclined seat and a nine-occurrence
 fixture. Independent three-side triangle formulas validate 27 configurations,
@@ -833,6 +836,30 @@ moments and mixed-material assembly checks cover 27 dimension configurations;
 fractional dimensions and asymmetric seed perturbations exercise compatibility
 between the nonlinear solve and native curved geometry.
 
+Constraint islands now follow actual constraint/point incidence, independent of
+profile ring and circle membership. Fixed constraints are unary; shared point
+references connect their equations. Unreferenced free points remain singleton
+islands rather than disappearing. Islands and their membership are ordered by
+stable source IDs, with independent recentering/scaling and complete per-group
+reports. Aggregation sums local rank, DOF, redundant equations and snapshot
+iterations, takes residual maxima and the worst available local condition bound,
+and preserves the most severe failure status. No successful neighboring group
+can mask numerical failure, nonconvergence or unconstrained motion. Schema-3
+reports preserve each local witness; recipe IR stays at schema 2. This is bounded
+dense solving of disconnected components, not sparse elimination inside a large
+connected component or automatic removal of fixed anchors from incidence.
+`modular_bore_plate.star` validates 64 points in 34 islands, 30 analytic bores
+and a 33-occurrence assembly with three shared definitions. Independent native
+array integrals cover 27 parameter combinations and selective regeneration.
+Three independent STEP imports verify moments/hierarchy, and nine browser cases
+check 2,160 bore/guide/plate rays with zero exact downloads. A single local full
+release publication measured 3.359 s and 46,484 KiB process peak RSS; [the raw
+record](benchmarks/islands-modular-bore-local.json) pins binary/source identities,
+workload, environment and measurement scope. This includes every export and
+preview variant, not browser interaction. Code review identifies nine repeated
+default plate tessellations across those consumers, plus two coarse levels;
+a generation-scoped certified mesh cache is a concrete remaining optimization.
+
 Evolve this constraint service separately from geometric construction. The target 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
 solution branches, and convergence limits. Preserve branch/continuation intent
@@ -902,6 +929,27 @@ a nonlinear solver is not a way to resolve a cyclic feature build.
 ## Display assets, streaming, and GPU responsibilities
 
 ### Independent display build
+
+Treat tessellation as a shared compilation product, not work repeated by every
+output writer. Within a publication job, preview, display manifests and mesh
+exports should request immutable certified meshes from the same meshing service.
+STEP and native engineering queries continue to consume authoritative geometry.
+This boundary applies before introducing distributed workers or cluster LOD.
+
+The cache identity includes verified geometric content, native numerical policy,
+the full tessellation policy and mesher implementation identity. A caller's
+claimed geometry hash is not sufficient evidence for reuse. Keep occurrence
+placement, materials and captured recipe provenance outside shared mesh identity;
+bind them separately to the published generation. Retain native face/edge mapping
+and error evidence in the immutable mesh result. Cache successful certified
+results only; a cache hit must not bypass validation of changed source geometry.
+
+Acceptance compares cached and uncached geometry, winding, semantic picking and
+exported measurements. Changing geometry, tolerance or meshing policy must select
+a different entry; identical geometry used by multiple outputs should mesh once
+per policy. Measure this construction cost separately from viewer frame time.
+This shared publication cache is target work: today's consumers can independently
+reconstruct the same mesh, even though instances already share display assets.
 
 Derive meshes in a separate worker. A display cache key includes geometric
 content, mesher implementation, chordal/angular error, edge policy, coordinate
@@ -1067,6 +1115,13 @@ unrelated parts. An interrupted display build cannot replace the last complete
 manifest with partial pages. Benchmark cold cache, single-definition edits and
 cache eviction: cheap opening achieved through unbounded preprocessing or disk
 growth does not pass the large-assembly gate.
+
+Exercise construction budgets with a single highly detailed unique part as well
+as many repeated parts. Meshing, simplification, clustering and compression must
+observe cancellation and bounded work independently. Publish a display level
+only when its required pages and validation evidence are complete; a failed or
+cancelled finer level retains the last valid coverage. Partial refinement output
+must never masquerade as a complete level or invalidate a released generation.
 
 ### GPU and portability
 
@@ -1488,7 +1543,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and convex line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
-| Sketches | Original Rust bounded 2D point solver, ten constraint kinds, schema-2 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, sparse islands, branch continuation, minimal conflict explanations |
+| Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |

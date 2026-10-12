@@ -18,7 +18,7 @@ let temporary,server,browser;
   const output=JSON.parse(execFileSync(process.env.CAD_BIN||path.join(root,'target/debug/cad'),args,{encoding:'utf8',stdio:'pipe'}));
   for(const [name,rank] of [['guide_layout',20]]){
    const report=output.sketch_reports[name];
-   assert.equal(report.schema_version,2);assert.equal(report.status,'fully_constrained');
+   assert.equal(report.schema_version,3);assert.equal(report.status,'fully_constrained');
    assert.equal(report.rank,rank);assert.equal(report.degrees_of_freedom,0);
    assert(report.max_residual_mm<=report.tolerance_mm);
    assert(report.max_angular_residual_radians<=report.angular_tolerance_radians);

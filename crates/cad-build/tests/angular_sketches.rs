@@ -17,7 +17,7 @@ fn recipe(v: Value) -> Recipe {
 fn check(build: &BuildResult, angle: f64) {
     let report = &build.sketch_reports["layout"];
     assert!(report.is_fully_constrained());
-    assert_eq!(report.schema_version, 2);
+    assert_eq!(report.schema_version, 3);
     assert_eq!(report.rank, 6);
     assert_eq!(report.degrees_of_freedom, 0);
     assert!(report.max_residual_mm <= report.tolerance_mm);

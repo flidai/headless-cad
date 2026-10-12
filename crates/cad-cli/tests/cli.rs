@@ -2668,7 +2668,7 @@ fn angular_conflicts_report_separate_units_and_preserve_published_generation() {
     };
     let valid = successful_json(run());
     let report = &valid["sketch_reports"]["support_sketch"];
-    assert_eq!(report["schema_version"], 2);
+    assert_eq!(report["schema_version"], 3);
     assert_eq!(report["status"], "fully_constrained");
     assert_eq!(report["angular_tolerance_radians"], 1e-9);
     assert!(report["max_angular_residual_radians"].as_f64().unwrap() <= 1e-9);
@@ -2697,7 +2697,7 @@ fn angular_conflicts_report_separate_units_and_preserve_published_generation() {
         valid["feature_hashes"]["support_sketch"]
     );
     let failed_report = &error["sketch"];
-    assert_eq!(failed_report["schema_version"], 2);
+    assert_eq!(failed_report["schema_version"], 3);
     assert_eq!(failed_report["status"], "not_converged");
     assert_eq!(failed_report["solver_build_id"], error["solver_build_id"]);
     assert_eq!(failed_report["angular_tolerance_radians"], 1e-9);

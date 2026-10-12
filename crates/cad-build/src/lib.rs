@@ -16,7 +16,8 @@ use thiserror::Error;
 
 mod sketch_profiles;
 pub use cad_sketch::{
-    Constraint, ConstraintKind, LineSide, Sketch, SketchPoint, SolveReport, SolveStatus,
+    Constraint, ConstraintKind, IslandReport, LineSide, Sketch, SketchPoint, SolveReport,
+    SolveStatus,
 };
 pub fn solver_build_id() -> &'static str {
     cad_sketch::SOLVER_BUILD_ID

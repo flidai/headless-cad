@@ -25,7 +25,7 @@ def wrap(value,period):return (value+period/2)%period-period/2
 
 
 def evidence(report,linear,angular,tolerance):
-    require(report['schema_version']==2 and report['status']=='fully_constrained','invalid solve status/schema')
+    require(report['schema_version']==3 and report['status']=='fully_constrained','invalid solve status/schema')
     require(report['degrees_of_freedom']==0 and report['condition_bound']<=1e8,'uncertified rank/conditioning')
     rows={r['id']:r for r in report['constraint_residuals']}
     require(rows.keys()==linear.keys()|angular.keys(),'constraint evidence set mismatch')

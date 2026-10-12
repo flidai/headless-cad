@@ -54,7 +54,7 @@ fn independent_trigonometry_and_trapezoid_integrals_check_twenty_seven_designs()
                 let cy = h * (36. + 2. * top) / (3. * (36. + top));
                 let built = cad_build::build(&recipe(span, angle, top)).unwrap();
                 for report in built.sketch_reports.values() {
-                    assert_eq!(report.schema_version, 2);
+                    assert_eq!(report.schema_version, 3);
                     assert!(report.is_fully_constrained());
                     assert!(report.max_residual_mm <= report.tolerance_mm);
                     assert!(

@@ -42,7 +42,7 @@ fn fractional_angular_source_roundtrips_without_losing_constraint_types() {
                 < 1e-4
         );
         let report = &built.sketch_reports["layout"];
-        assert_eq!(report.schema_version, 2);
+        assert_eq!(report.schema_version, 3);
         assert!(report.is_fully_constrained());
         assert!(report.max_angular_residual_radians <= 1e-9);
     }

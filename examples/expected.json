@@ -1464,5 +1464,43 @@
       "volume_tolerance_mm3": 0.003,
       "linear_tolerance_mm": 1e-05
     }
+  },
+  "modular_bore_plate.star": {
+    "plate": {
+      "volume_mm3": 203936.2842102152,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          180,
+          150,
+          8
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "modular_bore_plate": {
+      "volume_mm3": 246413.0976972615,
+      "solids": 33,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          180,
+          150,
+          24
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }
