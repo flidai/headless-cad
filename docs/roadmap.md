@@ -91,6 +91,13 @@ contain their transformed native coordinates.
 
 ## Next concrete implementation increments
 
+Published generations now carry a payload digest/size inventory, with a separate
+manifest schema and read-only `cad verify` command. Externally pinned manifest
+digests detect changes to the complete generation. Continue M7 toward a versioned
+capability-evidence ledger that records actual check runs, independent oracles,
+source/build identity and result artifacts; internally consistent bytes alone
+cannot promote a capability to validated or complete a manufacturing release.
+
 The first M3a increment now streams whole-part analytic LOD, preserving current
 surfaces while finer assets load and exposing unmet detail under resource or
 precision limits. `spindle_line.star` combines tapered housing variants with

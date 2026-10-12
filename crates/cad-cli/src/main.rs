@@ -9,6 +9,7 @@ use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 
 mod capabilities;
+mod integrity;
 mod server;
 mod watch;
 
@@ -61,6 +62,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Verify published artifact bytes without evaluating a recipe.
+    Verify {
+        directory: PathBuf,
+        /// Trusted BLAKE3 hash of the exact manifest bytes.
+        #[arg(long)]
+        manifest_hash: Option<String>,
+    },
     /// Describe supported recipe operations, limits and headless workflows as JSON.
     Capabilities {
         /// Return one operation and its inline type/domain dependencies.
@@ -776,6 +784,16 @@ fn run(cli: Cli) -> Result<Value, Box<dyn Error>> {
 }
 
 fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Error>> {
+    if let Command::Verify {
+        directory,
+        manifest_hash,
+    } = &cli.command
+    {
+        if !cli.params.is_empty() || cli.cache_dir.is_some() {
+            return Err("verify does not accept --param or --cache-dir".into());
+        }
+        return Ok(integrity::verify(directory, manifest_hash.as_deref())?);
+    }
     let parameters = parameters(&cli.params)?;
     if !parameters.is_empty()
         && matches!(
@@ -806,6 +824,18 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     "source_authority": "Git-versioned recipes and explicit parameter overrides",
                     "viewer": "read_only_inspection",
                     "feasibility": "The catalog describes supported domains; only evaluation and validation can certify a particular input."
+                },
+                "artifact_verification": {
+                    "command": "verify",
+                    "evaluates_geometry": false,
+                    "publishes_artifacts": false,
+                    "manifest_schema_version": integrity::MANIFEST_SCHEMA_VERSION,
+                    "algorithm": "blake3",
+                    "optional_trusted_pin": "--manifest-hash",
+                    "maximum_manifest_bytes": integrity::MAX_MANIFEST_BYTES,
+                    "maximum_payload_files": integrity::MAX_PAYLOAD_FILES,
+                    "directory_membership": "exact; no extra files or directories",
+                    "trust": "Hashes verify integrity, not authenticity; pin the manifest hash through a trusted channel."
                 },
                 "recipe_commands": [
                     {"name":"compile", "publishes_artifacts":false, "evaluates_geometry":false, "purpose":"Compile authoring syntax to recipe IR; this alone does not validate geometry."},
@@ -1316,10 +1346,11 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         let mut files: Vec<_> = artifacts.iter().map(|(name, _)| name.clone()).collect();
         files.push("manifest.json".into());
         summary["artifact_files"] = json!(files);
-        artifacts.push((
-            "manifest.json".into(),
-            serde_json::to_string_pretty(&summary)?,
-        ));
+        summary["manifest_schema_version"] = json!(integrity::MANIFEST_SCHEMA_VERSION);
+        summary["artifact_integrity"] = integrity::inventory(&artifacts)?;
+        let manifest = serde_json::to_string_pretty(&summary)?;
+        integrity::check_manifest_size(manifest.len() as u64)?;
+        artifacts.push(("manifest.json".into(), manifest));
         publish(out_dir, &artifacts)?;
         summary["artifacts"] = json!(artifacts
             .iter()
@@ -1344,7 +1375,10 @@ fn main() {
             }
             let mut report =
                 json!({ "error": error.to_string(), "code": "invalid_request", "causes": causes });
-            if let Some(selection) = error.downcast_ref::<UnresolvedSelection>() {
+            if let Some(integrity) = error.downcast_ref::<integrity::IntegrityError>() {
+                report["code"] = json!("artifact_integrity_failed");
+                report["diagnostic"] = json!(integrity.to_string());
+            } else if let Some(selection) = error.downcast_ref::<UnresolvedSelection>() {
                 report["code"] = json!(format!(
                     "selection_{}",
                     selection.0["status"].as_str().unwrap_or("unresolved")

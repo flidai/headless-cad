@@ -304,6 +304,7 @@ dependencies = [
  "cap-std",
  "clap",
  "rustix",
+ "serde",
  "serde_json",
  "tempfile",
 ]

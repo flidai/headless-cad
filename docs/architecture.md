@@ -1626,6 +1626,17 @@ limits cover only their documented scopes.
 
 ### Revision and release lifecycle
 
+Published-generation integrity is the first implemented boundary toward release
+evidence. Build manifests have a separate `manifest_schema_version` and a BLAKE3
+digest/byte-length inventory of every payload, excluding the manifest itself.
+`cad verify` checks the exact directory membership and payload bytes without
+recipe evaluation. Its returned manifest digest can be pinned by an external
+release record and supplied as `--manifest-hash` on later verification. This
+detects changes relative to that pin; self-consistent manifests alone do not
+authenticate a publisher or prove engineering correctness. The planned evidence
+ledger must additionally bind executed checks, independent oracles, build/source
+identity and their results. Artifact integrity does not close those obligations.
+
 Hosted project authorization applies to source snapshots, manifests, meshes,
 reports and every referenced dependency. Knowing a content digest grants no
 access. Deduplication is a storage optimization, not permission inheritance:

@@ -18,6 +18,7 @@ cad-export = { path = "../cad-export" }
 cad-recipe = { path = "../cad-recipe" }
 cad-preview = { path = "../cad-preview" }
 serde_json.workspace = true
+serde.workspace = true
 blake3.workspace = true
 clap = { version = "4", features = ["derive"] }
 tempfile = "3"

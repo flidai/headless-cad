@@ -28,7 +28,7 @@ crates are omitted from the table.
 | earcutr | 0.5.0 | ISC | cad-kernel; derived face triangulation |
 | robust | 1.2.0 | MIT OR Apache-2.0 | cad-kernel; adaptive orientation checks |
 | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli, Linux target |
-| serde | 1.0.229 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-kernel, cad-mesh, cad-preview, cad-sketch |
+| serde | 1.0.229 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-cli, cad-kernel, cad-mesh, cad-preview, cad-sketch |
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-cli, cad-kernel, cad-mesh, cad-preview, cad-recipe, cad-sketch |
 | sha2 | 0.11.0 | MIT OR Apache-2.0 | cad-preview; SHA-256 identity for fetched display assets |
 | starlark | 0.14.2 | Apache-2.0 | cad-recipe |

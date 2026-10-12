@@ -758,6 +758,38 @@ directories or directories containing exclusively artifacts listed in their CAD
 manifest may be replaced. Unmanaged files are preserved by refusing replacement.
 Output names must be safe, noncolliding filenames.
 
+### Verify a published generation
+
+```sh
+cad verify out/bracket
+cad verify out/bracket --manifest-hash "$TRUSTED_MANIFEST_HASH"
+```
+
+New build manifests carry an independent `manifest_schema_version` and an
+`artifact_integrity` table with BLAKE3 digests and byte lengths for every payload,
+including captured source, native geometry, exports and display assets. The
+manifest excludes its own bytes from this table; `verify` returns their digest
+as `manifest_hash`, which a release record can pin outside the generation.
+The existing `schema_version` continues to describe the recipe schema.
+
+Verification reads the published directory without evaluating a recipe or using
+a geometry cache. It checks the complete file set, sizes and digests, rejecting
+missing, modified or unexpected files, unsafe paths and nonregular entries.
+`--manifest-hash` additionally checks the exact manifest against a digest you
+already trust. Without that pin, replacing both a payload and its manifest can
+produce another internally consistent generation. Neither mode certifies the
+geometry, authenticates its author, or replaces engineering validation evidence.
+
+Older manifests without the integrity table require rebuilding before they can
+be verified. Verification failures produce structured JSON and leave the
+generation untouched. Store verification reports outside the generation so they
+do not become unlisted files.
+
+The format bounds manifests to 16 MiB and generations to 100,000 payload files.
+Payload verification streams file bytes rather than loading complete exports
+into memory. Keep a generation immutable while verifying it; the command does
+not lock files against other programs that overwrite them in place.
+
 An empty Boolean result is valid for `inspect` and `check`, with zero volume and
 null bounds. `build` reports an explicit export error because this STEP writer
 requires a solid; no previous artifact generation is replaced.
