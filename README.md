@@ -2920,3 +2920,11 @@ native surface witnesses for the upper bound. Two mounting holes remain real
 voids. Captured recipes, STEP export and bore/journal dimensions support review;
 this example does not establish load capacity, retention or a manufactured fit.
 The optional OCCT test is `tools/check-rounded-bearing-fit.py`.
+
+`examples/rounded_bearing_rotation.star` adds a full signed turn of that shaft.
+The `bore_witness_orbit` certificate uses the complete bore/cap witness region
+and a rotating untouched shaft ray to bound the gap over the whole arc. The
+housing itself need not be rotationally symmetric. Three native queries retain
+sample evidence; the analytic certificate supplies continuous coverage. Run
+`tools/check-rounded-bearing-fit.py --rotation` for independent STEP checks of
+both running and stepped-shoulder gaps, including reversed motion and poses.

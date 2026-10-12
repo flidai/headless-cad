@@ -42,8 +42,8 @@ mod solid_clearance;
 mod stepped_keyseat;
 mod trim_clearance;
 pub use rotation_clearance::{
-    RotationClearance, RotationInterval, RotationProofKind, RotationSample,
-    RotationalSymmetryCertificate, MAX_ROTATION_DEPTH, MAX_ROTATION_QUERIES,
+    BoreWitnessOrbitCertificate, RotationClearance, RotationInterval, RotationProofKind,
+    RotationSample, RotationalSymmetryCertificate, MAX_ROTATION_DEPTH, MAX_ROTATION_QUERIES,
 };
 mod translation_clearance;
 pub use solid_clearance::{ClearanceMethod, SolidClearance};

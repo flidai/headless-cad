@@ -798,3 +798,10 @@ with a real keyseat. Admission requires a uniquely aligned through bore and a
 certified material region around the chosen witnesses. This is a bounded static
 clearance capability; eccentric shafts, general contact, manufactured fit and
 load-bearing design remain open.
+
+The rounded bearing workflow now has a pair-specific full-turn bore witness
+certificate. It reduces the default case from exhausted subdivision to three
+actual queries while retaining full-angle bounds, explicit native evidence and
+independent STEP phase checks. The asymmetric housing is not classified as a
+rotationally symmetric body. General contact, dynamics and spatial assembly
+constraints remain open; this does not close the mechanical release gate.

@@ -59,6 +59,8 @@ pub(super) fn publish(
                 "Common rigid rotation — invariant distance"
             } else if check.rotation_sweep.as_ref().is_some_and(|r| r.proof_kind == cad_kernel::RotationProofKind::RotationalSymmetry) {
                 "Continuous rotation — native symmetry"
+            } else if check.rotation_sweep.as_ref().is_some_and(|r| r.proof_kind == cad_kernel::RotationProofKind::BoreWitnessOrbit) {
+                "Continuous rotation — bore witness orbit"
             } else if check.rotation_sweep.is_some() { "Continuous rotation — subdivision" } else if check.sweep.is_some() { "Continuous translation" } else { "Initial pose" }
         ));
     }

@@ -3157,3 +3157,29 @@ stock and keyseat subtraction, checks bidirectional STEP differences and native
 witness distance to imported boundaries, and exercises failed-publication
 preservation. These are nominal geometry certificates, not load or tolerance
 certification for manufactured bearings.
+
+
+### Bore witness orbits
+
+`RotationProofKind::BoreWitnessOrbit` is a pair-specific continuous certificate
+for a stationary rounded housing and a moving coaxial shaft admitted by the
+nested bore method. It is distinct from `RotationalSymmetry`: the housing's
+exterior and mounting holes can be asymmetric. The ideal containing annulus is
+invariant about the selected bore axis, preserving the static stock lower bound.
+The guarded bore/cap region supplies a housing witness at every azimuth, while
+a retained shaft witness rotates with the shaft, preserving the ideal upper.
+
+The declared motion axis must agree with the bore line at arithmetic scale.
+The full-angle deviation bound includes twice the axis offset, angle times axis
+departure times the moving radius, native boundary correspondence and motion
+roundoff. These terms widen both interval ends uniformly for the full [0,1]
+path; no conclusion is inferred from only three sampled positions. The disk
+membership proof applies to the ideal bore witness; perturbed shaft motion
+changes the distance allowance rather than requiring an enlarged housing disk.
+
+The optional `bore_orbit` report binds the selected bore face and support,
+shaft-stock frame and extent, guarded radius, numerical allowances, full interval
+and reference sample. Successful reports have three actual queries, a distinct
+proof kind and no subdivision intervals. Absence of intervals alone never
+establishes coverage. Unsupported pairs retain ordinary subdivision or refusal;
+no general contact or rotating-housing claim is introduced.

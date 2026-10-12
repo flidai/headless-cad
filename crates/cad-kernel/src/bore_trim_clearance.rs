@@ -9,6 +9,19 @@ fn bad() -> KernelError {
         "nested bore clearance requires arithmetic-coaxial shaft stock, a guarded circular through bore, and surviving native boundary witnesses".into(),
     )
 }
+pub(crate) struct OrbitBinding {
+    pub bore_face_index: usize,
+    pub bore_origin: [f64; 3],
+    pub bore_axis: [f64; 3],
+    pub bore_radius: f64,
+    pub guarded_radius: f64,
+    pub shaft_origin: [f64; 3],
+    pub shaft_axis: [f64; 3],
+    pub shaft_outer_radius: f64,
+    pub shaft_height: f64,
+    pub native_boundary_uncertainty: f64,
+    pub query: SolidClearance,
+}
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     std::array::from_fn(|i| a[i] + b[i])
 }
@@ -46,7 +59,7 @@ fn oriented(
     housing: &ModelSnapshot,
     shaft_model: &ModelSnapshot,
     t: Tolerance,
-) -> Result<SolidClearance, KernelError> {
+) -> Result<OrbitBinding, KernelError> {
     let admitted = crate::convex_trim_clearance::admit(housing, t)?;
     let g = admitted.geometry;
     let stock = shaft(shaft_model, t).ok_or_else(bad)?;
@@ -195,16 +208,39 @@ fn oriented(
         {
             return Err(KernelError::NumericRange);
         }
-        return Ok(SolidClearance {
+        let query = SolidClearance {
             method: ClearanceMethod::BoreTrimWitness,
             lower_bound_mm: lower,
             upper_bound_mm: upper,
             left_point,
             right_point,
             axis: mul(d, 1. / distance),
+        };
+        return Ok(OrbitBinding {
+            bore_face_index: g.path.segments.len() + 2 + index,
+            bore_origin,
+            bore_axis: housing_axis,
+            bore_radius: bore.radius,
+            guarded_radius: disk_radius,
+            shaft_origin: stock.origin,
+            shaft_axis: stock_axis,
+            shaft_outer_radius: stock.outer,
+            shaft_height: stock.height,
+            native_boundary_uncertainty: guard,
+            query,
         });
     }
     Err(bad())
+}
+
+/// The bore wall and guarded cap annulus support every azimuth, while the
+/// certified untouched shaft ray rotates rigidly with its native shaft.
+pub(crate) fn orbit_binding(
+    housing: &ModelSnapshot,
+    shaft_model: &ModelSnapshot,
+    t: Tolerance,
+) -> Result<OrbitBinding, KernelError> {
+    oriented(housing, shaft_model, t)
 }
 
 pub(crate) fn query(
@@ -213,9 +249,9 @@ pub(crate) fn query(
     t: Tolerance,
 ) -> Result<SolidClearance, KernelError> {
     if crate::convex_trim_clearance::is_candidate(a, t) && shaft(b, t).is_some() {
-        return oriented(a, b, t);
+        return oriented(a, b, t).map(|binding| binding.query);
     }
-    let mut q = oriented(b, a, t)?;
+    let mut q = oriented(b, a, t)?.query;
     std::mem::swap(&mut q.left_point, &mut q.right_point);
     q.axis = mul(q.axis, -1.);
     Ok(q)
@@ -436,5 +472,73 @@ mod tests {
             (Ok(far_h), Ok(far_shaft)) => query(&far_h.model, &far_shaft.model, t).is_err(),
             _ => true, // Transform itself may reach its stricter precision gate.
         });
+    }
+
+    #[test]
+    fn full_turn_bore_witness_orbit_has_three_diagnostic_queries() {
+        let t = Tolerance::default();
+        let h = housing(t);
+        let shaft = keyed(t);
+        for angle in [std::f64::consts::TAU, -std::f64::consts::TAU] {
+            let q = h
+                .rotation_clearance(&shaft, [0., 0., 10.], [0., 0., 1.], angle, 0.1, t, 3)
+                .unwrap();
+            assert_eq!(q.proof_kind, RotationProofKind::BoreWitnessOrbit);
+            assert_eq!(q.query_count, 3);
+            assert!(q.intervals.is_empty());
+            assert!(q.symmetry.is_none());
+            let proof = q.bore_orbit.as_ref().unwrap();
+            assert_eq!((proof.start, proof.end), (0., 1.));
+            assert_eq!(proof.reference_sample_index, 0);
+            assert_eq!(proof.bore_face_index, 10);
+            assert!(q.lower_bound_mm <= 0.15 && q.upper_bound_mm >= 0.15);
+            assert!(q.lower_bound_mm >= 0.1);
+            assert!(proof.lower_bound_mm <= 0.15 && proof.upper_bound_mm >= 0.15);
+            let encoded = serde_json::to_value(&q).unwrap();
+            assert_eq!(encoded["proof_kind"], "bore_witness_orbit");
+            assert_eq!(
+                serde_json::from_value::<RotationClearance>(encoded).unwrap(),
+                q
+            );
+        }
+    }
+
+    #[test]
+    fn orbit_axis_offset_and_tilt_cannot_bypass_three_query_budget() {
+        let t = Tolerance::default();
+        let h = housing(t);
+        let shaft = keyed(t);
+        for (pivot, axis) in [
+            ([0.001, 0., 10.], [0., 0., 1.]),
+            ([0., 0., 10.], [0.001_f64.sin(), 0., 0.001_f64.cos()]),
+        ] {
+            let result =
+                h.rotation_clearance(&shaft, pivot, axis, std::f64::consts::TAU, 0.1, t, 3);
+            assert!(result.is_err(), "{result:?}");
+        }
+    }
+
+    #[test]
+    fn stepped_shoulder_orbit_and_common_cyclic_pose() {
+        let t = Tolerance::default();
+        let h = housing(t);
+        let shaft = stepped_keyed(t);
+        let frame = [0.5, 0.5, 0.5, 0.5];
+        for (housing, shaft, pivot, axis) in [
+            (h.clone(), shaft.clone(), [0., 0., 10.], [0., 0., 1.]),
+            (
+                transform(&h, [13., -7., 15.], frame, t).unwrap().model,
+                transform(&shaft, [13., -7., 15.], frame, t).unwrap().model,
+                [23., -7., 15.],
+                [1., 0., 0.],
+            ),
+        ] {
+            let report = housing
+                .rotation_clearance(&shaft, pivot, axis, std::f64::consts::TAU, 0.04, t, 3)
+                .unwrap();
+            assert_eq!(report.proof_kind, RotationProofKind::BoreWitnessOrbit);
+            assert!(report.lower_bound_mm <= 0.05 && report.upper_bound_mm >= 0.05);
+            assert_eq!(report.query_count, 3);
+        }
     }
 }

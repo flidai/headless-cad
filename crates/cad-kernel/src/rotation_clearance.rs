@@ -7,6 +7,31 @@ pub const MAX_ROTATION_DEPTH: usize = 32;
 pub enum RotationProofKind {
     LipschitzSubdivision,
     RotationalSymmetry,
+    BoreWitnessOrbit,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BoreWitnessOrbitCertificate {
+    pub start: f64,
+    pub end: f64,
+    pub reference_sample_index: usize,
+    pub bore_face_index: usize,
+    pub bore_origin: [f64; 3],
+    pub bore_axis: [f64; 3],
+    pub bore_radius_mm: f64,
+    pub guarded_radius_mm: f64,
+    pub shaft_stock_origin: [f64; 3],
+    pub shaft_stock_axis: [f64; 3],
+    pub shaft_stock_outer_radius_mm: f64,
+    pub shaft_stock_height_mm: f64,
+    pub native_boundary_uncertainty_mm: f64,
+    pub axis_offset_mm: f64,
+    pub axis_direction_departure: f64,
+    pub moving_radius_bound_mm: f64,
+    pub motion_roundoff_mm: f64,
+    pub distance_variation_bound_mm: f64,
+    pub lower_bound_mm: f64,
+    pub upper_bound_mm: f64,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,6 +74,8 @@ pub struct RotationClearance {
     pub proof_kind: RotationProofKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub symmetry: Option<RotationalSymmetryCertificate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bore_orbit: Option<BoreWitnessOrbitCertificate>,
     /// Lower bound over the complete declared signed rotation, including endpoints.
     pub lower_bound_mm: f64,
     /// Minimum sampled upper bound; the global enclosure need not be tight.
@@ -211,6 +238,88 @@ fn symmetry_certificate(
         stationary_extent_mm: (extent + boundary_error).next_up(),
         distance_variation_bound_mm: variation,
         lower_bound_mm: 0.,
+    })
+}
+
+/// Pair-specific orbit: the complete housing need not be rotationally
+/// symmetric. Only its guarded bore wall/cap witness region is required at
+/// every azimuth. The uncut shaft stock supplies the invariant lower bound.
+#[allow(clippy::too_many_arguments)]
+fn bore_orbit_certificate(
+    housing: &ModelSnapshot,
+    shaft: &ModelSnapshot,
+    pivot: [f64; 3],
+    axis: [f64; 3],
+    angle: f64,
+    tolerance: Tolerance,
+    moving_radius_bound: f64,
+    source_scale: f64,
+) -> Option<BoreWitnessOrbitCertificate> {
+    use crate::math::{cross, sub};
+    let binding = crate::bore_trim_clearance::orbit_binding(housing, shaft, tolerance).ok()?;
+    let guard = binding.native_boundary_uncertainty;
+    let offset =
+        (norm(cross(sub(pivot, binding.bore_origin), binding.bore_axis)) + guard / 4.).next_up();
+    let same = norm(sub(axis, binding.bore_axis));
+    let opposed = norm(std::array::from_fn(|i| axis[i] + binding.bore_axis[i]));
+    let departure = (same.min(opposed) + 32. * f64::EPSILON).next_up();
+    // A tolerance-sized eccentricity or tilt cannot become exact symmetry.
+    // Residuals are admitted only on the native arithmetic scale and charged
+    // over the entire declared signed arc.
+    if !offset.is_finite()
+        || !departure.is_finite()
+        || offset > 2. * guard
+        || departure * moving_radius_bound > 2. * guard
+    {
+        return None;
+    }
+    // Compare declared motion to an ideal rotation about the selected bore
+    // axis. The annular slab is invariant under that ideal rotation. Its full
+    // guarded bore/cap region contains the rotated housing witness at every
+    // azimuth, while the untouched shaft witness rotates with the raw shaft.
+    // The motion mismatch changes their distance; it does not change the
+    // membership of the ideal housing witness. Two native displacements were
+    // already charged in the static query; reserve them again for the orbit.
+    // For nearby axes, point motion differs by at most 2*offset plus angle
+    // times axis departure and radius. This holds for every t in [0,1].
+    let roundoff = (2048. * f64::EPSILON * source_scale).next_up();
+    let variation = (2. * guard
+        + 2. * offset
+        + angle.abs() * departure * (moving_radius_bound + offset)
+        + roundoff)
+        .next_up();
+    let lower = (binding.query.lower_bound_mm - variation).next_down();
+    let upper = (binding.query.upper_bound_mm + variation).next_up();
+    if !roundoff.is_normal()
+        || !variation.is_finite()
+        || variation > tolerance.linear / 8.
+        || lower <= tolerance.linear
+        || !upper.is_finite()
+        || upper - lower > tolerance.linear
+    {
+        return None;
+    }
+    Some(BoreWitnessOrbitCertificate {
+        start: 0.,
+        end: 1.,
+        reference_sample_index: 0,
+        bore_face_index: binding.bore_face_index,
+        bore_origin: binding.bore_origin,
+        bore_axis: binding.bore_axis,
+        bore_radius_mm: binding.bore_radius,
+        guarded_radius_mm: binding.guarded_radius,
+        shaft_stock_origin: binding.shaft_origin,
+        shaft_stock_axis: binding.shaft_axis,
+        shaft_stock_outer_radius_mm: binding.shaft_outer_radius,
+        shaft_stock_height_mm: binding.shaft_height,
+        native_boundary_uncertainty_mm: guard,
+        axis_offset_mm: offset,
+        axis_direction_departure: departure,
+        moving_radius_bound_mm: moving_radius_bound,
+        motion_roundoff_mm: roundoff,
+        distance_variation_bound_mm: variation,
+        lower_bound_mm: lower,
+        upper_bound_mm: upper,
     })
 }
 struct Evaluator<'a> {
@@ -398,6 +507,7 @@ impl ModelSnapshot {
                 return Ok(RotationClearance {
                     proof_kind: RotationProofKind::RotationalSymmetry,
                     symmetry: Some(symmetry),
+                    bore_orbit: None,
                     lower_bound_mm: lower,
                     upper_bound_mm: upper,
                     required_minimum_mm: required_min,
@@ -410,6 +520,46 @@ impl ModelSnapshot {
                     samples: evaluator.samples,
                     intervals: vec![],
                 });
+            }
+        }
+        if evaluator.samples[0].query.method == ClearanceMethod::BoreTrimWitness {
+            if let Some(orbit) = bore_orbit_certificate(
+                self,
+                other,
+                pivot,
+                axis,
+                angle_radians,
+                tolerance,
+                radius_bound_mm,
+                source_scale,
+            ) {
+                if orbit.lower_bound_mm >= required_min {
+                    evaluator.sample(0.5)?;
+                    let upper = evaluator
+                        .samples
+                        .iter()
+                        .map(|s| s.upper_bound_mm)
+                        .fold(orbit.upper_bound_mm, f64::min);
+                    if upper < orbit.lower_bound_mm {
+                        return Err(KernelError::NumericRange);
+                    }
+                    return Ok(RotationClearance {
+                        proof_kind: RotationProofKind::BoreWitnessOrbit,
+                        symmetry: None,
+                        bore_orbit: Some(orbit.clone()),
+                        lower_bound_mm: orbit.lower_bound_mm,
+                        upper_bound_mm: upper,
+                        required_minimum_mm: required_min,
+                        pivot,
+                        axis,
+                        angle_radians,
+                        radius_bound_mm,
+                        speed_bound_mm,
+                        query_count: evaluator.samples.len(),
+                        samples: evaluator.samples,
+                        intervals: vec![],
+                    });
+                }
             }
         }
         let mut pending = vec![(0., 1., 0usize)];
@@ -459,6 +609,7 @@ impl ModelSnapshot {
         Ok(RotationClearance {
             proof_kind: RotationProofKind::LipschitzSubdivision,
             symmetry: None,
+            bore_orbit: None,
             lower_bound_mm,
             upper_bound_mm,
             required_minimum_mm: required_min,

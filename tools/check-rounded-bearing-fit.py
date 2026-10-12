@@ -24,7 +24,8 @@ d = module('bearing_pose', 'check-retained-drive-module.py')
 k, c = f.k, g.c
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Fuse
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
-from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
+from OCP.gp import gp_Ax1, gp_Ax2, gp_Pnt, gp_Dir, gp_Trsf
+from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 
 
 def references(parameters):
@@ -47,14 +48,47 @@ def references(parameters):
     return {('fixture','housing'):housing,('fixture','shaft'):shaft}
 
 
+def motion_evidence(manifest, leaves, expected):
+    check=manifest['clearance_checks']['running_gap'];sweep=check['rotation_sweep']
+    c.require(sweep['proof_kind']=='bore_witness_orbit','distinct pair-specific full-turn proof')
+    c.require('symmetry' not in sweep and sweep['intervals']==[],'not whole housing symmetry or empty subdivision evidence')
+    proof=sweep['bore_orbit']
+    c.require(proof['start']==0 and proof['end']==1,'complete signed arc coverage')
+    c.require(sweep['query_count']==3 and sorted(s['time'] for s in sweep['samples'])==[0,.5,1],'three real native queries')
+    c.require(sweep['lower_bound_mm']<=expected<=sweep['upper_bound_mm'],'global analytic minimum enclosure')
+    c.require(proof['lower_bound_mm']<=expected<=proof['upper_bound_mm'],'orbit analytic enclosure')
+    world=manifest['rigid_rotation_groups']['shaft_rotation']['rotation_world']
+    housing=leaves[('fixture','housing')]['shape'];shaft=leaves[('fixture','shaft')]['shape']
+    def moved(time):
+        frame=gp_Trsf();frame.SetRotation(gp_Ax1(gp_Pnt(*world['pivot']),gp_Dir(*world['axis'])),world['angle_radians']*time)
+        return BRepBuilderAPI_Transform(shaft,frame,True).Shape()
+    for sample in sweep['samples']:
+        c.require(sample['query']['method']=='bore_trim_witness','actual nested queries')
+        for side,shape in [('left',housing),('right',moved(sample['time']))]:
+            distance=min(c.witness_distance(sample['query'][side+'_point'],face) for face in g.faces(shape))
+            c.require(distance<2e-6,'motion sample witness on actual STEP boundary')
+    sampled=[]
+    for time in [0,.125,.25,.375,.5,.625,.75,.875,1]:
+        shaft_at=moved(time);distance=c.distance(housing,shaft_at)
+        d.close(distance,expected,'independent rotating gap',absolute=2e-6)
+        overlap=k.properties(k.boolean(BRepAlgoAPI_Common,housing,shaft_at))[0]
+        d.close(overlap,0,'no rotating material overlap',absolute=2e-6)
+        sampled.append(dict(time=time,distance_mm=distance,overlap_mm3=overlap))
+    return dict(proof_kind=sweep['proof_kind'],native_queries=3,sampled_step_evidence=sampled)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cad',type=Path,default=c.ROOT/'target/release/cad')
     parser.add_argument('--out-dir',type=Path,required=True)
+    parser.add_argument('--rotation',action='store_true')
     args = parser.parse_args(); args.out_dir.mkdir(parents=True,exist_ok=False)
-    cad=args.cad.resolve();source=c.ROOT/'examples/rounded_bearing_fit.star'
+    cad=args.cad.resolve();name='rounded_bearing_rotation' if args.rotation else 'rounded_bearing_fit'
+    source=c.ROOT/'examples'/(name+'.star')
     cases=[]
     configurations=[{},dict(pose=1),dict(shaft_radius=5,bore_gap=.3,pose=1),dict(shaft_radius=7,bore_gap=.12),dict(stepped=True,required_clearance=.025),dict(stepped=True,required_clearance=.025,pose=1)]
+    if args.rotation:
+        for index,parameters in enumerate(configurations):parameters['turn_radians']=(-1 if index%2 else 1)*math.tau
     for index,parameters in enumerate(configurations):
         out=args.out_dir/f'case-{index}'
         recipe=source
@@ -72,8 +106,8 @@ def main():
             recipe.write_text(text)
         result=c.run(cad,recipe,out,arguments);c.require(result.returncode==0,result.stderr)
         manifest=json.loads(result.stdout)
-        assembly=json.loads((out/'rounded_bearing_fit.assembly.json').read_text())
-        leaves=c.imported_leaves(out/'rounded_bearing_fit.step');refs=references(parameters)
+        assembly=json.loads((out/(name+'.assembly.json')).read_text())
+        leaves=c.imported_leaves(out/(name+'.step'));refs=references(parameters)
         c.require(set(leaves)==set(refs),'two exact source occurrence paths')
         differences={}
         for path,reference in refs.items():
@@ -88,10 +122,11 @@ def main():
         d.close(k.properties(k.boolean(BRepAlgoAPI_Common,*shapes))[0],0,'no material overlap',absolute=2e-6)
         replay=args.out_dir/f'replay-{index}'
         result=c.run(cad,out/'recipe.star',replay,arguments);c.require(result.returncode==0,result.stderr)
-        c.require((replay/'rounded_bearing_fit.step').read_bytes()==(out/'rounded_bearing_fit.step').read_bytes(),'captured source exact STEP replay')
+        c.require((replay/(name+'.step')).read_bytes()==(out/(name+'.step')).read_bytes(),'captured source exact STEP replay')
         verified=k.command(cad,'verify',out);c.require(verified.returncode==0,verified.stderr)
         cases.append(dict(parameters=parameters,clearance=evidence,symmetric_difference_mm3=differences,
-                          kernel_build_id=manifest['kernel_build_id'],executor_build_id=manifest['executor_build_id']))
+                          kernel_build_id=manifest['kernel_build_id'],executor_build_id=manifest['executor_build_id'],
+                          motion=motion_evidence(manifest,leaves,.05 if parameters.get('stepped') else parameters.get('bore_gap',.15)) if args.rotation else None))
     out=args.out_dir/'preserved'
     result=c.run(cad,source,out,{});c.require(result.returncode==0,result.stderr);before=c.inventory(out)
     rejected=[]
