@@ -41,3 +41,18 @@ fn source_solid_cylinder_clearance_uses_analytic_geometry() {
     let q = &b.clearance_checks["gap"];
     assert!(q.lower_bound_mm <= 3. && q.upper_bound_mm >= 3.);
 }
+
+#[test]
+fn source_revolved_cone_clearance_is_native() {
+    let source = SOURCE
+        .replace(
+            "extrude(id='body',profile=rectangle(id='p',width=2,depth=3),height=4)",
+            "revolve(id='body',profile=polygon(id='p',points=[[0,0],[2,0],[0,4]]))",
+        )
+        .replace("offset=[5,7,0]", "offset=[0,0,7]");
+    let check = CHECK.replace("min_clearance=4.99", "min_clearance=2.99");
+    let r = cad_recipe::from_starlark("cone.star", &format!("{source}{check}")).unwrap();
+    let b = cad_build::build(&r).unwrap();
+    let q = &b.clearance_checks["gap"];
+    assert!(q.lower_bound_mm <= 3. && q.upper_bound_mm >= 3.);
+}

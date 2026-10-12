@@ -2255,7 +2255,8 @@ arithmetic widens the interval. Acceptance uses the lower bound, not the visual
 mesh, bounding-box distance or an unverified candidate estimate.
 
 The supported domain is two nonempty, validated convex planar solids, recognized
-finite solid cylinders, or one of each. Each operand is limited to 128 vertices, 256 edges and 128 single-loop
+finite solid cylinders, or supported convex full-turn linear-meridian revolutions,
+including mixed pairs. Each operand is limited to 128 vertices, 256 edges and 128 single-loop
 faces; recipes admit 64 checks and ten million path-resolution work units.
 Other curved or nonconvex inputs (including annular tubes), contact/intersection,
 unresolved precision and resource excess fail explicitly. Failure does not classify collision or
@@ -2287,6 +2288,23 @@ The example varies relative roller tilt, axial/radial offsets and the whole
 assembly pose. It also includes an intentionally unsupported `tube=1` case.
 Clearance remains a nominal-geometry requirement, separate from dimensional
 manufacturing envelopes and continuous-motion collision certification.
+
+`revolved_clearance.star` adds tapered tooling: a frustum, a pointed cone, and a
+convex crowned profile, paired with a cone and a tilted planar guard. Native
+supports maximize over the complete revolved meridian, including circular extrema
+and poles. Admission checks convexity before support queries; a hollow or waisted
+profile cannot be substituted with its convex hull. Meridian corners must pass
+strict convexity at modeling tolerance; redundant or unresolved collinear breaks
+are rejected.
+
+```sh
+cad build examples/revolved_clearance.star --out-dir out/revolved_clearance
+```
+
+`shape=0`, `shape=1`, and `shape=2` select the supported profiles. `shape=3`
+(waisted) and `shape=4` (hollow) deliberately exercise unsupported-input failures.
+The same source-owned minimum requirement, placement precision limits and bounded
+search apply. General curved/nonconvex clearance remains a separate capability.
 
 ### Native planar edge chamfers
 

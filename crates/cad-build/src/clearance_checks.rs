@@ -186,47 +186,14 @@ pub(super) fn evaluate(
         // kernel still performs the full native convexity/certificate validation.
         for instance in [left, right] {
             let m = &assembly.parts[&instance.part].result.model;
-            if m.solids.len() != 1 || m.shells.len() != 1 {
-                return Err(fail(
-                    "pre-placement clearance requires one native solid and shell".into(),
-                    None,
-                    None,
-                ));
-            }
-            if m.vertices.len() > cad_kernel::MAX_CLEARANCE_VERTICES
-                || m.edges.len() > cad_kernel::MAX_CLEARANCE_EDGES
-                || m.faces.len() > cad_kernel::MAX_CLEARANCE_FACES
-                || m.loops.len() > cad_kernel::MAX_CLEARANCE_FACES
-                || m.loops
-                    .iter()
-                    .fold(0usize, |n, l| n.saturating_add(l.edges.len()))
-                    > 2 * cad_kernel::MAX_CLEARANCE_EDGES
-                || m.faces.iter().any(|f| f.loops.len() > 1)
-                || m.shells[0].faces.len() > cad_kernel::MAX_CLEARANCE_FACES
-                || m.solids[0].shells.len() > 1
-            {
-                return Err(fail("pre-placement clearance limit: 128 vertices, 256 edges, 128 single-loop faces and 512 loop-edge references per operand".into(), None, None));
-            }
-            let supported_geometry = if m.has_curved_geometry() {
-                m.cylinder_geometry(tolerance)
-                    .map_err(|e| {
-                        fail(
-                            format!("pre-placement cylinder validation: {e}"),
-                            None,
-                            None,
-                        )
-                    })?
-                    .is_some_and(|c| c.inner_radius == 0.)
-            } else {
-                true
-            };
-            if !supported_geometry || m.vertices.is_empty() {
-                return Err(fail(
-                    "pre-placement clearance requires a nonempty convex planar solid or validated finite solid cylinder".into(),
-                    None,
-                    None,
-                ));
-            }
+            m.validate_convex_clearance_operand(tolerance)
+                .map_err(|e| {
+                    fail(
+                        format!("pre-placement clearance admission: {e}"),
+                        None,
+                        None,
+                    )
+                })?;
         }
         let placed =
             |instance: &cad_assembly::Instance, path: &Vec<String>| -> Result<_, BuildError> {

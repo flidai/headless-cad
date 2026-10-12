@@ -161,7 +161,7 @@ fn oversized_source_operand_is_rejected_before_placement() {
     // reject the oversized source before inspecting/materializing that placement.
     v["assemblies"][1]["assemblies"][0]["transform"] = json!({"translation":[1e8,0,0]});
     assert!(
-        matches!(cad_build::build(&parse(v)), Err(BuildError::ClearanceCheckFailed {message,..}) if message.starts_with("pre-placement clearance limit:"))
+        matches!(cad_build::build(&parse(v)), Err(BuildError::ClearanceCheckFailed {message,..}) if message.starts_with("pre-placement clearance admission:") && message.contains("limit"))
     );
 }
 
@@ -229,6 +229,88 @@ fn solid_cylinders_and_mixed_pairs_are_global_native_clearance_obligations() {
                 .stats
                 .computed_solids,
             0
+        );
+    }
+}
+
+#[test]
+fn convex_revolved_cones_frusta_and_mixed_pairs_preserve_global_checks() {
+    for profile in [
+        json!([[0, 0], [2, 0], [0, 4]]),
+        json!([[0, 0], [2, 0], [1, 4], [0, 4]]),
+        json!([[0, 0], [2, 0], [2, 1], [1, 4], [0, 4]]),
+    ] {
+        for mixed in [false, true] {
+            let mut v = value();
+            v["features"][0] = json!({"op":"polygon","id":"p","points":profile});
+            v["features"][1] = json!({"op":"revolve","id":"body","profile":"p"});
+            if mixed {
+                v["features"].as_array_mut().unwrap().extend([
+                    json!({"op":"rectangle","id":"q","width":2,"depth":3}),
+                    json!({"op":"extrude","id":"box","profile":"q","height":4}),
+                ]);
+                v["parts"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!({"id":"box_part","feature":"box"}));
+                v["assemblies"].as_array_mut().unwrap().insert(
+                    1,
+                    json!({"id":"box_cell","instances":[{"id":"leaf/a","part":"box_part"}]}),
+                );
+                v["assemblies"][2]["assemblies"][1]["assembly"] = json!("box_cell");
+            }
+            let root = if mixed { 2 } else { 1 };
+            // Rotate the whole pair: its native Z separation becomes world X.
+            let q = [
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+            ];
+            v["assemblies"][root]["assemblies"][0]["transform"] =
+                json!({"translation":[10,-20,30],"rotation":q});
+            v["assemblies"][root]["assemblies"][1]["transform"] =
+                json!({"translation":[17,-20,30],"rotation":q});
+            v["clearance_checks"][0]["min_clearance"] = json!(2.99999);
+            let mut r = parse(v);
+            let mut engine = BuildEngine::default();
+            let b = engine.build_outputs(&r, &["body".into()]).unwrap();
+            let c = &b.clearance_checks["gap"];
+            assert!(c.lower_bound_mm <= 3. && c.upper_bound_mm >= 3.);
+            assert!(c.upper_bound_mm - c.lower_bound_mm < 1e-7);
+            assert!(b.assemblies.is_empty());
+            r.clearance_checks[0].min_clearance = 3.00001;
+            assert!(matches!(
+                engine.build_outputs(&r, &["body".into()]),
+                Err(BuildError::ClearanceCheckFailed {
+                    lower_bound_mm: Some(_),
+                    ..
+                })
+            ));
+            r.clearance_checks[0].min_clearance = 2.99999;
+            assert_eq!(
+                engine
+                    .build_outputs(&r, &["body".into()])
+                    .unwrap()
+                    .stats
+                    .computed_solids,
+                0
+            );
+        }
+    }
+}
+
+#[test]
+fn hollow_and_nonconvex_revolutions_fail_before_placement() {
+    for profile in [
+        json!([[1, 0], [2, 0], [2, 4], [1, 4]]),
+        json!([[0, 0], [2, 0], [1, 2], [2, 4], [0, 4]]),
+    ] {
+        let mut v = value();
+        v["features"][0] = json!({"op":"polygon","id":"p","points":profile});
+        v["features"][1] = json!({"op":"revolve","id":"body","profile":"p"});
+        assert!(
+            matches!(cad_build::build(&parse(v)),Err(BuildError::ClearanceCheckFailed {message,..}) if message.starts_with("pre-placement clearance admission:"))
         );
     }
 }

@@ -66,7 +66,7 @@ pub fn validate_revolve_profile(points: &[[f64; 2]], tol: Tolerance) -> Result<(
 fn world(g: &RevolveGeometry, r: f64, z: f64) -> [f64; 3] {
     std::array::from_fn(|i| g.origin[i] + g.axis[i] * z + g.x_direction[i] * r)
 }
-fn construct(mut g: RevolveGeometry) -> (ModelSnapshot, RevolveGeometry) {
+pub(crate) fn construct(mut g: RevolveGeometry) -> (ModelSnapshot, RevolveGeometry) {
     let mut m = ModelSnapshot {
         vertices: vec![],
         edges: vec![],

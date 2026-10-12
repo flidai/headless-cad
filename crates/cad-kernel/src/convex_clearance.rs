@@ -19,7 +19,7 @@ pub struct ConvexClearance {
     pub axis: [f64; 3],
 }
 fn unsupported() -> KernelError {
-    KernelError::Unsupported("convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders with a resolved support certificate".into())
+    KernelError::Unsupported("convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders/convex axis-closed linear-meridian revolutions with a resolved support certificate".into())
 }
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     std::array::from_fn(|i| a[i] + b[i])
@@ -106,8 +106,23 @@ fn preflight(m: &ModelSnapshot) -> Result<(), KernelError> {
     Ok(())
 }
 impl ModelSnapshot {
+    /// Check bounded native family admission for a clearance query. Pair-specific
+    /// separation and numerical certification are still required by the query.
+    pub fn validate_convex_clearance_operand(
+        &self,
+        tolerance: Tolerance,
+    ) -> Result<(), KernelError> {
+        if !tolerance.is_valid() {
+            return Err(KernelError::InvalidTolerance);
+        }
+        support::validate_operand(self, tolerance)
+    }
+
     /// Certify strictly positive Euclidean clearance for native convex planar solids
-    /// and finite solid circular cylinders in arbitrary rigid orientations.
+    /// and finite solid circular cylinders or convex full-turn linear-meridian
+    /// revolutions in arbitrary rigid orientations. Revolution meridians must be
+    /// strictly convex with a full-height axis closure; collinear or unresolved
+    /// near-collinear breaks, hollow sections and waists are unsupported.
     /// Other curves, nonconvexity, contact/intersection and unresolved precision fail;
     /// failure is not a collision classification. Bounds include arithmetic and
     /// accepted support/witness uncertainty and must differ by at most tolerance.

@@ -2058,6 +2058,29 @@ root-pose invariance. Independent STEP measurements compare both distances and
 witness membership. Annular tubes, general trimmed curved solids and nonconvex
 shapes remain unsupported rather than being replaced by their convex hulls.
 
+Convex full-turn linear-meridian revolutions extend the analytic support domain
+to cones, frustums, poles and convex piecewise profiles. Native admission must prove
+convexity and axis closure before using meridian support maxima; hollow or waisted
+profiles cannot be represented by their convex hulls. Meridian admission requires
+strict convexity separated from collinearity by modeling tolerance, rejecting
+redundant or unresolved corners. Support witnesses use native revolved rings,
+poles or axial support ties, with convex combinations confined to the admitted
+solid. Raw cone/frame consistency and complete radial/axial extents participate in
+precision admission. Build preflight shares the kernel admission contract before
+allocating placed snapshots. `revolved_clearance.star` is the acceptance fixture;
+independent STEP distances and boundary-witness membership, known radial/axial
+distances, pose changes and publication-preserving failures are required evidence.
+The tapered-guard oracle also derives minimum distance from reflection-symmetric
+meridian polygons. It records OCCT extrema disagreements explicitly: a feasible
+imported-boundary witness pair can refute a larger reported minimum. Such cases
+require the independent analytic result rather than a widened comparison tolerance. This
+extension does not cover arbitrary trimmed curves, nonconvex bodies or motion.
+The analytic simplex reducer uses direct affine projections rather than Gram
+normal equations. It retains fuller/newer feasible simplices when witness distances
+differ only within an arithmetic tie, avoiding stagnation at flat/smooth support
+transitions. This changes search progression, not the final interval acceptance.
+A scaled cone-to-box regression with a known 500 mm gap protects that behavior.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in

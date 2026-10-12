@@ -81,6 +81,13 @@ exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
 
+Convex linear-meridian revolutions extend native clearance toward tapered drive
+components: cones, frustums and convex crowned profiles. The shared kernel admission
+contract must reject hollow and waisted profiles before placement/query work.
+`revolved_clearance.star` requires independent STEP distance/witness checks,
+analytic radial/axial cases, pose invariance and preserved failed generations.
+General trimmed/nonconvex clearance and continuous motion remain open.
+
 Analytic clearance extends the native query to finite solid cylinders in arbitrary
 rigid poses and mixed cylinder/convex-planar pairs. `cylinder_clearance.star` adds
 skew rollers and a tilted guard with independent STEP distance/witness acceptance.

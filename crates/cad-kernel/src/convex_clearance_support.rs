@@ -2,6 +2,11 @@
 use super::*;
 #[derive(Clone)]
 enum Shape {
+    Revolution {
+        origin: [f64; 3],
+        axis: [f64; 3],
+        profile: Vec<[f64; 2]>,
+    },
     Poly(Vec<[f64; 3]>),
     Cylinder {
         origin: [f64; 3],
@@ -13,6 +18,28 @@ enum Shape {
 impl Shape {
     fn support(&self, d: [f64; 3]) -> [f64; 3] {
         match self {
+            Self::Revolution {
+                origin,
+                axis,
+                profile,
+            } => {
+                let z = dot(d, *axis);
+                let radial = cross(*axis, cross(d, *axis));
+                let radial_length = norm(radial);
+                let p = profile
+                    .iter()
+                    .max_by(|a, b| {
+                        (a[0] * radial_length + a[1] * z)
+                            .total_cmp(&(b[0] * radial_length + b[1] * z))
+                    })
+                    .unwrap();
+                let radial = if radial_length > 128. * f64::EPSILON * norm(d) {
+                    mul(radial, p[0] / radial_length)
+                } else {
+                    [0.; 3]
+                };
+                add(*origin, add(mul(*axis, p[1]), radial))
+            }
             Self::Poly(p) => *p
                 .iter()
                 .max_by(|a, b| dot(**a, d).total_cmp(&dot(**b, d)))
@@ -43,6 +70,19 @@ impl Shape {
     }
     fn support_value(&self, d: [f64; 3]) -> f64 {
         match self {
+            Self::Revolution {
+                origin,
+                axis,
+                profile,
+            } => {
+                let z = dot(*axis, d);
+                let radial = norm(cross(*axis, d));
+                dot(*origin, d)
+                    + profile
+                        .iter()
+                        .map(|p| p[0] * radial + p[1] * z)
+                        .fold(f64::NEG_INFINITY, f64::max)
+            }
             Self::Poly(p) => p
                 .iter()
                 .map(|v| dot(*v, d))
@@ -72,32 +112,39 @@ fn support(a: &Shape, b: &Shape, d: [f64; 3]) -> Pair {
         b: b.support(mul(d, -1.)),
     }
 }
-fn solve(mut m: [[f64; 4]; 3], n: usize) -> Option<[f64; 3]> {
-    let mut x = [0.; 3];
-    let scale = m
-        .iter()
-        .take(n)
-        .flat_map(|r| r[..n].iter())
-        .map(|v| v.abs())
-        .fold(0., f64::max);
-    for i in 0..n {
-        let pivot = (i..n).max_by(|a, b| m[*a][i].abs().total_cmp(&m[*b][i].abs()))?;
-        m.swap(i, pivot);
-        if m[i][i].abs() <= scale * 128. * f64::EPSILON {
-            return None;
-        }
-        let pivot_row = m[i];
-        for row in m.iter_mut().take(n).skip(i + 1) {
-            let f = row[i] / pivot_row[i];
-            for (entry, pivot_entry) in row[i..=n].iter_mut().zip(&pivot_row[i..=n]) {
-                *entry -= f * pivot_entry;
+// Direct affine projections avoid squaring the condition number in a Gram
+// system: thin support triangles are essential near smooth/flat transitions.
+fn affine_weights(base: [f64; 3], dirs: &[[f64; 3]]) -> Option<Vec<f64>> {
+    match dirs {
+        [u] => Some(vec![-dot(base, *u) / dot(*u, *u)]),
+        [u, v] => {
+            let n = cross(*u, *v);
+            let length = norm(n);
+            if length <= 64. * f64::EPSILON * norm(*u) * norm(*v) {
+                return None;
             }
+            let square = dot(n, n);
+            let q = mul(n, dot(n, base) / square);
+            let w = sub(q, base);
+            Some(vec![
+                dot(cross(w, *v), n) / square,
+                dot(cross(*u, w), n) / square,
+            ])
         }
+        [u, v, w] => {
+            let det = dot(*u, cross(*v, *w));
+            if det.abs() <= 64. * f64::EPSILON * norm(*u) * norm(*v) * norm(*w) {
+                return None;
+            }
+            let rhs = mul(base, -1.);
+            Some(vec![
+                dot(rhs, cross(*v, *w)) / det,
+                dot(*u, cross(rhs, *w)) / det,
+                dot(*u, cross(*v, rhs)) / det,
+            ])
+        }
+        _ => None,
     }
-    for i in (0..n).rev() {
-        x[i] = (m[i][n] - (i + 1..n).map(|j| m[i][j] * x[j]).sum::<f64>()) / m[i][i];
-    }
-    Some(x)
 }
 // Enumerate all simplex faces. Every retained witness uses nonnegative convex
 // weights, regardless of minimizer conditioning; the final support gap decides
@@ -120,14 +167,7 @@ fn reduce(simplex: &[Pair]) -> Option<(Vec<Pair>, Pair)> {
                 .skip(1)
                 .map(|i| sub(simplex[*i].delta(), base))
                 .collect::<Vec<_>>();
-            let mut m = [[0.; 4]; 3];
-            for i in 0..n {
-                for j in 0..n {
-                    m[i][j] = dot(dirs[i], dirs[j]);
-                }
-                m[i][n] = -dot(dirs[i], base);
-            }
-            let Some(x) = solve(m, n) else {
+            let Some(x) = affine_weights(base, &dirs) else {
                 continue;
             };
             weights[0] = 1. - x[..n].iter().sum::<f64>();
@@ -153,13 +193,44 @@ fn reduce(simplex: &[Pair]) -> Option<(Vec<Pair>, Pair)> {
             }
         }
         let d = norm(pair.delta());
-        if d.is_finite() && best.as_ref().is_none_or(|v| d < v.0) {
+        // Near an optimum, the improvement in witness distance is quadratic
+        // while the support-axis error is first order. Preserve fuller simplices
+        // when distances round alike so new support directions are not discarded.
+        // All candidates remain feasible and the final certificate is unchanged.
+        if d.is_finite()
+            && best.as_ref().is_none_or(|v| {
+                let roundoff = 32. * f64::EPSILON * d.max(v.0);
+                d < v.0 - roundoff || ((d - v.0).abs() <= roundoff && retained.len() >= v.1.len())
+            })
+        {
             best = Some((d, retained, pair));
         }
     }
     best.map(|(_, s, p)| (s, p))
 }
-fn validate(m: &ModelSnapshot, t: Tolerance) -> Result<Option<CylinderGeometry>, KernelError> {
+enum Geometry {
+    Cylinder(CylinderGeometry),
+    Revolution(RevolveGeometry),
+}
+impl Geometry {
+    fn origin(&self) -> [f64; 3] {
+        match self {
+            Self::Cylinder(g) => g.origin,
+            Self::Revolution(g) => g.origin,
+        }
+    }
+    fn extent(&self) -> f64 {
+        match self {
+            Self::Cylinder(g) => g.radius + g.height,
+            Self::Revolution(g) => g
+                .profile
+                .iter()
+                .map(|p| p[0] + p[1].abs())
+                .fold(0., f64::max),
+        }
+    }
+}
+fn validate(m: &ModelSnapshot, t: Tolerance) -> Result<Option<Geometry>, KernelError> {
     // These limits precede generic topology walks, including repeated handles.
     if m.solids.len() != 1 || m.shells.len() != 1 {
         return Err(unsupported());
@@ -185,11 +256,28 @@ fn validate(m: &ModelSnapshot, t: Tolerance) -> Result<Option<CylinderGeometry>,
         return Err(KernelError::InvalidInput(report));
     }
     if m.has_curved_geometry() {
-        let g = m.cylinder_geometry(t)?.ok_or_else(unsupported)?;
-        if g.inner_radius > 0. {
+        if let Ok(Some(g)) = m.cylinder_geometry(t) {
+            if g.inner_radius > 0. {
+                return Err(unsupported());
+            }
+            return Ok(Some(Geometry::Cylinder(g)));
+        }
+        let g = m.revolve_geometry(t)?.ok_or_else(unsupported)?;
+        // A convex half-meridian, with its axis edge spanning every axial level,
+        // proves a concave outer radius function and a solid (not hollow) body.
+        crate::validate_polygon(&g.profile, t)?;
+        let axis: Vec<_> = g.profile.iter().filter(|p| p[0] == 0.).collect();
+        let min = g.profile.iter().map(|p| p[1]).fold(f64::INFINITY, f64::min);
+        let max = g
+            .profile
+            .iter()
+            .map(|p| p[1])
+            .fold(f64::NEG_INFINITY, f64::max);
+        if axis.len() != 2 || !axis.iter().any(|p| p[1] == min) || !axis.iter().any(|p| p[1] == max)
+        {
             return Err(unsupported());
         }
-        Ok(Some(g))
+        Ok(Some(Geometry::Revolution(g)))
     } else {
         preflight(m)?;
         if !validation::geometry::validate_convex(m, t).is_empty() {
@@ -198,12 +286,91 @@ fn validate(m: &ModelSnapshot, t: Tolerance) -> Result<Option<CylinderGeometry>,
         Ok(None)
     }
 }
-fn consistency(
+pub(super) fn validate_operand(m: &ModelSnapshot, t: Tolerance) -> Result<(), KernelError> {
+    validate(m, t).map(|_| ())
+}
+fn revolution_consistency(
     m: &ModelSnapshot,
-    g: Option<&CylinderGeometry>,
+    g: &RevolveGeometry,
     error: f64,
 ) -> Result<(), KernelError> {
-    if let Some(g) = g {
+    if (norm(g.axis) - 1.).abs() > 64. * f64::EPSILON
+        || (norm(g.x_direction) - 1.).abs() > 64. * f64::EPSILON
+        || dot(g.axis, g.x_direction).abs() > 64. * f64::EPSILON
+    {
+        return Err(KernelError::NumericRange);
+    }
+    let (expected, geometry) = crate::revolve::construct(g.clone());
+    let extent = g
+        .profile
+        .iter()
+        .map(|p| p[0] + p[1].abs())
+        .fold(0., f64::max);
+    let near = |a, b| norm(sub(a, b)) <= error;
+    let direction =
+        |a, b| norm(sub(a, b)) <= 128. * f64::EPSILON && norm(sub(a, b)) * extent <= error;
+    for (a, b) in m.vertices.iter().zip(&expected.vertices) {
+        if !near(a.position, b.position) {
+            return Err(KernelError::NumericRange);
+        }
+    }
+    for (edge, canonical) in m.edges.iter().zip(&expected.edges) {
+        let valid = match (&edge.curve, &canonical.curve) {
+            (Curve::Circle(a), Curve::Circle(b)) => {
+                near(a.origin, b.origin)
+                    && (a.radius - b.radius).abs() <= error
+                    && direction(a.axis, b.axis)
+                    && direction(a.x_direction, b.x_direction)
+            }
+            (Curve::Line(a), Curve::Line(b)) => {
+                let length = norm(sub(
+                    expected.vertices[canonical.vertices[1].0].position,
+                    expected.vertices[canonical.vertices[0].0].position,
+                ));
+                near(a.origin, b.origin)
+                    && (norm(a.direction) - 1.).abs() <= 128. * f64::EPSILON
+                    && norm(sub(a.direction, b.direction)) * length <= error
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err(KernelError::NumericRange);
+        }
+    }
+    for (i, (face, canonical)) in m.faces.iter().zip(&expected.faces).enumerate() {
+        let valid = match (&face.surface, &canonical.surface) {
+            (Surface::Plane(a), Surface::Plane(b)) => {
+                near(a.origin, b.origin) && direction(a.normal, b.normal)
+            }
+            (Surface::Cylinder(a), Surface::Cylinder(b)) => {
+                near(a.origin, b.origin)
+                    && (a.radius - b.radius).abs() <= error
+                    && direction(a.axis, b.axis)
+                    && direction(a.x_direction, b.x_direction)
+                    && a.inward == b.inward
+            }
+            (Surface::Cone(a), Surface::Cone(b)) => {
+                let dz = (geometry.segments[i].end[1] - geometry.segments[i].start[1]).abs();
+                near(a.origin, b.origin)
+                    && (a.radius - b.radius).abs() <= error
+                    && direction(a.axis, b.axis)
+                    && direction(a.x_direction, b.x_direction)
+                    && a.inward == b.inward
+                    && (a.slope - b.slope).abs() * dz <= error
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err(KernelError::NumericRange);
+        }
+    }
+    Ok(())
+}
+fn consistency(m: &ModelSnapshot, g: Option<&Geometry>, error: f64) -> Result<(), KernelError> {
+    if let Some(Geometry::Revolution(g)) = g {
+        return revolution_consistency(m, g, error);
+    }
+    if let Some(Geometry::Cylinder(g)) = g {
         if (norm(g.axis) - 1.).abs() > 64. * f64::EPSILON
             || (norm(g.x_direction) - 1.).abs() > 64. * f64::EPSILON
             || dot(g.axis, g.x_direction).abs() > 64. * f64::EPSILON
@@ -296,7 +463,7 @@ fn query_bounded(
     let geometries = [validate(a, t)?, validate(b, t)?];
     let reference = geometries[0]
         .as_ref()
-        .map(|g| g.origin)
+        .map(Geometry::origin)
         .unwrap_or(a.vertices[0].position);
     let mut scale = 0_f64;
     let mut world = 0_f64;
@@ -305,14 +472,14 @@ fn query_bounded(
             .vertices
             .iter()
             .map(|v| v.position)
-            .chain(g.iter().map(|g| g.origin))
+            .chain(g.iter().map(Geometry::origin))
         {
             scale = scale.max(norm(sub(p, reference)));
             world = world.max(norm(p));
         }
         if let Some(g) = g {
-            scale = scale.max(norm(sub(g.origin, reference)) + g.radius + g.height);
-            world = world.max(norm(g.origin) + g.radius + g.height);
+            scale = scale.max(norm(sub(g.origin(), reference)) + g.extent());
+            world = world.max(norm(g.origin()) + g.extent());
         }
     }
     let error = (512. * world + 2048. * scale) * f64::EPSILON;
@@ -323,7 +490,17 @@ fn query_bounded(
         consistency(m, g.as_ref(), error)?;
     }
     let shapes: [Shape; 2] = std::array::from_fn(|i| {
-        if let Some(g) = &geometries[i] {
+        if let Some(Geometry::Revolution(g)) = &geometries[i] {
+            Shape::Revolution {
+                origin: mul(sub(g.origin, reference), 1. / scale),
+                axis: mul(g.axis, 1. / norm(g.axis)),
+                profile: g
+                    .profile
+                    .iter()
+                    .map(|p| [p[0] / scale, p[1] / scale])
+                    .collect(),
+            }
+        } else if let Some(Geometry::Cylinder(g)) = &geometries[i] {
             Shape::Cylinder {
                 origin: mul(sub(g.origin, reference), 1. / scale),
                 axis: mul(g.axis, 1. / norm(g.axis)),
@@ -340,6 +517,14 @@ fn query_bounded(
             )
         }
     });
+    let padding = if geometries
+        .iter()
+        .any(|g| matches!(g, Some(Geometry::Revolution(_))))
+    {
+        16. * error
+    } else {
+        8. * error
+    };
     let mut simplex = vec![support(&shapes[0], &shapes[1], [1., 0., 0.])];
     for _ in 0..iterations {
         let (retained, p) = reduce(&simplex).ok_or(KernelError::NumericRange)?;
@@ -359,10 +544,11 @@ fn query_bounded(
         let lower = (-shapes[1].support_value(mul(axis, -1.)) - shapes[0].support_value(axis))
             * scale
             / axis_norm
-            - 8. * error;
+            - padding;
         let left_point = add(reference, mul(p.a, scale));
         let right_point = add(reference, mul(p.b, scale));
-        let upper = distance.max(norm(sub(right_point, left_point))) + 8. * error;
+        let upper = distance.max(norm(sub(right_point, left_point))) + padding;
+
         if lower > t.linear && upper >= lower && upper - lower <= t.linear {
             return Ok(ConvexClearance {
                 lower_bound_mm: lower,
@@ -393,7 +579,13 @@ mod tests {
     fn check(a: &ModelSnapshot, b: &ModelSnapshot, expected: f64) {
         let t = Tolerance::default();
         for (a, b) in [(a, b), (b, a)] {
-            let q = a.convex_clearance(b, t).unwrap();
+            let q = a.convex_clearance(b, t).unwrap_or_else(|e| {
+                panic!(
+                    "expected {expected}; {:?} to {:?}: {e}",
+                    a.bounds(),
+                    b.bounds()
+                )
+            });
             assert!(
                 q.lower_bound_mm <= expected && q.upper_bound_mm >= expected,
                 "{q:?} expected {expected}"
@@ -509,6 +701,94 @@ mod tests {
                 check(&a, &b, 3. * scale);
             }
         }
+    }
+    #[test]
+    fn convex_revolutions_have_independent_axial_radial_and_mixed_distances() {
+        let t = Tolerance::default();
+        let profiles = [
+            vec![[0., 0.], [2., 0.], [0., 4.]],
+            vec![[0., 0.], [2., 0.], [1., 4.], [0., 4.]],
+            vec![[0., 0.], [2., 0.], [2., 1.], [1., 4.], [0., 4.]],
+            vec![[0., 0.], [2., 2.], [0., 4.]],
+        ];
+        for scale in [1e-3, 1., 100.] {
+            for profile in &profiles {
+                let profile = profile
+                    .iter()
+                    .map(|p| [p[0] * scale, p[1] * scale])
+                    .collect::<Vec<_>>();
+                let a = revolve_polygon(&profile, t).unwrap().model;
+                a.validate_convex_clearance_operand(t).unwrap();
+                for (offset, d) in [
+                    ([0., 0., 7. * scale], 3. * scale),
+                    ([7. * scale, 0., 0.], 3. * scale),
+                ] {
+                    let b = translate(&a, offset, t).unwrap().model;
+                    check(&a, &b, d);
+                }
+                let rotation = [0., (0.3_f64).sin(), 0., (0.3_f64).cos()];
+                let b = translate(&a, [0., 0., 7. * scale], t).unwrap().model;
+                check(
+                    &transform(&a, [20., -8., 3.], rotation, t).unwrap().model,
+                    &transform(&b, [20., -8., 3.], rotation, t).unwrap().model,
+                    3. * scale,
+                );
+                let cylinder = translate(
+                    &extrude_circle(scale, 4. * scale, t).unwrap().model,
+                    [7. * scale, 0., 0.],
+                    t,
+                )
+                .unwrap()
+                .model;
+                check(&a, &cylinder, 4. * scale);
+                let box_body = translate(
+                    &extrude_rectangle(2. * scale, 2. * scale, 4. * scale, t)
+                        .unwrap()
+                        .model,
+                    [7. * scale, -scale, 0.],
+                    t,
+                )
+                .unwrap()
+                .model;
+                check(&a, &box_body, 5. * scale);
+            }
+        }
+        let cone = revolve_polygon(&profiles[0], t).unwrap().model;
+        let reversed = transform(&cone, [0., 0., 11.], [1., 0., 0., 0.], t)
+            .unwrap()
+            .model;
+        check(&cone, &reversed, 3.);
+    }
+    #[test]
+    fn nonconvex_hollow_and_loose_conical_supports_never_certify() {
+        let t = Tolerance::default();
+        for profile in [
+            vec![[1., 0.], [2., 0.], [2., 4.], [1., 4.]],
+            vec![[0., 0.], [2., 0.], [1., 2.], [2., 4.], [0., 4.]],
+            vec![[0., 1.], [2., 0.], [2., 4.], [0., 3.]],
+        ] {
+            let a = revolve_polygon(&profile, t).unwrap().model;
+            assert!(a.validate_convex_clearance_operand(t).is_err());
+            let b = translate(&a, [0., 0., 10.], t).unwrap().model;
+            assert!(a.convex_clearance(&b, t).is_err());
+        }
+        let mut a = revolve_polygon(&[[0., 0.], [2., 0.], [0., 0.01]], t)
+            .unwrap()
+            .model;
+        let b = translate(&a, [7., 0., 0.], t).unwrap().model;
+        for face in &mut a.faces {
+            if let Surface::Cone(c) = &mut face.surface {
+                c.slope += 1e-8;
+            }
+        }
+        assert!(
+            a.validate(t).valid,
+            "fixture should exercise stricter query consistency beyond recognition"
+        );
+        assert!(matches!(
+            a.convex_clearance(&b, t),
+            Err(KernelError::NumericRange)
+        ));
     }
     #[test]
     fn curved_unsupported_and_unresolved_cases_fail_closed() {
