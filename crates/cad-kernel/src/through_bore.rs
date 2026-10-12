@@ -10,9 +10,9 @@ pub(crate) struct Stock {
     pub(crate) axis: [f64; 3],
     pub(crate) x: [f64; 3],
     pub(crate) height: f64,
-    profile: Profile,
+    pub(crate) profile: Profile,
 }
-enum Profile {
+pub(crate) enum Profile {
     Polygon {
         rings: Vec<Vec<[f64; 2]>>,
         circles: Vec<CircleHole>,

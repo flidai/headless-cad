@@ -434,6 +434,13 @@ pub enum Feature {
         height: f64,
         op_version: u32,
     },
+    Fillet {
+        id: String,
+        body: String,
+        faces: [ChamferFace; 2],
+        radius: f64,
+        op_version: u32,
+    },
     ChamferFaces {
         id: String,
         body: String,
@@ -627,6 +634,7 @@ impl<'de> Deserialize<'de> for Feature {
                     ],
                     "revolve" => &["op", "id", "op_version", "profile"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
+                    "fillet" => &["op", "id", "op_version", "body", "faces", "radius"],
                     "chamfer_faces" => &["op", "id", "op_version", "body", "faces", "distance"],
                     "chamfer" => &["op", "id", "op_version", "body", "face_normals", "distance"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
@@ -645,6 +653,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "sketch",
                                 "extrude",
                                 "revolve",
+                                "fillet",
                                 "chamfer_faces",
                                 "chamfer",
                                 "translate",
@@ -726,6 +735,13 @@ impl<'de> Deserialize<'de> for Feature {
                         profile: profile.ok_or_else(|| M::Error::missing_field("profile"))?,
                         height: height.ok_or_else(|| M::Error::missing_field("height"))?,
                     },
+                    "fillet" => Feature::Fillet {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        faces: faces.ok_or_else(|| M::Error::missing_field("faces"))?,
+                        radius: radius.ok_or_else(|| M::Error::missing_field("radius"))?,
+                    },
                     "chamfer_faces" => Feature::ChamferFaces {
                         id,
                         op_version,
@@ -794,6 +810,7 @@ impl Feature {
             | Self::Path { id, .. }
             | Self::Extrude { id, .. }
             | Self::Revolve { id, .. }
+            | Self::Fillet { id, .. }
             | Self::ChamferFaces { id, .. }
             | Self::Chamfer { id, .. }
             | Self::Translate { id, .. }
@@ -811,7 +828,7 @@ impl Feature {
             | Self::Sketch { .. }
             | Self::Path { .. } => vec![],
             Self::Extrude { profile, .. } | Self::Revolve { profile, .. } => vec![profile],
-            Self::ChamferFaces { body, faces, .. } => {
+            Self::ChamferFaces { body, faces, .. } | Self::Fillet { body, faces, .. } => {
                 let mut dependencies = vec![body.as_str()];
                 for face in faces {
                     if !dependencies.contains(&face.from_feature.as_str()) {
@@ -847,6 +864,7 @@ impl Feature {
             | Self::Path { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Revolve { op_version, .. }
+            | Self::Fillet { op_version, .. }
             | Self::ChamferFaces { op_version, .. }
             | Self::Chamfer { op_version, .. }
             | Self::Translate { op_version, .. }
@@ -865,6 +883,7 @@ impl Feature {
             Self::Path { .. } => "path",
             Self::Extrude { .. } => "extrude",
             Self::Revolve { .. } => "revolve",
+            Self::Fillet { .. } => "fillet",
             Self::ChamferFaces { .. } => "chamfer_faces",
             Self::Chamfer { .. } => "chamfer",
             Self::Translate { .. } => "translate",
@@ -1346,6 +1365,15 @@ fn hash_feature(
                 }
             }
         }
+        Feature::Fillet {
+            body,
+            faces,
+            radius,
+            ..
+        } => {
+            hash.update(&serde_json::to_vec(&(body, faces)).expect("face intent serializes"));
+            hash.update(&radius.to_le_bytes());
+        }
         Feature::ChamferFaces {
             body,
             faces,
@@ -1683,6 +1711,15 @@ impl BuildEngine {
                         }
                     }
                 }
+                Feature::Fillet {
+                    id, faces, radius, ..
+                } => {
+                    dimension(id, "radius", *radius)?;
+                    for face in faces {
+                        identifier("fillet anchor", &face.from_feature)?;
+                        identifier("fillet role", &face.role)?;
+                    }
+                }
                 Feature::ChamferFaces {
                     id,
                     faces,
@@ -1791,6 +1828,45 @@ impl BuildEngine {
             let mut hash = hash_feature(recipe, tolerance, feature, &hashes);
             // Logical ancestry is always resolved before either cache lookup.
             // Equal geometric hashes do not establish a semantic face reference.
+            let fillet_faces = if let Feature::Fillet {
+                id, body, faces, ..
+            } = feature
+            {
+                let mut selected = [cad_kernel::FaceId(0); 2];
+                let mut resolutions = Vec::new();
+                for (i, face) in faces.iter().enumerate() {
+                    let resolution = selection_graph.resolve_faces_with_remaining(
+                        &FaceSelector {
+                            anchor_feature: face.from_feature.clone(),
+                            role: face.role.clone(),
+                            target_feature: body.clone(),
+                            cardinality: FaceCardinality::Exactly { count: 1 },
+                        },
+                        &mut assertion_work_remaining,
+                    );
+                    if resolution.status != FaceResolutionStatus::Resolved
+                        || resolution.witnesses.len() != 1
+                    {
+                        return Err(BuildError::Kernel {
+                            feature: id.clone(),
+                            message: format!(
+                                "fillet face {i} selection {:?}: {}",
+                                resolution.status, resolution.diagnostic
+                            ),
+                        });
+                    }
+                    selected[i] = resolution.witnesses[0].target_face;
+                    resolutions.push(resolution);
+                }
+                let mut binding = blake3::Hasher::new();
+                binding.update(hash.as_bytes());
+                binding
+                    .update(&serde_json::to_vec(&resolutions).expect("face witnesses serialize"));
+                hash = binding.finalize().to_hex().to_string();
+                Some(selected)
+            } else {
+                None
+            };
             let chamfer_normals = if let Feature::ChamferFaces {
                 id, body, faces, ..
             } = feature
@@ -1929,6 +2005,12 @@ impl BuildEngine {
                             ),
                             _ => unreachable!("profile types validated before execution"),
                         },
+                        Feature::Fillet { body, radius, .. } => cad_kernel::fillet_longitudinal(
+                            &evaluated[body].model,
+                            fillet_faces.expect("semantic faces resolved before cache"),
+                            *radius,
+                            tolerance,
+                        ),
                         Feature::ChamferFaces { body, distance, .. } => cad_kernel::chamfer(
                             &evaluated[body].model,
                             chamfer_normals.expect("semantic faces resolved before cache"),

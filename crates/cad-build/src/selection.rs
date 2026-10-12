@@ -235,7 +235,9 @@ impl SelectionGraph {
                 continue;
             }
             let slots: Vec<_> = match &graph.nodes[id] {
-                Feature::Chamfer { body, .. } | Feature::ChamferFaces { body, .. } => {
+                Feature::Fillet { body, .. }
+                | Feature::Chamfer { body, .. }
+                | Feature::ChamferFaces { body, .. } => {
                     vec![("body", body)]
                 }
                 Feature::Translate { body, .. } | Feature::Transform { body, .. } => {

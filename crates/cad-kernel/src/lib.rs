@@ -55,6 +55,8 @@ pub use convex_clearance::{
     MAX_CLEARANCE_ITERATIONS, MAX_CLEARANCE_VERTICES,
 };
 pub use convex_intersection::chamfer;
+mod longitudinal_fillet;
+pub use longitudinal_fillet::fillet_longitudinal;
 mod face_frame;
 mod mass_properties;
 mod math;

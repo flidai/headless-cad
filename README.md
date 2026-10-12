@@ -1429,7 +1429,7 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 
 Round-hole cutting in arbitrary solids, general rotated nonconvex modeling, general sketch constraints, general
 polygon union/cut and nonconvex polygon Booleans, general trimmed curved surfaces,
-fillets, offsets, NURBS, STEP import, and GPU
+general rolling-ball fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
 boundaries and millimetre units, with occurrence relationships for assemblies; it does not preserve the executable recipe.
 Analytic cylinders use `ADVANCED_BREP_SHAPE_REPRESENTATION` with circles, a cylindrical surface and an explicit periodic seam. STL is unitless by specification, with coordinates written in millimetres.
@@ -2744,7 +2744,8 @@ validated native plane/line topology. It supports one strictly convex planar
 solid with at most 48 supporting planes including the new face. The cut must
 remain local to the selected edge: every other original vertex stays strictly
 inside, all original faces survive, and topology events reject. Curved or
-nonconvex solids, unequal setbacks and fillets remain unsupported. Numerical
+nonconvex solids and unequal setbacks remain unsupported by chamfer. Longitudinal
+fillets have a separate bounded operation described below. Numerical
 conditioning and model tolerance can further reject otherwise nominal inputs.
 
 Generated role `chamfer` identifies the new face; complete `body` lineage keeps
@@ -2815,3 +2816,36 @@ Use the same explicit `--param` overrides when reproducing a nondefault build.
 The viewer's **Recipe → Source file** picker shows captured module text. This is
 read-only source browsing; automatic feature-to-module line navigation remains
 future work. Module and lock edits are watched alongside the root recipe.
+
+
+### Native longitudinal fillets
+
+`fillet` rounds one full-height convex corner of a recognized right prism. Two
+semantic face references select its shared straight edge; the kernel produces an
+exact tangent cylindrical wall, preserves existing face descendants, and records
+the generated `fillet_wall` role. Original stock references can select subsequent
+corners after earlier topology edits:
+
+```python
+rounded = fillet(
+    id = "front_corner", body = stock,
+    faces = [
+        {"from_feature": stock, "role": "wall_x_min"},
+        {"from_feature": stock, "role": "wall_y_min"},
+    ],
+    radius = 4,
+)
+```
+
+The `rounded_bearing_cover.star` example rounds four corners, then cuts an actual
+bearing bore and four mounting holes. Its source asserts volume, midsection area,
+and survival of each fillet's semantic face. Parameters change corner radius,
+bore radius and thickness; the viewer inspects the resulting geometry and recipe.
+
+This operation supports convex line/arc right prisms with circular holes, selecting
+a corner between two straight outer walls. It rejects cap edges, arc-adjacent
+corners, reflex corners, polygon holes, and radius-driven topology changes.
+It does not clamp the requested radius. General rolling-ball fillets remain open.
+The independent `tools/check-longitudinal-fillet.py` acceptance uses OCCT's real
+edge-filleting operation, closed-form box/quarter-disk moments, STEP material
+differences, exact cylindrical radii, closed STL and captured-recipe replay.

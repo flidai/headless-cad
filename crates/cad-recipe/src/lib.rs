@@ -450,6 +450,22 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(id.to_owned())
     }
 
+    fn fillet(
+        id: &str,
+        body: &str,
+        faces: Value,
+        radius: Value,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let faces: [cad_build::ChamferFace; 2] =
+            serde_json::from_str(&faces.to_json()?).map_err(|_| {
+                anyhow::anyhow!(
+                    "faces must contain exactly two objects with from_feature and role strings"
+                )
+            })?;
+        store(eval)?.feature(serde_json::json!({"op":"fillet","id":id,"op_version":1,"body":body,"faces":faces,"radius":number(radius)?}))?;
+        Ok(id.to_owned())
+    }
     fn chamfer_faces(
         id: &str,
         body: &str,

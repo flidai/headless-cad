@@ -119,6 +119,7 @@ fn advertised_examples_compile_and_exercise_every_feature_operation() {
         "intersect",
         "chamfer",
         "chamfer_faces",
+        "fillet",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -573,7 +574,7 @@ fn focused_assembly_type_discovery_follows_nullable_inline_objects_not_reference
 fn focused_discovery_rejects_unknown_ids_and_conflicting_flags_without_writes() {
     let directory = tempfile::tempdir().unwrap();
     for args in [
-        vec!["capabilities", "--operation", "feature.fillet"],
+        vec!["capabilities", "--operation", "feature.unknown_operation"],
         vec!["capabilities", "--type", "missing_type"],
     ] {
         let result = cli(directory.path(), &args);

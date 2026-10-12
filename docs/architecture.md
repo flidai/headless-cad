@@ -736,7 +736,8 @@ edge's endpoint vertices may be removed; every other vertex must stay strictly
 inside the retained half-space beyond tolerance. Every original face must survive,
 with exactly one generated `chamfer` face and complete `body` input-face lineage.
 Larger cuts reaching other vertices, curved/nonconvex solids, unequal setbacks,
-multiple simultaneous edges and fillets remain unsupported.
+multiple simultaneous edges remain unsupported by chamfer. The separate bounded
+longitudinal fillet operation is described below.
 
 Feature hashing, native cache replay, Starlark/JSON IR and capability discovery
 include this operation. Semantic references propagate through the body map;
@@ -3007,3 +3008,34 @@ A genuinely overlapping pair of 36-component compounds still exceeds the native
 coordinate-grid budget and must preserve the previous published generation.
 This is a bounded exact-kernel scaling improvement, not general curved Boolean
 closure or completion of the large-assembly hardware gates.
+
+
+### Semantic longitudinal-edge fillets
+
+The recipe `fillet` feature binds two `{from_feature, role}` selectors to exactly
+one current descendant each before consulting geometry cache entries. The native
+operation admits their unique full-height straight shared edge on a recognized
+convex right prism. Selection witnesses participate in feature dependencies;
+identical material from an unrelated feature cannot substitute for ancestry.
+
+The selected line–line profile corner is replaced by a tangent circular arc.
+Existing outer arcs and circular holes survive, allowing sequential corner edits
+and later through-drilling. The result uses ordinary native line/arc prism
+geometry, so properties, sections, meshing and analytic STEP share the existing
+representation. Complete input face descendants preserve original cap/side-face
+references; `fillet_wall` names the new cylindrical face. Snapshot-local indices
+are not persistent source identifiers.
+
+Admission checks input supports, convexity, edge direction/height, conditioning,
+remaining straight spans, path validity, hole separation, and final native
+validity. Radius-driven topology events reject instead of silently shrinking or
+healing geometry. Cap edges, corners adjacent to arcs, reflex corners, polygonal
+holes and multiple solids are outside this operation's domain.
+
+Independent acceptance selects actual longitudinal edges in an OCCT prism and
+uses `BRepFilletAPI_MakeFillet`, not the implementation's tangent-point algorithm.
+It compares complete mass properties, bidirectional STEP material differences,
+exact cylinder radii, oriented closed meshes and source replay. Closed-form
+rectangle/quarter-disk integrals provide an additional independent moment check.
+The bearing-cover acceptance includes four rounds followed by five real bores.
+This is a first curved edge treatment, not general rolling-ball fillet closure.
