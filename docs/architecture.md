@@ -860,8 +860,8 @@ actual annular centroid and normal, enabling source-driven hardware attachment.
 The bounded domain permits up to 32 separated hole groups and 128 total axial
 sections. Cylindrical tools must open a stock cap; enclosed intervals, redundant
 cutters wholly inside existing voids, noncoaxial intersection, uncertain coaxiality,
-outer-profile contact and conical countersinks
-remain unsupported. Classification uses a separate arithmetic envelope and never
+outer-profile contact remain unsupported in this cylindrical domain.
+The conical extension is described below. Classification uses a separate arithmetic envelope and never
 snaps a dimensional offset into coaxial alignment.
 
 `counterbored_fixture.star` integrates eighteen machining features and twelve
@@ -889,9 +889,40 @@ sockets and six counterbored mounting holes, and assembles mirrored flanges,
 bearings, a shaft, spacer rods and seat-attached fasteners. Independent 27-case
 native moments, direct and assembled STEP/STL checks, publication-failure tests
 and circular silhouette/floor/shoulder picking cover the supported composition.
-General intersecting passages, pockets, conical cutters and fit/load certification
+General intersecting passages, pockets and fit/load certification
 remain separate obligations. The evidence ledger records this engineering case
 independently from complete manufacturing release or hardware performance gates.
+
+### Conical countersinks and axial machining composition
+
+The countersink extension generalizes the axial bore boundary to linear-radius
+sections. A solid frustum made by full revolution can cut a contained coaxial
+seat around a cylindrical pilot bore. The envelope of the existing void and the
+cutter is resolved at axial endpoints and analytical radius-equality crossings;
+this is native cone/cylinder geometry, not a mesh Boolean approximation.
+
+Continuous cone/cylinder junctions share one circular edge and have no artificial
+annular shoulder. Resolved radial jumps retain actual planar shoulders. Boundary
+recognition, cap loops, seam orientation, mass properties and display rings must
+agree on this representation, including after a common rigid placement. Stock
+face history is preserved; surviving cutter and prior bore walls map through
+support and interval overlap. Native material properties remain independent of
+display LOD and camera state.
+
+The supported domain retains separated hole groups, resolved positive radii and
+section lengths, cap-opening tools and explicit arithmetic guards. Tangent outer
+contact, overlapping noncoaxial groups, skew axes, enclosed tools, apex machining
+and unresolved intersections remain unsupported. Repeated and mixed cylindrical
+machining must continue to pass the earlier through/blind/counterbore corpus.
+
+`countersunk_bearing_cover.star` combines six conical seats and three blind
+locating sockets per annular cover, mirrored covers and twelve flush fastener
+envelopes. Independent frustum integrals check volume, centroid and full inertia;
+STEP re-import checks native cones and orientation; closed-mesh and browser
+selection checks exercise the shared ring and open pilot passage. Source face
+and property assertions plus exchange requirements gate publication. These
+checks advance the drive-module workflow without certifying threads, fits,
+preload, loads or a complete manufacturing release.
 
 ## Constraints and assemblies
 
@@ -1986,7 +2017,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores and coaxial counterbores in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |

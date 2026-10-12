@@ -44,6 +44,30 @@
       ]
     },
     {
+      "id": "machining.countersunk-bearing-cover",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "boolean.countersink",
+        "boolean.round_stock",
+        "boolean.blind_bore"
+      ],
+      "supported_domain": "Native annular covers with six conical countersinks composed with through bores and three blind locating sockets; mirrored cover assembly at bolt_pitch 40..44 mm, seat_depth 2..4 mm, flange_height 18..24 mm. Native parameter sweep and independent default/min/max STEP/STL checks. Sixteen direct box/disk/annulus and interior cone/pilot crossing cases cover top/bottom and common oblique frames, with 45-degree and non-45-degree cone angles.",
+      "exclusions": [
+        "General intersecting holes and pockets",
+        "Conical apex machining and enclosed cutters",
+        "Threads, fits, fastener preload and bearing performance certification",
+        "Manufacturing drawing release"
+      ],
+      "fixture": "examples/countersunk_bearing_cover.star",
+      "checks": [
+        "countersink-native-moments",
+        "countersink-exchange-moments",
+        "countersink-direct-export",
+        "countersink-direct-oracle"
+      ]
+    },
+    {
       "id": "manufacturing.drive-module-release",
       "status": "planned",
       "domain_ids": [],
@@ -119,6 +143,57 @@
         "{cad}",
         "--retain-dir",
         "{artifacts}/round_bearing_cartridge"
+      ]
+    },
+    {
+      "id": "countersink-native-moments",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "countersunk_bearing_cover"
+      ]
+    },
+    {
+      "id": "countersink-exchange-moments",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_countersunk_bearing_cover_ocp.py",
+        "--cad",
+        "{cad}",
+        "--retain-dir",
+        "{artifacts}/countersunk_bearing_cover"
+      ]
+    },
+    {
+      "id": "countersink-direct-export",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "run",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-export",
+        "--example",
+        "export_countersinks",
+        "--",
+        "{artifacts}/countersink_direct"
+      ]
+    },
+    {
+      "id": "countersink-direct-oracle",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_countersinks_ocp.py",
+        "{artifacts}/countersink_direct"
       ]
     }
   ]

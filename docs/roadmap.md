@@ -80,7 +80,7 @@ release and is checked independently from exported solid validity.
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums with part/rigid-module attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
-| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; simple concave line/arc path extrusion with circular holes and bounded parallel-cylinder union/intersection/through-cut and sequential contained circular through/blind bores and coaxial counterbores in recognized prisms and circular/annular stock implemented; curved inner paths, arcs in revolved meridians, partial revolution, general Booleans and generalized trim/seam handling remain |
+| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; simple concave line/arc path extrusion with circular holes and bounded parallel-cylinder union/intersection/through-cut and sequential contained circular through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock implemented; curved inner paths, arcs in revolved meridians, partial revolution, general Booleans and generalized trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache and analytic whole-part LOD implemented; metadata paging, cluster LOD, part spatial indexes and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Dimensioned slope fixture → four-bar mechanism → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | In progress: bounded original Rust point sketch solver, ten constraint kinds including directed angles and circle-to-line tangency; separate linear/angular tolerances, polygon extrusion, local rank/residual/conditioning reports, independent constraint islands and atomic failure handling; curves, large connected systems, branch continuation, conflict minimization and assembly solving remain |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
@@ -404,8 +404,8 @@ sections and annular shoulders, with overlap lineage and independent union-volum
 integration. `counterbored_fixture.star` combines eighteen machining features,
 twelve shoulder datums and a mirrored 32-occurrence fastening stack. Full native
 and material moments across 27 configurations, independent exchange checks and
-shoulder-picking checks cover this composition. Conical countersinks and
-noncoaxial intersections remain future work.
+shoulder-picking checks cover this composition. Noncoaxial intersections remain future work. Conical countersinks now extend
+the axial machining boundary as described below.
 Native circular and annular stock now enter the same machining sequence through
 an exact outer-cylinder boundary split with composed face lineage.
 `round_bearing_cartridge.star` adds a mirrored bearing assembly with socketed rods,
@@ -436,6 +436,16 @@ A visually elaborate tessellation is not evidence of a more capable exact
 kernel. Distinguish display benchmarks, topology/geometry benchmarks, constraint
 benchmarks, and engineering release examples. Assembly performance reports state
 both instance count and unique-definition count.
+
+
+The conical machining increment uses `countersunk_bearing_cover.star`: two
+annular covers with six tapered seats and three locating sockets each, plus
+shared flush fastener envelopes. It extends M2 with linear-radius axial sections,
+continuous shared cone/cylinder rings and analytical intersection breakpoints.
+Its independent native/STEP moments, mesh closure, semantic-edit obligations and
+browser picking must pass alongside the existing cylindrical machining corpus.
+The evidence ledger records this composition as `machining.countersunk-bearing-cover`;
+it does not close general curved Booleans or M6 manufacturing drawings.
 
 ## Meaning of completion
 

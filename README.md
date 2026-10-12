@@ -20,7 +20,7 @@ seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union, cut and intersection support orthogonal solids and a bounded analytic
 branch for two parallel solid cylinders. Right prisms and circular/annular stock
-also accept contained through/blind drilling and counterbores. Intersection supports bounded,
+also accept contained through/blind drilling, counterbores and conical countersinks. Intersection supports bounded,
 well-conditioned convex planar solids, including rotated inputs.
 
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
@@ -1755,8 +1755,8 @@ opposed counterbores, common oblique frames and three fixture configurations.
 `npm run test:counterbore --prefix tools/preview-check` checks annular shoulder
 picking and open pilot holes from both sides in all three viewers. Invalid cuts
 or removed required shoulders leave the previous published generation intact.
-Noncoaxial intersecting passages, conical countersinks and general pockets remain
-future work.
+Noncoaxial intersecting passages and general pockets remain future work.
+Conical countersinks are covered by the axial machining extension below.
 
 ### Machined round bearing cartridge
 
@@ -1788,3 +1788,29 @@ cases and three assembled STEP/STL oracle configurations cover the new boundary.
 through openings, socket floors and shoulder picking in all three viewers. The
 ledger capability `machining.round-bearing-cartridge` collects its native and
 retained independent product evidence using the release-evidence workflow above.
+
+
+### Countersunk bearing covers
+
+[countersink.star](examples/countersink.star) isolates a conical cut around one
+through bore. [countersunk_bearing_cover.star](examples/countersunk_bearing_cover.star) extends
+annular machining to native conical seats around six pilot holes per cover.
+Two mirrored covers, twelve flush screw envelopes, two bearings, three locating
+rods and a shaft form 20 occurrences sharing five definitions. The exposed
+`flange_inspection` output shows the tapered seats and three closed socket floors.
+Picking a part shows its captured Starlark recipe.
+
+`bolt_pitch` (40..44 mm), `seat_depth` (2..4 mm), and `flange_height` (18..24 mm)
+control the example. Edit the recipe and rebuild to revise the model. A changed
+seat depth revises the native conical boundary and screw envelope; the viewer
+remains an inspection client. The recipe carries native face/property assertions
+and fourteen STEP handoff requirements.
+
+The kernel composes coaxial cylindrical and conical sections with shared boundary
+rings at continuous transitions. Full native moments are integrated from the
+analytic geometry. Independent slice integrals, STEP import and closed-STL
+checks cover the composition; `npm run test:countersink --prefix tools/preview-check`
+checks cone picking, through passages and blind floors in all three viewers.
+Noncoaxial intersections, boundary contact, enclosed cutters, conical apex cuts
+and general pockets remain unsupported. These fasteners are geometric envelopes,
+not certified thread, fit or preload models.

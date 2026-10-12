@@ -10,6 +10,8 @@ jobs:
             capability: machining.counterbore-fixture
           - case: round-stock
             capability: machining.round-bearing-cartridge
+          - case: countersink
+            capability: machining.countersunk-bearing-cover
     steps:
       - uses: actions/checkout@v4
       - run: rustup show

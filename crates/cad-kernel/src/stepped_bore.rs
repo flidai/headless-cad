@@ -1,6 +1,6 @@
-//! Coaxial cylindrical machining. The native circle/plane/cylinder boundary is
+//! Coaxial cylindrical and conical machining. The native analytic boundary is
 //! the certificate; no recipe history or hidden construction metadata is used.
-use crate::math::norm;
+use crate::math::{finite, norm};
 use crate::*;
 use std::collections::BTreeMap;
 
@@ -9,6 +9,7 @@ pub const MAX_STEPPED_BORE_SEGMENTS: usize = 128;
 struct Segment {
     disk: ModelSnapshot,
     cylinder: CylinderGeometry,
+    upper_radius: f64,
     wall: FaceId,
     edges: [EdgeId; 2],
 }
@@ -52,10 +53,32 @@ fn same_plane(a: f64, b: f64, axis: [f64; 3], error: f64) -> bool {
 // curves. analytic::recognize validates every coordinate and seam reference.
 fn segment(m: &ModelSnapshot, f: usize, t: Tolerance) -> Result<Segment, KernelError> {
     let face = m.faces.get(f).ok_or_else(bad)?;
-    let Surface::Cylinder(wall) = &face.surface else {
-        return Err(bad());
+    let (wall, cone_slope) = match &face.surface {
+        Surface::Cylinder(c) => (c.clone(), 0.),
+        Surface::Cone(c) => (
+            Cylinder {
+                origin: c.origin,
+                axis: c.axis,
+                x_direction: c.x_direction,
+                radius: c.radius,
+                inward: c.inward,
+            },
+            c.slope,
+        ),
+        _ => return Err(bad()),
     };
-    if !wall.inward || face.loops.len() != 1 {
+    if !wall.inward
+        || face.loops.len() != 1
+        || !finite(wall.origin)
+        || !finite(wall.axis)
+        || !finite(wall.x_direction)
+        || !wall.radius.is_finite()
+        || wall.radius <= t.linear
+        || !cone_slope.is_finite()
+        || (norm(wall.axis) - 1.).abs() > 128. * f64::EPSILON
+        || (norm(wall.x_direction) - 1.).abs() > 128. * f64::EPSILON
+        || dot(wall.axis, wall.x_direction).abs() > 128. * f64::EPSILON
+    {
         return Err(bad());
     }
     let l = m.loops.get(face.loops[0].0).ok_or_else(bad)?;
@@ -123,16 +146,138 @@ fn segment(m: &ModelSnapshot, f: usize, t: Tolerance) -> Result<Segment, KernelE
     let mut surface = wall.clone();
     surface.inward = false;
     disk.faces[2].surface = Surface::Cylinder(surface);
-    let mut cylinder = crate::analytic::recognize(&disk, Some(t))?;
+    let upper_radius = top.radius;
+    let mut cylinder = if cone_slope == 0. {
+        crate::analytic::recognize(&disk, Some(t))?
+    } else {
+        // Reconstruct the frustum's complete native support from its boundary.
+        let height = dot(sub(top.origin, wall.origin), wall.axis);
+        let cylinder = CylinderGeometry {
+            origin: wall.origin,
+            axis: wall.axis,
+            x_direction: wall.x_direction,
+            radius: wall.radius,
+            height,
+            inner_radius: 0.,
+            inner_wall: None,
+            start_cap: FaceId(0),
+            end_cap: FaceId(1),
+            wall: FaceId(2),
+        };
+        let error = crate::bored_prism::arithmetic(m, &cylinder, t)?;
+        if !height.is_finite()
+            || height <= t.linear + error
+            || !upper_radius.is_finite()
+            || upper_radius <= t.linear + error
+            || (upper_radius - wall.radius - cone_slope * height).abs() > error
+        {
+            return Err(bad());
+        }
+        let expected = frustum(&cylinder, upper_radius, t)?;
+        if disk
+            .vertices
+            .iter()
+            .zip(&expected.vertices)
+            .any(|(a, b)| !finite(a.position) || norm(sub(a.position, b.position)) > error)
+        {
+            return Err(bad());
+        }
+        for (a, b) in disk.edges.iter().zip(&expected.edges) {
+            if a.vertices != b.vertices {
+                return Err(bad());
+            }
+            match (&a.curve, &b.curve) {
+                (Curve::Circle(a), Curve::Circle(b))
+                    if finite(a.origin)
+                        && finite(a.axis)
+                        && finite(a.x_direction)
+                        && norm(sub(a.origin, b.origin)) <= error
+                        && norm(sub(a.axis, b.axis)) <= 128. * f64::EPSILON
+                        && norm(sub(a.x_direction, b.x_direction)) <= 128. * f64::EPSILON
+                        && a.radius == b.radius => {}
+                (Curve::Line(a), Curve::Line(b))
+                    if finite(a.origin)
+                        && finite(a.direction)
+                        && norm(sub(a.origin, b.origin)) <= error
+                        && norm(sub(a.direction, b.direction)) <= 128. * f64::EPSILON => {}
+                _ => return Err(bad()),
+            }
+        }
+        disk.faces[2].surface = Surface::Cone(Cone {
+            origin: wall.origin,
+            axis: wall.axis,
+            x_direction: wall.x_direction,
+            radius: wall.radius,
+            slope: cone_slope,
+            inward: false,
+        });
+        cylinder
+    };
     cylinder.wall = FaceId(f);
     Ok(Segment {
         disk,
         cylinder,
+        upper_radius,
         wall: FaceId(f),
         edges: [ids[0], ids[1]],
     })
 }
-// Canonical serialization: three loops and three edges per axial segment;
+fn frustum(c: &CylinderGeometry, upper: f64, t: Tolerance) -> Result<ModelSnapshot, KernelError> {
+    let mut disk = extrude_circle(c.radius, c.height, t)?.model;
+    for (side, radius) in [(0, c.radius), (1, upper)] {
+        let origin = if side == 0 { c.origin } else { end(c) };
+        disk.vertices[side].position =
+            std::array::from_fn(|i| origin[i] + c.x_direction[i] * radius);
+        disk.edges[side].curve = Curve::Circle(Circle {
+            origin,
+            axis: c.axis,
+            x_direction: c.x_direction,
+            radius,
+        });
+        disk.faces[side].surface = Surface::Plane(Plane {
+            origin,
+            normal: c.axis.map(|v| if side == 0 { -v } else { v }),
+        });
+    }
+    disk.edges[2].curve = Curve::Line(Line {
+        origin: disk.vertices[0].position,
+        direction: c.axis,
+    });
+    disk.faces[2].surface = Surface::Cylinder(Cylinder {
+        origin: c.origin,
+        axis: c.axis,
+        x_direction: c.x_direction,
+        radius: c.radius,
+        inward: false,
+    });
+    if upper == c.radius {
+        return Ok(disk);
+    }
+    if !upper.is_finite() || upper <= t.linear || c.radius <= t.linear || c.height <= t.linear {
+        return Err(bad());
+    }
+    disk.vertices[1].position =
+        std::array::from_fn(|i| c.origin[i] + c.axis[i] * c.height + c.x_direction[i] * upper);
+    if let Curve::Circle(circle) = &mut disk.edges[1].curve {
+        circle.radius = upper;
+    }
+    if let Curve::Line(line) = &mut disk.edges[2].curve {
+        let direction = sub(disk.vertices[1].position, disk.vertices[0].position);
+        let length = norm(direction);
+        line.direction = direction.map(|v| v / length);
+    }
+    disk.faces[2].surface = Surface::Cone(Cone {
+        origin: c.origin,
+        axis: c.axis,
+        x_direction: c.x_direction,
+        radius: c.radius,
+        slope: (upper - c.radius) / c.height,
+        inward: false,
+    });
+    Ok(disk)
+}
+// Canonical serialization: three loops per axial segment; continuous sections
+// share a ring edge and vertex.
 // wall faces first within each group, then its endpoint/annular plane faces.
 fn build(
     base: &ModelSnapshot,
@@ -144,36 +289,60 @@ fn build(
     let mut m = base.clone();
     for group in groups {
         let mut rings = Vec::new();
-        for s in &group.segments {
-            let (v, e, l, f) = (
-                m.vertices.len(),
-                m.edges.len(),
-                m.loops.len(),
-                m.faces.len(),
-            );
-            m.vertices.extend(s.disk.vertices.clone());
-            m.edges.extend(s.disk.edges.iter().cloned().map(|mut edge| {
-                edge.vertices = edge.vertices.map(|id| VertexId(id.0 + v));
-                edge
-            }));
-            let eu = |i, r| EdgeUse {
-                edge: EdgeId(e + i),
-                reversed: r,
+        let mut previous_top: Option<(VertexId, EdgeId)> = None;
+        for (index, s) in group.segments.iter().enumerate() {
+            let (l, f) = (m.loops.len(), m.faces.len());
+            let continuous =
+                index > 0 && group.segments[index - 1].upper_radius == s.cylinder.radius;
+            let bottom = if continuous {
+                previous_top.unwrap().0
+            } else {
+                let v = VertexId(m.vertices.len());
+                m.vertices.push(s.disk.vertices[0].clone());
+                v
             };
+            let top = VertexId(m.vertices.len());
+            m.vertices.push(s.disk.vertices[1].clone());
+            let low_edge = if continuous {
+                previous_top.unwrap().1
+            } else {
+                let id = EdgeId(m.edges.len());
+                let mut e = s.disk.edges[0].clone();
+                e.vertices = [bottom, bottom];
+                m.edges.push(e);
+                id
+            };
+            let top_edge = EdgeId(m.edges.len());
+            let mut e = s.disk.edges[1].clone();
+            e.vertices = [top, top];
+            m.edges.push(e);
+            let seam = EdgeId(m.edges.len());
+            let mut e = s.disk.edges[2].clone();
+            e.vertices = [bottom, top];
+            m.edges.push(e);
+            previous_top = Some((top, top_edge));
+            let eu = |edge, reversed| EdgeUse { edge, reversed };
             m.loops.extend([
                 Loop {
-                    edges: vec![eu(0, false)],
+                    edges: vec![eu(low_edge, false)],
                 },
                 Loop {
-                    edges: vec![eu(1, true)],
+                    edges: vec![eu(top_edge, true)],
                 },
                 Loop {
-                    edges: vec![eu(0, true), eu(2, false), eu(1, false), eu(2, true)],
+                    edges: vec![
+                        eu(low_edge, true),
+                        eu(seam, false),
+                        eu(top_edge, false),
+                        eu(seam, true),
+                    ],
                 },
             ]);
             let mut wall = s.disk.faces[2].clone();
-            if let Surface::Cylinder(c) = &mut wall.surface {
-                c.inward = true;
+            match &mut wall.surface {
+                Surface::Cylinder(c) => c.inward = true,
+                Surface::Cone(c) => c.inward = true,
+                _ => return Err(bad()),
             }
             wall.loops = vec![LoopId(l + 2)];
             m.faces.push(wall);
@@ -206,9 +375,12 @@ fn build(
             plane(face, vec![rings[0][0]]);
         }
         for i in 1..group.segments.len() {
-            let lower = &group.segments[i - 1].cylinder;
             let upper = &group.segments[i].cylinder;
-            if upper.radius > lower.radius {
+            let lower_radius = group.segments[i - 1].upper_radius;
+            if upper.radius == lower_radius {
+                continue;
+            }
+            if upper.radius > lower_radius {
                 plane(
                     Surface::Plane(Plane {
                         origin: upper.origin,
@@ -277,9 +449,8 @@ fn extract(m: &ModelSnapshot, t: Tolerance, replay: bool) -> Result<Geometry, Ke
     let mut segments = Vec::new();
     for f in first..m.faces.len() {
         match m.faces[f].surface {
-            Surface::Cylinder(_) => segments.push(segment(m, f, t)?),
+            Surface::Cylinder(_) | Surface::Cone(_) => segments.push(segment(m, f, t)?),
             Surface::Plane(_) => {}
-            _ => return Err(bad()),
         }
     }
     if segments.is_empty() {
@@ -373,7 +544,12 @@ fn extract(m: &ModelSnapshot, t: Tolerance, replay: bool) -> Result<Geometry, Ke
                     lo,
                     stock.axis,
                     error,
-                ) || (before.radius - s.cylinder.radius).abs() <= t.linear + error
+                ) || ((group.segments[i - 1].upper_radius - s.cylinder.radius).abs()
+                    <= t.linear + error
+                    && group.segments[i - 1].upper_radius != s.cylinder.radius)
+                    || (group.segments[i - 1].upper_radius == s.cylinder.radius
+                        && group.segments[i - 1].upper_radius == before.radius
+                        && s.upper_radius == s.cylinder.radius)
                 {
                     return Err(bad());
                 }
@@ -386,12 +562,13 @@ fn extract(m: &ModelSnapshot, t: Tolerance, replay: bool) -> Result<Geometry, Ke
                 }
             }
         }
-        let largest = group
+        let mut envelope = group.segments[0].cylinder.clone();
+        envelope.radius = group
             .segments
             .iter()
-            .max_by(|a, b| a.cylinder.radius.total_cmp(&b.cylinder.radius))
-            .unwrap();
-        let tool = crate::bored_prism::disk_at(&largest.cylinder, &stock, 0., stock.height, t)?;
+            .map(|s| s.cylinder.radius.max(s.upper_radius))
+            .fold(0., f64::max);
+        let tool = crate::bored_prism::disk_at(&envelope, &stock, 0., stock.height, t)?;
         surrogate = crate::through_bore::cut(&surrogate, &tool, t)?.model;
     }
     if replay && build(&base, &groups, stock.height, stock.origin, stock.axis)? != *m {
@@ -437,30 +614,112 @@ fn extract(m: &ModelSnapshot, t: Tolerance, replay: bool) -> Result<Geometry, Ke
     })
 }
 pub(crate) fn recognize(m: &ModelSnapshot, t: Tolerance) -> Result<Geometry, KernelError> {
-    if !m
+    let has_cone = m
         .faces
         .iter()
-        .skip(2)
-        .any(|f| matches!(f.surface, Surface::Plane(_)) && f.loops.len() == 2)
+        .any(|f| matches!(f.surface, Surface::Cone(_)));
+    if !has_cone
+        && !m
+            .faces
+            .iter()
+            .skip(2)
+            .any(|f| matches!(f.surface, Surface::Plane(_)) && f.loops.len() == 2)
     {
         return Err(bad());
     }
     let g = extract(m, t, true)?;
-    if !g.groups.iter().any(|g| g.segments.len() > 1) {
+    if !has_cone && !g.groups.iter().any(|g| g.segments.len() > 1) {
         return Err(bad());
     }
     Ok(g)
+}
+fn cutter(m: &ModelSnapshot, t: Tolerance) -> Result<(CylinderGeometry, f64), KernelError> {
+    if let Ok(c) = crate::analytic::recognize(m, Some(t)) {
+        let r = c.radius;
+        return Ok((c, r));
+    }
+    let g = crate::revolve::recognize(m, t)?;
+    if g.profile.len() != 4 || g.profile.iter().filter(|p| p[0] == 0.).count() != 2 {
+        return Err(bad());
+    }
+    let walls: Vec<_> = g
+        .segments
+        .iter()
+        .filter(|s| matches!(m.faces[s.face.0].surface, Surface::Cone(_)))
+        .collect();
+    if walls.len() != 1 {
+        return Err(bad());
+    }
+    let wall = walls[0];
+    let (low, high) = if wall.start[1] < wall.end[1] {
+        (wall.start, wall.end)
+    } else {
+        (wall.end, wall.start)
+    };
+    let Surface::Cone(cone) = &m.faces[wall.face.0].surface else {
+        return Err(bad());
+    };
+    if cone.inward || low[0] <= t.linear || high[0] <= t.linear {
+        return Err(bad());
+    }
+    let cap = |z: f64| {
+        g.segments
+            .iter()
+            .find(|s| s.start[1] == z && s.end[1] == z)
+            .map(|s| s.face)
+            .ok_or_else(bad)
+    };
+    Ok((
+        CylinderGeometry {
+            origin: std::array::from_fn(|i| g.origin[i] + g.axis[i] * low[1]),
+            axis: g.axis,
+            x_direction: g.x_direction,
+            radius: low[0],
+            height: high[1] - low[1],
+            inner_radius: 0.,
+            inner_wall: None,
+            start_cap: cap(low[1])?,
+            end_cap: cap(high[1])?,
+            wall: wall.face,
+        },
+        high[0],
+    ))
+}
+fn segment_radius(s: &Segment, z: f64, origin: [f64; 3], axis: [f64; 3]) -> f64 {
+    let lo = dot(sub(s.cylinder.origin, origin), axis);
+    if z == lo {
+        s.cylinder.radius
+    } else if z == lo + s.cylinder.height {
+        s.upper_radius
+    } else {
+        s.cylinder.radius + (s.upper_radius - s.cylinder.radius) * ((z - lo) / s.cylinder.height)
+    }
 }
 pub(crate) fn cut(
     a: &ModelSnapshot,
     b: &ModelSnapshot,
     t: Tolerance,
 ) -> Result<OperationResult, KernelError> {
-    let old = extract(a, t, false)?;
+    let old = extract(a, t, false).or_else(|_| {
+        let s = crate::through_bore::stock(a, t)?;
+        Ok::<_, KernelError>(Geometry {
+            base: a.clone(),
+            groups: vec![],
+            surrogate: a.clone(),
+            origin: s.origin,
+            axis: s.axis,
+            x: s.x,
+            height: s.height,
+            floors: vec![],
+        })
+    })?;
     let stock = crate::through_bore::stock(&old.base, t)?;
-    let tool = crate::analytic::recognize(b, Some(t))?;
+    let (tool, tool_upper) = cutter(b, t)?;
     let error = crate::bored_prism::arithmetic(a, &tool, t)?;
     let (lo, hi, _) = crate::bored_prism::interval(&stock, &tool, error, t)?;
+    let tool_z = dot(sub(tool.origin, stock.origin), stock.axis);
+    let tool_slope = (tool_upper - tool.radius) / tool.height * dot(tool.axis, stock.axis).signum();
+    let tool_radius = |z: f64| tool.radius + tool_slope * (z - tool_z);
     let mut groups = old.groups.clone();
     let index = groups
         .iter()
@@ -477,6 +736,24 @@ pub(crate) fn cut(
         levels.push(dot(sub(s.cylinder.origin, stock.origin), stock.axis));
         levels.push(dot(sub(end(&s.cylinder), stock.origin), stock.axis));
     }
+    let mut crossings = vec![];
+    for segment in &group.segments {
+        let low = dot(sub(segment.cylinder.origin, stock.origin), stock.axis).max(lo);
+        let high = (dot(sub(segment.cylinder.origin, stock.origin), stock.axis)
+            + segment.cylinder.height)
+            .min(hi);
+        if low < high {
+            let a = tool_radius(low) - segment_radius(segment, low, stock.origin, stock.axis);
+            let b = tool_radius(high) - segment_radius(segment, high, stock.origin, stock.axis);
+            if (a < 0. && b > 0.) || (a > 0. && b < 0.) {
+                let z = low + (high - low) * (a / (a - b));
+                if z > low && z < high {
+                    levels.push(z);
+                    crossings.push(z);
+                }
+            }
+        }
+    }
     levels.sort_by(f64::total_cmp);
     let mut clean: Vec<f64> = vec![];
     for z in levels {
@@ -490,61 +767,82 @@ pub(crate) fn cut(
         }
         clean.push(z);
     }
-    let mut sections: Vec<(f64, f64, f64)> = vec![];
+    let mut sections: Vec<(f64, f64, f64, f64)> = vec![];
     let mut changed = false;
     for pair in clean.windows(2) {
-        let mid = (pair[0] + pair[1]) / 2.;
-        let previous = group
-            .segments
-            .iter()
-            .find(|s| {
-                let z = dot(sub(s.cylinder.origin, stock.origin), stock.axis);
-                mid > z && mid < z + s.cylinder.height
-            })
-            .map_or(0., |s| s.cylinder.radius);
-        let radius = if mid > lo && mid < hi {
-            previous.max(tool.radius)
-        } else {
-            previous
+        let mid = pair[0] / 2. + pair[1] / 2.;
+        let previous = group.segments.iter().find(|s| {
+            let z = dot(sub(s.cylinder.origin, stock.origin), stock.axis);
+            mid > z && mid < z + s.cylinder.height
+        });
+        let old_radius = previous.map_or(0., |s| segment_radius(s, mid, stock.origin, stock.axis));
+        let active = mid > lo && mid < hi && tool_radius(mid) > old_radius;
+        if !active && previous.is_none() {
+            return Err(bad());
+        }
+        changed |= active;
+        let radius = |z| {
+            if active {
+                tool_radius(z)
+            } else {
+                segment_radius(previous.unwrap(), z, stock.origin, stock.axis)
+            }
         };
-        if radius == 0. {
-            return Err(bad());
-        }
-        if radius > previous && previous > 0. && radius - previous <= t.linear + error {
-            return Err(bad());
-        }
-        changed |= radius > previous;
+        let (mut r0, r1) = (radius(pair[0]), radius(pair[1]));
         if let Some(last) = sections.last_mut() {
-            if radius == last.2 {
+            // A crossing endpoint is shared only within a certified arithmetic
+            // envelope, never because two radial supports lie within tolerance.
+            if crossings.contains(&pair[0]) && (r0 - last.3).abs() <= error {
+                r0 = last.3;
+            }
+            if r0 == r1 && last.2 == last.3 && r0 == last.3 {
                 last.1 = pair[1];
                 continue;
             }
-            if (radius - last.2).abs() <= t.linear + error {
+            if r0 != last.3 && (r0 - last.3).abs() <= t.linear + error {
                 return Err(bad());
             }
         }
-        sections.push((pair[0], pair[1], radius));
+        if r0 <= t.linear + error
+            || r1 <= t.linear + error
+            || (r0 != r1 && (r1 - r0).abs() <= t.linear + error)
+        {
+            return Err(bad());
+        }
+        if active
+            && old_radius > 0.
+            && tool_slope == 0.
+            && tool_radius(mid) - old_radius <= t.linear + error
+        {
+            return Err(bad());
+        }
+        sections.push((pair[0], pair[1], r0, r1));
     }
     if !changed {
         return Err(bad());
     }
     groups[index].segments = sections
         .into_iter()
-        .map(|(low, high, radius)| {
+        .map(|(low, high, radius, upper_radius)| {
             let mut c = tool.clone();
             c.radius = radius;
             let disk = crate::bored_prism::disk_at(&c, &stock, low, high, t)?;
             let cylinder = crate::analytic::recognize(&disk, Some(t))?;
-            // Certify real cutter support; no tolerance-based axis snapping.
             if [cylinder.origin, end(&cylinder)]
                 .into_iter()
                 .any(|p| norm(cross(sub(p, tool.origin), tool.axis)) > error)
             {
                 return Err(KernelError::NumericRange);
             }
+            let disk = if upper_radius == radius {
+                disk
+            } else {
+                frustum(&cylinder, upper_radius, t)?
+            };
             Ok(Segment {
                 disk,
                 cylinder,
+                upper_radius,
                 wall: FaceId(usize::MAX),
                 edges: [EdgeId(usize::MAX); 2],
             })
@@ -581,7 +879,7 @@ pub(crate) fn cut(
                     + stock.axis[i] * (z - dot(sub(tool.origin, stock.origin), stock.axis))
             });
             if dot(sub(center, plane.origin), plane.normal).abs()
-                + norm(cross(stock.axis, plane.normal)) * tool.radius
+                + norm(cross(stock.axis, plane.normal)) * tool_radius(z)
                 > error
             {
                 return Err(KernelError::NumericRange);
@@ -600,8 +898,19 @@ pub(crate) fn cut(
                 .iter()
                 .flat_map(|g| &g.segments)
                 .filter(|n| {
-                    if n.cylinder.radius != s.cylinder.radius
-                        || !aligned(&s.cylinder, &n.cylinder, error)
+                    if !aligned(&s.cylinder, &n.cylinder, error)
+                        || (segment_radius(
+                            s,
+                            dot(sub(n.cylinder.origin, stock.origin), stock.axis),
+                            stock.origin,
+                            stock.axis,
+                        ) - n.cylinder.radius)
+                            .abs()
+                            > error
+                        || ((s.upper_radius - s.cylinder.radius) / s.cylinder.height
+                            - (n.upper_radius - n.cylinder.radius) / n.cylinder.height)
+                            .abs()
+                            > 128. * f64::EPSILON
                     {
                         return false;
                     }
@@ -633,7 +942,11 @@ pub(crate) fn cut(
         .iter()
         .flat_map(|g| &g.segments)
         .filter(|s| {
-            if s.cylinder.radius != tool.radius || !aligned(&tool, &s.cylinder, error) {
+            let z = dot(sub(s.cylinder.origin, stock.origin), stock.axis);
+            if (s.cylinder.radius - tool_radius(z)).abs() > error
+                || (s.upper_radius - tool_radius(z + s.cylinder.height)).abs() > error
+                || !aligned(&tool, &s.cylinder, error)
+            {
                 return false;
             }
             let low = dot(sub(s.cylinder.origin, stock.origin), stock.axis);
@@ -652,8 +965,8 @@ pub(crate) fn cut(
             if dot(sub(*p, plane.origin), plane.normal).abs() <= error
                 && dot(normal, plane.normal) < -1. + 128. * f64::EPSILON
                 && norm(cross(sub(*p, tool.origin), tool.axis)) <= error
-                && *outer <= tool.radius
-                && *inner < tool.radius - t.linear - error
+                && *outer <= tool_radius(dot(sub(*p, stock.origin), stock.axis))
+                && *inner < tool_radius(dot(sub(*p, stock.origin), stock.axis)) - t.linear - error
             {
                 right.get_mut(&cap).unwrap().push(*f);
                 floors.push(*f);
@@ -686,26 +999,70 @@ pub(crate) fn cut(
 }
 impl Geometry {
     pub(crate) fn properties(&self, t: Tolerance) -> Result<MassProperties, KernelError> {
-        let bores = self
-            .groups
-            .iter()
-            .flat_map(|g| &g.segments)
-            .map(|s| PrismBore {
-                cylinder: s.cylinder.clone(),
-                opening_caps: vec![],
-                floor: None,
-            })
-            .collect();
-        BoredPrismGeometry {
-            base: self.base.clone(),
-            bores,
-            origin: self.origin,
-            axis: self.axis,
-            x_direction: self.x,
-            height: self.height,
-            surrogate: self.surrogate.clone(),
+        let base = self.base.mass_properties(t)?;
+        let reference = base.centroid.ok_or_else(bad)?;
+        let mut volume = base.volume;
+        let mut first = [0.; 3];
+        let mut inertia = base.central_inertia.ok_or_else(bad)?;
+        let mut absolute = inertia.map(|r| r.map(f64::abs));
+        for segment in self.groups.iter().flat_map(|g| &g.segments) {
+            let c = &segment.cylinder;
+            let p = if c.radius == segment.upper_radius {
+                c.properties()?
+            } else {
+                RevolveGeometry {
+                    origin: c.origin,
+                    axis: c.axis,
+                    x_direction: c.x_direction,
+                    profile: vec![
+                        [0., 0.],
+                        [c.radius, 0.],
+                        [segment.upper_radius, c.height],
+                        [0., c.height],
+                    ],
+                    segments: vec![],
+                }
+                .properties()?
+            };
+            let d = sub(p.centroid.unwrap(), reference);
+            volume -= p.volume;
+            for i in 0..3 {
+                first[i] -= p.volume * d[i];
+                for j in 0..3 {
+                    let own = p.central_inertia.unwrap()[i][j];
+                    let shift = p.volume * (if i == j { dot(d, d) } else { 0. } - d[i] * d[j]);
+                    inertia[i][j] -= own + shift;
+                    absolute[i][j] += own.abs() + shift.abs();
+                }
+            }
         }
-        .properties(t)
+        if !volume.is_normal() || volume <= base.volume * 4096. * f64::EPSILON {
+            return Err(KernelError::NumericRange);
+        }
+        let d = first.map(|v| v / volume);
+        let centroid = std::array::from_fn(|i| reference[i] + d[i]);
+        for i in 0..3 {
+            for j in 0..3 {
+                let shift = volume * (if i == j { dot(d, d) } else { 0. } - d[i] * d[j]);
+                inertia[i][j] -= shift;
+                absolute[i][j] += shift.abs();
+            }
+        }
+        if !finite(centroid)
+            || inertia
+                .iter()
+                .flatten()
+                .any(|v| !v.is_finite() || (*v != 0. && !v.is_normal()))
+            || absolute.iter().flatten().any(|v| !v.is_finite())
+            || (0..3).any(|i| inertia[i][i] <= absolute[i][i] * 4096. * f64::EPSILON)
+        {
+            return Err(KernelError::NumericRange);
+        }
+        Ok(MassProperties {
+            volume,
+            centroid: Some(centroid),
+            central_inertia: Some(inertia),
+        })
     }
     pub(crate) fn cap_centroid(&self, id: FaceId, t: Tolerance) -> Result<[f64; 3], KernelError> {
         if let Some((_, p, _, _)) = self.floors.iter().find(|(f, _, _, _)| *f == id) {
@@ -739,8 +1096,12 @@ impl Geometry {
                 self.axis,
                 error,
             ) {
+                let mut cylinder = s.cylinder.clone();
+                if id.0 == 1 {
+                    cylinder.radius = s.upper_radius;
+                }
                 bores.push(PrismBore {
-                    cylinder: s.cylinder.clone(),
+                    cylinder,
                     opening_caps: vec![id],
                     floor: None,
                 });
@@ -815,7 +1176,7 @@ pub(crate) fn tessellate(
         let radius = group
             .segments
             .iter()
-            .map(|s| s.cylinder.radius)
+            .map(|s| s.cylinder.radius.max(s.upper_radius))
             .fold(0., f64::max);
         let first = &group.segments[0];
         let last = group.segments.last().unwrap();
@@ -830,25 +1191,29 @@ pub(crate) fn tessellate(
             .collect();
         for patch in &wall_patches {
             let ring = |s: &Segment, side: usize| -> [[f64; 3]; 2] {
-                let center = if side == 0 {
-                    s.cylinder.origin
-                } else {
-                    end(&s.cylinder)
+                // Use the shared native circle, not independently reconstructed
+                // endpoint arithmetic, so adjacent walls have identical samples.
+                let Curve::Circle(circle) = &s.disk.edges[side].curve else {
+                    unreachable!()
                 };
+                let center = circle.origin;
                 let z = dot(sub(center, g.origin), g.axis);
+                let ring_radius = if side == 0 {
+                    s.cylinder.radius
+                } else {
+                    s.upper_radius
+                };
                 [0, 1].map(|k| {
-                    if s.cylinder.radius == radius
-                        && same_plane(z, 0., g.axis, support_errors[&s.wall])
-                    {
+                    if ring_radius == radius && same_plane(z, 0., g.axis, support_errors[&s.wall]) {
                         return patch.points[k];
                     }
-                    if s.cylinder.radius == radius
+                    if ring_radius == radius
                         && same_plane(z, g.height, g.axis, support_errors[&s.wall])
                     {
                         return patch.points[3 - k];
                     }
                     std::array::from_fn(|i| {
-                        center[i] + (patch.points[k][i] - origin[i]) * s.cylinder.radius / radius
+                        center[i] + (patch.points[k][i] - origin[i]) * ring_radius / radius
                     })
                 })
             };
@@ -878,7 +1243,14 @@ pub(crate) fn tessellate(
                 add(
                     s.wall,
                     vec![a[0], a[1], b[1], b[0]],
-                    patch.normal,
+                    {
+                        let mut n = cross(sub(a[1], a[0]), sub(b[1], a[0]));
+                        if dot(n, patch.normal) < 0. {
+                            n = n.map(|v| -v);
+                        }
+                        let length = norm(n);
+                        n.map(|v| v / length)
+                    },
                     vec![Some(s.edges[0]), None, Some(s.edges[1]), None],
                 );
             }
@@ -897,8 +1269,11 @@ pub(crate) fn tessellate(
                                 end(&s.cylinder)
                             };
                             let error = crate::bored_prism::arithmetic(&g.base, &s.cylinder, t)?;
-                            if r == s.cylinder.radius
-                                && same_plane(dot(sub(p, g.origin), g.axis), z, g.axis, error)
+                            if r == (if side == 0 {
+                                s.cylinder.radius
+                            } else {
+                                s.upper_radius
+                            }) && same_plane(dot(sub(p, g.origin), g.axis), z, g.axis, error)
                             {
                                 return Ok((ring(s, side), s.edges[side]));
                             }
@@ -935,11 +1310,12 @@ pub(crate) fn tessellate(
             }
             // Fill surrogate cap annuli down to the actual endpoint opening.
             for (side, s) in [(0, first), (1, last)] {
-                let center = if side == 0 {
-                    s.cylinder.origin
-                } else {
-                    end(&s.cylinder)
+                // Use the shared native circle, not independently reconstructed
+                // endpoint arithmetic, so adjacent walls have identical samples.
+                let Curve::Circle(circle) = &s.disk.edges[side].curve else {
+                    unreachable!()
                 };
+                let center = circle.origin;
                 let z = dot(sub(center, g.origin), g.axis);
                 let error = crate::bored_prism::arithmetic(&g.base, &s.cylinder, t)?;
                 let open = same_plane(z, if side == 0 { 0. } else { g.height }, g.axis, error);
@@ -950,7 +1326,12 @@ pub(crate) fn tessellate(
                 };
                 let normal = g.axis.map(|v| if side == 0 { -v } else { v });
                 if open {
-                    if s.cylinder.radius != radius {
+                    if (if side == 0 {
+                        s.cylinder.radius
+                    } else {
+                        s.upper_radius
+                    }) != radius
+                    {
                         let b = ring(s, side);
                         add(
                             FaceId(side),
@@ -983,7 +1364,12 @@ pub(crate) fn tessellate(
                     g.axis,
                 );
                 let error = crate::bored_prism::arithmetic(&g.base, &s.cylinder, t)?;
-                let same = s.cylinder.radius == radius
+                let endpoint_radius = if side == 0 {
+                    s.cylinder.radius
+                } else {
+                    s.upper_radius
+                };
+                let same = endpoint_radius == radius
                     && same_plane(z, if side == 0 { 0. } else { g.height }, g.axis, error);
                 for e in &mut patch.boundary_edges {
                     if *e == Some(surrogate_edges[side]) {
@@ -1048,6 +1434,148 @@ mod tests {
             bad.iter().take(3).collect::<Vec<_>>()
         );
     }
+    fn cone(r0: f64, z0: f64, r1: f64, z1: f64) -> ModelSnapshot {
+        let t = Tolerance::default();
+        translate(
+            &revolve_polygon(&[[0., z0], [r0, z0], [r1, z1], [0., z1]], t)
+                .unwrap()
+                .model,
+            [20., 13., 0.],
+            t,
+        )
+        .unwrap()
+        .model
+    }
+    fn difference(a: &ModelSnapshot, b: &ModelSnapshot) -> ModelSnapshot {
+        boolean(a, b, BooleanOp::Difference, Tolerance::default())
+            .unwrap()
+            .model
+    }
+    #[test]
+    fn countersinks_compose_in_both_orders_and_cross_existing_supports() {
+        let t = Tolerance::default();
+        let base = extrude_rectangle(80., 40., 12., t).unwrap().model;
+        let drill = tool(3., -2., 16.);
+        let sink = cone(3., 8., 9., 14.);
+        let forward = difference(&difference(&base, &drill), &sink);
+        let reverse = difference(&difference(&base, &sink), &drill);
+        assert_eq!(forward, reverse);
+        let g = recognize(&forward, t).unwrap();
+        assert_eq!(g.groups[0].segments.len(), 2);
+        assert_eq!(
+            g.groups[0].segments[0].edges[1],
+            g.groups[0].segments[1].edges[0]
+        );
+        assert!(g.floors.is_empty());
+        let expected =
+            80. * 40. * 12. - std::f64::consts::PI * (9. * 8. + 4. / 3. * (9. + 21. + 49.));
+        assert!((forward.mass_properties(t).unwrap().volume - expected).abs() < 1e-8);
+        for m in [
+            forward.clone(),
+            difference(&forward, &tool(5., -2., 16.)),
+            difference(&forward, &cone(9., -2., 3., 4.)),
+            difference(&difference(&base, &drill), &cone(1., 6., 9., 14.)),
+            difference(&forward, &cone(10., -2., 2., 14.)),
+        ] {
+            assert!(m.validate(t).valid);
+            closed(&m);
+            closed(
+                &transform(&m, [12., -7., 4.], [0.5, 0.5, 0., 0.5_f64.sqrt()], t)
+                    .unwrap()
+                    .model,
+            );
+        }
+        // Same cutter support, with its axis and meridian reversed.
+        let reversed = transform(&cone(9., -14., 3., -8.), [0., 26., 0.], [1., 0., 0., 0.], t)
+            .unwrap()
+            .model;
+        let opposite = difference(&difference(&base, &drill), &reversed);
+        assert!((opposite.mass_properties(t).unwrap().volume - expected).abs() < 1e-8);
+        closed(&opposite);
+    }
+    #[test]
+    fn malformed_countersink_support_frames_seams_and_shared_edges_fail_closed() {
+        let t = Tolerance::default();
+        let base = extrude_rectangle(80., 40., 12., t).unwrap().model;
+        let m = difference(
+            &difference(&base, &tool(3., -2., 16.)),
+            &cone(3., 8., 9., 14.),
+        );
+        let g = recognize(&m, t).unwrap();
+        let wall = g.groups[0].segments[1].wall;
+        for mutation in 0..12 {
+            let mut forged = m.clone();
+            let Surface::Cone(c) = &mut forged.faces[wall.0].surface else {
+                panic!()
+            };
+            match mutation {
+                0 => c.origin[0] = f64::NAN,
+                1 => c.axis[1] = f64::NAN,
+                2 => c.x_direction[2] = f64::INFINITY,
+                3 => c.slope = f64::NAN,
+                4 => c.axis[2] = 2.,
+                5 => c.x_direction = c.axis,
+                6 => c.slope += 0.01,
+                7 => c.radius += 0.01,
+                8 => {
+                    let e = g.groups[0].segments[1].edges[0];
+                    forged.edges[e.0].vertices[1] = VertexId(usize::MAX);
+                }
+                9 => {
+                    let l = forged.faces[wall.0].loops[0];
+                    let e = forged.loops[l.0].edges[1].edge;
+                    if let Curve::Line(line) = &mut forged.edges[e.0].curve {
+                        line.direction = [0., 0., 1.];
+                    }
+                }
+                10 => {
+                    let e = g.groups[0].segments[1].edges[0];
+                    if let Curve::Circle(c) = &mut forged.edges[e.0].curve {
+                        c.radius += 0.01;
+                    }
+                }
+                _ => {
+                    let l = forged.faces[wall.0].loops[0];
+                    forged.loops[l.0].edges[0].reversed = false;
+                }
+            }
+            assert!(recognize(&forged, t).is_err(), "mutation {mutation}");
+            assert!(!forged.validate(t).valid, "mutation {mutation}");
+        }
+    }
+    #[test]
+    fn countersink_lineage_and_unsupported_contacts_remain_explicit() {
+        let t = Tolerance::default();
+        let base = extrude_rectangle(80., 40., 12., t).unwrap().model;
+        let pilot = difference(&base, &tool(3., -2., 16.));
+        let tool_model = cone(3., 8., 9., 14.);
+        let result = cut(&pilot, &tool_model, t).unwrap();
+        let g = recognize(&result.model, t).unwrap();
+        let cone_wall = g.groups[0].segments[1].wall;
+        assert_eq!(result.history.generated_faces["bore_wall"], vec![cone_wall]);
+        assert!(!result.history.generated_faces.contains_key("bore_shoulder"));
+        assert!(result.history.input_faces["left"]
+            .values()
+            .any(|ids| ids == &vec![g.groups[0].segments[0].wall]));
+        assert!(result.history.input_faces["right"]
+            .values()
+            .any(|ids| ids == &vec![cone_wall]));
+        let offset = translate(&tool_model, [1., 0., 0.], t).unwrap().model;
+        let skew = transform(&tool_model, [0.; 3], [0.1, 0., 0., 0.99_f64.sqrt()], t)
+            .unwrap()
+            .model;
+        for invalid in [cone(3., 2., 5., 6.), cone(3., 8., 30., 14.), offset, skew] {
+            assert!(cut(&pilot, &invalid, t).is_err());
+        }
+        assert!(cut(&result.model, &tool_model, t).is_err());
+    }
+    #[test]
+    fn countersink_unresolved_radial_jump_is_not_snapped() {
+        let t = Tolerance::default();
+        let base = extrude_rectangle(80., 40., 12., t).unwrap().model;
+        let pilot = difference(&base, &tool(3., -2., 16.));
+        assert!(cut(&pilot, &cone(3. + 1e-13, 8., 9., 14.), t).is_err());
+    }
     #[test]
     fn native_stepped_mesh_shared_rings_are_closed() {
         let m = fixture().model;
@@ -1092,6 +1620,7 @@ mod tests {
                     .model;
                     let cylinder = crate::analytic::recognize(&disk, Some(t)).unwrap();
                     Segment {
+                        upper_radius: cylinder.radius,
                         disk,
                         cylinder,
                         wall: FaceId(0),

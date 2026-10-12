@@ -56,6 +56,7 @@ jobs:
       - run: npm run test:gpu --prefix tools/preview-check
       - run: npm run test:stream --prefix tools/preview-check
       - run: npm run test:round-stock --prefix tools/preview-check
+      - run: npm run test:countersink --prefix tools/preview-check
       - uses: actions/upload-artifact@v4
         with:
           name: cad-examples
