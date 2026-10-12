@@ -90,9 +90,9 @@ impl Drop for Client {
 }
 const SMALL:&str="p=rectangle(id=\"p\",width=8,depth=4)\nb=extrude(id=\"b\",profile=p,height=2)\noutput(name=\"part\",feature=b)\n";
 // Native orthogonal grid classification, not a source-size/feature-count probe.
-// At union_25, 26 disjoint boxes give51^3 cells and156 boundary faces:
-// 132651*156 = 20693556 > the kernel's20000000 classification budget.
-const OVERSIZED:&str="def model():\n    p=rectangle(id=\"p\",width=1,depth=1)\n    b=extrude(id=\"b\",profile=p,height=1)\n    result=b\n    for i in range(1,36):\n        placed=translate(id=\"at_\"+str(i),body=b,offset=[2*i,2*i,2*i])\n        result=union(id=\"union_\"+str(i),left=result,right=placed)\n    output(name=\"oversized\",feature=result)\nmodel()\n";
+// The separated compound is cheap; its shifted copy overlaps real cells and
+// forces a143^3 coordinate grid, beyond the bounded general Boolean admission.
+const OVERSIZED:&str="def model():\n    p=rectangle(id=\"p\",width=1,depth=1)\n    b=extrude(id=\"b\",profile=p,height=1)\n    result=b\n    for i in range(1,36):\n        placed=translate(id=\"at_\"+str(i),body=b,offset=[2*i,2*i,2*i])\n        result=union(id=\"union_\"+str(i),left=result,right=placed)\n    shifted=translate(id=\"shifted\",body=result,offset=[0.5,0.5,0.5])\n    overlap=union(id=\"overlap\",left=result,right=shifted)\n    output(name=\"oversized\",feature=overlap)\nmodel()\n";
 #[test]
 fn oversized_native_operation_is_structured_preserves_candidate_and_allows_next_job() {
     let workspace = tempfile::tempdir().unwrap();
@@ -124,11 +124,11 @@ fn oversized_native_operation_is_structured_preserves_candidate_and_allows_next_
         failed["worker"]["result"]["code"],
         "kernel_operation_failed"
     );
-    assert_eq!(failed["worker"]["result"]["feature"], "union_25");
+    assert_eq!(failed["worker"]["result"]["feature"], "overlap");
     assert!(failed["worker"]["result"]["diagnostic"]
         .as_str()
         .unwrap()
-        .contains("coordinate classification exceeds operation budget"));
+        .contains("coordinate grid has 2924207 cells; maximum is 200000"));
     assert_eq!(failed["artifacts"].as_array().unwrap().len(), 0);
     assert!(failed["manifest_hash"].is_null());
     let unchanged = client.tool("cad_job", json!({"job_id":good["job_id"]}), false);

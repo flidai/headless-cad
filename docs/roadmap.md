@@ -737,3 +737,14 @@ open-descriptor and core-file limits before recipe evaluation. Isolated process
 probes exercise actual enforcement; the drive remains a normal-capacity acceptance
 case. These per-process limits do not close M3 exact-body scheduling or R5 hosted
 isolation, durable jobs, aggregate quotas, and delivery reconciliation.
+
+
+### Separated orthogonal stock scaling
+
+Strictly separated orthogonal operands can now compose through exact native
+topology remapping, preserving face ancestry and full validation without a global
+coordinate grid. The billet-batch example exercises up to 144 solids and later
+local trimming. Independent exchange/moment checks and a still-bounded overlapping
+workload separate expanded capability from resource-guard coverage. Remaining
+quadratic validation, general curved Booleans, exact-body scheduling and declared
+hardware acceptance remain open.

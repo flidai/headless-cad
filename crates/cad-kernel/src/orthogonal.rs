@@ -279,6 +279,188 @@ fn rectangular_faces(model: &ModelSnapshot) -> Result<Vec<RectFace>, KernelError
         .collect()
 }
 
+// Fast-path admission checks exact support identity independently of the
+// tolerance-based generic input validator. The bounded rectangular faces then
+// certify the complete material AABB; seam vertices or display bounds are never
+// substituted for a curved support (this path is planar/orthogonal only).
+fn exact_rectangular_supports(
+    model: &ModelSnapshot,
+    faces: &[RectFace],
+) -> Result<(), KernelError> {
+    for (face, rect) in model.faces.iter().zip(faces) {
+        if face.try_plane().unwrap().origin[rect.axis] != rect.bounds.min[rect.axis] {
+            return Err(KernelError::Unsupported(
+                "disjoint orthogonal operands require exact native plane supports".into(),
+            ));
+        }
+    }
+    for edge in &model.edges {
+        let a = model.vertices[edge.vertices[0].0].position;
+        let b = model.vertices[edge.vertices[1].0].position;
+        let changes: Vec<_> = (0..3).filter(|&i| a[i] != b[i]).collect();
+        let line = edge.try_line().ok_or_else(|| {
+            KernelError::Unsupported("disjoint orthogonal operands require native lines".into())
+        })?;
+        if changes.len() != 1
+            || (0..3).any(|i| {
+                if changes.contains(&i) {
+                    line.direction[i].abs() != 1.
+                } else {
+                    line.direction[i] != 0. || line.origin[i] != a[i]
+                }
+            })
+        {
+            return Err(KernelError::Unsupported(
+                "disjoint orthogonal operands require exact native line supports".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+fn disjoint_bounds(a: &[RectFace], b: &[RectFace], tolerance: Tolerance) -> bool {
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    let bounds = |faces: &[RectFace]| Bounds {
+        min: std::array::from_fn(|i| {
+            faces
+                .iter()
+                .map(|f| f.bounds.min[i])
+                .fold(f64::INFINITY, f64::min)
+        }),
+        max: std::array::from_fn(|i| {
+            faces
+                .iter()
+                .map(|f| f.bounds.max[i])
+                .fold(f64::NEG_INFINITY, f64::max)
+        }),
+    };
+    let (a, b) = (bounds(a), bounds(b));
+    (0..3).any(|i| {
+        [b.min[i] - a.max[i], a.min[i] - b.max[i]]
+            .into_iter()
+            .any(|gap| gap.is_normal() && gap.next_down() > tolerance.linear)
+    })
+}
+fn disjoint_result(
+    a: &ModelSnapshot,
+    b: &ModelSnapshot,
+    operation: BooleanOp,
+    tolerance: Tolerance,
+) -> Result<OperationResult, KernelError> {
+    let model = match operation {
+        BooleanOp::Intersection => empty(),
+        BooleanOp::Difference => a.clone(),
+        BooleanOp::Union => {
+            let counts = [
+                a.vertices.len(),
+                a.edges.len(),
+                a.loops.len(),
+                a.faces.len(),
+                a.shells.len(),
+                a.solids.len(),
+            ];
+            let other = [
+                b.vertices.len(),
+                b.edges.len(),
+                b.loops.len(),
+                b.faces.len(),
+                b.shells.len(),
+                b.solids.len(),
+            ];
+            let mut totals = [0usize; 6];
+            for i in 0..6 {
+                totals[i] = counts[i].checked_add(other[i]).ok_or_else(|| {
+                    KernelError::ResourceLimit("disjoint topology count overflow".into())
+                })?;
+            }
+            // Keep the final validator's actual quadratic budget, before copying
+            // any native arrays. This shortcut removes cell allocation, not the
+            // native geometric validity checks or their resource contract.
+            if totals[3]
+                .checked_mul(totals[3].saturating_sub(1))
+                .and_then(|n| n.checked_div(2))
+                .is_none_or(|n| n > crate::validation::geometry::MAX_FACE_PAIRS)
+            {
+                return Err(KernelError::ResourceLimit(
+                    "disjoint union exceeds native face-pair validation budget".into(),
+                ));
+            }
+            let mut model = a.clone();
+            model.vertices.extend(b.vertices.iter().cloned());
+            model.edges.extend(b.edges.iter().map(|e| Edge {
+                vertices: e.vertices.map(|v| VertexId(v.0 + counts[0])),
+                curve: e.curve.clone(),
+            }));
+            model.loops.extend(b.loops.iter().map(|l| {
+                Loop {
+                    edges: l
+                        .edges
+                        .iter()
+                        .map(|u| EdgeUse {
+                            edge: EdgeId(u.edge.0 + counts[1]),
+                            reversed: u.reversed,
+                        })
+                        .collect(),
+                }
+            }));
+            model.faces.extend(b.faces.iter().map(|f| Face {
+                surface: f.surface.clone(),
+                loops: f.loops.iter().map(|id| LoopId(id.0 + counts[2])).collect(),
+            }));
+            model.shells.extend(b.shells.iter().map(|s| Shell {
+                faces: s.faces.iter().map(|id| FaceId(id.0 + counts[3])).collect(),
+            }));
+            model.solids.extend(b.solids.iter().map(|s| {
+                Solid {
+                    shells: s
+                        .shells
+                        .iter()
+                        .map(|id| ShellId(id.0 + counts[4]))
+                        .collect(),
+                }
+            }));
+            model
+        }
+    };
+    let validation = model.validate(tolerance);
+    if !validation.valid {
+        return Err(KernelError::InvalidResult(validation));
+    }
+    let mut result = result(model, "boundary");
+    result.history.input_faces.insert(
+        "left".into(),
+        (0..a.faces.len())
+            .map(|i| {
+                (
+                    FaceId(i),
+                    if operation == BooleanOp::Intersection {
+                        vec![]
+                    } else {
+                        vec![FaceId(i)]
+                    },
+                )
+            })
+            .collect(),
+    );
+    result.history.input_faces.insert(
+        "right".into(),
+        (0..b.faces.len())
+            .map(|i| {
+                (
+                    FaceId(i),
+                    if operation == BooleanOp::Union {
+                        vec![FaceId(a.faces.len() + i)]
+                    } else {
+                        vec![]
+                    },
+                )
+            })
+            .collect(),
+    );
+    Ok(result)
+}
+
 // The sample lies strictly between every input coordinate plane. A ray along X
 // therefore never hits a face edge. Outward oriented crossings encode occupancy.
 fn inside(faces: &[RectFace], sample: [f64; 3]) -> Result<bool, KernelError> {
@@ -328,6 +510,11 @@ fn neighbor(mut cell: [usize; 3], direction: usize, shape: [usize; 3]) -> Option
 /// planes, not a fixed-resolution voxel approximation. Through-holes and
 /// disconnected solids are supported. Cavities and nonmanifold contacts return
 /// explicit Unsupported errors. Distinct plane gaps <= tolerance are rejected.
+/// Strictly separated operand AABBs with exact orthogonal native supports bypass
+/// the Cartesian arrangement: union concatenates native topology, difference
+/// preserves the left operand, and intersection is empty. Coordinate-gap checks
+/// and bounded final validation still apply, including quadratic face-pair work.
+/// This shortcut does not admit disconnected curved solids.
 /// Intersection additionally supports two single strictly convex planar solids
 /// (48 input planes maximum) through analytic supporting-plane reconstruction.
 /// Unresolved near-coincidence, ill-conditioned plane triples, and tangent or
@@ -400,6 +587,11 @@ pub fn boolean(
                 return Err(KernelError::Unsupported("distinct coordinate planes are within modeling tolerance; explicit snapping is required".into()));
             }
         }
+    }
+    if disjoint_bounds(&a_faces, &b_faces, tolerance) {
+        exact_rectangular_supports(a, &a_faces)?;
+        exact_rectangular_supports(b, &b_faces)?;
+        return disjoint_result(a, b, operation, tolerance);
     }
     let shape = axes.each_ref().map(|axis| axis.len() - 1);
     let count = shape
@@ -572,4 +764,172 @@ pub fn boolean(
         return Err(KernelError::InvalidResult(report));
     }
     boolean_result(model, &a_faces, &b_faces, operation)
+}
+
+#[cfg(test)]
+mod disjoint_tests {
+    use super::*;
+    fn diagonal() -> ModelSnapshot {
+        let t = Tolerance::default();
+        let unit = extrude_rectangle(1., 1., 1., t).unwrap().model;
+        let mut model = unit.clone();
+        for i in 1..36 {
+            let moved = translate(&unit, [2. * i as f64; 3], t).unwrap().model;
+            let old = model.clone();
+            let result = boolean(&model, &moved, BooleanOp::Union, t).unwrap();
+            for j in 0..old.faces.len() {
+                assert_eq!(
+                    result.history.input_faces["left"][&FaceId(j)],
+                    vec![FaceId(j)]
+                );
+            }
+            for j in 0..moved.faces.len() {
+                assert_eq!(
+                    result.history.input_faces["right"][&FaceId(j)],
+                    vec![FaceId(old.faces.len() + j)]
+                );
+            }
+            assert_eq!(&result.model.faces[..old.faces.len()], old.faces.as_slice());
+            assert_eq!(&result.model.edges[..old.edges.len()], old.edges.as_slice());
+            model = result.model;
+        }
+        model
+    }
+    #[test]
+    fn diagonal_components_preserve_exact_topology_full_moments_and_closed_mesh() {
+        let t = Tolerance::default();
+        let model = diagonal();
+        assert_eq!(
+            (model.solids.len(), model.shells.len(), model.faces.len()),
+            (36, 36, 216)
+        );
+        assert_eq!(
+            model.bounds(),
+            Bounds {
+                min: [0.; 3],
+                max: [71.; 3]
+            }
+        );
+        let mass = model.mass_properties(t).unwrap();
+        assert!((mass.volume - 36.).abs() < 1e-10);
+        for x in mass.centroid.unwrap() {
+            assert!((x - 35.5).abs() < 1e-10);
+        }
+        for (i, row) in mass.central_inertia.unwrap().iter().enumerate() {
+            for (j, value) in row.iter().enumerate() {
+                assert!((value - if i == j { 31086. } else { -15540. }).abs() < 1e-7);
+            }
+        }
+        let mut incidence = BTreeMap::<(usize, usize), (usize, i32)>::new();
+        let mut volume = 0.;
+        let mut count = 0;
+        for i in 0..model.faces.len() {
+            for triangle in crate::triangulate_face(&model, FaceId(i), t).unwrap() {
+                count += 1;
+                let p = triangle.map(|v| model.vertices[v.0].position);
+                volume += crate::math::dot(p[0], crate::math::cross(p[1], p[2])) / 6.;
+                for j in 0..3 {
+                    let a = triangle[j].0;
+                    let b = triangle[(j + 1) % 3].0;
+                    let entry = incidence.entry((a.min(b), a.max(b))).or_default();
+                    entry.0 += 1;
+                    entry.1 += if a < b { 1 } else { -1 };
+                }
+            }
+        }
+        assert_eq!(count, 432);
+        assert!((volume - 36.).abs() < 1e-9);
+        assert!(incidence.values().all(|v| *v == (2, 0)));
+        // Exact cyclic rigid placement retains the supported orthogonal family.
+        let moved = crate::transform(&model, [20., -8., 3.], [0.5; 4], t)
+            .unwrap()
+            .model;
+        let properties = moved.mass_properties(t).unwrap();
+        assert!((properties.volume - 36.).abs() < 1e-10);
+        assert_eq!(properties.centroid.unwrap(), [55.5, 27.5, 38.5]);
+    }
+    #[test]
+    fn intersecting_compounds_still_refuse_an_oversized_native_grid() {
+        let t = Tolerance::default();
+        let a = diagonal();
+        let b = translate(&a, [0.5; 3], t).unwrap().model;
+        match boolean(&a, &b, BooleanOp::Union, t) {
+            Err(KernelError::ResourceLimit(message)) => {
+                assert!(message.contains("coordinate grid"))
+            }
+            result => panic!("expected bounded interacting grid refusal, got {result:?}"),
+        }
+    }
+    #[test]
+    fn disjoint_difference_intersection_swapping_and_later_local_cut() {
+        let t = Tolerance::default();
+        let a = extrude_rectangle(2., 3., 4., t).unwrap().model;
+        let b = translate(&a, [5., 0., 0.], t).unwrap().model;
+        for (a, b) in [(&a, &b), (&b, &a)] {
+            let d = boolean(a, b, BooleanOp::Difference, t).unwrap();
+            assert_eq!(&d.model, a);
+            assert!(d.history.input_faces["right"].values().all(Vec::is_empty));
+            let i = boolean(a, b, BooleanOp::Intersection, t).unwrap();
+            assert!(i.model.solids.is_empty());
+            assert!(i
+                .history
+                .input_faces
+                .values()
+                .all(|m| m.values().all(Vec::is_empty)));
+        }
+        let mut rows = vec![];
+        for y in 0..4 {
+            let mut row = translate(&a, [0., 7. * y as f64, 0.], t).unwrap().model;
+            for x in 1..4 {
+                let next = translate(&a, [5. * x as f64, 7. * y as f64, 0.], t)
+                    .unwrap()
+                    .model;
+                row = boolean(&row, &next, BooleanOp::Union, t).unwrap().model;
+            }
+            rows.push(row);
+        }
+        let mut batch = rows.remove(0);
+        for row in rows {
+            batch = boolean(&batch, &row, BooleanOp::Union, t).unwrap().model;
+        }
+        let cutter = translate(
+            &extrude_rectangle(1.5, 5., 6., t).unwrap().model,
+            [-0.5, -1., -1.],
+            t,
+        )
+        .unwrap()
+        .model;
+        let cut = boolean(&batch, &cutter, BooleanOp::Difference, t).unwrap();
+        assert_eq!(cut.model.solids.len(), 16);
+        assert!((cut.model.volume() - 372.).abs() < 1e-10);
+        assert!(cut.model.validate(t).valid);
+    }
+    #[test]
+    fn near_planes_touch_overlap_curves_and_raw_supports_never_get_disjoint_shortcut() {
+        let t = Tolerance::default();
+        let a = extrude_rectangle(1., 1., 1., t).unwrap().model;
+        for offset in [[1. + t.linear / 2., 0., 0.], [10., t.linear / 2., 0.]] {
+            let b = translate(&a, offset, t).unwrap().model;
+            assert!(boolean(&a, &b, BooleanOp::Union, t).is_err());
+        }
+        for (offset, volume) in [([1., 0., 0.], 2.), ([0.5; 3], 1.875)] {
+            let b = translate(&a, offset, t).unwrap().model;
+            let m = boolean(&a, &b, BooleanOp::Union, t).unwrap().model;
+            assert_eq!(m.solids.len(), 1);
+            assert!((m.volume() - volume).abs() < 1e-12);
+        }
+        let b = translate(&a, [10., 0., 0.], t).unwrap().model;
+        let mut bad = a.clone();
+        bad.faces[0].try_plane_mut().unwrap().origin[2] += t.linear / 10.;
+        assert!(boolean(&bad, &b, BooleanOp::Union, t).is_err());
+        bad = a.clone();
+        let edge = &mut bad.edges[0];
+        let line = edge.try_line_mut().unwrap();
+        let axis = (0..3).find(|&i| line.direction[i] == 0.).unwrap();
+        line.origin[axis] += t.linear / 10.;
+        assert!(boolean(&bad, &b, BooleanOp::Union, t).is_err());
+        let cylinder = extrude_circle(1., 2., t).unwrap().model;
+        let other = translate(&cylinder, [10., 0., 0.], t).unwrap().model;
+        assert!(boolean(&cylinder, &other, BooleanOp::Union, t).is_err());
+    }
 }

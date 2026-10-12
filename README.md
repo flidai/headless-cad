@@ -45,6 +45,13 @@ surviving surface witnesses, with independently validated STEP exchange.
 Native equal-distance `chamfer` also trims a selected straight edge of a strictly
 convex planar solid, retaining original face lineage and a named generated face.
 
+Separated orthogonal solids now compose directly when their complete bounds are
+strictly apart and native supports are exact. This avoids constructing a global
+coordinate grid for disconnected stock while preserving topology and face lineage.
+`examples/billet_batch.star` builds 64 separated billets, then applies a real local
+trim; its 1–12 row/column parameters reach 144 solids. Full native validation and
+ambiguous-plane rejection still apply, and overlapping Boolean grids remain bounded.
+
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
 optional independent interoperability oracle in development.
 

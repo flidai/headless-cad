@@ -2978,3 +2978,32 @@ or automatic spilling of exact bodies. Those remain separate architecture work.
 The current host does not provide a writable delegated cgroup, so the implementation
 does not silently claim cgroup enforcement. This process admission strengthens the
 local R5 foundation without closing the commercial resource or replay gates.
+
+
+### Exact separated orthogonal composition
+
+Orthogonal Boolean admission now checks strict separation of complete operand
+AABBs after the existing rectangular-face validation and coordinate-gap policy.
+A one-ULP downward bound on the positive separating gap must exceed modeling
+tolerance. Fast-path input planes and line supports must coincide exactly with
+the orthogonal topology; generic tolerance-based validation alone does not prove
+that the vertex bounds enclose a shifted raw support. Curved geometry and unresolved
+support identities do not enter this path.
+
+For certified separated operands, union concatenates the native topology with
+checked index remapping; difference preserves the left operand; intersection is
+empty. Face ancestry is direct and one-to-one for retained faces, with explicit
+deletions. The output still passes full native validation. Union checks the existing
+20,000,000 face-pair ceiling before copying topology. Validation remains quadratic;
+this removes unnecessary cell classification, not every scaling limit.
+
+The independent acceptance corpus includes diagonal disconnected unit solids,
+complete moments, STEP component counts and directed geometric differences,
+oriented closed STL, and a row-composed billet batch with a subsequent intersecting
+trim. The 8×8 batch contains 64 solids and 384 faces, with volume 11,520 mm³ and
+centroid [47,31,1.5]; trimming the first billet removes 36 mm³. Parameters also
+exercise 1×1 and 12×12 batches, and source face witnesses survive composition.
+A genuinely overlapping pair of 36-component compounds still exceeds the native
+coordinate-grid budget and must preserve the previous published generation.
+This is a bounded exact-kernel scaling improvement, not general curved Boolean
+closure or completion of the large-assembly hardware gates.

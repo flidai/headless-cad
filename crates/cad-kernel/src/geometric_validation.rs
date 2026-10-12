@@ -3,7 +3,7 @@
 use super::ValidationIssue;
 use crate::*;
 
-const MAX_FACE_PAIRS: usize = 20_000_000;
+pub(crate) const MAX_FACE_PAIRS: usize = 20_000_000;
 
 struct Rectangle {
     axis: usize,
