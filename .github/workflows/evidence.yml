@@ -6,6 +6,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - case: motion-studies
+            capability: assembly.motion-studies
           - case: planar-mechanisms
             capability: assembly.planar-mechanisms
           - case: prescribed-joints

@@ -48,6 +48,7 @@ struct GraphStore {
     section_views: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     mechanisms: RefCell<Vec<serde_json::Value>>,
+    motion_studies: RefCell<Vec<serde_json::Value>>,
     mechanism_bindings: RefCell<Vec<serde_json::Value>>,
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
@@ -582,6 +583,36 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         );
         definitions.push(serde_json::to_value(definition)?);
         Ok(id.into())
+    }
+
+    fn motion_study(
+        id: &str,
+        mechanism: &str,
+        targets: Value,
+        max_drive_step_radians: Value,
+        max_pin_step_mm: Value,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let definition: cad_build::MotionStudyDefinition =
+            serde_json::from_value(serde_json::json!({
+                "id":id,"mechanism":mechanism,"input":{
+                    "targets":serde_json::from_str::<serde_json::Value>(&targets.to_json()?)?,
+                    "max_drive_step_radians":number(max_drive_step_radians)?,
+                    "max_pin_step_mm":number(max_pin_step_mm)?
+                }
+            }))?;
+        let graph = store(eval)?;
+        let mut studies = graph.motion_studies.borrow_mut();
+        anyhow::ensure!(
+            studies.len() < cad_build::MAX_MOTION_STUDIES,
+            "too many motion studies"
+        );
+        anyhow::ensure!(
+            !studies.iter().any(|s| s["id"] == id),
+            "duplicate motion study ID '{id}'"
+        );
+        studies.push(serde_json::to_value(definition)?);
+        Ok(NoneType)
     }
 
     fn mechanism_bind(
@@ -1304,11 +1335,12 @@ pub fn from_starlark_with_modules(
     let section_views = graph.section_views.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let mechanisms = graph.mechanisms.into_inner();
+    let motion_studies = graph.motion_studies.into_inner();
     let mechanism_bindings = graph.mechanism_bindings.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() { 2 } else { 1 },
+        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -1317,6 +1349,9 @@ pub fn from_starlark_with_modules(
         value["parts"] = serde_json::json!(parts);
         value["assemblies"] = serde_json::json!(assemblies);
         value["assembly_outputs"] = serde_json::json!(assembly_outputs);
+    }
+    if !motion_studies.is_empty() {
+        value["motion_studies"] = serde_json::json!(motion_studies);
     }
     if !mechanisms.is_empty() {
         value["mechanisms"] = serde_json::json!(mechanisms);

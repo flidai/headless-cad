@@ -397,7 +397,46 @@ Limits are 64 mechanisms and 4,096 bindings per recipe; each mechanism permits
 30 pins, 64 links, 16 drives, 32 branch witnesses and at most 128 generated
 constraints. Placement requires fully constrained local convergence and acceptable
 conditioning. This is planar pin/bar closure, not general 3D mates, dynamics,
-automatic continuation, collision checking or proof of global uniqueness.
+continuation through singularities, collision checking or proof of global uniqueness.
+
+### Recorded motion studies
+
+A `motion_study` follows a sequence of prescribed drive coordinates through an
+existing planar mechanism. `examples/motion_four_bar.star` reuses the locked
+four-bar source and records an outward and return stroke:
+
+```python
+motion_study(id = "cycle", mechanism = layout,
+    targets = [{"input_angle":angle}, {"input_angle":1.3},
+               {"input_angle":0.5}, {"input_angle":angle}],
+    max_drive_step_radians = 0.08, max_pin_step_mm = 2)
+```
+
+Targets must provide every drive and the first must exactly match the source
+mechanism's drive values. Each solve starts from the last accepted pin positions.
+The sampler bisects intervals when a drive step, solved pin displacement or
+failed solve requires it. Every accepted sample passes the same residual, rank,
+conditioning and requested-branch checks as a static mechanism. Angles interpolate
+numerically in the declared `(-pi, pi]` range; no automatic wrap or shortest-rotation
+rule changes the requested path.
+
+There are at most 128 requested targets, 512 attempted solves per study and 16
+subdivision levels. A recipe permits 16 studies sharing 2,048 attempted solves;
+failed trials also consume the budget. All studies are global build obligations,
+including selected-body builds. Rejected studies retain an accepted prefix and
+failure coordinates/diagnostics, and preserve the last published generation.
+
+Builds publish `motion-<id>.json` and `motion-<id>.study.html`. The gallery links
+the inspector, where you can scrub recorded pin/link configurations, inspect
+residuals, select links and read captured source/modules. Playback uses stored
+samples and makes no modeling calls. The JSON retains solved link frames for
+headless consumers. Ordinary assembly/STEP artifacts keep the nominal recipe
+pose; the study inspector is a planar mechanism layout, not animated solid CAD.
+
+Motion intent and evidence enter `mechanism_context_hash` and publication/query
+context. They leave unchanged part geometry and nominal assembly hashes intact.
+Sampled continuation does not certify the intervals between samples, continuous
+branch correctness, collision, clearance or dynamics.
 
 ### Prescribed revolute and prismatic joints
 

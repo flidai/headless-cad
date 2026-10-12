@@ -297,6 +297,31 @@
         "mechanism-cli",
         "mechanism-independent"
       ]
+    },
+    {
+      "id": "assembly.motion-studies",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "assembly.motion_studies"
+      ],
+      "supported_domain": "Source-owned sampled continuation of an unchanged bounded planar pin/bar graph. Complete requested angle-drive coordinates, warm starts, bounded subdivision and per-sample drive/pin displacement witnesses; global study/solve budgets and structured rejected prefixes. Motion four-bar fixture retains the nominal static assembly and samples the requested crank cycle; native, publication and independent geometric closure checks are required.",
+      "exclusions": [
+        "Continuous-path or collision-free certification between samples",
+        "General spatial or flexible-body mechanisms",
+        "Automatic continuation through singular configurations",
+        "Time, velocity, dynamics and load analysis",
+        "Changing part geometry at motion frames"
+      ],
+      "fixture": "examples/motion_four_bar.star",
+      "checks": [
+        "motion-native",
+        "motion-build",
+        "motion-recipe",
+        "motion-product",
+        "motion-cli",
+        "motion-independent"
+      ]
     }
   ],
   "checks": [
@@ -900,6 +925,87 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/four_bar"
+      ]
+    },
+    {
+      "id": "motion-native",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-assembly",
+        "motion_tests"
+      ]
+    },
+    {
+      "id": "motion-build",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-build",
+        "--test",
+        "motion_studies"
+      ]
+    },
+    {
+      "id": "motion-recipe",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-recipe",
+        "--test",
+        "motion_studies"
+      ]
+    },
+    {
+      "id": "motion-product",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "motion_four_bar"
+      ]
+    },
+    {
+      "id": "motion-cli",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "motion"
+      ]
+    },
+    {
+      "id": "motion-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_motion_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/motion_four_bar"
       ]
     }
   ]

@@ -38,6 +38,7 @@ pub(super) struct Evaluation<'a> {
     pub reports: BTreeMap<String, MechanismReport>,
     pub bindings: Vec<MechanismBindingReport>,
     pub context_hash: String,
+    pub motion_studies: BTreeMap<String, MotionStudyReport>,
 }
 fn invalid(id: &str, message: impl ToString) -> BuildError {
     BuildError::MechanismFailed {
@@ -229,8 +230,10 @@ pub(super) fn evaluate(
     bindings.sort_by(|a, b| {
         (&a.binding.assembly, &a.binding.instance).cmp(&(&b.binding.assembly, &b.binding.instance))
     });
+    let motion_studies = motion_studies::evaluate(recipe, &reports, tolerance)?;
     let context_hash = blake3::hash(
-        &serde_json::to_vec(&(&reports, &bindings)).expect("validated finite mechanism reports"),
+        &serde_json::to_vec(&(&reports, &bindings, &motion_studies))
+            .expect("validated finite mechanism reports"),
     )
     .to_hex()
     .to_string();
@@ -239,5 +242,6 @@ pub(super) fn evaluate(
         reports,
         bindings,
         context_hash,
+        motion_studies,
     })
 }

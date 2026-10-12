@@ -177,6 +177,14 @@ This advances closed-loop mechanics beyond prescribed coordinates. Keep general
 spatial constraints, continuation through singularities and collision checks open;
 explicit initial guesses and signed branch admission do not establish them.
 
+M4 now includes source-owned sampled continuation: warm starts, adaptive drive/pin
+step bounds, explicit branch admission, charged solve budgets and preserved failure
+prefixes. The motion-four-bar fixture reuses locked source and publishes a recorded
+layout inspector plus source-bound JSON. Its acceptance checks sampled closure,
+round trips, static-geometry reuse and failure-preserving publication. Continuous
+branch certification, singularity crossing, physical interference and dynamics
+remain open. Sample playback never executes modeling calls.
+
 ## Next concrete implementation increments
 
 Published generations now carry a payload digest/size inventory, with a separate

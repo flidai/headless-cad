@@ -44,6 +44,10 @@ pub use property_assertions::{
     EngineeringProperty, PropertyAssertion, PropertyAssertionReport, PropertyAssertionStatus,
     MAX_PROPERTY_ASSERTIONS, MAX_PROPERTY_ASSERTION_WORK,
 };
+mod motion_studies;
+pub use motion_studies::{
+    MotionStudyDefinition, MotionStudyReport, MAX_MOTION_ATTEMPTS, MAX_MOTION_STUDIES,
+};
 mod mechanisms;
 pub use mechanisms::{
     MechanismBinding, MechanismBindingReport, MechanismDefinition, MechanismReport, MAX_MECHANISMS,
@@ -87,6 +91,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
             include_bytes!("mechanisms.rs").as_slice(),
+            include_bytes!("motion_studies.rs").as_slice(),
             include_bytes!("property_assertions.rs").as_slice(),
             include_bytes!("exchange_requirements.rs").as_slice(),
             include_bytes!("section_views.rs").as_slice(),
@@ -143,6 +148,8 @@ pub struct Recipe {
     pub mechanisms: Vec<MechanismDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanism_bindings: Vec<MechanismBinding>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub motion_studies: Vec<MotionStudyDefinition>,
 }
 
 impl<'de> Deserialize<'de> for Recipe {
@@ -184,8 +191,15 @@ impl<'de> Deserialize<'de> for Recipe {
             mechanisms: Option<Vec<MechanismDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             mechanism_bindings: Option<Vec<MechanismBinding>>,
+            #[serde(default, deserialize_with = "present_vec")]
+            motion_studies: Option<Vec<MotionStudyDefinition>>,
         }
         let raw = RawRecipe::deserialize(deserializer)?;
+        if raw.schema_version == 1 && raw.motion_studies.is_some() {
+            return Err(serde::de::Error::custom(
+                "motion studies require schema version 2",
+            ));
+        }
         if raw.schema_version == 1 && (raw.mechanisms.is_some() || raw.mechanism_bindings.is_some())
         {
             return Err(serde::de::Error::custom(
@@ -240,6 +254,7 @@ impl<'de> Deserialize<'de> for Recipe {
             face_datums: raw.face_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
             mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
+            motion_studies: raw.motion_studies.unwrap_or_default(),
         })
     }
 }
@@ -823,11 +838,18 @@ pub struct BuildResult {
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
     pub mechanism_bindings: Vec<MechanismBindingReport>,
     pub mechanism_context_hash: String,
+    pub motion_studies: BTreeMap<String, MotionStudyReport>,
     selection_graph: selection::SelectionGraph,
 }
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("motion study '{id}' failed: {message}")]
+    MotionStudyFailed {
+        id: String,
+        message: String,
+        report: Option<Box<cad_assembly::MotionFailure>>,
+    },
     #[error("mechanism '{id}' failed: {message}")]
     MechanismFailed {
         id: String,
@@ -1414,6 +1436,7 @@ impl BuildEngine {
             return Err(BuildError::Tolerance);
         }
         mechanisms::preflight(recipe)?;
+        motion_studies::preflight(recipe)?;
         let mut indices = HashMap::new();
         for (index, feature) in recipe.features.iter().enumerate() {
             identifier("feature", feature.id())?;
@@ -1864,6 +1887,7 @@ impl BuildEngine {
             pending_exchange_requirements: recipe.exchange_requirements.clone(),
             section_views: BTreeMap::new(),
             face_datums: BTreeMap::new(),
+            motion_studies: mechanism_evaluation.motion_studies,
             mechanism_reports: mechanism_evaluation.reports,
             mechanism_bindings: mechanism_evaluation.bindings,
             mechanism_context_hash: mechanism_evaluation.context_hash,

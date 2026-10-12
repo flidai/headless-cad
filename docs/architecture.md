@@ -1352,8 +1352,43 @@ The native product corpus passes 27 angle/length/plane configurations; three
 independent STEP cases check closure, placements, material volume/centroid and
 sections. Failed branch/underconstraint edits preserve publication and motion
 reuses part geometry. Inspection of captured source is a separate browser gate.
-General spatial mates, mechanism continuation, conflict minimization, collision,
+General spatial mates, continuation through singularities, conflict minimization, collision,
 loads and dynamics remain separate target work.
+
+### Source-owned sampled motion
+
+A motion-study declaration references a planar mechanism and a sequence of
+complete drive-coordinate maps. Its first target equals the source drive state;
+ordinary assembly publication retains that nominal pose. Warm starts use the last
+accepted pin coordinates. Deterministic bisection adapts requested intervals to
+both drive increments and observed pin displacement, retrying failed local solves
+within explicit depth and solve-attempt budgets. All accepted states must satisfy
+the static mechanism's residual, rank, conditioning and signed-branch policy.
+
+This is sampled continuation, not a continuous-path certificate. Explicit angle
+values interpolate in their declared range without hidden wrapping. No point
+between recorded samples is inferred to be collision-free, dynamically valid or
+on a certified continuous branch. Singularity crossing and general 3D motion
+remain target work.
+
+Native sampling loads zero exact bodies. Compact accepted frames retain drive
+coordinates, pins, link frames, branch witnesses, local solver diagnostics and
+measured step increments; failures retain the accepted prefix and available full
+solver diagnostics. Requested and adaptive samples are distinguishable. Every
+attempt, including rejected trials, consumes a shared build budget. Preflight
+checks all declarations and references before sampling; unused/output-unselected
+studies remain global obligations. Bounds are 16 studies, 2,048 shared attempts,
+512 attempts per study, 128 targets and 16 subdivision levels.
+
+The atomic generation includes source-bound motion JSON and a self-contained
+inspection page. The page only visits recorded pin/link layouts, exposes captured
+recipe/modules and reports, and cannot invoke a solver. It leaves the nominal 3D
+assembly viewer unchanged. A separate study context participates in the mechanism
+and recipe context hashes; a trajectory-only edit does not alter native geometric
+identity. The acceptance fixture reuses locked four-bar source, exercises return
+strokes, varies requested precision and checks every accepted point against
+independent circle-intersection formulas. Independent exchange checks cover
+explicit requested poses, not all unobserved intervals.
 
 The target general assembly solver operates on rigid frames, named attachment datums, joint
 parameters, and sparse constraints. It must not need full solid data to solve
@@ -2361,7 +2396,7 @@ pin/bar solver has its own bounded acceptance contract above.
 | Authoring | Starlark functions/loops/parameters and locked local modules with captured replay bundles; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Remote package resolution, unit types, source maps, full public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM; bounded prescribed revolute/prismatic motion; bounded planar pin/bar closure | General 3D/closed-loop joint constraints, flexible occurrences and configurations |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM; bounded prescribed revolute/prismatic motion; bounded planar pin/bar closure and sampled motion studies | General 3D/closed-loop joint constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |

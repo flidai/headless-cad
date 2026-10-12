@@ -245,11 +245,29 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "exchange_policy_status": if recipe.exchange_requirements.is_empty() { "not_requested" } else { "pending_publication" },
         "sketch_reports": build.sketch_reports,
         "mechanism_reports": build.mechanism_reports,
+        "motion_studies": build.motion_studies,
         "mechanism_bindings": build.mechanism_bindings,
         "mechanism_context_hash": build.mechanism_context_hash,
         "face_datums": build.face_datums,
         "outputs": outputs,
     }))
+}
+
+fn motion_summary(build: &BuildResult) -> Value {
+    json!(build
+        .motion_studies
+        .iter()
+        .map(|(id, study)| (
+            id,
+            json!({
+                "definition":study.definition,"solver_id":study.solver_id,
+                "requested_frames":study.solution.requested_frames,
+                "completed_requested_frames":study.solution.completed_requested_frames,
+                "accepted_steps":study.solution.accepted_steps,
+                "attempted_solves":study.solution.attempted_solves,
+            })
+        ))
+        .collect::<BTreeMap<_, _>>())
 }
 
 fn bom_document(bom: &cad_assembly::BomReport) -> Result<Value, Box<dyn Error>> {
@@ -576,6 +594,7 @@ fn difference(before: &Value, after: &Value) -> Value {
     let mechanisms = json!({
         "status": if before["mechanism_context_hash"] == after["mechanism_context_hash"] { "unchanged" } else { "changed" },
         "before": before["mechanism_reports"], "after": after["mechanism_reports"],
+        "before_studies": before["motion_studies"], "after_studies": after["motion_studies"],
         "before_bindings": before["mechanism_bindings"], "after_bindings": after["mechanism_bindings"],
         "before_context_hash": before["mechanism_context_hash"], "after_context_hash": after["mechanism_context_hash"],
     });
@@ -959,6 +978,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             result["property_assertions"] = json!(built.property_assertions);
             result["sketch_reports"] = json!(built.sketch_reports);
             result["mechanism_reports"] = json!(built.mechanism_reports);
+            result["motion_studies"] = motion_summary(&built);
             result["mechanism_bindings"] = json!(built.mechanism_bindings);
             result["mechanism_context_hash"] = json!(built.mechanism_context_hash);
             result["section_views"] = json!(built.section_views);
@@ -1002,6 +1022,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             report["property_assertions"] = json!(build.property_assertions);
             report["sketch_reports"] = json!(build.sketch_reports);
             report["mechanism_reports"] = json!(build.mechanism_reports);
+            report["motion_studies"] = motion_summary(&build);
             report["mechanism_bindings"] = json!(build.mechanism_bindings);
             report["mechanism_context_hash"] = json!(build.mechanism_context_hash);
             report["section_views"] = json!(build.section_views);
@@ -1157,6 +1178,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         result["property_assertions"] = json!(build.property_assertions);
         result["sketch_reports"] = json!(build.sketch_reports);
         result["mechanism_reports"] = json!(build.mechanism_reports);
+        result["motion_studies"] = motion_summary(&build);
         result["mechanism_bindings"] = json!(build.mechanism_bindings);
         result["mechanism_context_hash"] = json!(build.mechanism_context_hash);
         result["section_views"] = json!(build.section_views);
@@ -1511,6 +1533,38 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         } else {
             "passed"
         });
+        for (id, study) in &build.motion_studies {
+            filename(&format!("motion-{id}"))?;
+            let mechanism = &build.mechanism_reports[&study.definition.mechanism].definition;
+            let context = cad_preview::RecipeContext {
+                modules: snapshot.modules.clone(),
+                source_bundle_hash: snapshot.bundle_hash(),
+                language: language.to_owned(),
+                source: source_text.to_owned(),
+                source_name: source_name.clone(),
+                output_name: id.clone(),
+                feature_id: study.definition.mechanism.clone(),
+                parameters: parameters.clone(),
+                property_assertions: property_assertions.clone(),
+                content_hash: blake3::hash(&serde_json::to_vec(study)?)
+                    .to_hex()
+                    .to_string(),
+                recipe_context_hash: summary["recipe_context_hash"].as_str().unwrap().to_owned(),
+            };
+            let document = json!({"schema_version":1,"kind":"planar_motion_study","units":"mm","drive_units":"rad",
+                "coordinate_frame":"mechanism_local_xy","mechanism":mechanism,"study":study,
+                "snapshot":{"recipe_context_hash":context.recipe_context_hash,"source_bundle_hash":context.source_bundle_hash,"parameter_overrides":parameters,"mechanism_context_hash":build.mechanism_context_hash},
+                "fidelity":"Solved samples only; no continuous-path, collision or dynamics certification. Static assembly artifacts retain the source mechanism pose."});
+            let json_file = format!("motion-{id}.json");
+            let html_file = format!("motion-{id}.study.html");
+            artifacts.push((json_file.clone(), serde_json::to_string_pretty(&document)?));
+            artifacts.push((
+                html_file.clone(),
+                cad_preview::to_motion_study_html(&mechanism.input, &study.solution, &context)?,
+            ));
+            summary["motion_studies"][id]["artifacts"] =
+                json!({"json":json_file,"inspector":html_file});
+        }
         // Source-authored views are global native obligations, including when
         // their target is omitted from selected/display-only geometry exports.
         for (id, view) in &build.section_views {
@@ -1634,6 +1688,16 @@ fn main() {
                     cad_build::BuildError::Sketch { feature, .. } => {
                         report["code"] = json!("invalid_sketch");
                         report["feature"] = json!(feature);
+                    }
+                    cad_build::BuildError::MotionStudyFailed {
+                        id,
+                        message,
+                        report: witness,
+                    } => {
+                        report["code"] = json!("motion_study_failed");
+                        report["study"] = json!(id);
+                        report["diagnostic"] = json!(message);
+                        report["motion_failure"] = json!(witness);
                     }
                     cad_build::BuildError::MechanismFailed {
                         id,

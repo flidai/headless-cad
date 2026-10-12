@@ -8,6 +8,9 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use thiserror::Error;
 
+mod motion;
+pub use motion::to_motion_study_html;
+
 mod assembly;
 pub use assembly::{
     to_assembly_gpu_html, to_assembly_gpu_html_with_fallback,

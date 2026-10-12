@@ -694,3 +694,33 @@ fn mechanism_discovery_covers_source_graph_and_reports_bounded_planar_scope() {
         4096
     );
 }
+
+#[test]
+fn motion_study_discovery_distinguishes_sampled_continuation_from_static_pose() {
+    let directory = tempfile::tempdir().unwrap();
+    let output = cli(
+        directory.path(),
+        &["capabilities", "--type", "motion_study_definition"],
+    );
+    assert!(output.status.success());
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let ids: Vec<_> = value["object_types"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| o["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["motion_study", "motion_study_definition"]);
+    let output = cli(directory.path(), &["capabilities"]);
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["resource_limits"]["motion_studies_per_recipe"], 16);
+    assert_eq!(
+        value["resource_limits"]["motion_solve_attempts_per_build"],
+        2048
+    );
+    assert!(value["domains"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["id"] == "assembly.motion_studies"));
+}

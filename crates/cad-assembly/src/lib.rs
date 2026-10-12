@@ -10,6 +10,8 @@
 mod bom;
 mod mass_properties;
 pub use mass_properties::AssemblyMassProperties;
+mod motion;
+pub use motion::*;
 mod mechanism;
 pub use mechanism::*;
 mod joint;
@@ -45,6 +47,7 @@ pub fn assembly_build_id() -> &'static str {
         hash.update(include_bytes!("datum.rs"));
         hash.update(include_bytes!("joint.rs"));
         hash.update(include_bytes!("mechanism.rs"));
+        hash.update(include_bytes!("motion.rs"));
         hash.update(cad_sketch::SOLVER_BUILD_ID.as_bytes());
         hash.update(include_bytes!("../Cargo.toml"));
         hash.update(include_bytes!("../../../Cargo.lock"));
@@ -598,3 +601,6 @@ mod joint_tests;
 
 #[cfg(test)]
 mod mechanism_tests;
+
+#[cfg(test)]
+mod motion_tests;

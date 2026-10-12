@@ -1,5 +1,5 @@
 use super::*;
-fn four_bar(angle: f64, upper: bool) -> PlanarMechanism {
+pub(super) fn four_bar(angle: f64, upper: bool) -> PlanarMechanism {
     PlanarMechanism {
         pins: vec![
             MechanismPin {
