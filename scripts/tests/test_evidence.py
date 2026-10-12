@@ -81,10 +81,16 @@ class CollectedEvidenceAcceptance(unittest.TestCase):
 
     def test_modified_binary_source_oracle_and_result_are_rejected(self):
         oracle = next(c for c in self.manifest['checks'] if c['kind']=='independent')
+        generation_prefixes = tuple(str(Path(entry['manifest']).parent)+'/'
+                                    for entry in self.manifest['generation_verifications'])
+        # Oracle reports live outside managed generations, but their directory
+        # names are not part of the evidence contract (sections use sections.json).
+        reports = sorted(name for name in self.manifest['files']
+                         if name.startswith('artifacts/') and name.endswith('.json')
+                         and not name.startswith(generation_prefixes))
+        self.assertTrue(reports, 'requires a retained oracle/query JSON report')
         paths = ['tools/cad', 'source/'+self.manifest['capability']['fixture'],
-                 'source/'+oracle['argv'][1], oracle['stdout'],
-                 next(name for name in self.manifest['files']
-                      if name.startswith('artifacts/') and '/reports/' in name and name.endswith('.json'))]
+                 'source/'+oracle['argv'][1], oracle['stdout'], reports[0]]
         for name in paths:
             with self.subTest(path=name):
                 path = self.bundle/name
