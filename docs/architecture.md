@@ -2938,13 +2938,43 @@ Malformed/oversized frames or repeated request IDs terminate the stdio session.
 Requests must use unique IDs of at most 256 serialized bytes. Unknown tool arguments are rejected. Busy requests
 return a retryable diagnostic instead of queuing another worker. Cancellation
 signals the worker, which is killed and reaped by the polling supervisor. These
-are bounded buffers and polling guards, not hard RSS/disk quotas or a malicious
-native-code sandbox. Session exit removes the temporary jobs; there is no durable
+are bounded buffers and polling guards. In addition, Linux child processes now
+apply and verify hard resource limits before recipe evaluation, as described below.
+Neither layer is a malicious native-code sandbox. Session exit removes the temporary jobs; there is no durable
 storage service or resumable job handle yet.
 
 This adapter advances R5 but does not close it. It does not write workspace source,
 publish active releases, solve constraints from natural language, or certify all
-assembly collisions. Still required: durable isolated jobs, hard resource admission,
+assembly collisions. Still required: durable isolated jobs, exact-body scheduling with resource admission,
 expected-base serialized compare-and-swap publication, client delivery reconciliation,
 and measured end-to-end autonomous task success. A scripted protocol fixture proves
 the propose/fail/repair/replay interface, not autonomous reasoning by an AI model.
+
+
+### Linux worker process admission
+
+The fixed CAD child enters an internal, allowlisted `_agent-worker` entrypoint.
+Before parsing or evaluating the recipe, it applies and verifies Linux `setrlimit`
+policies through the safe Rust `rustix` API: virtual address space 2 GiB; CPU time
+45 seconds soft and 46 seconds hard; individual file size 128 MiB; open file
+descriptors 128; core file size zero. Soft and hard limits are clamped to stricter
+inherited limits. Admission failure prevents evaluation. The process loader and
+runtime startup precede this entrypoint; this does not bound every instruction
+since process creation. The parent process retains its own limits.
+
+A small admission record in the private job directory captures the effective
+limits. The parent removes previous records before each operation, bounds and
+validates the new record, and requires it before accepting success. Successful
+geometry and normal native failures include this evidence. CPU/file-size signals
+have explicit outcome codes. Other termination signals remain unexplained process
+failures; an abort alone is not evidence of allocation exhaustion. Cancelled jobs
+are discarded, and failed jobs expose no partial engineering artifacts.
+
+`RLIMIT_AS` bounds virtual mappings; it is not an RSS measurement or a cgroup memory
+quota. `RLIMIT_FSIZE` limits each file; aggregate disk still uses the 128 MiB polling
+guard. Existing pipe, retained-job, source and frame limits remain in force.
+There is no filesystem/network namespace isolation, descendant aggregate accounting,
+or automatic spilling of exact bodies. Those remain separate architecture work.
+The current host does not provide a writable delegated cgroup, so the implementation
+does not silently claim cgroup enforcement. This process admission strengthens the
+local R5 foundation without closing the commercial resource or replay gates.

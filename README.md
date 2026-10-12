@@ -100,8 +100,12 @@ session-local and disappear when the MCP process exits; retrieve any artifacts
 you want to retain before closing the session. The viewer remains read-only.
 This first adapter is Linux-only for confined source capture, accepts numeric
 parameter overrides, and limits sessions to one active tool, 32 snapshots and 16
-jobs. Worker time/output/disk guards are not a hard OS memory sandbox. Hosted
-workers, durable job storage, module editing, and expected-base release publication
+jobs. Before evaluating a recipe, Linux workers enforce a 2 GiB virtual-address limit,
+45/46-second CPU soft/hard limits, a 128 MiB individual-file ceiling, 128 open
+files, and no core dumps. Stricter inherited limits are preserved. The separate
+wall-time and aggregate-disk guards remain polling checks. This is not a filesystem
+sandbox or a cgroup RSS quota. Hosted workers, durable job storage, module editing,
+and expected-base release publication
 remain open. See [the agent contract](docs/architecture.md#local-agent-candidate-jobs)
 for the precise boundary.
 

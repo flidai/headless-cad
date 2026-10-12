@@ -318,24 +318,49 @@ fn safe_name(name: &str) -> Result<()> {
     }
 }
 fn tree_bytes(root: &Path) -> Result<u64> {
+    tree_bytes_impl(root, false)
+}
+// Publication renames staging directories while this advisory live poll runs.
+// Only disappearing descendants may be skipped; quiescent retention is strict.
+fn live_tree_bytes(root: &Path) -> Result<u64> {
+    tree_bytes_impl(root, true)
+}
+fn tree_bytes_impl(root: &Path, live: bool) -> Result<u64> {
+    let root_meta = fs::symlink_metadata(root).map_err(|e| e.to_string())?;
+    if !root_meta.is_dir() || root_meta.file_type().is_symlink() {
+        return Err("worker root is not a real directory".into());
+    }
     let mut total = 0u64;
     let mut pending = vec![root.to_path_buf()];
     let mut count = 0;
     while let Some(path) = pending.pop() {
-        for entry in fs::read_dir(path).map_err(|e| e.to_string())? {
-            let entry = entry.map_err(|e| e.to_string())?;
+        let entries = match fs::read_dir(&path) {
+            Ok(v) => v,
+            Err(e) if live && path != root && e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e.to_string()),
+        };
+        for entry in entries {
+            let entry = match entry {
+                Ok(v) => v,
+                Err(e) if live && e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(e.to_string()),
+            };
             count += 1;
             if count > 10000 {
                 return Err("worker file count exceeded".into());
             }
-            let meta = entry.file_type().map_err(|e| e.to_string())?;
-            if meta.is_symlink() {
+            let meta = match fs::symlink_metadata(entry.path()) {
+                Ok(v) => v,
+                Err(e) if live && e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(e.to_string()),
+            };
+            if meta.file_type().is_symlink() {
                 return Err("worker created symlink".into());
             }
             if meta.is_dir() {
                 pending.push(entry.path());
             } else if meta.is_file() {
-                total = total.saturating_add(entry.metadata().map_err(|e| e.to_string())?.len());
+                total = total.saturating_add(meta.len());
             } else {
                 return Err("worker created special file".into());
             }
@@ -343,6 +368,7 @@ fn tree_bytes(root: &Path) -> Result<u64> {
     }
     Ok(total)
 }
+
 fn drain(
     mut pipe: impl Read + Send + 'static,
     limit: usize,
@@ -372,7 +398,34 @@ fn run(
     timeout: Duration,
     cancel: &Arc<AtomicBool>,
 ) -> Result<Value> {
-    let mut child = Command::new(executable)
+    run_process(executable, directory, args, timeout, cancel, true)
+}
+fn run_process(
+    executable: &Path,
+    directory: &Path,
+    args: &[String],
+    timeout: Duration,
+    cancel: &Arc<AtomicBool>,
+    native_worker: bool,
+) -> Result<Value> {
+    let mut command = Command::new(executable);
+    if native_worker {
+        if !args.first().is_some_and(|a| {
+            matches!(
+                a.as_str(),
+                "compile" | "inspect" | "build" | "capabilities" | "verify"
+            )
+        }) {
+            return Err("invalid fixed worker operation".into());
+        }
+        match fs::remove_file(directory.join(crate::worker_limits::ADMISSION_FILE)) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.to_string()),
+        }
+        command.arg("_agent-worker");
+    }
+    let mut child = command
         .args(args)
         .current_dir(directory)
         .env_clear()
@@ -395,13 +448,26 @@ fn run(
     let start = Instant::now();
     let mut failure = None;
     let status = loop {
-        let bytes = tree_bytes(directory);
+        let bytes = live_tree_bytes(directory);
         if cancel.load(Ordering::Relaxed)
             || start.elapsed() > timeout
             || overflow.load(Ordering::Relaxed)
             || bytes.as_ref().map_or(true, |n| *n > MAX_JOB_BYTES)
         {
-            failure = Some("worker cancelled, timeout, output or disk limit exceeded".to_owned());
+            failure = Some(
+                if cancel.load(Ordering::Relaxed) {
+                    "worker_cancelled"
+                } else if start.elapsed() > timeout {
+                    "worker_timeout"
+                } else if overflow.load(Ordering::Relaxed) {
+                    "worker_output_limit"
+                } else if bytes.is_err() {
+                    "worker_tree_invalid"
+                } else {
+                    "worker_disk_limit"
+                }
+                .to_owned(),
+            );
             let _ = child.kill();
             break child.wait().map_err(|e| e.to_string());
         }
@@ -423,23 +489,71 @@ fn run(
         .join()
         .map_err(|_| "stderr reader failed")?
         .map_err(|e| e.to_string())?;
+    let admission = if native_worker {
+        let path = directory.join(crate::worker_limits::ADMISSION_FILE);
+        match fs::File::open(path) {
+            Ok(file) => {
+                let mut bytes = Vec::new();
+                file.take(16385)
+                    .read_to_end(&mut bytes)
+                    .map_err(|e| e.to_string())?;
+                if bytes.len() > 16384 {
+                    return Err("worker admission record too large".into());
+                }
+                let record = serde_json::from_slice::<Value>(&bytes)
+                    .map_err(|_| "invalid worker admission record")?;
+                crate::worker_limits::validate_record(&record)?;
+                Some(record)
+            }
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
     if overflow.load(Ordering::Relaxed) {
-        return Err("worker output limit exceeded".into());
-    }
-    if let Some(failure) = failure {
-        return Err(failure);
+        failure = Some("worker_output_limit".into());
     }
     if cancel.load(Ordering::Relaxed) {
-        return Err("worker cancelled".into());
+        failure = Some("worker_cancelled".into());
+    }
+    if let Some(code) = failure {
+        if native_worker {
+            return Ok(
+                json!({"success":false,"admission":admission,"result":{"code":code,"error":code}}),
+            );
+        }
+        return Err(code);
     }
     let status = status?;
     if tree_bytes(directory)? > MAX_JOB_BYTES {
+        if native_worker {
+            return Ok(
+                json!({"success":false,"admission":admission,"result":{"code":"worker_disk_limit","error":"worker exceeded disk byte limit"}}),
+            );
+        }
         return Err("worker disk limit exceeded".into());
+    }
+    if native_worker && status.success() && admission.is_none() {
+        return Err("worker admission record missing".into());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if let Some(signal) = status.signal() {
+            let code = match signal {
+                s if s == rustix::process::Signal::XCPU.as_raw() => "worker_cpu_limit",
+                s if s == rustix::process::Signal::XFSZ.as_raw() => "worker_file_limit",
+                _ => "worker_terminated",
+            };
+            return Ok(
+                json!({"success":false,"admission":admission,"result":{"code":code,"signal":signal,"error":"worker terminated; other signals do not identify a specific resource failure","stderr_excerpt":String::from_utf8_lossy(&err[..err.len().min(16*1024)]),"stderr_truncated":err.len()>16*1024}}),
+            );
+        }
     }
     let payload = if status.success() { &out } else { &err };
     let result: Value =
         serde_json::from_slice(payload).map_err(|_| "worker returned invalid JSON")?;
-    Ok(json!({"success":status.success(),"result":result}))
+    Ok(json!({"success":status.success(),"result":result,"admission":admission}))
 }
 
 #[cfg(test)]
@@ -459,31 +573,34 @@ mod tests {
         let sleep = executable("sleep");
         let yes = executable("yes");
         let cancelled = Arc::new(AtomicBool::new(true));
-        assert!(run(
+        assert!(run_process(
             &sleep,
             dir.path(),
             &["5".into()],
             Duration::from_secs(1),
-            &cancelled
+            &cancelled,
+            false
         )
         .is_err());
         let started = Instant::now();
-        assert!(run(
+        assert!(run_process(
             &sleep,
             dir.path(),
             &["5".into()],
             Duration::from_millis(10),
-            &Arc::new(AtomicBool::new(false))
+            &Arc::new(AtomicBool::new(false)),
+            false
         )
         .is_err());
         assert!(started.elapsed() >= Duration::from_millis(10));
         assert!(started.elapsed() < Duration::from_secs(2));
-        assert!(run(
+        assert!(run_process(
             &yes,
             dir.path(),
             &[],
             Duration::from_secs(2),
-            &Arc::new(AtomicBool::new(false))
+            &Arc::new(AtomicBool::new(false)),
+            false
         )
         .is_err());
     }
@@ -542,6 +659,47 @@ mod tests {
         assert!(tree_bytes(dir.path()).is_err());
     }
     #[test]
+    fn live_tree_monitor_tolerates_atomic_generation_publication() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = root.path().to_path_buf();
+        let finished = Arc::new(AtomicBool::new(false));
+        let done = finished.clone();
+        let publisher = thread::spawn(move || {
+            for i in 0..200 {
+                let payload = format!("generation {i}");
+                let manifest = json!({"artifact_files":["manifest.json","part.json"]});
+                crate::publish(
+                    &directory.join("generation"),
+                    &[
+                        ("manifest.json".into(), manifest.to_string()),
+                        ("part.json".into(), payload),
+                    ],
+                )
+                .unwrap();
+            }
+            done.store(true, Ordering::Release);
+        });
+        let mut polls = 0;
+        while !finished.load(Ordering::Acquire) {
+            live_tree_bytes(root.path()).unwrap();
+            polls += 1;
+        }
+        publisher.join().unwrap();
+        assert!(polls > 0);
+        assert!(tree_bytes(root.path()).unwrap() > 0);
+        assert_eq!(
+            fs::read_to_string(root.path().join("generation/part.json")).unwrap(),
+            "generation 199"
+        );
+        assert!(live_tree_bytes(&root.path().join("missing_root")).is_err());
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink("/", root.path().join("escape")).unwrap();
+            assert!(live_tree_bytes(root.path()).is_err());
+            assert!(tree_bytes(root.path()).is_err());
+        }
+    }
+    #[test]
     fn failed_candidate_retention_obeys_disk_and_report_caps() {
         let failed = json!({"worker":{"success":false}});
         assert!(validate_retention(MAX_JOB_BYTES + 1, 0, Some(&failed)).is_err());
@@ -569,9 +727,11 @@ mod tests {
             assert!(jobs.jobs.is_empty());
             assert_eq!(jobs.sequence, 0);
         }
-        assert!(jobs
-            .capabilities(None, None, Arc::new(AtomicBool::new(true)))
-            .is_err());
+        assert_eq!(
+            jobs.capabilities(None, None, Arc::new(AtomicBool::new(true)))
+                .unwrap()["result"]["code"],
+            "worker_cancelled"
+        );
     }
     #[test]
     fn invalid_requests_never_start_workers() {

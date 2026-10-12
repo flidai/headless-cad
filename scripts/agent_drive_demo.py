@@ -172,7 +172,8 @@ def main():
                   'workspace_unchanged': True, 'offline_replay_native_and_step_equal': True,
                   'before_snapshot': snapshot['snapshot_id'], 'rejected_snapshot': invalid['snapshot_id'],
                   'after_snapshot': repaired['snapshot_id'], 'native_rejection': rejected['worker']['result'],
-                  'jobs': summaries, 'tool_calls': len(trace), 'trace': trace}
+                  'jobs': summaries, 'worker_admission': {name: job['worker'].get('admission') for name, job in [('before', before), ('rejected', rejected), ('after', after)]},
+                  'tool_calls': len(trace), 'trace': trace}
         (root / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
         title = 'Recipe proposal → native rejection → repaired rotating drive'
         (root / 'index.html').write_text(f'''<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

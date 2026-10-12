@@ -727,6 +727,13 @@ mutating source or accepted results. The protocol acceptance fixture exercises
 propose → native rejection → repair → build → verify → offline replay.
 
 This is session-local candidate execution, not completion of M7/R5. Durable job
-storage, hard OS memory/disk admission, module proposals, expected-base publication,
+storage, exact-body memory scheduling and aggregate disk quotas, module proposals, expected-base publication,
 remote authentication, idempotent delivery, and measured autonomous engineering
 success remain open. All five commercial product gates remain open.
+
+
+Linux local workers now apply verified virtual-address, CPU, individual-file,
+open-descriptor and core-file limits before recipe evaluation. Isolated process
+probes exercise actual enforcement; the drive remains a normal-capacity acceptance
+case. These per-process limits do not close M3 exact-body scheduling or R5 hosted
+isolation, durable jobs, aggregate quotas, and delivery reconciliation.

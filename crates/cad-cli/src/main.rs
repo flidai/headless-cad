@@ -23,6 +23,7 @@ mod section;
 mod server;
 mod tolerance_stacks;
 mod watch;
+mod worker_limits;
 
 #[derive(Debug)]
 struct InvalidBrep(cad_kernel::ValidationReport);
@@ -1653,7 +1654,28 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let mut arguments: Vec<_> = std::env::args_os().collect();
+    if arguments.get(1).is_some_and(|arg| arg == "_agent-worker") {
+        let operation = arguments.get(2).and_then(|arg| arg.to_str()).unwrap_or("");
+        let allowed = matches!(
+            operation,
+            "compile" | "inspect" | "build" | "capabilities" | "verify"
+        );
+        let admission = if allowed {
+            worker_limits::apply_and_record()
+        } else {
+            Err("invalid internal worker operation".into())
+        };
+        if let Err(error) = admission {
+            eprintln!(
+                "{}",
+                json!({"code":"worker_admission_failed","error":error})
+            );
+            std::process::exit(1);
+        }
+        arguments.remove(1);
+    }
+    let cli = Cli::parse_from(arguments);
     if let Command::Mcp { workspace } = &cli.command {
         if !cli.params.is_empty() || cli.cache_dir.is_some() {
             eprintln!("MCP accepts parameters per job and owns its private cache");
