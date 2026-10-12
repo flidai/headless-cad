@@ -70,3 +70,17 @@ fn source_coaxial_shaft_inside_ring_reports_meridian_method() {
     );
     assert!(q.lower_bound_mm <= 1. && q.upper_bound_mm >= 1.);
 }
+
+#[test]
+fn source_eccentric_shaft_inside_ring_reports_parallel_annular_method() {
+    let source = "shaft=extrude(id='shaft',profile=circle(id='sp',radius=1),height=4)\nring=extrude(id='ring',profile=circle(id='rp',radius=3,inner_radius=2),height=4)\na=part(id='shaft_part',body=shaft)\nb=part(id='ring_part',body=ring)\nassembly_output(name='pair',assembly=assembly(id='root',instances=[instance(id='left',part=a),instance(id='right',part=b,offset=[0.25,0,0])]))\n";
+    let check = CHECK.replace("min_clearance=4.99", "min_clearance=0.74");
+    let r = cad_recipe::from_starlark("eccentric.star", &format!("{source}{check}")).unwrap();
+    let b = cad_build::build(&r).unwrap();
+    let q = &b.clearance_checks["gap"].query;
+    assert_eq!(
+        serde_json::to_value(q).unwrap()["method"],
+        "parallel_annular"
+    );
+    assert!(q.lower_bound_mm <= 0.75 && q.upper_bound_mm >= 0.75);
+}

@@ -71,6 +71,10 @@ fn explicit_curved_nonconvex_contact_and_unresolved_domains_fail() {
     }
     let mut v = value();
     v["features"][0] = json!({"op":"circle","id":"p","radius":1,"inner_radius":0.5});
+    // Hollow circular bodies now support parallel lateral offsets, but a true
+    // relative tilt still lies outside the admitted annular family.
+    v["assemblies"][1]["assemblies"][1]["transform"]["rotation"] =
+        json!([(0.1_f64).sin(), 0., 0., (0.1_f64).cos()]);
     assert!(matches!(
         cad_build::build(&parse(v)),
         Err(BuildError::ClearanceCheckFailed { .. })
@@ -303,7 +307,7 @@ fn convex_revolved_cones_frusta_and_mixed_pairs_preserve_global_checks() {
 #[test]
 fn noncoaxial_hollow_and_nonconvex_revolutions_fail_explicitly() {
     for profile in [
-        json!([[1, 0], [2, 0], [2, 4], [1, 4]]),
+        json!([[1, 0], [2, 0], [3, 4], [2, 4]]),
         json!([[0, 0], [2, 0], [1, 2], [2, 4], [0, 4]]),
     ] {
         let mut v = value();
@@ -380,7 +384,7 @@ fn coaxial_shaft_inside_ring_is_native_and_globally_enforced() {
 }
 
 #[test]
-fn coaxial_query_rejects_overlap_contact_and_actual_axis_misalignment() {
+fn coaxial_query_rejects_overlap_contact_and_actual_axis_tilt() {
     for radius in [2., 2.5, 4.] {
         let mut v = coaxial_pair();
         v["features"][0]["radius"] = json!(radius);
@@ -390,8 +394,8 @@ fn coaxial_query_rejects_overlap_contact_and_actual_axis_misalignment() {
         ));
     }
     for transform in [
-        json!({"translation":[0.25,0,0]}),
         json!({"rotation":[(0.001_f64).sin(),0,0,(0.001_f64).cos()]}),
+        json!({"translation":[0.25,0,0],"rotation":[(0.001_f64).sin(),0,0,(0.001_f64).cos()]}),
     ] {
         let mut v = coaxial_pair();
         v["assemblies"][2]["assemblies"][1]["transform"] = transform;
@@ -413,4 +417,54 @@ fn coaxial_nonconvex_revolution_uses_filled_meridian_without_hull_substitution()
     let q = &b.clearance_checks["gap"].query;
     assert_eq!(q.method, cad_kernel::ClearanceMethod::CoaxialMeridian);
     assert!(q.lower_bound_mm <= 3. && q.upper_bound_mm >= 3.);
+}
+
+#[test]
+fn parallel_annular_eccentric_and_external_pairs_are_global_native_queries() {
+    for (two_rings, offset, expected) in [
+        (false, [0.25, 0., 0.], 0.75),
+        (true, [8., 0., 0.], 2.),
+        (true, [4., 0., 7.], 3.),
+        (true, [8., 0., 7.], 13_f64.sqrt()),
+    ] {
+        for opposed in [false, true] {
+            let mut v = coaxial_pair();
+            if two_rings {
+                v["features"][0] = json!({"op":"circle","id":"p","radius":3,"inner_radius":2});
+            }
+            let translation = [
+                offset[0],
+                offset[1],
+                offset[2] + if opposed { 4. } else { 0. },
+            ];
+            v["assemblies"][2]["assemblies"][1]["transform"] =
+                json!({"translation":translation,"rotation":if opposed {[1,0,0,0]}else{[0,0,0,1]}});
+            v["clearance_checks"][0]["min_clearance"] = json!(expected - 1e-5);
+            let mut r = parse(v);
+            let mut engine = BuildEngine::default();
+            let b = engine.build_outputs(&r, &["body".into()]).unwrap();
+            let c = &b.clearance_checks["gap"];
+            assert_eq!(c.query.method, cad_kernel::ClearanceMethod::ParallelAnnular);
+            assert!(c.lower_bound_mm <= expected && c.upper_bound_mm >= expected);
+            assert!(c.upper_bound_mm - c.lower_bound_mm < 1e-7);
+            assert!(b.assemblies.is_empty());
+            r.clearance_checks[0].min_clearance = expected + 1e-5;
+            assert!(matches!(
+                engine.build_outputs(&r, &["body".into()]),
+                Err(BuildError::ClearanceCheckFailed {
+                    lower_bound_mm: Some(_),
+                    ..
+                })
+            ));
+            r.clearance_checks[0].min_clearance = expected - 1e-5;
+            assert_eq!(
+                engine
+                    .build_outputs(&r, &["body".into()])
+                    .unwrap()
+                    .stats
+                    .computed_solids,
+                0
+            );
+        }
+    }
 }

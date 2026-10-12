@@ -1,4 +1,4 @@
-//! Global native convex-polyhedral separation obligations for explicit leaf pairs.
+//! Global native material separation obligations for explicit leaf pairs.
 use super::*;
 pub const MAX_CLEARANCE_CHECKS: usize = 64;
 pub const MAX_CLEARANCE_RESOLVE_WORK: usize = 10_000_000;

@@ -2111,6 +2111,28 @@ offline replay and failed-publication preservation. General noncoaxial curved or
 nonconvex distance, penetration, manufactured envelopes and swept motion remain
 open release obligations.
 
+Recognized finite circular extrusions additionally support parallel-axis lateral
+offsets through `SolidClearance.method = parallel_annular`. The planar radial
+material sets are closed disks or annuli. Their exact separation is the maximum
+of zero, external separation, and either body's separation from the other's hole;
+combining this with finite axial interval separation gives the 3D distance by
+Euclidean norm. This handles nesting and exterior separation without a convex
+hull. Overlapping radial footprints with a positive axial gap require a shared
+material point; native witnesses may use circle intersections away from the
+centerline. Every witness remains tied to the actual circular extrusion.
+
+Existing native support consistency, scale/placement error budgets and topology
+admission remain binding. Opposed axes are normalized into one axial coordinate;
+real tilt is unsupported, while admitted arithmetic angular departure widens the
+interval. Near-coaxial cases retain the coaxial method, and pairs admitted by the
+convex path retain their original method. `parallel_clearance.star` exercises
+eccentric bores, offset sleeves, hollow spindles and reversed nesting. Acceptance
+requires independent radial/axial formulas, imported STEP boundary witnesses and
+placements, exact-distance cases, noncentral footprint intersections, common and
+opposed poses, replay/cache behavior, and preserved generations on rejected edits.
+Offset stepped/tapered meridians, arbitrary nonparallel annuli and continuous
+motion remain separate geometry obligations.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in

@@ -2,11 +2,14 @@
 use crate::convex_clearance::support::{circular_consistency, revolution_consistency};
 use crate::math::{dot, norm, sub};
 use crate::*;
+#[path = "parallel_clearance.rs"]
+mod parallel;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClearanceMethod {
     ConvexSupport,
     CoaxialMeridian,
+    ParallelAnnular,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,7 +23,7 @@ pub struct SolidClearance {
     pub axis: [f64; 3],
 }
 fn unsupported() -> KernelError {
-    KernelError::Unsupported("solid clearance requires certified convex separation or separated coaxial full-turn linear-meridian material regions; overlap/contact and unresolved alignment are not classified".into())
+    KernelError::Unsupported("solid clearance requires certified convex separation or separated coaxial full-turn linear-meridian material regions or parallel circular extrusions; overlap/contact and unresolved alignment are not classified".into())
 }
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     std::array::from_fn(|i| a[i] + b[i])
@@ -252,7 +255,10 @@ impl ModelSnapshot {
                 axis: q.axis,
             });
         }
-        coaxial(self, other, t)
+        match coaxial(self, other, t) {
+            Ok(q) => Ok(q),
+            Err(coaxial_error) => parallel::query(self, other, t).map_err(|_| coaxial_error),
+        }
     }
 }
 
@@ -337,11 +343,6 @@ mod tests {
         let contained = translate(&contained, [0., 0., 1.], t).unwrap().model;
         assert!(ring.clearance(&contained, t).is_err());
         let shaft = extrude_circle(1., 4., t).unwrap().model;
-        for x in [1e-8, 0.25] {
-            assert!(ring
-                .clearance(&translate(&shaft, [x, 0., 0.], t).unwrap().model, t)
-                .is_err());
-        }
         let tilted = transform(
             &shaft,
             [0.; 3],

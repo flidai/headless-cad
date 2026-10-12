@@ -2322,18 +2322,39 @@ The default stepped shaft has 1 mm nominal bore clearance and the spacer has a
 6 mm axial gap. `shape=0..3`, `slide`, `opposed`, `pose`, and `axial_gap` exercise
 profile and placement changes. `gap=0`, `oversize=1`, `eccentric=1`, and `tilt=1`
 exercise contact, material containment and unsupported noncoaxial arrangements.
-Small arithmetic alignment departures widen the interval; actual eccentricity or
-tilt is rejected rather than snapped into coaxial alignment.
+Small arithmetic alignment departures widen the coaxial interval. The coaxial
+profile path rejects actual eccentricity or tilt rather than snapping axes. The
+parallel circular-extrusion path below additionally supports lateral offsets.
 
 The generic native API is `ModelSnapshot::clearance`; the original
 `convex_clearance` API keeps its convex-only contract. Published clearance JSON
 uses schema 2 and `kind: native_geometric_clearance`. Each query records
-`method: convex_support | coaxial_meridian`; its `axis` is a witness direction,
+`method: convex_support | coaxial_meridian | parallel_annular`; its `axis` is a witness direction,
 not a global separating plane for nested bodies. Coaxial admission allows at most
 128 faces, 256 loops, two loops per face, and the existing vertex/edge/reference
 budgets. The report displays the geometry method beside each checked pair.
-General noncoaxial hollow/nonconvex queries, continuous motion and manufacturing
-tolerance envelopes remain separate capabilities.
+General nonparallel or noncircular hollow/nonconvex queries, continuous motion
+and manufacturing tolerance envelopes remain separate capabilities.
+
+`parallel_clearance.star` adds true lateral offsets between finite circular
+extrusions, including a solid or hollow spindle and an offset annular sleeve.
+The native query combines complete planar annular-material separation with the
+finite axial-interval gap. When the radial footprints overlap but their heights
+are separated, witnesses may lie at circle intersections away from the line
+joining the centers; centerline sampling is insufficient.
+
+```sh
+cad build examples/parallel_clearance.star --out-dir out/parallel_clearance
+```
+
+The default spindle has 0.25 mm eccentricity and 0.75 mm bore clearance. The
+sleeve has a 6 mm axial gap despite overlapping annular footprints. `eccentric`,
+`lateral`, `shaft_radius`, `shaft_inner`, `slide`, and `spacer_x` exercise nesting,
+external separation and axial/radial combinations. Opposed axes and common rigid
+poses preserve the material sets. The report labels this path `Parallel annuli`;
+coaxial and convex inputs retain their existing method labels. Contact/material
+overlap and real axis tilt fail explicitly. This path does not extend offset
+support to stepped or tapered meridians.
 
 ### Native planar edge chamfers
 

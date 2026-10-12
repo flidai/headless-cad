@@ -81,6 +81,14 @@ exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
 
+Parallel circular-extrusion clearance advances the bearing workflow to real
+lateral offsets: eccentric solid/hollow spindles, exterior rings and nested
+annuli. `parallel_clearance.star` includes overlapping annular footprints whose
+axially separated witnesses lie away from the centerline. Independent exact
+radial/axial formulas, STEP boundary witnesses, reversed/common poses and
+publication-preserving failures are required evidence. Offset noncircular
+meridians, nonparallel annuli and continuous motion remain open.
+
 Coaxial native clearance now advances the bearing workflow beyond convex shapes:
 actual hollow bores, stepped shafts and concave meridians retain their material
 regions. `coaxial_clearance.star` combines radial bearing and axial spacer checks
