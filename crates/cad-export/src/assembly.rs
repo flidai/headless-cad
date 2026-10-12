@@ -195,12 +195,28 @@ pub fn assembly_to_stl(
     assembly: &BuiltAssembly,
     tolerance: Tolerance,
 ) -> Result<String, ExportError> {
+    assembly_to_stl_with_cache(
+        assembly,
+        tolerance,
+        &mut cad_mesh::GenerationMeshCache::default(),
+    )
+}
+
+/// Reuse body meshes across occurrences and other publication consumers.
+pub fn assembly_to_stl_with_cache(
+    assembly: &BuiltAssembly,
+    tolerance: Tolerance,
+    cache: &mut cad_mesh::GenerationMeshCache,
+) -> Result<String, ExportError> {
     assembly
         .validate(tolerance)
         .map_err(|e| ExportError::InvalidModel(e.to_string()))?;
     let mut local = BTreeMap::new();
     for (name, part) in &assembly.parts {
-        local.insert(name, polygons(&part.result.model, tolerance)?);
+        local.insert(
+            name,
+            polygons_with_cache(&part.result.model, tolerance, cache)?,
+        );
     }
     let mut output = String::new();
     for instance in &assembly.instances {

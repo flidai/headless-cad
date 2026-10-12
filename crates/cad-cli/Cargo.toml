@@ -10,6 +10,7 @@ name = "cad"
 path = "src/main.rs"
 
 [dependencies]
+cad-mesh = { path = "../cad-mesh" }
 cad-assembly = { path = "../cad-assembly" }
 cad-build = { path = "../cad-build" }
 cad-kernel = { path = "../cad-kernel" }

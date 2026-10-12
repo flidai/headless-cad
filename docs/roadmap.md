@@ -319,9 +319,10 @@ publication even when other groups converge. `modular_bore_plate.star` exercises
 solving, sparse elimination and incremental island result caching remain future
 work; the implementation does not claim them from disconnected-group scaling.
 Native 27-case, three-case independent STEP and nine-case browser acceptance
-pass. Next, reuse certified tessellation across publication consumers; the
-30-bore fixture exposes repeated default-mesh construction even though its
-constraint islands solve quickly.
+pass. Certified tessellation is now reused across publication consumers through
+a bounded generation cache; the 30-bore fixture measures its effect separately
+from constraint solving. Continue toward bounded exact-body residency and display
+preprocessing budgets; a cache retention cap is not a full job memory bound.
 
 ## Example policy
 

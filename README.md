@@ -788,11 +788,21 @@ Starlark / JSON / Rust Feature values
           ▼                ▼
  cad-export             cad-preview
  STEP / STL             SVG / interactive HTML
+          └───────┬────────┘
+                  ▼
+ cad-mesh: shared certified tessellation for one publication job
 ```
 
 A separate `cad-assembly` crate validates shared part definitions and rigid
 occurrences. It preserves logical identity, local geometry reuse, and placement
 metadata independently of the feature DAG.
+
+`cad-mesh` reuses analytic meshes and certified planar-face triangulation across
+preview and STL writers. Each publication owns its cache; native geometry and the
+complete numerical/meshing policy determine reuse. STEP and engineering queries
+retain native geometry. Cache retention is bounded separately from construction
+working memory, output strings and meshes still held by callers. The manifest
+reports cache activity; this optimization does not relax native validation.
 
 The kernel stores vertices, edges with supporting lines, oriented edge uses,
 loops, faces with supporting planes, shells, and solids. Volume is integrated

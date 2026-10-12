@@ -2,12 +2,15 @@
 //! Software previews expand bounded transient arrays. The separate opt-in GPU
 //! viewer retains shared meshes with a larger occurrence budget. Neither browser
 //! viewer loads or evaluates the exact B-rep.
+#[cfg(test)]
+use super::scene_with_policy;
 use super::{
-    render_html, render_html_template, render_svg, scene_with_policy, scene_with_tolerance, Face,
-    PreviewError, RecipeContext, Scene,
+    render_html, render_html_template, render_svg, scene_with_cache, scene_with_policy_and_cache,
+    Face, PreviewError, RecipeContext, Scene,
 };
 use cad_assembly::{BuiltAssembly, Instance};
 use cad_kernel::Tolerance;
+use cad_mesh::GenerationMeshCache;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -84,10 +87,25 @@ fn assembly_scene(assembly: &BuiltAssembly, gpu: bool) -> Result<AssemblyScene, 
     assembly_scene_with_tolerance(assembly, gpu, Tolerance::default())
 }
 
+#[cfg(test)]
 fn assembly_scene_with_tolerance(
     assembly: &BuiltAssembly,
     gpu: bool,
     tolerance: Tolerance,
+) -> Result<AssemblyScene, PreviewError> {
+    assembly_scene_with_cache(
+        assembly,
+        gpu,
+        tolerance,
+        &mut GenerationMeshCache::default(),
+    )
+}
+
+fn assembly_scene_with_cache(
+    assembly: &BuiltAssembly,
+    gpu: bool,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
 ) -> Result<AssemblyScene, PreviewError> {
     assembly
         .validate(tolerance)
@@ -112,7 +130,7 @@ fn assembly_scene_with_tolerance(
             }
         }
         if !meshes.contains_key(&part.content_hash) {
-            let local = scene_with_tolerance(&part.result.model, tolerance)?;
+            let local = scene_with_cache(&part.result.model, tolerance, cache)?;
             unique_faces += local.faces.len();
             unique_points += local
                 .faces
@@ -201,9 +219,17 @@ pub fn to_assembly_scene_json_with_tolerance(
     assembly: &BuiltAssembly,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
-    Ok(serde_json::to_string_pretty(
-        &assembly_scene_with_tolerance(assembly, false, tolerance)?,
-    )?)
+    to_assembly_scene_json_with_cache(assembly, tolerance, &mut GenerationMeshCache::default())
+}
+
+pub fn to_assembly_scene_json_with_cache(
+    assembly: &BuiltAssembly,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
+    Ok(serde_json::to_string_pretty(&assembly_scene_with_cache(
+        assembly, false, tolerance, cache,
+    )?)?)
 }
 
 /// A standalone occurrence-aware viewer with exact source/provenance context.
@@ -219,13 +245,27 @@ pub fn to_assembly_html_with_tolerance(
     recipe: &RecipeContext,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
+    to_assembly_html_with_cache(
+        assembly,
+        recipe,
+        tolerance,
+        &mut GenerationMeshCache::default(),
+    )
+}
+
+pub fn to_assembly_html_with_cache(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
     if recipe.content_hash != assembly.content_hash {
         return Err(PreviewError::Recipe(
             "recipe output identity does not match assembly",
         ));
     }
     render_html(
-        &assembly_scene_with_tolerance(assembly, false, tolerance)?,
+        &assembly_scene_with_cache(assembly, false, tolerance, cache)?,
         Some(recipe),
     )
 }
@@ -240,9 +280,17 @@ pub fn to_assembly_gpu_scene_json_with_tolerance(
     assembly: &BuiltAssembly,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
-    Ok(serde_json::to_string_pretty(
-        &assembly_scene_with_tolerance(assembly, true, tolerance)?,
-    )?)
+    to_assembly_gpu_scene_json_with_cache(assembly, tolerance, &mut GenerationMeshCache::default())
+}
+
+pub fn to_assembly_gpu_scene_json_with_cache(
+    assembly: &BuiltAssembly,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
+    Ok(serde_json::to_string_pretty(&assembly_scene_with_cache(
+        assembly, true, tolerance, cache,
+    )?)?)
 }
 
 /// Opt-in WebGL2 occurrence viewer, preserving shared meshes on the GPU.
@@ -274,12 +322,28 @@ pub fn to_assembly_gpu_html_with_fallback_and_tolerance(
     portable_preview_available: bool,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
+    to_assembly_gpu_html_with_fallback_and_cache(
+        assembly,
+        recipe,
+        portable_preview_available,
+        tolerance,
+        &mut GenerationMeshCache::default(),
+    )
+}
+
+pub fn to_assembly_gpu_html_with_fallback_and_cache(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    portable_preview_available: bool,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
     if recipe.content_hash != assembly.content_hash {
         return Err(PreviewError::Recipe(
             "recipe output identity does not match assembly",
         ));
     }
-    let mut scene = assembly_scene_with_tolerance(assembly, true, tolerance)?;
+    let mut scene = assembly_scene_with_cache(assembly, true, tolerance, cache)?;
     scene.portable_preview_available = Some(portable_preview_available);
     render_html_template(&scene, Some(recipe), include_str!("gpu-viewer.html"))
 }
@@ -306,12 +370,28 @@ pub fn to_assembly_stream_bundle_with_tolerance(
     portable_preview_available: bool,
     tolerance: Tolerance,
 ) -> Result<StreamBundle, PreviewError> {
+    to_assembly_stream_bundle_with_cache(
+        assembly,
+        recipe,
+        portable_preview_available,
+        tolerance,
+        &mut GenerationMeshCache::default(),
+    )
+}
+
+pub fn to_assembly_stream_bundle_with_cache(
+    assembly: &BuiltAssembly,
+    recipe: &RecipeContext,
+    portable_preview_available: bool,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<StreamBundle, PreviewError> {
     if recipe.content_hash != assembly.content_hash {
         return Err(PreviewError::Recipe(
             "recipe output identity does not match assembly",
         ));
     }
-    let mut scene = assembly_scene_with_tolerance(assembly, true, tolerance)?;
+    let mut scene = assembly_scene_with_cache(assembly, true, tolerance, cache)?;
     scene.schema_version = 2;
     scene.portable_preview_available = Some(portable_preview_available);
     let mut assets = BTreeMap::<String, String>::new();
@@ -327,13 +407,14 @@ pub fn to_assembly_stream_bundle_with_tolerance(
         let mut meshes = Vec::new();
         if model.has_curved_geometry() {
             for chordal_error in [0.5, 0.1] {
-                meshes.push(scene_with_policy(
+                meshes.push(scene_with_policy_and_cache(
                     model,
                     tolerance,
                     cad_kernel::TessellationPolicy {
                         chordal_error,
                         ..Default::default()
                     },
+                    cache,
                 )?);
             }
         }
@@ -483,8 +564,16 @@ pub fn to_assembly_svg_with_tolerance(
     assembly: &BuiltAssembly,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
-    render_svg(&expand(&assembly_scene_with_tolerance(
-        assembly, false, tolerance,
+    to_assembly_svg_with_cache(assembly, tolerance, &mut GenerationMeshCache::default())
+}
+
+pub fn to_assembly_svg_with_cache(
+    assembly: &BuiltAssembly,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
+    render_svg(&expand(&assembly_scene_with_cache(
+        assembly, false, tolerance, cache,
     )?)?)
 }
 

@@ -1036,6 +1036,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         .to_string());
         let property_assertions: BTreeMap<String, cad_preview::EngineeringCheck> =
             serde_json::from_value(summary["property_assertions"].clone())?;
+        let mut mesh_cache = cad_mesh::GenerationMeshCache::default();
         let mut names = BTreeSet::new();
         for (name, output) in &build.outputs {
             filename(name)?;
@@ -1057,12 +1058,16 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     format!("{name}.step"),
                     cad_export::to_step(model, tolerance)?,
                 ));
-                artifacts.push((format!("{name}.stl"), cad_export::to_stl(model, tolerance)?));
+                artifacts.push((
+                    format!("{name}.stl"),
+                    cad_export::to_stl_with_cache(model, tolerance, &mut mesh_cache)?,
+                ));
                 artifacts.push((
                     format!("{name}.preview.svg"),
-                    cad_preview::to_svg_with_tolerance(
+                    cad_preview::to_svg_with_cache(
                         model,
                         recipe.tolerance.unwrap_or_default(),
+                        &mut mesh_cache,
                     )?,
                 ));
             }
@@ -1082,10 +1087,11 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             };
             artifacts.push((
                 format!("{name}.preview.html"),
-                cad_preview::to_html_with_recipe_and_tolerance(
+                cad_preview::to_html_with_recipe_and_cache(
                     model,
                     &context,
                     recipe.tolerance.unwrap_or_default(),
+                    &mut mesh_cache,
                 )?,
             ));
             summary["outputs"][name]["available_files"] = json!(artifacts[artifact_start..]
@@ -1151,14 +1157,16 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             artifacts.push((
                 format!("{name}.display.json"),
                 if *display_only {
-                    cad_preview::to_assembly_gpu_scene_json_with_tolerance(
+                    cad_preview::to_assembly_gpu_scene_json_with_cache(
                         assembly,
                         recipe.tolerance.unwrap_or_default(),
+                        &mut mesh_cache,
                     )?
                 } else {
-                    cad_preview::to_assembly_scene_json_with_tolerance(
+                    cad_preview::to_assembly_scene_json_with_cache(
                         assembly,
                         recipe.tolerance.unwrap_or_default(),
+                        &mut mesh_cache,
                     )?
                 },
             ));
@@ -1169,13 +1177,18 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 ));
                 artifacts.push((
                     format!("{name}.stl"),
-                    cad_export::assembly_to_stl(assembly, recipe.tolerance.unwrap_or_default())?,
+                    cad_export::assembly_to_stl_with_cache(
+                        assembly,
+                        recipe.tolerance.unwrap_or_default(),
+                        &mut mesh_cache,
+                    )?,
                 ));
                 artifacts.push((
                     format!("{name}.preview.svg"),
-                    cad_preview::to_assembly_svg_with_tolerance(
+                    cad_preview::to_assembly_svg_with_cache(
                         assembly,
                         recipe.tolerance.unwrap_or_default(),
+                        &mut mesh_cache,
                     )?,
                 ));
             }
@@ -1193,27 +1206,30 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             if !display_only {
                 artifacts.push((
                     format!("{name}.preview.html"),
-                    cad_preview::to_assembly_html_with_tolerance(
+                    cad_preview::to_assembly_html_with_cache(
                         assembly,
                         &context,
                         recipe.tolerance.unwrap_or_default(),
+                        &mut mesh_cache,
                     )?,
                 ));
             }
             artifacts.push((
                 format!("{name}.gpu.html"),
-                cad_preview::to_assembly_gpu_html_with_fallback_and_tolerance(
+                cad_preview::to_assembly_gpu_html_with_fallback_and_cache(
                     assembly,
                     &context,
                     !display_only,
                     recipe.tolerance.unwrap_or_default(),
+                    &mut mesh_cache,
                 )?,
             ));
-            let bundle = cad_preview::to_assembly_stream_bundle_with_tolerance(
+            let bundle = cad_preview::to_assembly_stream_bundle_with_cache(
                 assembly,
                 &context,
                 !display_only,
                 recipe.tolerance.unwrap_or_default(),
+                &mut mesh_cache,
             )?;
             artifacts.push((format!("{name}.stream.html"), bundle.html));
             artifacts.push((format!("{name}.stream.json"), bundle.scene_json));
@@ -1236,6 +1252,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             );
             summary["outputs"][name]["available_files"] = json!(dependencies);
         }
+        summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
         let mut artifact_names = BTreeSet::new();
         for (name, _) in &artifacts {
             if !artifact_names.insert(name.to_ascii_lowercase()) {

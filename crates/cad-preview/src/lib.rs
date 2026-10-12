@@ -2,6 +2,7 @@
 //! Previews are visualization artifacts; they are not geometry validity checks.
 
 use cad_kernel::{ModelSnapshot, Tolerance};
+use cad_mesh::GenerationMeshCache;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -10,11 +11,14 @@ use thiserror::Error;
 mod assembly;
 pub use assembly::{
     to_assembly_gpu_html, to_assembly_gpu_html_with_fallback,
-    to_assembly_gpu_html_with_fallback_and_tolerance, to_assembly_gpu_scene_json,
-    to_assembly_gpu_scene_json_with_tolerance, to_assembly_html, to_assembly_html_with_tolerance,
-    to_assembly_scene_json, to_assembly_scene_json_with_tolerance, to_assembly_stream_bundle,
-    to_assembly_stream_bundle_with_tolerance, to_assembly_svg, to_assembly_svg_with_tolerance,
-    DisplayMeshAsset, StreamBundle,
+    to_assembly_gpu_html_with_fallback_and_cache, to_assembly_gpu_html_with_fallback_and_tolerance,
+    to_assembly_gpu_scene_json, to_assembly_gpu_scene_json_with_cache,
+    to_assembly_gpu_scene_json_with_tolerance, to_assembly_html, to_assembly_html_with_cache,
+    to_assembly_html_with_tolerance, to_assembly_scene_json, to_assembly_scene_json_with_cache,
+    to_assembly_scene_json_with_tolerance, to_assembly_stream_bundle,
+    to_assembly_stream_bundle_with_cache, to_assembly_stream_bundle_with_tolerance,
+    to_assembly_svg, to_assembly_svg_with_cache, to_assembly_svg_with_tolerance, DisplayMeshAsset,
+    StreamBundle,
 };
 
 #[derive(Debug, Error)]
@@ -121,27 +125,56 @@ fn scene_with_tolerance(
     model: &ModelSnapshot,
     tolerance: Tolerance,
 ) -> Result<Scene, PreviewError> {
-    scene_with_policy(model, tolerance, cad_kernel::TessellationPolicy::default())
+    scene_with_cache(model, tolerance, &mut GenerationMeshCache::default())
 }
 
+fn scene_with_cache(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<Scene, PreviewError> {
+    scene_with_policy_and_cache(
+        model,
+        tolerance,
+        cad_kernel::TessellationPolicy::default(),
+        cache,
+    )
+}
+
+#[cfg(test)]
 fn scene_with_policy(
     model: &ModelSnapshot,
     tolerance: Tolerance,
     policy: cad_kernel::TessellationPolicy,
 ) -> Result<Scene, PreviewError> {
+    scene_with_policy_and_cache(
+        model,
+        tolerance,
+        policy,
+        &mut GenerationMeshCache::default(),
+    )
+}
+
+fn scene_with_policy_and_cache(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    policy: cad_kernel::TessellationPolicy,
+    cache: &mut GenerationMeshCache,
+) -> Result<Scene, PreviewError> {
     let invalid = PreviewError::Geometry;
     if model.has_curved_geometry() {
-        let mesh = cad_kernel::tessellate_analytic(model, tolerance, policy)
+        let mesh = cache
+            .analytic(model, tolerance, policy)
             .map_err(|_| PreviewError::Geometry("analytic display tessellation failed"))?;
         let mut crease_edges = std::collections::BTreeSet::new();
         let faces = mesh
             .patches
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(id, patch)| {
                 let edges = patch
                     .boundary_edges
-                    .into_iter()
+                    .iter()
                     .map(|edge| match edge {
                         Some(edge) => {
                             crease_edges.insert(edge.0);
@@ -153,7 +186,7 @@ fn scene_with_policy(
                 Face {
                     id,
                     semantic_face_id: Some(patch.face.0),
-                    points: patch.points,
+                    points: patch.points.clone(),
                     edges,
                     normal: patch.normal,
                     triangles: None,
@@ -235,9 +268,10 @@ fn scene_with_policy(
         }
         let triangles = if !cad_kernel::face_is_convex(model, cad_kernel::FaceId(id)) {
             Some(
-                cad_kernel::triangulate_face(model, cad_kernel::FaceId(id), tolerance)
+                cache
+                    .planar_face(model, tolerance, cad_kernel::FaceId(id))
                     .map_err(|_| invalid("face triangulation failed"))?
-                    .into_iter()
+                    .iter()
                     .map(|ids| ids.map(|id| vertex_indices[&id.0]))
                     .collect(),
             )
@@ -304,20 +338,50 @@ pub fn to_html_with_recipe_and_tolerance(
     recipe: &RecipeContext,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
-    render_html(&scene_with_tolerance(model, tolerance)?, Some(recipe))
+    to_html_with_recipe_and_cache(
+        model,
+        recipe,
+        tolerance,
+        &mut GenerationMeshCache::default(),
+    )
+}
+
+pub fn to_html_with_recipe_and_cache(
+    model: &ModelSnapshot,
+    recipe: &RecipeContext,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
+    render_html(&scene_with_cache(model, tolerance, cache)?, Some(recipe))
 }
 /// Render geometry using the model's build tolerance.
 pub fn to_html_with_tolerance(
     model: &ModelSnapshot,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
-    render_html(&scene_with_tolerance(model, tolerance)?, None)
+    to_html_with_cache(model, tolerance, &mut GenerationMeshCache::default())
+}
+
+pub fn to_html_with_cache(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
+    render_html(&scene_with_cache(model, tolerance, cache)?, None)
 }
 pub fn to_svg_with_tolerance(
     model: &ModelSnapshot,
     tolerance: Tolerance,
 ) -> Result<String, PreviewError> {
-    render_svg(&scene_with_tolerance(model, tolerance)?)
+    to_svg_with_cache(model, tolerance, &mut GenerationMeshCache::default())
+}
+
+pub fn to_svg_with_cache(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    cache: &mut GenerationMeshCache,
+) -> Result<String, PreviewError> {
+    render_svg(&scene_with_cache(model, tolerance, cache)?)
 }
 
 fn script_json(value: &impl Serialize) -> Result<String, serde_json::Error> {

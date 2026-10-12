@@ -13,7 +13,7 @@ use std::fmt::Write;
 mod analytic;
 mod assembly;
 mod bom;
-pub use assembly::{assembly_to_step, assembly_to_stl};
+pub use assembly::{assembly_to_step, assembly_to_stl, assembly_to_stl_with_cache};
 pub use bom::bom_to_csv;
 use thiserror::Error;
 
@@ -80,6 +80,18 @@ fn triple(point: Point) -> String {
 }
 
 fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>, ExportError> {
+    polygons_with_cache(
+        model,
+        tolerance,
+        &mut cad_mesh::GenerationMeshCache::default(),
+    )
+}
+
+fn polygons_with_cache(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    cache: &mut cad_mesh::GenerationMeshCache,
+) -> Result<Vec<Polygon>, ExportError> {
     let validation = model.validate(tolerance);
     if !validation.valid {
         return Err(ExportError::InvalidModel(format!(
@@ -88,15 +100,12 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
         )));
     }
     if model.has_curved_geometry() {
-        let mesh = cad_kernel::tessellate_analytic(
-            model,
-            tolerance,
-            cad_kernel::TessellationPolicy::default(),
-        )
-        .map_err(|error| ExportError::InvalidModel(error.to_string()))?;
+        let mesh = cache
+            .analytic(model, tolerance, cad_kernel::TessellationPolicy::default())
+            .map_err(|error| ExportError::InvalidModel(error.to_string()))?;
         return Ok(mesh
             .patches
-            .into_iter()
+            .iter()
             .map(|patch| {
                 let triangles = (1..patch.points.len() - 1)
                     .map(|i| [patch.points[0], patch.points[i], patch.points[i + 1]])
@@ -104,7 +113,7 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
                 Polygon {
                     boundaries: Vec::new(),
                     triangles,
-                    points: patch.points,
+                    points: patch.points.clone(),
                     normal: patch.normal,
                 }
             })
@@ -154,9 +163,10 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
                     .map(|i| [points[0], points[i], points[i + 1]])
                     .collect()
             } else {
-                cad_kernel::triangulate_face(model, cad_kernel::FaceId(face_index), tolerance)
+                cache
+                    .planar_face(model, tolerance, cad_kernel::FaceId(face_index))
                     .map_err(|error| ExportError::InvalidModel(error.to_string()))?
-                    .into_iter()
+                    .iter()
                     .map(|ids| ids.map(|id| model.vertices[id.0].position))
                     .collect()
             };
@@ -172,7 +182,20 @@ fn polygons(model: &ModelSnapshot, tolerance: Tolerance) -> Result<Vec<Polygon>,
 
 /// Export a validated solid as deterministic ASCII STL, in millimetres.
 pub fn to_stl(model: &ModelSnapshot, tolerance: Tolerance) -> Result<String, ExportError> {
-    let polygons = polygons(model, tolerance)?;
+    to_stl_with_cache(
+        model,
+        tolerance,
+        &mut cad_mesh::GenerationMeshCache::default(),
+    )
+}
+
+/// Reuse certified tessellation within one publication job.
+pub fn to_stl_with_cache(
+    model: &ModelSnapshot,
+    tolerance: Tolerance,
+    cache: &mut cad_mesh::GenerationMeshCache,
+) -> Result<String, ExportError> {
+    let polygons = polygons_with_cache(model, tolerance, cache)?;
     let mut output = String::from("solid headless_cad\n");
     for polygon in polygons {
         for [a, b, c] in polygon.triangles {

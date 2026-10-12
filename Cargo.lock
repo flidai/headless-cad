@@ -298,6 +298,7 @@ dependencies = [
  "cad-build",
  "cad-export",
  "cad-kernel",
+ "cad-mesh",
  "cad-preview",
  "cad-recipe",
  "cap-std",
@@ -313,6 +314,7 @@ version = "0.1.0"
 dependencies = [
  "cad-assembly",
  "cad-kernel",
+ "cad-mesh",
  "thiserror",
 ]
 
@@ -329,12 +331,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cad-mesh"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "cad-kernel",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "cad-preview"
 version = "0.1.0"
 dependencies = [
  "cad-assembly",
  "cad-build",
  "cad-kernel",
+ "cad-mesh",
  "cad-recipe",
  "serde",
  "serde_json",

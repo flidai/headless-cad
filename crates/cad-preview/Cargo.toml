@@ -6,6 +6,7 @@ edition.workspace = true
 publish.workspace = true
 
 [dependencies]
+cad-mesh = { path = "../cad-mesh" }
 cad-assembly = { path = "../cad-assembly" }
 cad-kernel = { path = "../cad-kernel" }
 serde.workspace = true

@@ -5,6 +5,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+cad-mesh = { path = "../cad-mesh" }
 cad-assembly = { path = "../cad-assembly" }
 cad-kernel = { path = "../cad-kernel" }
 thiserror.workspace = true

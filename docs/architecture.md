@@ -930,9 +930,10 @@ a nonlinear solver is not a way to resolve a cyclic feature build.
 
 ### Independent display build
 
-Treat tessellation as a shared compilation product, not work repeated by every
-output writer. Within a publication job, preview, display manifests and mesh
-exports should request immutable certified meshes from the same meshing service.
+Tessellation is a shared compilation product. Within a publication job, preview,
+display manifests and STL exports request immutable certified meshes through
+`cad-mesh::GenerationMeshCache`. Legacy library entry points retain their signatures
+and allocate their own cache; callers can opt into explicit shared-cache variants.
 STEP and native engineering queries continue to consume authoritative geometry.
 This boundary applies before introducing distributed workers or cluster LOD.
 
@@ -948,8 +949,29 @@ Acceptance compares cached and uncached geometry, winding, semantic picking and
 exported measurements. Changing geometry, tolerance or meshing policy must select
 a different entry; identical geometry used by multiple outputs should mesh once
 per policy. Measure this construction cost separately from viewer frame time.
-This shared publication cache is target work: today's consumers can independently
-reconstruct the same mesh, even though instances already share display assets.
+The CLI now shares one cache across body and assembly publication, including
+separate analytic LOD policies. Analytic meshes and nonconvex/holed planar-face
+triangulations are cached; inexpensive convex planar fans remain local to writers.
+Native validation stays in the exporter and assembly consumers. STEP remains on
+its native path and may repeat planar triangulation independently.
+
+Retention defaults to 64 MiB and at most 1,024 entries with deterministic FIFO
+eviction. Charges cover serialized native witnesses, mesh vector capacities, Arc
+headers and entry descriptors, not allocator/tree overhead, construction scratch,
+output strings or caller-held meshes. Oversized successful meshes return uncached;
+zero-budget mode provides an uncached reference. This is a retention bound, not a
+peak process-memory guarantee. Manifest counters expose hits, misses, successful
+builds, failures, evictions and retained charges with kernel/mesher identities.
+Budgeted and cancellable preprocessing remains separate target work.
+
+The [local shared-mesh measurement](benchmarks/shared-mesh-modular-bore-local.json)
+records three fresh-process full publications of the 30-bore plate at
+0.77–0.85 seconds, compared with the earlier single 3.36-second observation.
+Each publication reports six constructions (two analytic definitions at three
+policies) and thirteen hits, with 2,166,720 charged retained bytes. Peak child RSS
+across these runs was 47,672 KiB. STEP, STL and SVG for both body and assembly
+match the earlier baseline byte-for-byte. Shared-host timing and uncontrolled OS
+caches make this performance evidence local, not a hardware release gate.
 
 Derive meshes in a separate worker. A display cache key includes geometric
 content, mesher implementation, chordal/angular error, edge policy, coordinate
