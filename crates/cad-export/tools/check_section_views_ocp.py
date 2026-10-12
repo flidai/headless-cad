@@ -61,6 +61,9 @@ def case(cad, directory, pitch, depth, height):
         require(native['snapshot']['parameter_overrides'] == parameters, 'effective parameter snapshot')
         require(native['publication']['recipe_context_hash'] == manifest['recipe_context_hash'], 'generation context')
         require(native['publication']['generation_mode'] == 'full', 'publication mode')
+        require(native['exchange_policy_status'] == manifest['exchange_policy_status'] == 'passed',
+                'published view has stale exchange policy status')
+        require(native['exchange_requirements'] == manifest['exchange_requirements'], 'exchange receipt binding')
         require(native['snapshot']['content_hash'] == build['outputs'][native['output_name']]['content_hash'], 'target content')
         plane = native['section']['plane']
         require(plane['normal'] == [0, 0, 1] and plane['x_direction'] == [1, 0, 0], 'source plane orientation')

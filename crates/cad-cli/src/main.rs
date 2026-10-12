@@ -1470,6 +1470,13 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             );
             summary["outputs"][name]["available_files"] = json!(dependencies);
         }
+        summary["exchange_requirements"] =
+            exchange::enforce(&recipe.exchange_requirements, &artifacts, *display_only)?;
+        summary["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
+            "not_requested"
+        } else {
+            "passed"
+        });
         // Source-authored views are global native obligations, including when
         // their target is omitted from selected/display-only geometry exports.
         for (id, view) in &build.section_views {
@@ -1482,8 +1489,18 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 &source_bytes,
                 &parameters,
             )?;
+            // Execution counters belong in the build manifest. Source-owned view
+            // bytes must remain identical when the same build is served from cache.
+            view_report
+                .as_object_mut()
+                .expect("section report")
+                .remove("stats");
             view_report["section_view"] =
                 json!({"declaration":view.declaration,"status":view.status});
+            // These are staged publication reports, not standalone native queries:
+            // carry the same satisfied exchange receipts as their generation.
+            view_report["exchange_requirements"] = summary["exchange_requirements"].clone();
+            view_report["exchange_policy_status"] = summary["exchange_policy_status"].clone();
             view_report["publication"] = json!({
                 "recipe_context_hash":summary["recipe_context_hash"],
                 "recipe_source":summary["recipe_source"],
@@ -1503,13 +1520,6 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             artifacts.push((json_file, json_text));
             artifacts.push((svg_file, svg_text));
         }
-        summary["exchange_requirements"] =
-            exchange::enforce(&recipe.exchange_requirements, &artifacts, *display_only)?;
-        summary["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
-            "not_requested"
-        } else {
-            "passed"
-        });
         summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
         let mut artifact_names = BTreeSet::new();
         for (name, _) in &artifacts {

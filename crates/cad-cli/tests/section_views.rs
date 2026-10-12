@@ -124,9 +124,19 @@ fn source_views_publish_bound_native_artifacts_for_full_selected_and_display_gen
         original["section_views"]["mid"]["snapshot"]["content_hash"],
         edited["section_views"]["mid"]["snapshot"]["content_hash"]
     );
+    let edited_json = fs::read(root.join("out/section-mid.json")).unwrap();
+    let edited_svg = fs::read(root.join("out/section-mid.svg")).unwrap();
     let cached = success(build(root, &["--param", "radius=3"]));
     assert_eq!(cached["stats"]["computed_solids"], 0);
     assert_view(root, &cached, 9. * std::f64::consts::PI);
+    assert_eq!(
+        edited_json,
+        fs::read(root.join("out/section-mid.json")).unwrap()
+    );
+    assert_eq!(
+        edited_svg,
+        fs::read(root.join("out/section-mid.svg")).unwrap()
+    );
     let selected = success(build(root, &["--output", "other"]));
     assert!(selected["outputs"].get("body").is_none());
     assert_view(root, &selected, 4. * std::f64::consts::PI);
