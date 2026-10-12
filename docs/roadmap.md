@@ -271,6 +271,29 @@ whole-path expected minima and interior-collision rejection, including collision
 missed by endpoint/midpoint sampling. This advances mechanical validation without
 closing general rotating-motion clearance or the R3 release gate.
 
+The fixed-axis rotation increment extends this certificate to a signed angular
+path around a source-owned local pivot and axis. `rotation_clearance.star` orbits
+a tool past radial and overhead guards and includes an interior collision hidden
+by endpoint/midpoint sampling. Its radius/speed bounds and independent orbit/STEP
+checks share the existing work, failure-publication and source-replay contracts.
+General coupled motion and the complete R3 release gate remain open.
+
+## Paused checkpoint — 2026-10-12
+
+Work paused at the user's request after implementing fixed-axis rotation
+clearance. The release binary builds; 166 kernel tests, 25 focused recipe/build
+tests, rotation and translation CLI acceptance, formatting and strict Clippy pass.
+Independent rotation STEP/orbit and browser acceptance scripts are prepared but
+have not run. This increment is not yet independently validated or published.
+
+The live server and distribution retain the last validated translation-clearance
+release (`39b95e8`), with 74 verified example generations. On explicit resumption,
+run `tools/check-rotation-clearance.py` in the independent OCP environment into a
+new evidence directory, publish the rotation example, and run
+`tools/preview-check/rotation-clearance.cjs`. Resolve any failures before refreshing
+the server/distribution and verifying all published generations. The commercial
+release gates remain open; the overall goal is paused, not complete.
+
 ## Next concrete implementation increments
 
 Published generations now carry a payload digest/size inventory, with a separate

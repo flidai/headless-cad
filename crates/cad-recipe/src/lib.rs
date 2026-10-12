@@ -643,6 +643,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         right_instance_path: Value,
         min_clearance: Value,
         right_translation: Option<Value>,
+        right_rotation: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let check = cad_build::ClearanceCheck {
@@ -654,6 +655,12 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             right_translation: right_translation
                 .filter(|v| !v.is_none())
                 .map(|v| -> anyhow::Result<[f64; 3]> { Ok(serde_json::from_str(&v.to_json()?)?) })
+                .transpose()?,
+            right_rotation: right_rotation
+                .filter(|v| !v.is_none())
+                .map(|v| -> anyhow::Result<cad_build::RotationPath> {
+                    Ok(serde_json::from_str(&v.to_json()?)?)
+                })
                 .transpose()?,
         };
         check.validate()?;

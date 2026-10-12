@@ -6,6 +6,33 @@ pub const MAX_CLEARANCE_SWEEPS: usize = 16;
 pub const MAX_CLEARANCE_SWEEP_QUERIES: usize = 4096;
 pub const MAX_CLEARANCE_TRANSLATION_MM: f64 = 1_000_000.;
 #[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct RotationPath {
+    pub pivot: [f64; 3],
+    pub axis: [f64; 3],
+    pub angle_radians: f64,
+}
+impl<'de> Deserialize<'de> for RotationPath {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Raw {
+            pivot: [f64; 3],
+            axis: [f64; 3],
+            angle_radians: f64,
+        }
+        let value = serde_json::Value::deserialize(d)?;
+        if !value.is_object() {
+            return Err(serde::de::Error::custom("rotation path must be an object"));
+        }
+        let r: Raw = serde_json::from_value(value).map_err(serde::de::Error::custom)?;
+        Ok(Self {
+            pivot: r.pivot,
+            axis: r.axis,
+            angle_radians: r.angle_radians,
+        })
+    }
+}
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ClearanceCheck {
     pub id: String,
     pub output: String,
@@ -14,6 +41,8 @@ pub struct ClearanceCheck {
     pub min_clearance: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub right_translation: Option<[f64; 3]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub right_rotation: Option<RotationPath>,
 }
 impl<'de> Deserialize<'de> for ClearanceCheck {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -27,6 +56,8 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             min_clearance: f64,
             #[serde(default)]
             right_translation: Option<[f64; 3]>,
+            #[serde(default)]
+            right_rotation: Option<RotationPath>,
         }
         let v = serde_json::Value::deserialize(d)?;
         if !v.is_object() {
@@ -42,6 +73,7 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             right_instance_path: r.right_instance_path,
             min_clearance: r.min_clearance,
             right_translation: r.right_translation,
+            right_rotation: r.right_rotation,
         })
     }
 }
@@ -69,7 +101,11 @@ pub struct ClearanceCheckReport {
     pub sweep: Option<cad_kernel::TranslationClearance>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub right_translation_world: Option<[f64; 3]>,
-    /// Total initial-placement plus local-vector rotation allowance for the path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotation_sweep: Option<cad_kernel::RotationClearance>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub right_rotation_world: Option<RotationPath>,
+    /// Total initial-placement and source-frame path mapping allowance.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path_uncertainty_mm: Option<f64>,
     pub lower_bound_mm: f64,
@@ -107,6 +143,24 @@ impl ClearanceCheck {
                 "minimum clearance must be finite and strictly positive millimetres",
             ));
         }
+        if self.right_translation.is_some() && self.right_rotation.is_some() {
+            return Err(fail(
+                "right_translation and right_rotation are mutually exclusive",
+            ));
+        }
+        if let Some(r) = &self.right_rotation {
+            let norm = r.axis[0].hypot(r.axis[1]).hypot(r.axis[2]);
+            let pivot_length = r.pivot[0].hypot(r.pivot[1]).hypot(r.pivot[2]);
+            if !r.axis.into_iter().chain(r.pivot).all(f64::is_finite)
+                || (norm - 1.).abs() > 32. * f64::EPSILON
+                || pivot_length > MAX_CLEARANCE_TRANSLATION_MM
+                || !r.angle_radians.is_finite()
+                || r.angle_radians == 0.
+                || r.angle_radians.abs() > std::f64::consts::TAU
+            {
+                return Err(fail("right_rotation requires a finite local pivot within 1000000 mm, unit axis, and nonzero signed angle of at most 2pi radians"));
+            }
+        }
         if let Some(v) = self.right_translation {
             let length = v[0].hypot(v[1]).hypot(v[2]);
             if !v.into_iter().all(f64::is_finite)
@@ -129,12 +183,12 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     if recipe
         .clearance_checks
         .iter()
-        .filter(|c| c.right_translation.is_some())
+        .filter(|c| c.right_translation.is_some() || c.right_rotation.is_some())
         .count()
         > MAX_CLEARANCE_SWEEPS
     {
         return Err(BuildError::ResourceLimit {
-            resource: "clearance translation sweeps",
+            resource: "clearance motion sweeps",
             limit: MAX_CLEARANCE_SWEEPS,
         });
     }
@@ -294,6 +348,8 @@ pub(super) fn evaluate(
         }
         let mut sweep = None;
         let mut right_translation_world = None;
+        let mut rotation_sweep = None;
+        let mut right_rotation_world = None;
         let mut path_uncertainty_mm = None;
         let (query, lower, upper) = if let Some(local) = c.right_translation {
             let world = right.transform.vector(local);
@@ -345,6 +401,95 @@ pub(super) fn evaluate(
             path_uncertainty_mm = Some(path_error);
             sweep = Some(result);
             (query, lower, upper)
+        } else if let Some(local) = &c.right_rotation {
+            let world = RotationPath {
+                pivot: right.transform.point(local.pivot),
+                axis: right.transform.vector(local.axis),
+                angle_radians: local.angle_radians,
+            };
+            let pivot_error = ((local
+                .pivot
+                .into_iter()
+                .chain(right.transform.translation)
+                .map(f64::abs)
+                .sum::<f64>())
+                * (1024. * f64::EPSILON))
+                .next_up();
+            let axis_error = (local.axis.into_iter().map(f64::abs).sum::<f64>()
+                * (1024. * f64::EPSILON))
+                .next_up();
+            let bounds = right_model.bounds();
+            let radius = (0..3)
+                .map(|i| {
+                    (bounds.min[i] - world.pivot[i])
+                        .abs()
+                        .max((bounds.max[i] - world.pivot[i]).abs())
+                })
+                .fold(0_f64, f64::hypot)
+                .next_up();
+            // Pivot perturbations move a rotated point by at most twice their
+            // norm. Axis perturbation is bounded uniformly over the signed arc.
+            let path_error = (uncertainty
+                + 2. * pivot_error
+                + 4. * local.angle_radians.abs() * radius * axis_error)
+                .next_up();
+            if !world
+                .pivot
+                .into_iter()
+                .chain(world.axis)
+                .all(f64::is_finite)
+                || !path_error.is_finite()
+                || path_error > tolerance.linear / 8.
+            {
+                return Err(fail(
+                    "rotation path frame exceeds precision budget".into(),
+                    None,
+                    None,
+                ));
+            }
+            let budget =
+                cad_kernel::MAX_ROTATION_QUERIES.min(MAX_CLEARANCE_SWEEP_QUERIES - sweep_queries);
+            if budget < 3 {
+                return Err(BuildError::ResourceLimit {
+                    resource: "clearance sweep queries",
+                    limit: MAX_CLEARANCE_SWEEP_QUERIES,
+                });
+            }
+            let required = (c.min_clearance + path_error).next_up();
+            if !required.is_finite() {
+                return Err(fail("rotation threshold overflow".into(), None, None));
+            }
+            let result = left_model
+                .rotation_clearance(
+                    &right_model,
+                    world.pivot,
+                    world.axis,
+                    world.angle_radians,
+                    required,
+                    tolerance,
+                    budget,
+                )
+                .map_err(|e| fail(e.to_string(), None, None))?;
+            sweep_queries += result.query_count;
+            let query = result
+                .samples
+                .iter()
+                .find(|s| s.time == 0.)
+                .ok_or_else(|| {
+                    fail(
+                        "rotation certificate missing initial query".into(),
+                        None,
+                        None,
+                    )
+                })?
+                .query
+                .clone();
+            let lower = (result.lower_bound_mm - path_error).next_down();
+            let upper = (result.upper_bound_mm + path_error).next_up();
+            right_rotation_world = Some(world);
+            path_uncertainty_mm = Some(path_error);
+            rotation_sweep = Some(result);
+            (query, lower, upper)
         } else {
             let query = left_model
                 .clearance(&right_model, tolerance)
@@ -386,6 +531,8 @@ pub(super) fn evaluate(
                 placement_uncertainty_mm: uncertainty,
                 sweep,
                 right_translation_world,
+                rotation_sweep,
+                right_rotation_world,
                 path_uncertainty_mm,
                 lower_bound_mm: lower,
                 upper_bound_mm: upper,

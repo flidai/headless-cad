@@ -560,7 +560,7 @@ fn translation_interior_collision_and_invalid_authored_vectors_fail_globally() {
     assert!(matches!(
         cad_build::build(&r),
         Err(BuildError::ResourceLimit {
-            resource: "clearance translation sweeps",
+            resource: "clearance motion sweeps",
             limit: 16
         })
     ));
@@ -597,4 +597,169 @@ fn translation_query_budgets_bound_individual_and_aggregate_refinement() {
     assert!(
         matches!(cad_build::build(&r),Err(BuildError::ClearanceCheckFailed{message,..}) if message.contains("budget") || message.contains("limit"))
     );
+}
+
+#[test]
+fn rotation_path_uses_local_pivot_and_preserves_global_cache_obligations() {
+    for posed in [false, true] {
+        let mut v = value();
+        v["assemblies"][1]["assemblies"][1]["transform"]["translation"] = json!([8, 0, 0]);
+        v["clearance_checks"][0]["min_clearance"] = json!(4.);
+        v["clearance_checks"][0]["right_rotation"] =
+            json!({"pivot":[1,1.5,2],"axis":[0,0,1],"angle_radians":std::f64::consts::FRAC_PI_2});
+        if posed {
+            let q = [
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+            ];
+            v["assemblies"].as_array_mut().unwrap().push(json!({"id":"posed","assemblies":[{"id":"pose","assembly":"root","transform":{"translation":[10,-20,30],"rotation":q}}]}));
+            v["assembly_outputs"][0]["assembly"] = json!("posed");
+            v["clearance_checks"][0]["left_instance_path"] = json!(["pose", "left", "leaf/a"]);
+            v["clearance_checks"][0]["right_instance_path"] = json!(["pose", "right", "leaf/a"]);
+        }
+        let mut r = parse(v);
+        let mut engine = BuildEngine::default();
+        let b = engine.build_outputs(&r, &["body".into()]).unwrap();
+        let c = &b.clearance_checks["gap"];
+        let sweep = c.rotation_sweep.as_ref().unwrap();
+        assert!(c.sweep.is_none() && c.right_translation_world.is_none());
+        assert!(c.lower_bound_mm >= 4.);
+        assert_eq!(
+            sweep.samples.iter().find(|s| s.time == 0.).unwrap().query,
+            c.query
+        );
+        let world = c.right_rotation_world.as_ref().unwrap();
+        let expected = if posed {
+            [12., -18.5, 21.]
+        } else {
+            [9., 1.5, 2.]
+        };
+        assert!(world
+            .pivot
+            .into_iter()
+            .zip(expected)
+            .all(|(a, b)| (a - b).abs() < 1e-12));
+        let expected_axis = if posed { [1., 0., 0.] } else { [0., 0., 1.] };
+        assert!(world
+            .axis
+            .into_iter()
+            .zip(expected_axis)
+            .all(|(a, b)| (a - b).abs() < 1e-12));
+        assert_eq!(
+            engine
+                .build_outputs(&r, &["body".into()])
+                .unwrap()
+                .stats
+                .computed_solids,
+            0
+        );
+        r.clearance_checks[0]
+            .right_rotation
+            .as_mut()
+            .unwrap()
+            .angle_radians = -std::f64::consts::FRAC_PI_2;
+        assert!(
+            engine
+                .build_outputs(&r, &["body".into()])
+                .unwrap()
+                .clearance_checks["gap"]
+                .lower_bound_mm
+                >= 4.
+        );
+        r.clearance_checks[0].min_clearance = 10.;
+        assert!(matches!(
+            engine.build_outputs(&r, &["body".into()]),
+            Err(BuildError::ClearanceCheckFailed { .. })
+        ));
+    }
+}
+
+#[test]
+fn rotation_interior_contact_and_strict_path_declarations_fail() {
+    let mut v = value();
+    v["assemblies"][1]["assemblies"][0]["transform"] = json!({"translation":[0,5,0]});
+    v["assemblies"][1]["assemblies"][1]["transform"] = json!({"translation":[5,0,0]});
+    v["clearance_checks"][0]["min_clearance"] = json!(0.1);
+    v["clearance_checks"][0]["right_rotation"] =
+        json!({"pivot":[-5,0,0],"axis":[0,0,1],"angle_radians":std::f64::consts::TAU});
+    assert!(matches!(
+        BuildEngine::default().build_outputs(&parse(v), &["body".into()]),
+        Err(BuildError::ClearanceCheckFailed { .. })
+    ));
+    let valid = cad_build::RotationPath {
+        pivot: [0.; 3],
+        axis: [0., 0., 1.],
+        angle_radians: 1.,
+    };
+    for path in [
+        cad_build::RotationPath {
+            angle_radians: 0.,
+            ..valid.clone()
+        },
+        cad_build::RotationPath {
+            angle_radians: std::f64::consts::TAU + 0.1,
+            ..valid.clone()
+        },
+        cad_build::RotationPath {
+            angle_radians: f64::NAN,
+            ..valid.clone()
+        },
+        cad_build::RotationPath {
+            axis: [0., 0., 2.],
+            ..valid.clone()
+        },
+        cad_build::RotationPath {
+            pivot: [1e6 + 1., 0., 0.],
+            ..valid.clone()
+        },
+        cad_build::RotationPath {
+            pivot: [f64::INFINITY, 0., 0.],
+            ..valid.clone()
+        },
+    ] {
+        let mut r = parse(value());
+        r.clearance_checks[0].right_rotation = Some(path);
+        assert!(matches!(
+            cad_build::build(&r),
+            Err(BuildError::InvalidClearanceCheck { .. })
+        ));
+    }
+    let mut r = parse(value());
+    r.clearance_checks[0].right_rotation = Some(valid.clone());
+    r.clearance_checks[0].right_translation = Some([1., 0., 0.]);
+    assert!(matches!(
+        cad_build::build(&r),
+        Err(BuildError::InvalidClearanceCheck { .. })
+    ));
+    for malformed in [
+        json!([[0, 0, 0], [0, 0, 1], 1]),
+        json!({"pivot":[0,0,0],"axis":[0,0,1],"angle_radians":1,"extra":1}),
+    ] {
+        let mut v = value();
+        v["clearance_checks"][0]["right_rotation"] = malformed;
+        assert!(serde_json::from_value::<Recipe>(v).is_err());
+    }
+    let mut r = parse(value());
+    let check = r.clearance_checks[0].clone();
+    r.clearance_checks = (0..17)
+        .map(|i| {
+            let mut c = check.clone();
+            c.id = format!("motion{i}");
+            if i % 2 == 0 {
+                c.right_rotation = Some(valid.clone())
+            } else {
+                c.right_translation = Some([1., 0., 0.])
+            };
+            c
+        })
+        .collect();
+    assert!(matches!(
+        cad_build::build(&r),
+        Err(BuildError::ResourceLimit {
+            resource: "clearance motion sweeps",
+            limit: 16
+        })
+    ));
 }

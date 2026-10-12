@@ -108,3 +108,37 @@ fn source_translation_optional_vector_is_strict_and_preserves_static_defaults() 
     let r = cad_recipe::from_starlark("static.star", &format!("{source}{none}")).unwrap();
     assert!(r.clearance_checks[0].right_translation.is_none());
 }
+
+#[test]
+fn source_rotation_path_is_strict_optional_and_mutually_exclusive() {
+    let source = SOURCE.replace("offset=[5,7,0]", "offset=[8,0,0]");
+    let declaration = "{'pivot':[1,1.5,2],'axis':[0,0,1],'angle_radians':1}";
+    let check = CHECK.replace(
+        "min_clearance=4.99",
+        &format!("min_clearance=4,right_rotation={declaration}"),
+    );
+    let r = cad_recipe::from_starlark("rotation.star", &format!("{source}{check}")).unwrap();
+    assert!(cad_build::build(&r).unwrap().clearance_checks["gap"]
+        .rotation_sweep
+        .is_some());
+    for declaration in [
+        "[]",
+        "{'pivot':[0,0,0],'axis':[0,0,2],'angle_radians':1}",
+        "{'pivot':[0,0,0],'axis':[0,0,1],'angle_radians':0}",
+        "{'pivot':[0,0,0],'axis':[0,0,1],'angle_radians':1,'extra':1}",
+    ] {
+        let invalid = CHECK.replace(
+            "min_clearance=4.99",
+            &format!("min_clearance=4,right_rotation={declaration}"),
+        );
+        assert!(cad_recipe::from_starlark("invalid.star", &format!("{source}{invalid}")).is_err());
+    }
+    let both = check.replace(
+        "min_clearance=4,",
+        "min_clearance=4,right_translation=[1,0,0],",
+    );
+    assert!(cad_recipe::from_starlark("exclusive.star", &format!("{source}{both}")).is_err());
+    let none = CHECK.replace("min_clearance=4.99", "min_clearance=4,right_rotation=None");
+    let r = cad_recipe::from_starlark("static.star", &format!("{source}{none}")).unwrap();
+    assert!(r.clearance_checks[0].right_rotation.is_none());
+}

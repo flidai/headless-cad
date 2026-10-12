@@ -33,7 +33,11 @@ mod arc_prism;
 mod bored_prism;
 mod circular_boolean;
 mod convex_clearance;
+mod rotation_clearance;
 mod solid_clearance;
+pub use rotation_clearance::{
+    RotationClearance, RotationInterval, RotationSample, MAX_ROTATION_DEPTH, MAX_ROTATION_QUERIES,
+};
 mod translation_clearance;
 pub use solid_clearance::{ClearanceMethod, SolidClearance};
 pub use translation_clearance::{

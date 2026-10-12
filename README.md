@@ -2385,6 +2385,32 @@ Reports retain interval certificates, timed witnesses and arithmetic allowances;
 `query` still describes the initial pose. This supports one prescribed translating
 body per pair, not rotation, general trajectories or manufactured tolerances.
 
+### Continuous fixed-axis rotation clearance
+
+```sh
+cad build examples/rotation_clearance.star --out-dir out/rotation_clearance
+```
+
+Declare `right_rotation = {"pivot": [-20, 0, 0], "axis": [0, 0, 1],
+"angle_radians": 6.283185307179586}` on a clearance check to validate a complete
+turn. Pivot and unit axis are in the right occurrence's initial local frame;
+the left body stays fixed. The signed angle declares the actual travel, including
+a full turn, rather than the shortest rotation between endpoint orientations.
+Rotation and translation declarations are mutually exclusive.
+
+The example orbits a cylindrical tool past a radial guard and beneath an overhead
+guard. Their default whole-path minima are 5 and 6 mm. `--param guard_radius=20`
+introduces a quarter-turn collision despite clear endpoints and midpoint. The
+native certificate bounds each interval using the body's conservative radius
+from the pivot and angular travel, with explicit pose arithmetic allowances.
+
+The report labels `Continuous rotation`, retains the initial query, and publishes
+timed witnesses and coverage in `rotation_sweep`. Angles must be finite, nonzero
+and at most one full turn in magnitude. Rotation shares the translation work
+budgets. Unsupported intermediate geometry or a path that cannot be certified
+within its budget fails without replacing the last valid generation. Combined
+screw motion, coupled moving bodies and arbitrary trajectories remain unsupported.
+
 ### Native planar edge chamfers
 
 ```python

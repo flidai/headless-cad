@@ -2198,6 +2198,28 @@ in the independent OCP environment and `tools/preview-check/translation-clearanc
 against the published example. This corpus establishes the declared translation
 contract, not general motion certification or commercial release readiness.
 
+Fixed-axis rotational clearance adds `right_rotation = {pivot, axis,
+angle_radians}` in the right occurrence's initial local frame, mutually exclusive
+with translation. The axis is unit within the declared arithmetic tolerance;
+the signed angle specifies actual travel up to one full turn. The native API
+transforms the moving body around the fixed world pivot and axis at each sample,
+retaining the initial-pose query separately. It bounds point speed by a
+conservative full-body radius from the pivot times absolute angular travel.
+Adaptive dyadic intervals then use the same complete-coverage Lipschitz argument
+as translation. Native transforms, pivot/axis mapping and initial placement each
+contribute explicit arithmetic allowances; unsupported intermediate geometry or
+unresolved bounds reject the check.
+
+The optional `rotation_sweep` report contains timed native queries, covering
+intervals, radius/speed bounds and numerical allowances. Clearance schema 3 retains
+whole-path top-level bounds and labels the scope `Continuous rotation`. Rotation
+and translation share the 16-sweep and 4,096-query aggregate budgets, with 1,025
+queries and depth 32 per path. `rotation_clearance.star` requires independent
+signed-orbit minima and imported STEP checks under common rigid poses, plus an
+interior collision with clear endpoints and midpoint. This extends prescribed
+motion validation; coupled moving bodies, screw paths and general trajectories
+remain separate release obligations.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in
