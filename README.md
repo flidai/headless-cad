@@ -37,6 +37,8 @@ cad build my-part/main.star --out-dir my-part/build
 Open `my-part/build/plate.preview.html` in a browser. It is entirely local and
 self-contained: drag to orbit, scroll to zoom, click a face to inspect it, or use
 the named view buttons. The SVG preview is useful in reviews and documentation.
+The portable inspector lists native faces separately from display patches;
+assembly native-face totals sum occurrences of shared definitions.
 
 **Recipes/code are the source of truth. The viewer is read-only.** It has no
 modeling tools, kernel calls, or write-back path. Every geometry change is made in
@@ -1097,6 +1099,7 @@ npm run test:bvh:numeric
 npm run test:bvh
 npm run test:revolve
 npm run test:apex
+npm run test:counts
 npm run test:cone
 ```
 

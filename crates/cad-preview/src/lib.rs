@@ -104,6 +104,7 @@ struct Scene {
     #[serde(skip_serializing_if = "Option::is_none")]
     tessellation_error_mm: Option<f64>,
     faces: Vec<Face>,
+    native_faces: usize,
     crease_edges: Vec<usize>,
     vertices: usize,
     edges: usize,
@@ -164,6 +165,7 @@ fn scene_with_policy(
         return Ok(Scene {
             tessellation_error_mm: Some(mesh.chordal_error_bound),
             faces,
+            native_faces: model.faces.len(),
             crease_edges: crease_edges.into_iter().collect(),
             vertices: model.vertices.len(),
             edges: model.edges.len(),
@@ -273,6 +275,7 @@ fn scene_with_policy(
     Ok(Scene {
         tessellation_error_mm: None,
         faces,
+        native_faces: model.faces.len(),
         crease_edges,
         vertices: model.vertices.len(),
         edges: model.edges.len(),
@@ -548,7 +551,7 @@ fn render_svg(scene: &Scene) -> Result<String, PreviewError> {
             }
         }
     }
-    write!(output, r##"<text x="32" y="688" fill="#63716c" font-family="monospace" font-size="13">{} solid(s) · {} faces · millimetres</text></svg>"##, scene.solids, scene.faces.len()).unwrap();
+    write!(output, r##"<text x="32" y="688" fill="#63716c" font-family="monospace" font-size="13">{} solid(s) · {} native faces · millimetres</text></svg>"##, scene.solids, scene.native_faces).unwrap();
     Ok(output)
 }
 
@@ -560,6 +563,35 @@ fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
 mod tests {
     use super::*;
     use cad_kernel::{extrude_rectangle, EdgeId, Tolerance};
+
+    #[test]
+    fn analytic_preview_counts_native_faces_separately_from_display_patches() {
+        let t = Tolerance::default();
+        for profile in [
+            vec![[0., 0.], [8., 0.], [0., 12.]],
+            vec![[0., 0.], [8., 0.], [8., 20.], [6., 20.], [0., 32.]],
+        ] {
+            let model = cad_kernel::revolve_polygon(&profile, t).unwrap().model;
+            let data = scene(&model).unwrap();
+            assert_eq!(data.native_faces, model.faces.len());
+            assert!(data.faces.len() > data.native_faces);
+            let semantic: std::collections::BTreeSet<_> = data
+                .faces
+                .iter()
+                .map(|face| face.semantic_face_id.unwrap())
+                .collect();
+            assert_eq!(semantic.len(), data.native_faces);
+            let serialized = serde_json::to_value(&data).unwrap();
+            assert_eq!(serialized["native_faces"], model.faces.len());
+            assert_eq!(
+                serialized["faces"].as_array().unwrap().len(),
+                data.faces.len()
+            );
+            assert!(to_svg(&model)
+                .unwrap()
+                .contains(&format!("{} native faces", model.faces.len())));
+        }
+    }
 
     #[test]
     fn preview_embeds_actual_model_and_no_remote_dependencies() {

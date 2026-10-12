@@ -426,6 +426,7 @@ fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
             .filter_map(|m| m.tessellation_error_mm)
             .reduce(f64::max),
         faces: vec![],
+        native_faces: 0,
         crease_edges: vec![],
         vertices: 0,
         edges: 0,
@@ -466,6 +467,7 @@ fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
         result
             .crease_edges
             .extend(mesh.crease_edges.iter().map(|id| id + edge_offset));
+        result.native_faces += mesh.native_faces;
         result.vertices += mesh.vertices;
         result.edges += mesh.edges;
     }

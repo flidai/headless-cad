@@ -26,7 +26,8 @@
     "test:attachments": "node attachment-check.cjs",
     "test:properties": "node property-checks.cjs",
     "test:lod": "node lod-check.cjs",
-    "test:apex": "node apex-check.cjs"
+    "test:apex": "node apex-check.cjs",
+    "test:counts": "node counts-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"
