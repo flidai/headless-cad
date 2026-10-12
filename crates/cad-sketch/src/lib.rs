@@ -33,6 +33,22 @@ pub struct Constraint {
     #[serde(flatten)]
     pub kind: ConstraintKind,
 }
+/// Side of a directed supporting line, viewed in the sketch XY plane.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineSide {
+    Left,
+    Right,
+}
+impl LineSide {
+    fn sign(self) -> f64 {
+        match self {
+            Self::Left => 1.,
+            Self::Right => -1.,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ConstraintKind {
@@ -56,6 +72,13 @@ pub enum ConstraintKind {
         a: String,
         b: String,
         value: f64,
+    },
+    /// Circle center/radius handle tangent to an infinite supporting line.
+    /// The signed side is explicit; contact need not lie inside the segment.
+    CircleLineTangent {
+        circle: [String; 2],
+        line: [String; 2],
+        side: LineSide,
     },
     /// Equality of the two endpoint-pair segment lengths.
     EqualLength {
@@ -177,7 +200,10 @@ pub fn validate(sketch: &Sketch) -> Result<(), SketchError> {
                 }
                 vec![point]
             }
-            ConstraintKind::EqualLength { a, b }
+            ConstraintKind::CircleLineTangent {
+                circle: a, line: b, ..
+            }
+            | ConstraintKind::EqualLength { a, b }
             | ConstraintKind::Parallel { a, b }
             | ConstraintKind::Perpendicular { a, b }
             | ConstraintKind::Angle { a, b, .. } => {
@@ -236,6 +262,7 @@ enum Equation {
     Delta(usize, usize),
     Distance(usize, usize, f64),
     EqualLength([usize; 2], [usize; 2]),
+    CircleLineTangent([usize; 2], [usize; 2], LineSide),
     Angle([usize; 2], [usize; 2], f64, f64),
 }
 struct System {
@@ -324,6 +351,13 @@ impl System {
                 ConstraintKind::Vertical { a, b } => {
                     equations.push(Equation::Delta(indices[a.as_str()], indices[b.as_str()]))
                 }
+                ConstraintKind::CircleLineTangent { circle, line, side } => {
+                    equations.push(Equation::CircleLineTangent(
+                        circle.each_ref().map(|v| indices[v.as_str()]),
+                        line.each_ref().map(|v| indices[v.as_str()]),
+                        *side,
+                    ))
+                }
                 ConstraintKind::EqualLength { a, b } => equations.push(Equation::EqualLength(
                     a.each_ref().map(|v| indices[v.as_str()]),
                     b.each_ref().map(|v| indices[v.as_str()]),
@@ -372,6 +406,7 @@ impl System {
         let mut residuals = Vec::with_capacity(self.equations.len());
         let mut jacobian = Vec::with_capacity(self.equations.len());
         let mut singular = false;
+        let mut linear_roundoff = 0f64;
         for eq in &self.equations {
             let mut row = vec![0.; n];
             let residual = match *eq {
@@ -383,6 +418,52 @@ impl System {
                     row[a] = 1.;
                     row[b] = -1.;
                     x[a] - x[b]
+                }
+                Equation::CircleLineTangent(circle, line, side) => {
+                    let [c, r] = circle;
+                    let [a, b] = line;
+                    let u = [x[b] - x[a], x[b + 1] - x[a + 1]];
+                    let w = [x[c] - x[a], x[c + 1] - x[a + 1]];
+                    let q = [x[r] - x[c], x[r + 1] - x[c + 1]];
+                    let length = u[0].hypot(u[1]);
+                    let radius = q[0].hypot(q[1]);
+                    let world = x
+                        .iter()
+                        .map(|v| v.abs() * self.scale)
+                        .fold(self.world_scale, f64::max);
+                    let coordinate_error = 256. * f64::EPSILON * world / self.scale;
+                    let valid = length > (64. * f64::EPSILON).max(16. * coordinate_error)
+                        && radius > (64. * f64::EPSILON).max(16. * coordinate_error);
+                    let distance = if length > 0. {
+                        (u[0] / length) * w[1] - (u[1] / length) * w[0]
+                    } else {
+                        0.
+                    };
+                    if valid {
+                        let du = [
+                            w[1] / length - distance * (u[0] / length) / length,
+                            -w[0] / length - distance * (u[1] / length) / length,
+                        ];
+                        let dw = [-u[1] / length, u[0] / length];
+                        for axis in 0..2 {
+                            row[a + axis] -= du[axis] + dw[axis];
+                            row[b + axis] += du[axis];
+                            row[c + axis] += dw[axis] + side.sign() * q[axis] / radius;
+                            row[r + axis] -= side.sign() * q[axis] / radius;
+                        }
+                        // Far-away contact can amplify endpoint direction error.
+                        // Reserve uncertainty using the uncombined derivative
+                        // magnitudes, including arithmetic in the signed distance.
+                        let amplification = 4. + 2. * w[0].hypot(w[1]) / length;
+                        let error = coordinate_error * amplification;
+                        linear_roundoff = linear_roundoff.max(error);
+                        if error * self.scale > self.tolerance_mm / 16. {
+                            singular = true;
+                        }
+                    } else {
+                        singular = true;
+                    }
+                    distance - side.sign() * radius
                 }
                 Equation::EqualLength(a, b) | Equation::Angle(a, b, _, _) => {
                     let u = [x[a[1]] - x[a[0]], x[a[1] + 1] - x[a[0] + 1]];
@@ -459,6 +540,7 @@ impl System {
             residuals,
             jacobian,
             singular,
+            linear_roundoff,
         }
     }
     fn max_residual(&self, e: &Evaluation) -> f64 {
@@ -520,7 +602,7 @@ impl System {
             SolveStatus::FullyConstrained | SolveStatus::Underconstrained
         ) {
             if e.singular
-                || self.max_residual(&e) * self.scale > self.tolerance_mm
+                || (self.max_residual(&e) + e.linear_roundoff) * self.scale > self.tolerance_mm
                 || self.max_angular_residual(&e) > ANGULAR_TOLERANCE_RADIANS
             {
                 status = SolveStatus::NumericalFailure;
@@ -579,6 +661,7 @@ struct Evaluation {
     residuals: Vec<f64>,
     jacobian: Vec<Vec<f64>>,
     singular: bool,
+    linear_roundoff: f64,
 }
 impl Evaluation {
     fn objective(&self) -> f64 {
@@ -734,9 +817,9 @@ fn solve_bounded(
     let mut damping = 1e-3_f64;
     for iteration in 0..=budget {
         if eval.singular {
-            return Ok(fail(&x,&eval,iteration,"a segment direction is numerically unresolved or an angular residual lies on its wrap cut"));
+            return Ok(fail(&x,&eval,iteration,"a segment/radius direction or supporting-line precision is unresolved, or an angular residual lies on its wrap cut"));
         }
-        if system.max_residual(&eval) <= normalized_tolerance
+        if system.max_residual(&eval) + eval.linear_roundoff <= normalized_tolerance
             && system.max_angular_residual(&eval) <= ANGULAR_TOLERANCE_RADIANS * 0.9
         {
             let rank = rank(&eval.jacobian, x.len());
@@ -1236,3 +1319,6 @@ mod tests {
 
 #[cfg(test)]
 mod angular_tests;
+
+#[cfg(test)]
+mod tangent_tests;

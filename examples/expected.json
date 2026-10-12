@@ -1388,5 +1388,43 @@
       "volume_tolerance_mm3": 0.003,
       "linear_tolerance_mm": 1e-05
     }
+  },
+  "tangent_bore_fixture.star": {
+    "plate": {
+      "volume_mm3": 63195.752280681016,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          80,
+          8
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-05
+    },
+    "tangent_bore_fixture": {
+      "volume_mm3": 83163.75228068102,
+      "solids": 7,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          80,
+          24
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }

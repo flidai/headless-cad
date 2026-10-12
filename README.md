@@ -1007,7 +1007,7 @@ Prescribed clearances are design intent, not a certified interference result.
 
 ### Dimension-driven sketches
 
-`sketch(id, points, constraints, outline, holes=[])` records design intent for
+`sketch(id, points, constraints, outline, holes=[], circular_holes=[])` records design intent for
 the headless builder. Each point has an `id` and a two-coordinate `position`
 initial guess. Each constraint has a unique `id` and a `kind`: `fixed` uses
 `point` and `position`; `coincident`, `horizontal` and `vertical` use `a` and `b`;
@@ -1015,7 +1015,8 @@ initial guess. Each constraint has a unique `id` and a `kind`: `fixed` uses
 endpoint-ID pairs such as `a = ["a", "b"]`, `b = ["b", "c"]`: `equal_length`,
 `parallel`, `perpendicular` and `angle`. Directed `angle` adds finite `degrees`
 in (-180, 180], measured from the first segment to the second; parallel and
-perpendicular relations are unoriented, modulo 180 degrees. `outline` lists named vertices
+perpendicular relations are unoriented, modulo 180 degrees. `circle_line_tangent`
+uses `circle`, `line` and an explicit `side`, as described below. `outline` lists named vertices
 in CCW order, and optional hole rings use CW order. Rings omit the closing point.
 The solved profile feeds `extrude`; sketch-driven revolution is not yet supported.
 
@@ -1066,8 +1067,7 @@ height `sqrt(44²-((36-deck_top_width)/2)²)`. Native checks pass across 27 conf
 independent STEP readback and all three browser clients (nine browser cases).
 Run `npm run test:angular-sketch --prefix tools/preview-check` for browser
 acceptance and `crates/cad-export/tools/check_angle_fixture_ocp.py` with the
-optional OCP environment for exchange acceptance. Circles/arcs
-in constrained sketches, tangency, branch-continuation policies and assembly
+optional OCP environment for exchange acceptance. Constrained arc boundaries, circle-to-circle tangency, branch-continuation policies and assembly
 joints remain future work.
 
 ### Constrained circular holes
@@ -1082,8 +1082,8 @@ constrained. Initial guesses still select a local solution branch.
 These circles remain analytic through native extrusion and STEP. Polygonal and
 circular holes share the 32-hole limit; unknown handles, zero radii, touching,
 intersecting or outside holes fail validation before publication. This does not
-yet introduce independent circle variables, circular outer boundaries, arc or
-tangency constraints in the sketch solver.
+yet introduce independent circle variables, circular outer boundaries or constrained arcs.
+Circle-to-line tangency is available through the point-handle contract below.
 
 [constrained_drill_jig.star](examples/constrained_drill_jig.star) combines a
 three-hole plate, three shared annular guide bushings and two shared feet.
@@ -1100,6 +1100,32 @@ rays across nine browser cases. Invalid solved profiles return
 `invalid_polygon_profile`, the feature ID and a diagnostic, preserving the
 previous complete generation. Readers that do not support the new optional
 sketch field reject it explicitly.
+
+### Circle-to-line tangency
+
+```python
+{"id":"seat", "kind":"circle_line_tangent",
+ "circle":["center","radius_handle"], "line":["start","end"], "side":"left"}
+```
+
+This dimensional constraint makes the circle tangent to the **infinite supporting
+line** directed from `start` to `end`. `left` means positive signed distance in
+the sketch XY plane; `right` means negative. The circle's radius is the distance
+from its centre to its radius handle. Contact may lie beyond the endpoint
+segment. Reverse the line and swap the side to preserve the same intent.
+The constraint does not fix radius or handle direction; author the necessary
+additional dimensions. Degenerate directions and insufficient numerical
+precision fail explicitly. Residuals are millimetres, not radians.
+
+[tangent_bore_fixture.star](examples/tangent_bore_fixture.star) locates two bores
+inside opposed construction wedges without calculating their centres in the
+recipe. The plate, two feet and four clamps form seven occurrences sharing three
+definitions. Parameters are `half_width` (20..35 mm), `bore_radius` (3..6 mm),
+and `thickness` (6..10 mm). Independent wedge formulas verify 27 configurations;
+three STEP cases check moments and hierarchy. Nine browser cases check 144
+bore/plate/clamp rays and captured source with `npm run test:tangent-sketch
+--prefix tools/preview-check`. Construction tangency does not certify physical
+contact, holding force, finite-segment contact or assembly constraints.
 
 ### Native line and arc profiles
 

@@ -1,5 +1,5 @@
 //! Direct typed fields remain compatible with serde_json/arbitrary_precision.
-use crate::{Constraint, ConstraintKind};
+use crate::{Constraint, ConstraintKind, LineSide};
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum Endpoints {
@@ -29,6 +29,7 @@ impl<'de> Deserialize<'de> for Constraint {
                     mut value,
                     mut degrees,
                 ) = (None, None, None, None, None, None, None, None);
+                let (mut circle, mut line, mut side) = (None, None, None);
                 while let Some(key) = map.next_key::<String>()? {
                     match key.as_str() {
                         "id" => {
@@ -67,6 +68,24 @@ impl<'de> Deserialize<'de> for Constraint {
                             }
                             b = Some(map.next_value::<Endpoints>()?);
                         }
+                        "circle" => {
+                            if circle.is_some() {
+                                return Err(M::Error::duplicate_field("circle"));
+                            }
+                            circle = Some(map.next_value::<[String; 2]>()?);
+                        }
+                        "line" => {
+                            if line.is_some() {
+                                return Err(M::Error::duplicate_field("line"));
+                            }
+                            line = Some(map.next_value::<[String; 2]>()?);
+                        }
+                        "side" => {
+                            if side.is_some() {
+                                return Err(M::Error::duplicate_field("side"));
+                            }
+                            side = Some(map.next_value::<LineSide>()?);
+                        }
                         "degrees" => {
                             if degrees.is_some() {
                                 return Err(M::Error::duplicate_field("degrees"));
@@ -83,7 +102,8 @@ impl<'de> Deserialize<'de> for Constraint {
                             return Err(M::Error::unknown_field(
                                 &key,
                                 &[
-                                    "id", "kind", "point", "position", "a", "b", "value", "degrees",
+                                    "id", "kind", "point", "position", "a", "b", "value",
+                                    "degrees", "circle", "line", "side",
                                 ],
                             ))
                         }
@@ -92,6 +112,28 @@ impl<'de> Deserialize<'de> for Constraint {
                 let id = id.ok_or_else(|| M::Error::missing_field("id"))?;
                 let kind = kind.ok_or_else(|| M::Error::missing_field("kind"))?;
                 let invalid = || M::Error::custom("fields do not match constraint kind");
+                if kind == "circle_line_tangent" {
+                    if point.is_some()
+                        || position.is_some()
+                        || a.is_some()
+                        || b.is_some()
+                        || value.is_some()
+                        || degrees.is_some()
+                    {
+                        return Err(invalid());
+                    }
+                    return Ok(Constraint {
+                        id,
+                        kind: ConstraintKind::CircleLineTangent {
+                            circle: circle.ok_or_else(|| M::Error::missing_field("circle"))?,
+                            line: line.ok_or_else(|| M::Error::missing_field("line"))?,
+                            side: side.ok_or_else(|| M::Error::missing_field("side"))?,
+                        },
+                    });
+                }
+                if circle.is_some() || line.is_some() || side.is_some() {
+                    return Err(invalid());
+                }
                 let kind = if kind == "fixed" {
                     if a.is_some() || b.is_some() || value.is_some() || degrees.is_some() {
                         return Err(invalid());
