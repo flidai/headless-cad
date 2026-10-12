@@ -2459,8 +2459,9 @@ remain native analytic geometry, with derived STEP/STL and preview artifacts.
 The example exposes width, depth, axial position/length, shaft dimensions, scale
 and output pose. Semantic assertions retain the pocket floor/end walls and both
 journal caps through placement. This domain has flat pocket ends and sharp
-corners; rounded milling ends, repeated seats, stepped/annular stock and matching
-internal hub keyways require additional operations. Native properties and transverse
+corners; rounded milling ends, repeated seats and stepped/annular stock require
+additional operations. Matching internal hub keyways have the separate bounded
+domain below. Native properties and transverse
 sections are supported; current clearance queries do not yet admit keyed bodies.
 A shaft keyseat alone does not establish a complete torque-transfer or retention design.
 
@@ -2470,6 +2471,38 @@ cases. It checks native and STEP volume, centroid and inertia, both directed sol
 differences against an independently constructed cylinder-minus-box, and oriented
 watertight STL within its declared chordal error bound. The browser regression
 checks native floor-face picking and captured recipe source.
+
+### Through-keyways in annular hubs
+
+```sh
+cad build examples/keyed_hub.star --out-dir out/keyed_hub
+```
+
+The matching hub operation uses `cut` with annular circular stock and a rectangular
+cutter spanning beyond both end caps. The cutter opens the existing bore while
+remaining strictly inside the outer wall. Its radial start lies within the bore,
+its roof lies beyond the bore radius, and both roof corners retain resolved wall
+thickness. Native cylindrical supports and line/arc trims define the resulting
+keyed bore; the outer cylindrical wall remains intact.
+
+The example exposes bore and outer radii, hub length, keyway width and roof,
+cutter coverage, scale and common operand pose. Its default 4.04 mm width and
+8.05 mm roof coordinate suit the planned 4 × 4 mm key seated at radius 4 mm in
+a 6 mm shaft. These nominal dimensions do not establish load capacity or retention.
+Blind keyways, repeated slots, rounded corners and native clearance queries on
+keyed bodies remain outside this domain.
+
+`tools/check-hub-keyway.py` validates 14 scale/pose, shallow, thin-wall and
+authored-example cases against independent closed-form moments and OCCT solids,
+plus five rejected edits that preserve the prior publication. Exact STEP geometry
+and oriented watertight STL have separate acceptance bounds.
+
+`examples/keyed_coupling.star` combines a cut shaft, cut hub and separate key,
+with a transverse engagement drawing. Its parameters revise shaft radius and
+nominal bore, side and roof gaps. `tools/check-keyed-coupling.py` independently
+checks actual imported face gaps, intentional floor contact, zero solid overlap
+between parts and material accounting across four configurations. This is a geometric engagement fixture;
+axial retention, toleranced fits and torque capacity still require engineering work.
 
 ### Native planar edge chamfers
 

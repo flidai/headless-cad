@@ -35,7 +35,9 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
         .iter()
         .any(|e| matches!(e.curve, crate::Curve::CircularArc(_)))
     {
-        let result = crate::keyseat::recognize(model, tolerance)
+        let result = crate::hub_keyway::recognize(model, tolerance)
+            .map(|_| ())
+            .or_else(|_| crate::keyseat::recognize(model, tolerance).map(|_| ()))
             .map(|_| ())
             .or_else(|_| crate::arc_prism::recognize(model, tolerance).map(|_| ()))
             .map(|_| ())

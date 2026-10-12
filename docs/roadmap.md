@@ -297,11 +297,24 @@ The finite shaft-keyseat increment adds a curved-boundary machining operation
 needed by the drive module: a rectangular pocket through the cylindrical exterior
 with intact journals at both ends. The isolating `keyed_shaft.star` fixture and
 independent cylinder-minus-box oracle validate the geometry before assembly use.
-This does not complete the torque path. Next geometry obligations are a matching
-internal hub keyway and composition with a stepped shaft/retention groove; the
+The matching internal through-keyway increment preserves the annular hub's outer
+wall and adds a keyed bore with exact cylindrical and planar supports.
+`keyed_coupling.star` combines these two cuts with a separate key and a transverse
+engagement drawing; independent part-intersection and face-gap checks are required
+before accepting the fixture. This establishes nominal geometric engagement,
+not rated torque transfer. Next geometry obligations include
+composition with a stepped shaft/retention groove; the
 mechanical layout also needs flanged bushings, a thrust washer/retainer and a
 reviewed endplay stack. Do not replace these with a visual key overlapping uncut
 material, an unattached collar, or an unvalidated friction claim.
+
+Before replacing the integrated drive module's round bodies, extend native
+clearance queries without dropping its existing obligations. For bounded coaxial
+keyed bodies, a containing round-stock distance can supply a conservative lower
+bound; an equally close pair of points certified to survive both native trims
+must supply the upper bound. Reject cases without such a witness or a sufficiently
+tight interval. This preserves a path toward measured sleeve, spacer and hub gaps
+while keeping intentional key contact and torque capacity separate.
 
 ## Next concrete implementation increments
 

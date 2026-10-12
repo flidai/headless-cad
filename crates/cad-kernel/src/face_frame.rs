@@ -121,7 +121,9 @@ impl ModelSnapshot {
         let centroid = if self.has_curved_geometry() {
             // The validated circular caps have their exact area centroid at
             // the supporting plane origin, independent of tessellation.
-            if let Ok(g) = crate::keyseat::recognize(self, tolerance) {
+            if let Ok(g) = crate::hub_keyway::recognize(self, tolerance) {
+                g.face_centroid(face_id, tolerance)?
+            } else if let Ok(g) = crate::keyseat::recognize(self, tolerance) {
                 g.face_centroid(face_id, tolerance)?
             } else if let Ok(g) = crate::stepped_bore::recognize(self, tolerance) {
                 g.cap_centroid(face_id, tolerance)?

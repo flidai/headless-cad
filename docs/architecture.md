@@ -1143,6 +1143,28 @@ internal hub keyway and a real axial-retention arrangement
 remain required before incorporating a complete keyed drive into the reference
 engineering workflow. This domain does not claim general curved Boolean closure.
 
+### Internal through-keyways in annular hubs
+
+The matching operation admits an annular circular cylinder and one centered
+rectangular cutter extending strictly beyond both caps. Recover both operand
+frames and certify arithmetic alignment. The cutter begins within the bore;
+its roof lies radially beyond the bore, with roof corners strictly inside the
+outer cylinder. Reject unresolved wall thickness, partial axial coverage,
+outer-wall breakthrough and repeated machining of a keyed body.
+
+Represent the result with two planar caps containing native inner loops, the
+unchanged periodic outer cylinder, two surviving inward bore patches, and three
+planar keyway walls. Integrate the removed circle-to-roof strip analytically,
+preserving full central inertia under rigid placement. Retain cap/outer-wall
+lineage, split bore lineage and generated roof/side roles. Derived meshes must
+share trim coordinates and remain oriented and watertight.
+
+The independent acceptance construction is an annular cylinder minus a box;
+closed-form removed-strip moments provide a second oracle. Compare both directed
+STEP differences, full moments, native surface types, scale/pose variants and
+failed-publication preservation. Keep geometric key engagement, axial retention,
+clearance-query support and load-capacity evidence as separate obligations.
+
 ## Constraints and assemblies
 
 Stage assembly-solver acceptance separately from today's attachment DAG: first a grounded

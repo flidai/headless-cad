@@ -181,6 +181,9 @@ pub fn tessellate_analytic(
     tolerance: Tolerance,
     policy: TessellationPolicy,
 ) -> Result<CylinderMesh, KernelError> {
+    if let Ok(g) = crate::hub_keyway::recognize(model, tolerance) {
+        return crate::hub_keyway::tessellate(model, &g, tolerance, policy);
+    }
     if let Ok(g) = crate::keyseat::recognize(model, tolerance) {
         return crate::keyseat::tessellate(model, &g, tolerance, policy);
     }

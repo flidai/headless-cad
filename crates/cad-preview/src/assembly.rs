@@ -539,6 +539,13 @@ fn mesh_asset(mesh: &Scene) -> Result<(MeshAssetDescriptor, String), PreviewErro
 }
 
 fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
+    // One shared sentinel beyond every occurrence's real native edge range.
+    let derived_edge = scene.instances.iter().try_fold(0usize, |total, instance| {
+        let mesh = &scene.meshes[&scene.definitions[&instance.part].mesh];
+        total.checked_add(mesh.edges).ok_or_else(|| {
+            PreviewError::Assembly("expanded edge count exceeds numerical range".into())
+        })
+    })?;
     let mut result = Scene {
         tessellation_error_mm: scene
             .meshes
@@ -578,7 +585,17 @@ fn expand(scene: &AssemblyScene) -> Result<Scene, PreviewError> {
                 id: result.faces.len(),
                 semantic_face_id: face.semantic_face_id,
                 points,
-                edges: face.edges.iter().map(|id| id + edge_offset).collect(),
+                edges: face
+                    .edges
+                    .iter()
+                    .map(|id| {
+                        if *id == mesh.edges {
+                            derived_edge
+                        } else {
+                            id + edge_offset
+                        }
+                    })
+                    .collect(),
                 normal,
                 triangles: face.triangles.clone(),
                 loop_starts: face.loop_starts.clone(),
@@ -991,6 +1008,21 @@ mod tests {
         let svg = to_assembly_svg(&fixture()).unwrap();
         assert!(svg.contains("2 solid(s)"));
         assert_eq!(svg, to_assembly_svg(&fixture()).unwrap());
+    }
+
+    #[test]
+    fn derived_edges_cannot_alias_the_next_occurrences_boundary() {
+        let mut compact = assembly_scene(&fixture(), false).unwrap();
+        for mesh in compact.meshes.values_mut() {
+            mesh.faces[0].edges[0] = mesh.edges;
+        }
+        let expanded = expand(&compact).unwrap();
+        assert_eq!(expanded.edges, 24);
+        for face in [&expanded.faces[0], &expanded.faces[6]] {
+            assert_eq!(face.edges[0], expanded.edges);
+            assert!(!expanded.crease_edges.contains(&face.edges[0]));
+        }
+        assert!(expanded.crease_edges.contains(&12));
     }
 
     #[test]

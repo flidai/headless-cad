@@ -51,7 +51,7 @@ function normalizeScene(raw){
    points+=face.points.length;if(faces.length>=50000||points>200000)throw Error('Software display limit exceeded');
    const transformed=face.points.map(p=>rotate(p,q).map((v,i)=>v+t[i])),normal=rotate(face.normal,q);
    if(!transformed.every(p=>p.every(Number.isFinite))||!normal.every(Number.isFinite))throw Error('Display coordinate overflow');
-   faces.push({id:faces.length,local_face_id:face.semantic_face_id??face.id,semantic_face_id:face.semantic_face_id,instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id,points:transformed,normal,triangles:face.triangles,loop_starts:face.loop_starts,edges:face.edges.map(id=>id+edges)});
+   faces.push({id:faces.length,local_face_id:face.semantic_face_id??face.id,semantic_face_id:face.semantic_face_id,instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id,points:transformed,normal,triangles:face.triangles,loop_starts:face.loop_starts,edges:face.edges.map(id=>id===mesh.edges?-1:id+edges)});
   }
   crease_edges.push(...mesh.crease_edges.map(id=>id+edges));vertices+=mesh.vertices;edges+=mesh.edges;solids+=mesh.solids;native_faces+=mesh.native_faces??nativeFaceCount(mesh);
  }
