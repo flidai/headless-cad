@@ -285,6 +285,37 @@ permanently promoted by one run. Manufacturing-release and hardware-scale entrie
 remain planned. Performance promotion is rejected pending a hardware/workload
 evidence protocol.
 
+### Integrated source-revision demonstration
+
+`examples/drive_module_release.star` composes the current supported geometry into
+a bearing-supported fixture with a shaft and drive-disc blank. Nine shared part
+definitions produce 19 occurrences, including housing hold-down bars and
+simplified fastener envelopes. The recipe declares seven geometric clearance
+checks, four circular size dimensions, support pitch, two worst-case size stacks,
+material properties and a section sheet. A focused bearing inspection assembly
+provides the transverse section because general mixed-axis curved sectioning is
+not yet supported; it is explicitly separate from the complete assembly.
+
+`scripts/drive_module_demo.py` makes an actual source patch from revision A to B:
+shaft diameter 12→14 mm and support pitch 60→72 mm. It retains the source patch,
+semantic diff, before/after STEP/BOM/section artifacts, native checks and a static
+inspection index. The revised build reuses three cached solids and computes six.
+An excessive 0.3 mm running-clearance requirement fails while preserving every
+published byte. Captured revised source replays without the authoring copy or
+geometry cache, matching source bytes, feature hashes, output geometry identities
+and clearance reports. Source-context identities may differ with captured source
+filenames; replay does not equate those contextual identities with geometry.
+
+Independent `tools/check-drive-module.py` acceptance checks both parameter sets
+against component-volume and density formulas, imported STEP geometry and assembly
+hierarchy, native dimensions and the seven named separations. Calculated masses
+are approximately 0.791257 kg and 0.861077 kg. Browser acceptance checks both
+captured source revisions through shaft selection and the walkthrough's artifact
+links. This is a scripted, reproducible revision demonstration, not an autonomous
+AI integration. Axial retention, torque transfer, threads, load ratings and a
+complete manufacturing specification remain open; all five commercial gates
+remain open.
+
 ## System decomposition
 
 ```mermaid

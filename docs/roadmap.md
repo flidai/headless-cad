@@ -278,21 +278,20 @@ by endpoint/midpoint sampling. Its radius/speed bounds and independent orbit/STE
 checks share the existing work, failure-publication and source-replay contracts.
 General coupled motion and the complete R3 release gate remain open.
 
-## Paused checkpoint — 2026-10-12
+## Resumed integration — 2026-10-12
 
-Work paused at the user's request after implementing fixed-axis rotation
-clearance. The release binary builds; 166 kernel tests, 25 focused recipe/build
-tests, rotation and translation CLI acceptance, formatting and strict Clippy pass.
-Independent rotation STEP/orbit and browser acceptance scripts are prepared but
-have not run. This increment is not yet independently validated or published.
+The user resumed work toward an integrated bearing-supported drive-module
+revision demonstration. Independent rotation acceptance now passes 15
+configurations/30 paths, 183 covering intervals, 138 imported STEP poses and four
+publication-preserving failures. The read-only browser report also passes its
+source/scope checks. This closes the pending rotation increment acceptance, not
+the commercial R3 gate.
 
-The live server and distribution retain the last validated translation-clearance
-release (`39b95e8`), with 74 verified example generations. On explicit resumption,
-run `tools/check-rotation-clearance.py` in the independent OCP environment into a
-new evidence directory, publish the rotation example, and run
-`tools/preview-check/rotation-clearance.cjs`. Resolve any failures before refreshing
-the server/distribution and verifying all published generations. The commercial
-release gates remain open; the overall goal is paused, not complete.
+The next product evidence joins a reviewable shaft-diameter/mounting-pitch source
+patch, before/after artifacts, native engineering checks, drawings/BOM/STEP,
+rejected-edit recovery and captured-source replay. Simplified fastener envelopes
+and a drive-disc blank must stay explicit; axial retention and torque transfer
+are not established by positive clearance or by the display alone.
 
 ## Next concrete implementation increments
 

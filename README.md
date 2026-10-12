@@ -75,6 +75,33 @@ For an unpacked archive, use its included `./cad` executable instead. Native
 archives target their build platform and libc; source installation is the
 portable route across operating systems.
 
+## Review a complete source revision
+
+The experimental bearing-drive walkthrough changes shaft diameter from 12 to
+14 mm and mounting pitch from 60 to 72 mm. It builds both revisions, records a
+source patch and semantic diff, publishes native engineering checks and section
+sheets with STEP/BOM artifacts, then rejects an excessive clearance requirement
+without changing the last valid generation. Finally it rebuilds the revised
+captured recipe without the working source or geometry cache.
+
+```sh
+cargo build --release --locked -p cad-cli
+python3 scripts/drive_module_demo.py --out-dir out/drive_module_demo
+./target/release/cad serve out --port 8080
+```
+
+Open `http://localhost:8080/drive_module_demo/index.html`. Select a shaft occurrence
+in either assembly preview to inspect that revision's actual Starlark source.
+The walkthrough is a scripted source edit, not an autonomous AI demo. It shows
+the reproducible workflow an agent can use. Its no-replace publication currently
+requires Linux; use a new output directory for every run.
+
+The assembly includes simplified fastener envelopes and a drive-disc blank.
+Axial retention, torque transfer, load ratings, threads and complete manufacturing
+specification remain design work. Native size and clearance checks cover their
+named obligations, not whole-assembly certification. The five commercial release
+gates remain open.
+
 ## Discover operations for automation
 
 ```sh
