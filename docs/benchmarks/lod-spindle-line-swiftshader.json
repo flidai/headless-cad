@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "revision": "83cde5ab2acb809b9ca3343663f2b17e5b373804",
+  "working_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "benchmark_sha256": "1ac57a1227b5bbcc839606ffe49b21a9c14ae767992a395263fb73147a05a80b",
+  "preview_sha256": "270f630a1904ff72380475a6c036639078f9f3410a50e7218bd0119d1562a158",
+  "date_utc": "2026-10-12T00:17:58.591Z",
+  "url": "http://localhost:8080/spindle_scale/spindle_line.stream.html",
+  "browser": "154.0.8037.92",
+  "software_renderer_requested": true,
+  "environment": {
+    "os": "Linux",
+    "release": "6.18.54",
+    "cpu": "QEMU Virtual CPU version 2.5+",
+    "logical_cpus": 16
+  },
+  "viewport": [
+    1440,
+    1000
+  ],
+  "device_scale_factor": 1,
+  "proxy_ready_ms": 946.7916399999999,
+  "coarse_ready_ms": 1059.226647,
+  "focus_detail_ready_ms": 190.67513199999985,
+  "timing_scope": "cold page to coarse coverage, then station detail including fetch and GPU completion; not presentation latency",
+  "overview": {
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "instances": 4000,
+    "visible": 4000,
+    "uniqueParts": 15,
+    "residentMeshes": 15,
+    "residentBytes": 569561,
+    "reservedBytes": 0,
+    "activeLevels": {
+      "9ce340d33c096020e29715247966b622edeaae02e51067150320c9c89e963720": 0,
+      "62613a19a44a8c6e2154d1cc98476481cb8a7790e5ed8ad98251b94583f1d3fb": 0,
+      "bb6c8292c16d6f089811bb899acce4b4cf8bd36bb7170d31f7eff2edf40fd9df": 0,
+      "f75bcf287692aaa9b6bfeb660950902f4dd51a871ca608ccea8345e9b3400953": 0,
+      "a474915ce1db2fb10a83a6c6603b7fe9f2e4a7518b8d4e5f76f54a43c34e5c6a": 0,
+      "bb01658a0fa765498d6e0a3f897f45d965a5d29b9b3e69188674b8edf01bd367": 0,
+      "329e3c505c75ef20aa52a1a144fb7a309003e4c35fa4ddf3cd976ed632573c31": 0,
+      "b1882aa83f52e39c7ee56d83371c2437a075504201b166492ce44c7637b680dc": 0,
+      "34260d08c65307cc8c17c2375ef1d48c0db7764609fe4d00c5c44bb2c66e2262": 0,
+      "92f6af637b6eaa547b14d5ca8f33bcb9f39a73e58c4a0eb7f3bdedb1b33ea27c": 0,
+      "c2ea4e202a72d1b34f49e62cf9e8fd8e61047b8c5f5b0c8249f21db716d2654b": 0,
+      "1b53ad5ba4c3bc9ebacc29abcac3f445d418a28d498eb1da6112d1e9f1c048a6": 0,
+      "9dd047387c1e6ca302c9f640d4e5e89f7312c9546f7453510e2a673abf138a4c": 0,
+      "6ee6a43c575310459bd065e8f00f0ecf2cf44431fd23b1d2efe098968e82ffac": 0,
+      "1fe16cb769b7716efeba778f8610fa667c8d615749cad480a7e77f0dd59dd580": 0
+    },
+    "maxScreenErrorPixels": 0.12509985387675898,
+    "unmetDetailCount": 0,
+    "proxies": 0,
+    "errors": [],
+    "geometryVertices": 7716,
+    "drawCalls": 15,
+    "requested": 15,
+    "camera": {
+      "target": [
+        1950,
+        1200,
+        30
+      ],
+      "right": [
+        0.8660254037844386,
+        0.5000000000000001,
+        0
+      ],
+      "up": [
+        -0.2938926261462366,
+        0.5090369604551271,
+        0.8090169943749475
+      ],
+      "eye": [
+        0.40450849718747384,
+        -0.7006292692220367,
+        0.5877852522924731
+      ],
+      "halfHeight": 2618.585389098473,
+      "halfWidth": 3035.2412307779987,
+      "depthRange": 1702.727591543558,
+      "width": 1100,
+      "height": 949,
+      "pixelWidth": 1100,
+      "pixelHeight": 949,
+      "culling": {
+        "cullNodeTests": 1023,
+        "cullLeafTests": 512,
+        "cullOccurrenceTests": 4000,
+        "cullPrunedNodes": 0
+      }
+    },
+    "assemblyHash": "6b309cbfa6d54a7062d83a8b1e9537e793a410d5848554b4e27dc2693eeda088",
+    "contextHash": "a28f1d1a8e086f919b7e28605329f48cd30f1ac1bbffa1191dc7a7be0318703c",
+    "parameters": {
+      "columns": 40,
+      "stations": 1000,
+      "variants": 12
+    },
+    "finestEncodedBytes": 2480023,
+    "finestGeometryBytes": 1462608
+  },
+  "detail": {
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "instances": 4000,
+    "visible": 4,
+    "uniqueParts": 15,
+    "residentMeshes": 4,
+    "residentBytes": 614806,
+    "reservedBytes": 0,
+    "activeLevels": {
+      "9ce340d33c096020e29715247966b622edeaae02e51067150320c9c89e963720": 2,
+      "62613a19a44a8c6e2154d1cc98476481cb8a7790e5ed8ad98251b94583f1d3fb": 2,
+      "bb6c8292c16d6f089811bb899acce4b4cf8bd36bb7170d31f7eff2edf40fd9df": 2,
+      "f75bcf287692aaa9b6bfeb660950902f4dd51a871ca608ccea8345e9b3400953": 2
+    },
+    "maxScreenErrorPixels": 0.252995369192045,
+    "unmetDetailCount": 0,
+    "proxies": 0,
+    "errors": [],
+    "geometryVertices": 8064,
+    "drawCalls": 4,
+    "requested": 19,
+    "camera": {
+      "target": [
+        0,
+        0,
+        30
+      ],
+      "right": [
+        1,
+        6.123233995736766e-17,
+        0
+      ],
+      "up": [
+        -6.123233995736766e-17,
+        1,
+        6.123233995736766e-17
+      ],
+      "eye": [
+        3.749399456654644e-33,
+        -6.123233995736766e-17,
+        1
+      ],
+      "halfHeight": 30,
+      "halfWidth": 34.77344573234984,
+      "depthRange": 30.308918848681934,
+      "width": 1100,
+      "height": 949,
+      "pixelWidth": 1100,
+      "pixelHeight": 949,
+      "culling": {
+        "cullNodeTests": 19,
+        "cullLeafTests": 2,
+        "cullOccurrenceTests": 15,
+        "cullPrunedNodes": 8
+      }
+    },
+    "assemblyHash": "6b309cbfa6d54a7062d83a8b1e9537e793a410d5848554b4e27dc2693eeda088",
+    "contextHash": "a28f1d1a8e086f919b7e28605329f48cd30f1ac1bbffa1191dc7a7be0318703c",
+    "parameters": {
+      "columns": 40,
+      "stations": 1000,
+      "variants": 12
+    },
+    "finestEncodedBytes": 2480023,
+    "finestGeometryBytes": 1462608
+  },
+  "requests": [
+    "http://localhost:8080/spindle_scale/spindle_line.stream.html",
+    "http://localhost:8080/spindle_scale/mesh-57dce025f68bb4b9dc86d12701ff21cefc10a2ab6fa191aa7daadb1227211151.display.json",
+    "http://localhost:8080/spindle_scale/mesh-029e038723c8632c837dca112cb4db4270ebfa46fa96b63d26b43b9c5a9b0296.display.json",
+    "http://localhost:8080/spindle_scale/mesh-2ce8d5b9433ed43fa3ae555044818e5eca6853ddbbd63e21fa8ac78dd5281843.display.json",
+    "http://localhost:8080/spindle_scale/mesh-8faf3ded737f71a654c6ca36e175f5e29dfa04ad82337fdf0b175c4e70d66313.display.json",
+    "http://localhost:8080/spindle_scale/mesh-a7d73aa05f8895e2d38b02752ed8ff13a27714398e6fe8b7ada8c6f4271da7d8.display.json",
+    "http://localhost:8080/spindle_scale/mesh-1a88f81b7d0a29d6ef4aecca2776c9f024315904f38bd1d800b72e91c2795769.display.json",
+    "http://localhost:8080/spindle_scale/mesh-6d92208ef7ccd70cbe4c55e6e10c8bbfeffbe00d3b374b5d868d290792049abe.display.json",
+    "http://localhost:8080/spindle_scale/mesh-5f0549fd4ba9b392e11ab0b95f6d302a9f453a658f74b1d7ee24f60eb008f350.display.json",
+    "http://localhost:8080/spindle_scale/mesh-3f42f27e80e10b26ee0918010c8427400f8e5c2a4e993aeb20b819a7189ee316.display.json",
+    "http://localhost:8080/spindle_scale/mesh-e2b3ead34de474cc78d1d344fb23a57d0b2a7693009734ab58f8229253f5b9e0.display.json",
+    "http://localhost:8080/spindle_scale/mesh-0a99fee09e7547a54d650357e1bf62b7865cf829f0db6985f68efa9b7becae61.display.json",
+    "http://localhost:8080/spindle_scale/mesh-4641da813c6c0b53861cd802a09f94e4e3b9a8ecf057ef6f0681520b769fe724.display.json",
+    "http://localhost:8080/spindle_scale/mesh-f30bed1e825c86552d6926cb76ab932fc3e63c034f7161b66463da57594dbbfc.display.json",
+    "http://localhost:8080/spindle_scale/mesh-23a45e46de2c8cdede4b251575b5e5d61f45cdd1e02c785c8b0a02ba2aec7876.display.json",
+    "http://localhost:8080/spindle_scale/mesh-7daf32c50b61464cdb6f153839f3cbca754fc7421573754ea5ff2f19725a5b11.display.json",
+    "http://localhost:8080/spindle_scale/mesh-458f29cb0b9ad0c0be10e5b324847dba908391b2412b1dda6a63f399f1dab944.display.json",
+    "http://localhost:8080/spindle_scale/mesh-6925162e739cf547b55417f5f7b3478df4864589aec5fd049b62c3fe8a2d44ac.display.json",
+    "http://localhost:8080/spindle_scale/mesh-a06cf68497755bb6d0a9cfeb0a91ba7d917b90dae9f4cc6b4d0e6d2da9c81c8b.display.json",
+    "http://localhost:8080/spindle_scale/mesh-004f4db9815dd4346220f1aba51ef2216c7071ea0ae966bf1e66366e2790b941.display.json"
+  ],
+  "exact_geometry_requests": 0
+}

@@ -1086,6 +1086,33 @@ camera, environment, requests, identities and accounting scope. Reproduce with
 `node tools/preview-check/stream-benchmark.cjs` after serving the workcell; set
 `CAD_BROWSER` to the browser executable and optionally `CAD_STREAM_URL`.
 
+### Recorded analytic part-LOD sample
+
+The 1,000-station spindle line contains 4,000 occurrences and 15 unique part
+meshes (12 housing variants plus base, shaft and retainer). A cold browser at
+1440×1000 used coarse levels for the overview, then refined the four visible
+parts at the origin station to their finest levels. Retainer picking preserved
+native face 1; no exact-geometry downloads occurred.
+
+| Observation | Recorded result |
+| --- | --- |
+| Overview accounted mesh residency | 569,561 bytes versus 3,942,631 bytes for all finest encoded meshes plus geometry buffers |
+| Focused station accounted mesh residency | 614,806 bytes; four resident definitions |
+| Cold coarse coverage | 1,059 ms |
+| Station-detail completion after camera change | 191 ms |
+| Unmet geometric detail target / proxies after settling | Zero in both views |
+
+This local Chromium/SwiftShader sample is software-rendered workload evidence,
+not a discrete-GPU frame-rate or whole-process memory gate. Timing includes page
+loading or refinement fetches and GPU completion, and excludes headless building.
+The residency figures exclude browser parse transients, instance buffers and
+driver allocations. The [raw record](benchmarks/lod-spindle-line-swiftshader.json)
+pins revision, preview and benchmark hashes, parameters, environment and camera
+states. Reproduce with the 1,000-station command and
+`tools/preview-check/lod-benchmark.cjs` documented in the README. Additional LOD
+assets increase publication storage and meshing work; the runtime savings do not
+establish bounded exact-body residency during a build.
+
 ### Recorded occurrence-BVH acceptance
 
 The occurrence-BVH acceptance fixture contains 25,600 occurrences and eight
