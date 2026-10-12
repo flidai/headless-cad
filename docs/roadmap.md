@@ -13,6 +13,14 @@ team automation (M7). None is closed by completing a renderer or accumulating
 passing examples. First-party delivery remains Apache-2.0, with an original Rust
 kernel and source-authoritative modeling throughout.
 
+M3's large-assembly gate also includes the architecture's
+[exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):
+test one oversized unique-body operation as well as repeated-part assemblies,
+and measure concurrent inspection, revision and export. Bounded display memory
+does not establish bounded modeling memory. Resource failures must preserve the
+previous complete generation without reducing engineering fidelity. M7 adapters
+must reconcile idempotent release deliveries and expose partial synchronization.
+
 Use the [feature-brief acceptance scenarios](architecture.md#feature-brief-acceptance-scenarios)
 to turn these tracks into release checks. Increase unique geometry complexity,
 feature-history depth, occurrence count, constraint coupling and annotation count
@@ -49,6 +57,12 @@ and measure their complete native section circles. The conical-seat examples
 exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
+
+M5 now includes native planar edge chamfers. The guide-block example chains six
+local cuts and attaches inclined wear pads to a generated chamfer datum. Its
+parameter corpus checks independent volume/centroid/inertia, while STEP checks
+verify support planes, sections and assembly placement. This bounded operation
+starts M5; the general edge-treatment and repair gates remain open.
 
 Use the architecture's [delivery priorities](architecture.md#delivery-priorities-and-completion-authority)
 to select and review increments across modeling, assembly scale, inspection,
@@ -120,7 +134,7 @@ release and is checked independently from exported solid validity.
 | M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; simple concave line/arc path extrusion with circular holes and bounded parallel-cylinder union/intersection/through-cut and sequential contained circular through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock implemented; curved inner paths, arcs in revolved meridians, partial revolution, general Booleans and generalized trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache and analytic whole-part LOD implemented; metadata paging, cluster LOD, part spatial indexes and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Dimensioned slope fixture → four-bar mechanism → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | In progress: bounded original Rust point sketch solver, ten constraint kinds including directed angles and circle-to-line tangency; separate linear/angular tolerances, polygon extrusion, local rank/residual/conditioning reports, independent constraint islands and atomic failure handling; curves, large connected systems, branch continuation, conflict minimization and assembly solving remain |
-| M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
+| M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | In progress: local equal-distance straight-edge chamfers on strictly convex planar solids, with complete face lineage and generated-face datums; curved/unequal chamfers, fillets, sweeps/lofts, offsets/shelling and general repair remain |
 | M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries and global recipe property assertions and revision-bound STEP/STL fidelity declarations and source-bound native planar-section JSON/SVG implemented; drawings, PMI, broader independent semantic round-trip evidence, principal axes and configuration policies remain |
 | M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | Planned |
 

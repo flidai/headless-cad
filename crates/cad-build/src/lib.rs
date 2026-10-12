@@ -304,6 +304,13 @@ pub enum Feature {
         height: f64,
         op_version: u32,
     },
+    Chamfer {
+        id: String,
+        body: String,
+        face_normals: [[f64; 3]; 2],
+        distance: f64,
+        op_version: u32,
+    },
     Translate {
         id: String,
         body: String,
@@ -370,6 +377,8 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut circular_holes = None;
                 let mut height = None;
                 let mut body = None;
+                let mut face_normals = None;
+                let mut distance = None;
                 let mut offset = None;
                 let mut rotation = None;
                 let mut left = None;
@@ -405,6 +414,8 @@ impl<'de> Deserialize<'de> for Feature {
                         }
                         "height" => read_field!(height, f64),
                         "body" => read_field!(body, String),
+                        "face_normals" => read_field!(face_normals, [[f64; 3]; 2]),
+                        "distance" => read_field!(distance, f64),
                         "offset" => read_field!(offset, [f64; 3]),
                         "rotation" => read_field!(rotation, [f64; 4]),
                         "left" => read_field!(left, String),
@@ -431,6 +442,8 @@ impl<'de> Deserialize<'de> for Feature {
                                     "circular_holes",
                                     "height",
                                     "body",
+                                    "face_normals",
+                                    "distance",
                                     "offset",
                                     "rotation",
                                     "left",
@@ -474,6 +487,7 @@ impl<'de> Deserialize<'de> for Feature {
                     ],
                     "revolve" => &["op", "id", "op_version", "profile"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
+                    "chamfer" => &["op", "id", "op_version", "body", "face_normals", "distance"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
                     "transform" => &["op", "id", "op_version", "body", "offset", "rotation"],
                     "union" => &["op", "id", "op_version", "left", "right"],
@@ -490,6 +504,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "sketch",
                                 "extrude",
                                 "revolve",
+                                "chamfer",
                                 "translate",
                                 "transform",
                                 "union",
@@ -569,6 +584,14 @@ impl<'de> Deserialize<'de> for Feature {
                         profile: profile.ok_or_else(|| M::Error::missing_field("profile"))?,
                         height: height.ok_or_else(|| M::Error::missing_field("height"))?,
                     },
+                    "chamfer" => Feature::Chamfer {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        face_normals: face_normals
+                            .ok_or_else(|| M::Error::missing_field("face_normals"))?,
+                        distance: distance.ok_or_else(|| M::Error::missing_field("distance"))?,
+                    },
                     "translate" => Feature::Translate {
                         id,
                         op_version,
@@ -622,6 +645,7 @@ impl Feature {
             | Self::Path { id, .. }
             | Self::Extrude { id, .. }
             | Self::Revolve { id, .. }
+            | Self::Chamfer { id, .. }
             | Self::Translate { id, .. }
             | Self::Transform { id, .. }
             | Self::Union { id, .. }
@@ -637,7 +661,9 @@ impl Feature {
             | Self::Sketch { .. }
             | Self::Path { .. } => vec![],
             Self::Extrude { profile, .. } | Self::Revolve { profile, .. } => vec![profile],
-            Self::Translate { body, .. } | Self::Transform { body, .. } => vec![body],
+            Self::Chamfer { body, .. }
+            | Self::Translate { body, .. }
+            | Self::Transform { body, .. } => vec![body],
             Self::Union { left, right, .. }
             | Self::Cut { left, right, .. }
             | Self::Intersect { left, right, .. } => vec![left, right],
@@ -662,6 +688,7 @@ impl Feature {
             | Self::Path { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Revolve { op_version, .. }
+            | Self::Chamfer { op_version, .. }
             | Self::Translate { op_version, .. }
             | Self::Transform { op_version, .. }
             | Self::Union { op_version, .. }
@@ -678,6 +705,7 @@ impl Feature {
             Self::Path { .. } => "path",
             Self::Extrude { .. } => "extrude",
             Self::Revolve { .. } => "revolve",
+            Self::Chamfer { .. } => "chamfer",
             Self::Translate { .. } => "translate",
             Self::Transform { .. } => "transform",
             Self::Union { .. } => "union",
@@ -1084,6 +1112,15 @@ fn hash_feature(
                 }
             }
         }
+        Feature::Chamfer {
+            face_normals,
+            distance,
+            ..
+        } => {
+            for value in face_normals.iter().flatten().chain([distance]) {
+                hash.update(&value.to_le_bytes());
+            }
+        }
         Feature::Extrude { height, .. } => {
             hash.update(&height.to_le_bytes());
         }
@@ -1396,6 +1433,25 @@ impl BuildEngine {
                         }
                     }
                 }
+                Feature::Chamfer {
+                    id,
+                    face_normals,
+                    distance,
+                    ..
+                } => {
+                    dimension(id, "distance", *distance)?;
+                    for normal in face_normals {
+                        let length = normal.iter().map(|v| v * v).sum::<f64>().sqrt();
+                        if normal.iter().any(|v| !v.is_finite())
+                            || (length - 1.).abs() > 128. * f64::EPSILON
+                        {
+                            return Err(BuildError::Kernel {
+                                feature: id.clone(),
+                                message: "chamfer face normals must be finite unit vectors".into(),
+                            });
+                        }
+                    }
+                }
                 Feature::Extrude { id, height, .. } => dimension(id, "height", *height)?,
                 Feature::Transform {
                     id,
@@ -1556,6 +1612,17 @@ impl BuildEngine {
                             ),
                             _ => unreachable!("profile types validated before execution"),
                         },
+                        Feature::Chamfer {
+                            body,
+                            face_normals,
+                            distance,
+                            ..
+                        } => cad_kernel::chamfer(
+                            &evaluated[body].model,
+                            *face_normals,
+                            *distance,
+                            tolerance,
+                        ),
                         Feature::Transform {
                             body,
                             offset,

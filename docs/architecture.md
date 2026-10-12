@@ -608,7 +608,7 @@ mixed-material mass/inertia and bore/length edits. This is analytic annular
 extrusion, not yet a generalized curved cut operation.
 
 Progress through general nonconvex solid operations, curved extrusion,
-revolution, generalized Booleans, sweeps/lofts, chamfers/fillets, offsets/shelling,
+revolution, generalized Booleans, sweeps/lofts, general chamfers/fillets, offsets/shelling,
 and controlled import repair. Include open shells and cavity orientation in the
 data model before promising shelling. Each operation declares supported input
 classes, degeneracies, maximum work, postconditions, and meaningful failures.
@@ -625,6 +625,39 @@ bound or report further changes explicitly. Test thin walls, fits and clearances
 against their authorized engineering limits after the complete chain; passing
 each operation's local tolerance is insufficient. A repair report cannot turn
 an unresolved deviation bound into a successful manufacturing release.
+
+### Native local-edge planar chamfers
+
+The first explicit M5 edge operation is `chamfer(body, face_normals, distance)`.
+It resolves each of two finite outward unit normals to exactly one input face,
+requires one shared straight edge and constructs an equal-face-setback bisector
+half-space. This normal selector is declared in the input model frame; it is not
+a persistent face index, closest-face search or implicit selection after rotation.
+For outward normals n1/n2 and unit bisector m, the inward plane offset is
+`distance * sqrt((1-dot(n1,n2))/2)`. This retains the specified along-face
+setback for acute, right and obtuse dihedrals.
+
+Chamfer shares the bounded plane reconstruction used by convex intersection.
+Its input bounds can exclude impossible ill-conditioned plane triplets without
+snapping dependent planes. Input/result validation, arithmetic range and
+conditioning checks still apply. The current domain is one strictly convex
+planar solid and at most 48 supports including the added plane. Only the selected
+edge's endpoint vertices may be removed; every other vertex must stay strictly
+inside the retained half-space beyond tolerance. Every original face must survive,
+with exactly one generated `chamfer` face and complete `body` input-face lineage.
+Larger cuts reaching other vertices, curved/nonconvex solids, unequal setbacks,
+multiple simultaneous edges and fillets remain unsupported.
+
+Feature hashing, native cache replay, Starlark/JSON IR and capability discovery
+include this operation. Semantic references propagate through the body map;
+generated chamfer faces can drive assertions and planar datum attachments.
+`chamfered_guide_block.star` chains six edge operations, sections the result and
+places inclined wear pads through a generated-face datum in repeated assemblies.
+The `modeling.planar-edge-chamfer` evidence case combines a 27-case independent
+moment-integral corpus, atomic publication rejection, imported STEP support-plane,
+section and placement checks, plus acute/obtuse rigidly transformed wedge cases.
+This is a bounded start on M5; general curved edge treatment and controlled repair
+remain separate release obligations.
 
 ### Persistent topology references
 
@@ -1572,8 +1605,10 @@ no change to authoritative kernel coordinates or engineering measurements.
 
 Normal assembly builds include both `.preview.html` (Canvas) and `.gpu.html`.
 `build/watch --display-only` can publish GPU assembly inspection without exact
-body files, STEP/STL, or SVG generation. Opening that artifact loads zero exact
-B-reps. The headless build still evaluates and validates geometry. Assembly builds also publish `.stream.html` and schema-2 `.stream.json`, with
+body files, STEP/STL, or ordinary preview SVGs. Source-declared section views still
+publish their native JSON/SVG artifacts and enforce their validation obligations.
+Opening the inspection artifact loads zero exact B-reps. The headless build still
+evaluates and validates geometry. Assembly builds also publish `.stream.html` and schema-2 `.stream.json`, with
 separate `mesh-<sha256>.display.json` assets. The streaming page embeds metadata,
 bounds, occurrence paths and captured recipe context, then fetches visible meshes.
 Descriptors record exact byte length, SHA-256, bounds and geometry counts. The
@@ -1932,6 +1967,30 @@ component counters alone omit allocator overhead and overlapping scratch space.
 These are target contracts. Current generation-cache accounting and display
 limits cover only their documented scopes.
 
+#### Exact-body admission and oversized operations
+
+Lightweight inspection must be paired with bounded modeling execution. Before
+materializing an operation's dependencies, the scheduler reserves its live input
+bodies, output estimate and scratch allowance, including retained input pins.
+Spilling an unrelated cached body does not make an operation out-of-core: some
+algorithms require all their inputs and working structures together. Declare that
+minimum working set in the operation capability contract; where it cannot be
+bounded in advance, execute within an isolated worker with an enforced process
+limit. Admission must avoid repeated eviction/recomputation without progress.
+
+An operation that exceeds the job budget returns a structured resource outcome
+with the feature, budget and observed/estimated requirement. It may be retried
+with an explicitly larger budget or a separately validated partitioned algorithm.
+It must not silently reduce geometric fidelity, substitute a display mesh or
+publish a partially built solid. Only algorithms with a tested partition/merge
+contract may claim out-of-core exact processing.
+
+Gate this target with both one large unique body and many shared small bodies.
+Run inspection concurrently with a one-part revision and full assembly export;
+record total process-tree peak memory, exact-body loads, scratch, cancellation
+latency and unchanged-generation integrity after a forced resource failure.
+Fast graphics-only opening alone cannot pass this modeling-scale gate.
+
 ### Revision and release lifecycle
 
 Published-generation integrity is the first implemented boundary toward release
@@ -1984,6 +2043,14 @@ and exchange files by digest. Adapters for PDM/PLM/ERP consume that manifest;
 they cannot silently change authoritative recipes. Optional locks may coordinate
 non-mergeable imported assets or organizational release policy, but ordinary
 recipe authoring remains compatible with Git branches and offline work.
+
+External release delivery uses an idempotency key bound to destination, release
+digest and configuration. Adapters retain per-artifact acknowledgments and remote
+revision identifiers, so retrying a timed-out delivery cannot create duplicate
+part or BOM revisions. A local engineering release and its external synchronization
+status are separate: partial delivery remains pending or failed until the required
+destination acknowledgments are reconciled. Test interrupted transfers, duplicate
+requests and lost acknowledgments against a deterministic adapter fixture.
 
 Where a team requires release approval, bind it to the precise source,
 configuration, build and validation digests; a changed input requires a new

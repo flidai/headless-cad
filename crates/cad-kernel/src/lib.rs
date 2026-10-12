@@ -33,6 +33,7 @@ mod arc_prism;
 mod bored_prism;
 mod circular_boolean;
 mod convex_intersection;
+pub use convex_intersection::chamfer;
 mod face_frame;
 mod mass_properties;
 mod math;

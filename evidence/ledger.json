@@ -202,6 +202,28 @@
         "dimension-svg",
         "circle-dimension-independent"
       ]
+    },
+    {
+      "id": "modeling.planar-edge-chamfer",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "solid.chamfer"
+      ],
+      "supported_domain": "Equal-distance local straight-edge chamfers on one strictly convex planar solid with exact outward unit-normal face criteria, complete body-face lineage and generated chamfer role. Six-operation guide-block chains with inclined datum-mounted wear pads; 27 native parameter combinations and seven independent STEP configurations including acute/obtuse rotated wedges.",
+      "exclusions": [
+        "Curved, nonconvex or multiple solids",
+        "Unequal setbacks, simultaneous edge networks, fillets and implicit repair",
+        "Other-vertex removal, disappearing faces and topology-event cuts",
+        "Unresolved numeric conditioning or more than 48 support planes"
+      ],
+      "fixture": "examples/chamfered_guide_block.star",
+      "checks": [
+        "chamfer-kernel",
+        "chamfer-native",
+        "chamfer-publication",
+        "chamfer-independent"
+      ]
     }
   ],
   "checks": [
@@ -504,6 +526,59 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/circle_dimensions"
+      ]
+    },
+    {
+      "id": "chamfer-kernel",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-kernel",
+        "--lib"
+      ]
+    },
+    {
+      "id": "chamfer-native",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "chamfered_guide_block"
+      ]
+    },
+    {
+      "id": "chamfer-publication",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "chamfer"
+      ]
+    },
+    {
+      "id": "chamfer-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_chamfered_guide_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/chamfer"
       ]
     }
   ]

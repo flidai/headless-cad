@@ -221,6 +221,7 @@ impl BuildResult {
                 continue;
             }
             let slots: Vec<_> = match &graph.nodes[id] {
+                Feature::Chamfer { body, .. } => vec![("body", body)],
                 Feature::Translate { body, .. } | Feature::Transform { body, .. } => {
                     vec![("input", body)]
                 }

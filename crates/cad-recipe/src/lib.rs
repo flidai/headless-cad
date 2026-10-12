@@ -409,6 +409,26 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(id.to_owned())
     }
 
+    fn chamfer(
+        id: &str,
+        body: &str,
+        face_normals: Value,
+        distance: Value,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let face_normals: [[f64; 3]; 2] =
+            serde_json::from_str(&face_normals.to_json()?).map_err(|_| {
+                anyhow::anyhow!("face_normals must contain exactly two finite unit 3D vectors")
+            })?;
+        anyhow::ensure!(
+            face_normals.iter().all(|n| n.iter().all(|v| v.is_finite())
+                && (n.iter().map(|v| v * v).sum::<f64>().sqrt() - 1.).abs() <= 128. * f64::EPSILON),
+            "face_normals must contain exactly two finite unit 3D vectors"
+        );
+        store(eval)?.feature(serde_json::json!({"op":"chamfer","id":id,"op_version":1,"body":body,"face_normals":face_normals,"distance":number(distance)?}))?;
+        Ok(id.to_owned())
+    }
+
     fn translate(
         id: &str,
         body: &str,

@@ -28,6 +28,9 @@ branch for two parallel solid cylinders. Right prisms and circular/annular stock
 also accept contained through/blind drilling, counterbores and conical countersinks. Intersection supports bounded,
 well-conditioned convex planar solids, including rotated inputs.
 
+Native equal-distance `chamfer` also trims a selected straight edge of a strictly
+convex planar solid, retaining original face lineage and a named generated face.
+
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
 optional independent interoperability oracle in development.
 
@@ -1955,3 +1958,36 @@ reports view changes even when the geometry stays unchanged.
 The countersink and bearing-cover examples declare parameter-driven body and
 assembly views. Assembly sections retain occurrence identity and sum overlapping
 material; these inspection artifacts are a foundation for future drawings.
+
+
+### Native planar edge chamfers
+
+```python
+beveled = chamfer(
+    id = "front_edge", body = stock,
+    face_normals = [[0, -1, 0], [0, 0, 1]], distance = 1.5,
+)
+```
+
+The two outward unit normals select exactly one planar face each in the input
+model's coordinate frame. They must share one straight edge. `distance` is the
+equal setback along each adjacent face, perpendicular to that edge; it is not
+the cut plane's normal offset. Criteria are explicit directions, not face numbers
+or nearest-face guesses. Rotate them with a rotated input body.
+
+The kernel constructs the new bisector half-space directly and reconstructs
+validated native plane/line topology. It supports one strictly convex planar
+solid with at most 48 supporting planes including the new face. The cut must
+remain local to the selected edge: every other original vertex stays strictly
+inside, all original faces survive, and topology events reject. Curved or
+nonconvex solids, unequal setbacks and fillets remain unsupported. Numerical
+conditioning and model tolerance can further reject otherwise nominal inputs.
+
+Generated role `chamfer` identifies the new face; complete `body` lineage keeps
+references to surviving faces. This supports chained chamfers, face assertions
+and associative planar datums. Failed operations preserve the previous published
+generation. [chamfered_guide_block.star](examples/chamfered_guide_block.star)
+chains six chamfers, sections the result and mounts inclined wear pads through a
+generated-face datum in a repeated assembly. Its 27-configuration corpus checks
+volume, centroid and full inertia against independent domain integrals; separate
+STEP checks verify all twelve support planes, section areas and pad placement.

@@ -1,6 +1,7 @@
 //! Bounded analytic half-space intersection. No tessellation, snapping, or weld.
 use crate::math::{cross, dot, norm, sub};
 use crate::*;
+use std::collections::BTreeSet;
 
 const MAX_PLANES: usize = 48;
 #[derive(Clone)]
@@ -42,7 +43,7 @@ pub(crate) fn intersect(
     b: &ModelSnapshot,
     tol: Tolerance,
 ) -> Result<OperationResult, KernelError> {
-    let mut maps = [a, b].map(|m| {
+    let maps = [a, b].map(|m| {
         (0..m.faces.len())
             .map(|i| (FaceId(i), vec![]))
             .collect::<BTreeMap<_, _>>()
@@ -106,6 +107,22 @@ pub(crate) fn intersect(
             }
         }
     }
+    reconstruct(planes, reference, epsilon, tol, maps, None)
+}
+
+fn reconstruct(
+    mut planes: Vec<Support>,
+    reference: [f64; 3],
+    epsilon: f64,
+    tol: Tolerance,
+    mut maps: [BTreeMap<FaceId, Vec<FaceId>>; 2],
+    bounds: Option<[[f64; 3]; 2]>,
+) -> Result<OperationResult, KernelError> {
+    if planes.len() > MAX_PLANES {
+        return Err(KernelError::ResourceLimit(
+            "convex reconstruction supports at most 48 planes".into(),
+        ));
+    }
     // Canonical geometric ordering makes reconstruction independent of operand order.
     planes.sort_by(|a, b| {
         a.normal
@@ -134,8 +151,32 @@ pub(crate) fn intersect(
                 if det == 0. {
                     continue;
                 }
+                let c23 = cross(n2, n3);
+                let c31 = cross(n3, n1);
+                let c12 = cross(n1, n2);
+                let numerators: [f64; 3] = std::array::from_fn(|axis| {
+                    offsets[i] * c23[axis] + offsets[j] * c31[axis] + offsets[k] * c12[axis]
+                });
+                // A chamfer is contained in its input bounds. Cramer's numerator
+                // must equal det*x for any feasible point. Exclude inconsistent
+                // triples without dividing by a near-zero determinant. The wide
+                // arithmetic envelope covers unit-normal products, local plane
+                // offsets and determinant error over the bounded coordinates.
+                // This does not declare nearly dependent planes coincident.
+                if bounds.is_some_and(|[lo, hi]| {
+                    (0..3).any(|axis| {
+                        let a = det * (lo[axis] - tol.linear);
+                        let b = det * (hi[axis] + tol.linear);
+                        numerators[axis] < a.min(b) - epsilon * 64.
+                            || numerators[axis] > a.max(b) + epsilon * 64.
+                    })
+                }) {
+                    continue;
+                }
                 if det.abs() <= 128. * f64::EPSILON {
-                    return Err(unsupported("near-dependent supporting planes exceed reliable intersection conditioning"));
+                    return Err(unsupported(
+                        "near-dependent supporting planes exceed reliable intersection conditioning",
+                    ));
                 }
                 // Cramer's rule amplifies coefficient and arithmetic error by
                 // inverse determinant. Leave a wide margin below model tolerance;
@@ -146,12 +187,7 @@ pub(crate) fn intersect(
                         "plane intersection conditioning exceeds modeling tolerance",
                     ));
                 }
-                let c23 = cross(n2, n3);
-                let c31 = cross(n3, n1);
-                let c12 = cross(n1, n2);
-                let p = std::array::from_fn(|axis| {
-                    (offsets[i] * c23[axis] + offsets[j] * c31[axis] + offsets[k] * c12[axis]) / det
-                });
+                let p = numerators.map(|value| value / det);
                 if !p.into_iter().all(f64::is_finite) {
                     return Err(KernelError::NumericRange);
                 }
@@ -177,7 +213,9 @@ pub(crate) fn intersect(
                     } else if distance.abs() <= tol.linear + solve_error {
                         // Only the generating triplet has known incidence. A
                         // nearby fourth plane is not welded into that vertex.
-                        return Err(unsupported("intersection vertex has unresolved incidence with another supporting plane"));
+                        return Err(unsupported(
+                            "intersection vertex has unresolved incidence with another supporting plane",
+                        ));
                     }
                 }
                 if let Some(old) = candidates.get(&active) {
@@ -294,9 +332,376 @@ pub(crate) fn intersect(
     Ok(result(model, maps))
 }
 
+/// Equal face-distance chamfer of one straight edge of a strictly convex solid.
+/// Supplied directions are outward unit normals in the input model frame.
+pub fn chamfer(
+    body: &ModelSnapshot,
+    face_normals: [[f64; 3]; 2],
+    distance: f64,
+    tol: Tolerance,
+) -> Result<OperationResult, KernelError> {
+    if !tol.is_valid() {
+        return Err(KernelError::InvalidTolerance);
+    }
+    if !distance.is_finite() || distance <= tol.linear {
+        return Err(KernelError::InvalidDimension {
+            dimension: "chamfer distance",
+        });
+    }
+    let validation = body.validate(tol);
+    if !validation.valid {
+        return Err(KernelError::InvalidInput(validation));
+    }
+    if body.vertices.is_empty() || !validation::geometry::validate_convex(body, tol).is_empty() {
+        return Err(unsupported(
+            "chamfer requires one strictly convex planar solid",
+        ));
+    }
+    if body.faces.len() + 1 > MAX_PLANES {
+        return Err(KernelError::ResourceLimit(
+            "chamfer supports at most 48 planes including new face".into(),
+        ));
+    }
+    let mut selected = vec![];
+    for normal in face_normals {
+        if normal.iter().any(|v| !v.is_finite()) || (norm(normal) - 1.).abs() > 128. * f64::EPSILON
+        {
+            return Err(unsupported(
+                "chamfer face directions must be finite unit outward normals",
+            ));
+        }
+        let matches: Vec<_> = body
+            .faces
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| {
+                f.try_plane()
+                    .is_some_and(|p| norm(sub(p.normal, normal)) <= 128. * f64::EPSILON)
+            })
+            .map(|(i, _)| FaceId(i))
+            .collect();
+        if matches.len() != 1 {
+            return Err(unsupported(
+                "chamfer direction must resolve exactly one planar face",
+            ));
+        }
+        selected.push(matches[0]);
+    }
+    if selected[0] == selected[1] {
+        return Err(unsupported("chamfer requires two distinct adjacent faces"));
+    }
+    let edges = |face: FaceId| {
+        body.faces[face.0]
+            .loops
+            .iter()
+            .flat_map(|l| body.loops[l.0].edges.iter().map(|e| e.edge))
+            .collect::<BTreeSet<_>>()
+    };
+    let shared: Vec<_> = edges(selected[0])
+        .intersection(&edges(selected[1]))
+        .copied()
+        .collect();
+    if shared.len() != 1 {
+        return Err(unsupported(
+            "chamfer faces must share exactly one straight edge",
+        ));
+    }
+    let edge = &body.edges[shared[0].0];
+    if !matches!(edge.curve, Curve::Line(_)) {
+        return Err(unsupported("chamfer requires a straight edge"));
+    }
+    let normals = selected
+        .iter()
+        .map(|f| body.faces[f.0].try_plane().unwrap().normal)
+        .collect::<Vec<_>>();
+    let cosine = dot(normals[0], normals[1]);
+    let sum = std::array::from_fn(|i| normals[0][i] + normals[1][i]);
+    let length = norm(sum);
+    let sine_half = ((1. - cosine) / 2.).sqrt();
+    if !sine_half.is_finite() || sine_half <= 1e-6 || length <= 1e-6 {
+        return Err(unsupported(
+            "chamfer dihedral is unresolved or ill-conditioned",
+        ));
+    }
+    let normal = sum.map(|v| v / length);
+    let setback = distance * sine_half;
+    let reference = body.vertices[edge.vertices[0].0].position;
+    let scale = body
+        .vertices
+        .iter()
+        .flat_map(|v| sub(v.position, reference))
+        .map(f64::abs)
+        .fold(distance, f64::max);
+    // Public snapshots may use distant tangential plane origins. Include their
+    // local coordinate magnitude in the offset dot-product error budget; vertex
+    // bounds alone do not bound cancellation in dot(normal, plane.origin).
+    // Reject unresolved representations rather than silently reanchoring them.
+    let scale = body
+        .faces
+        .iter()
+        .flat_map(|face| sub(face.try_plane().unwrap().origin, reference))
+        .map(f64::abs)
+        .fold(scale, f64::max);
+    let epsilon = scale * 128. * f64::EPSILON;
+    let world_scale = body
+        .vertices
+        .iter()
+        .flat_map(|v| v.position)
+        .map(f64::abs)
+        .fold(scale, f64::max);
+    let error = (epsilon + world_scale * 128. * f64::EPSILON) / length.min(sine_half);
+    if !epsilon.is_normal()
+        || !error.is_normal()
+        || error > tol.linear / 16.
+        || !setback.is_normal()
+    {
+        return Err(KernelError::NumericRange);
+    }
+    for (id, vertex) in body.vertices.iter().enumerate() {
+        let signed = dot(normal, sub(vertex.position, reference)) + setback;
+        if !signed.is_finite() {
+            return Err(KernelError::NumericRange);
+        }
+        if edge.vertices.contains(&VertexId(id)) {
+            if signed <= tol.linear + error {
+                return Err(unsupported("chamfer setback is unresolved"));
+            }
+        } else if signed >= -tol.linear - error {
+            return Err(unsupported(
+                "chamfer reaches another vertex or topology event",
+            ));
+        }
+    }
+    let mut planes: Vec<_> = body
+        .faces
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let p = f.try_plane().unwrap();
+            Support {
+                origin: sub(p.origin, reference),
+                normal: p.normal,
+                sources: vec![(0, FaceId(i))],
+            }
+        })
+        .collect();
+    planes.push(Support {
+        origin: normal.map(|v| -setback * v),
+        normal,
+        sources: vec![(1, FaceId(0))],
+    });
+    let maps = [
+        (0..body.faces.len()).map(|i| (FaceId(i), vec![])).collect(),
+        BTreeMap::from([(FaceId(0), vec![])]),
+    ];
+    let lo = std::array::from_fn(|axis| {
+        body.vertices
+            .iter()
+            .map(|v| v.position[axis] - reference[axis])
+            .fold(f64::INFINITY, f64::min)
+    });
+    let hi = std::array::from_fn(|axis| {
+        body.vertices
+            .iter()
+            .map(|v| v.position[axis] - reference[axis])
+            .fold(f64::NEG_INFINITY, f64::max)
+    });
+    let mut result = reconstruct(planes, reference, epsilon, tol, maps, Some([lo, hi]))?;
+    let retained = result.history.input_faces.remove("left").unwrap();
+    let generated = result
+        .history
+        .input_faces
+        .remove("right")
+        .unwrap()
+        .remove(&FaceId(0))
+        .unwrap();
+    if retained.values().any(|v| v.len() != 1)
+        || generated.len() != 1
+        || result.model.faces.len() != body.faces.len() + 1
+    {
+        return Err(unsupported("chamfer failed local-edge topology contract"));
+    }
+    result.history.input_faces.insert("body".into(), retained);
+    result
+        .history
+        .generated_faces
+        .insert("chamfer".into(), generated);
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn chamfer_box_volume_lineage_and_rigid_covariance() {
+        let t = Tolerance::default();
+        let b = extrude_rectangle(10., 12., 8., t).unwrap().model;
+        let out = chamfer(&b, [[-1., 0., 0.], [0., -1., 0.]], 2., t).unwrap();
+        assert!((out.model.mass_properties(t).unwrap().volume - 944.).abs() < 1e-9);
+        assert_eq!(out.history.generated_faces["chamfer"].len(), 1);
+        assert_eq!(out.history.input_faces["body"].len(), 6);
+        assert!(out.history.input_faces["body"]
+            .values()
+            .all(|v| v.len() == 1));
+        assert_eq!(
+            out.model,
+            chamfer(&b, [[0., -1., 0.], [-1., 0., 0.]], 2., t)
+                .unwrap()
+                .model
+        );
+        let moved = transform(&b, [12., -7., 4.], [0.5, 0.5, 0., 0.5_f64.sqrt()], t)
+            .unwrap()
+            .model;
+        let rotate = |v: [f64; 3]| {
+            [
+                (v[0] + v[1]) / 2. + 0.5_f64.sqrt() * v[2],
+                (v[0] + v[1]) / 2. - 0.5_f64.sqrt() * v[2],
+                0.5_f64.sqrt() * (v[1] - v[0]),
+            ]
+        };
+        let rotated = chamfer(
+            &moved,
+            [rotate([-1., 0., 0.]), rotate([0., -1., 0.])],
+            2.,
+            t,
+        )
+        .unwrap();
+        assert!((rotated.model.mass_properties(t).unwrap().volume - 944.).abs() < 1e-8);
+        let angle = 0.41_f64;
+        let axis = [1. / 14_f64.sqrt(), 2. / 14_f64.sqrt(), 3. / 14_f64.sqrt()];
+        let quaternion = [
+            axis[0] * angle.sin(),
+            axis[1] * angle.sin(),
+            axis[2] * angle.sin(),
+            angle.cos(),
+        ];
+        let general = transform(&b, [3., -5., 9.], quaternion, t).unwrap().model;
+        let original_ids = [
+            b.faces
+                .iter()
+                .position(|f| f.try_plane().unwrap().normal == [-1., 0., 0.])
+                .unwrap(),
+            b.faces
+                .iter()
+                .position(|f| f.try_plane().unwrap().normal == [0., -1., 0.])
+                .unwrap(),
+        ];
+        let normal = original_ids.map(|i| general.faces[i].try_plane().unwrap().normal);
+        assert!((chamfer(&general, normal, 2., t).unwrap().model.volume() - 944.).abs() < 1e-8);
+        let next = chamfer(&out.model, [[1., 0., 0.], [0., 1., 0.]], 1., t).unwrap();
+        assert!((next.model.volume() - 940.).abs() < 1e-8);
+        let nextrotated = chamfer(
+            &rotated.model,
+            [rotate([1., 0., 0.]), rotate([0., 1., 0.])],
+            1.,
+            t,
+        )
+        .unwrap();
+        assert!((nextrotated.model.volume() - 940.).abs() < 1e-8);
+    }
+    #[test]
+    fn chamfer_nonright_setback_and_six_sequential_edges() {
+        let t = Tolerance::default();
+        for x in [5., -5.] {
+            let y = 5. * 3_f64.sqrt();
+            let b = extrude_polygon(&[[0., 0.], [20., 0.], [x, y]], 8., t)
+                .unwrap()
+                .model;
+            let n = [-y / (x * x + y * y).sqrt(), x / (x * x + y * y).sqrt(), 0.];
+            let cut = chamfer(&b, [[0., -1., 0.], n], 2., t).unwrap();
+            let expected = b.volume() - 8. * 2. * 2. * y / (x * x + y * y).sqrt() / 2.;
+            assert!((cut.model.volume() - expected).abs() < 1e-8);
+            // Each new point on the bottom cap is exactly the specified setback
+            // from the original corner, on one of the adjacent side faces.
+            let new_points: Vec<_> = cut
+                .model
+                .vertices
+                .iter()
+                .filter(|v| v.position[2].abs() < 1e-9 && v.position[0].hypot(v.position[1]) < 3.)
+                .collect();
+            assert_eq!(new_points.len(), 2);
+            for v in new_points {
+                assert!((v.position[0].hypot(v.position[1]) - 2.).abs() < 1e-9);
+            }
+        }
+        for d in [3., 4., 5.] {
+            for e in [0.75, 1.5, 2.25] {
+                let mut b = extrude_rectangle(60., 40., 15., t).unwrap().model;
+                for sx in [-1., 1.] {
+                    for sy in [-1., 1.] {
+                        b = chamfer(&b, [[sx, 0., 0.], [0., sy, 0.]], d, t)
+                            .unwrap()
+                            .model;
+                    }
+                }
+                for sy in [-1., 1.] {
+                    b = chamfer(&b, [[0., sy, 0.], [0., 0., 1.]], e, t)
+                        .unwrap()
+                        .model;
+                }
+                let expected =
+                    (2400. - 2. * d * d) * 15. - (60. - 2. * d) * e * e - 2. * e * e * e / 3.;
+                assert!((b.volume() - expected).abs() < 1e-7);
+                assert!(b.validate(t).valid);
+            }
+        }
+    }
+    #[test]
+    fn chamfer_rejects_unresolved_and_nonlocal_inputs() {
+        let t = Tolerance::default();
+        let b = extrude_rectangle(10., 12., 8., t).unwrap().model;
+        let good = [[-1., 0., 0.], [0., -1., 0.]];
+        for distance in [0., -1., f64::NAN, f64::INFINITY, t.linear, 10., 11.] {
+            assert!(chamfer(&b, good, distance, t).is_err());
+        }
+        for normals in [
+            [[-2., 0., 0.], [0., -1., 0.]],
+            [[f64::NAN, 0., 0.], [0., -1., 0.]],
+            [[-1., 0., 0.], [1., 0., 0.]],
+            [[-1., 0., 0.], [-1., 0., 0.]],
+            [[0.6, 0.8, 0.], [0., -1., 0.]],
+        ] {
+            assert!(chamfer(&b, normals, 1., t).is_err());
+        }
+        let concave = extrude_polygon_with_holes(
+            &[
+                [0., 0.],
+                [10., 0.],
+                [10., 3.],
+                [3., 3.],
+                [3., 10.],
+                [0., 10.],
+            ],
+            &[],
+            8.,
+            t,
+        )
+        .unwrap()
+        .model;
+        assert!(chamfer(&concave, good, 1., t).is_err());
+        let curved = extrude_circle(5., 8., t).unwrap().model;
+        assert!(chamfer(&curved, good, 1., t).is_err());
+    }
+    #[test]
+    fn chamfer_rejects_unresolved_distant_tangential_plane_origins() {
+        let t = Tolerance::default();
+        let mut body = extrude_rectangle(10., 12., 8., t).unwrap().model;
+        for face in &mut body.faces {
+            let Surface::Plane(plane) = &mut face.surface else {
+                unreachable!()
+            };
+            if plane.normal == [-1., 0., 0.] {
+                plane.origin[1] = 1e16;
+            }
+        }
+        // This is the same exact axis-aligned support and valid topology, but
+        // its representation exceeds the conservative chamfer arithmetic domain.
+        assert!(body.validate(t).valid);
+        assert!(matches!(
+            chamfer(&body, [[-1., 0., 0.], [0., -1., 0.]], 2., t),
+            Err(KernelError::NumericRange)
+        ));
+    }
     fn diamond(t: Tolerance) -> ModelSnapshot {
         let square = extrude_rectangle(10. * 2_f64.sqrt(), 10. * 2_f64.sqrt(), 8., t)
             .unwrap()
