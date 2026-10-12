@@ -1,6 +1,6 @@
 //! Starlark is a graph-construction frontend, never a geometry evaluator.
-//! All lengths in this first API are millimetres. Imports and external IO are
-//! deliberately not exposed. Native functions only append declarative nodes.
+//! All lengths in this first API are millimetres. Imports use explicit in-memory
+//! source bundles; ambient external IO is never exposed. Native functions append declarative nodes.
 
 // Starlark generates sibling wrappers for explicit named section-view fields.
 #![allow(clippy::too_many_arguments)]
@@ -13,10 +13,15 @@ use cad_build::{
     MAX_PARTS, MAX_POLYGON_HOLES, MAX_POLYGON_POINTS,
 };
 use starlark::any::ProvidesStaticType;
-use starlark::environment::{GlobalsBuilder, Module};
+use starlark::environment::GlobalsBuilder;
+mod modules;
+pub use modules::{
+    starlark_loads, validate_module_label, MAX_MODULE_HEAP_BYTES, MAX_MODULE_SOURCE_BYTES,
+    MAX_MODULE_TICKS, MAX_RECIPE_HEAP_BYTES, MAX_RECIPE_MODULES, MAX_RECIPE_SOURCE_BYTES,
+    MAX_RECIPE_TICKS,
+};
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
-use starlark::syntax::{AstModule, Dialect};
 use starlark::values::{none::NoneType, Heap, Value};
 use thiserror::Error;
 
@@ -1122,6 +1127,18 @@ pub fn from_starlark_with_params(
     source: &str,
     overrides: &BTreeMap<String, f64>,
 ) -> Result<Recipe, RecipeError> {
+    from_starlark_with_modules(filename, source, overrides, &BTreeMap::new())
+}
+
+/// Evaluate only explicitly supplied, immutable module sources. Labels are
+/// project-root-relative .star paths; this API performs no filesystem or network IO.
+/// Interpreter heap limits exclude Rust-owned allocations and are not a security sandbox.
+pub fn from_starlark_with_modules(
+    filename: &str,
+    source: &str,
+    overrides: &BTreeMap<String, f64>,
+    modules: &BTreeMap<String, String>,
+) -> Result<Recipe, RecipeError> {
     for (name, value) in overrides {
         if name.is_empty() || name.trim() != name || !value.is_finite() {
             return Err(RecipeError::Evaluation(format!(
@@ -1129,30 +1146,11 @@ pub fn from_starlark_with_params(
             )));
         }
     }
-    let ast = AstModule::parse(filename, source.to_owned(), &Dialect::Standard)
-        .map_err(|err| RecipeError::Evaluation(err.to_string()))?;
-    let globals = GlobalsBuilder::standard().with(cad_functions).build();
     let graph = GraphStore {
         overrides: overrides.clone(),
         ..GraphStore::default()
     };
-    Module::with_temp_heap(|module| {
-        let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&graph);
-        evaluator
-            .set_max_callstack_size(64)
-            .map_err(|err| RecipeError::Evaluation(err.to_string()))?;
-        evaluator
-            .set_max_heap_size(16 * 1024 * 1024)
-            .map_err(|err| RecipeError::Evaluation(err.to_string()))?;
-        evaluator
-            .set_max_tick_count(1_000_000)
-            .map_err(|err| RecipeError::Evaluation(err.to_string()))?;
-        evaluator
-            .eval_module(ast, &globals)
-            .map_err(|err| RecipeError::Evaluation(err.to_string()))?;
-        Ok::<_, RecipeError>(())
-    })?;
+    modules::evaluate(filename, source, modules, &graph)?;
     let unused: Vec<_> = overrides
         .keys()
         .filter(|name| !graph.parameters.borrow().contains_key(*name))

@@ -1,3 +1,4 @@
+mod source;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fs;
@@ -177,23 +178,6 @@ enum Command {
         #[arg(long = "output", value_name = "NAME")]
         outputs: Vec<String>,
     },
-}
-
-fn load(path: &Path, parameters: &BTreeMap<String, f64>) -> Result<Recipe, Box<dyn Error>> {
-    load_source(path, &fs::read_to_string(path)?, parameters)
-}
-
-fn load_source(
-    path: &Path,
-    source: &str,
-    parameters: &BTreeMap<String, f64>,
-) -> Result<Recipe, Box<dyn Error>> {
-    match path.extension().and_then(|ext| ext.to_str()) {
-        Some("star") => Ok(cad_recipe::from_starlark_with_params(&path.to_string_lossy(), source, parameters)?),
-        Some("json") if parameters.is_empty() => Ok(serde_json::from_str(source)?),
-        Some("json") => Err("parameter overrides require a .star recipe; compiled JSON already contains resolved values".into()),
-        _ => Err("recipe extension must be .star or .json".into()),
-    }
 }
 
 fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>> {
@@ -826,7 +810,9 @@ fn properties_report(
         "output_model_frame"
     });
     report["units"] = json!({"volume":"mm3", "volume_centroid":"mm", "central_volume_inertia":"mm5", "mass_kg":"kg", "center_of_mass":"mm", "central_mass_inertia":"kg*mm2", "density_kg_per_m3":"kg/m3"});
-    report["inertia_convention"] = json!("central symmetric tensor: integral ((r dot r) identity - r outer r); off-diagonals are negative product moments; r measured from the corresponding centroid");
+    report["inertia_convention"] = json!(
+        "central symmetric tensor: integral ((r dot r) identity - r outer r); off-diagonals are negative product moments; r measured from the corresponding centroid"
+    );
     report["snapshot"] = json!({
         "recipe_source_hash": blake3::hash(source).to_hex().to_string(),
         "parameter_overrides": parameters, "tolerance": tolerance,
@@ -844,7 +830,7 @@ fn run(cli: Cli) -> Result<Value, Box<dyn Error>> {
     run_with_source(cli, None)
 }
 
-fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Error>> {
+fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value, Box<dyn Error>> {
     if let Command::Verify {
         directory,
         manifest_hash,
@@ -883,6 +869,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     "argument_catalog_representation": "json_recipe_ir",
                     "workflow": "Author a recipe, compile Starlark to the typed JSON IR, check geometry and obligations, review inspect/diff results, then build artifacts.",
                     "source_authority": "Git-versioned recipes and explicit parameter overrides",
+                    "modules": {"scope":"local locked Starlark only; no network","lockfile":"<recipe-filename>.lock.json","lock_schema":{"schema_version":1,"modules":{"lib/example.star":{"blake3":"64 lowercase hexadecimal characters"}}},"labels":"canonical project-root-relative .star paths; symlink escape rejected","maximum_modules":32,"maximum_starlark_root_bytes":1048576,"maximum_module_bytes":1048576,"maximum_replay_json_bytes":67108864,"maximum_bundle_source_bytes":8388608,"captured_artifact":"recipe.bundle.json","replay":"cad build recipe.bundle.json (supply original --param overrides)","parameter_overrides":"not stored in source bundle; replay using original explicit --param overrides from manifest recipe_source.parameter_overrides","identity":"source_bundle_hash binds root language/source and labeled module bytes; root recipe_source_hash retains root-only meaning"},
                     "viewer": "read_only_inspection",
                     "feasibility": "The catalog describes supported domains; only evaluation and validation can certify a particular input."
                 },
@@ -925,8 +912,9 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             return Ok(document);
         }
         Command::Bom { recipe, assembly } => {
-            let source = fs::read(recipe)?;
-            let recipe = load_source(recipe, std::str::from_utf8(&source)?, &parameters)?;
+            let snapshot = source::Snapshot::read(recipe)?;
+            let source = snapshot.source.as_bytes();
+            let recipe = snapshot.recipe(&parameters)?;
             if !recipe
                 .assembly_outputs
                 .iter()
@@ -942,7 +930,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 .ok_or_else(|| format!("unknown assembly output '{assembly}'"))?;
             let mut result =
                 bom_document(&model.bill_of_materials(recipe.tolerance.unwrap_or_default())?)?;
-            result["recipe_source_hash"] = json!(blake3::hash(&source).to_hex().to_string());
+            result["recipe_source_hash"] = json!(blake3::hash(source).to_hex().to_string());
             result["parameter_overrides"] = json!(parameters);
             result["stats"] = json!(built.stats);
             result["build_scope"] = json!(built.scope);
@@ -955,6 +943,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             } else {
                 "pending_publication"
             });
+            snapshot.bind(&mut result);
             return Ok(result);
         }
         Command::Select {
@@ -965,8 +954,9 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             count,
             all,
         } => {
-            let source_bytes = fs::read(recipe)?;
-            let recipe = load_source(recipe, std::str::from_utf8(&source_bytes)?, &parameters)?;
+            let snapshot = source::Snapshot::read(recipe)?;
+            let source_bytes = snapshot.source.as_bytes();
+            let recipe = snapshot.recipe(&parameters)?;
             let build = engine(&cli.cache_dir).build(&recipe)?;
             let selector = cad_build::FaceSelector {
                 anchor_feature: anchor.clone(),
@@ -994,7 +984,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 "pending_publication"
             });
             report["snapshot"] = json!({
-                "recipe_source_hash": blake3::hash(&source_bytes).to_hex().to_string(),
+                "recipe_source_hash": blake3::hash(source_bytes).to_hex().to_string(),
                 "parameter_overrides": parameters,
                 "tolerance": recipe.tolerance.unwrap_or_default(),
                 "kernel_version": cad_kernel::KERNEL_VERSION,
@@ -1002,6 +992,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 "anchor_content_hash": build.feature_hashes.get(anchor),
                 "target_content_hash": build.feature_hashes.get(target),
             });
+            snapshot.bind(&mut report);
             if !resolved {
                 return Err(Box::new(UnresolvedSelection(report)));
             }
@@ -1059,13 +1050,19 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             );
         }
         Command::Diff { before, after } => {
-            let a = load(before, &parameters)?;
-            let b = load(after, &parameters)?;
+            let before_source = source::Snapshot::read(before)?;
+            let after_source = source::Snapshot::read(after)?;
+            let a = before_source.recipe(&parameters)?;
+            let b = after_source.recipe(&parameters)?;
             let mut engine = engine(&cli.cache_dir);
-            return Ok(difference(
+            let mut result = difference(
                 &report(&a, &engine.build(&a)?)?,
                 &report(&b, &engine.build(&b)?)?,
-            ));
+            );
+            if before_source.bundle_hash().is_some() || after_source.bundle_hash().is_some() {
+                result["source_bundles"] = json!({"before":before_source.bundle_hash(),"after":after_source.bundle_hash()});
+            }
+            return Ok(result);
         }
         _ => {}
     }
@@ -1080,12 +1077,13 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
     };
     // One immutable byte snapshot feeds graph evaluation, provenance, and the
     // viewer. In watch mode these are the bytes that triggered this rebuild.
-    let source_bytes = match source {
-        Some(bytes) => bytes.to_vec(),
-        None => fs::read(path)?,
+    let snapshot = match source {
+        Some(snapshot) => snapshot.clone(),
+        None => source::Snapshot::read(path)?,
     };
-    let source_text = std::str::from_utf8(&source_bytes)?;
-    let recipe = load_source(path, source_text, &parameters)?;
+    let source_bytes = snapshot.source.as_bytes();
+    let source_text = snapshot.source.as_str();
+    let recipe = snapshot.recipe(&parameters)?;
     if matches!(cli.command, Command::Compile { .. }) {
         return Ok(serde_json::to_value(recipe)?);
     }
@@ -1124,9 +1122,10 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             &build,
             output,
             *density_kg_per_m3,
-            &source_bytes,
+            source_bytes,
             &parameters,
         )?;
+        snapshot.bind(&mut result);
         result["property_assertions"] = json!(build.property_assertions);
         result["sketch_reports"] = json!(build.sketch_reports);
         result["section_views"] = json!(build.section_views);
@@ -1153,13 +1152,15 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             x_direction: section::vector(x_direction)?,
         };
         let mut result =
-            section::report(&recipe, &build, output, plane, &source_bytes, &parameters)?;
+            section::report(&recipe, &build, output, plane, source_bytes, &parameters)?;
+        snapshot.bind(&mut result);
         if format == "svg" {
             result["svg"] = json!(section::svg(&result)?);
         }
         return Ok(result);
     }
     let mut summary = report(&recipe, &build)?;
+    snapshot.bind(&mut summary);
     if let Command::Build {
         out_dir,
         display_only,
@@ -1174,7 +1175,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         // Do not replace directories containing the source recipe or cache.
         if out_dir.exists() {
             let destination = out_dir.canonicalize()?;
-            if path.canonicalize()?.starts_with(&destination)
+            if snapshot.paths.iter().any(|p| p.starts_with(&destination))
                 || cli
                     .cache_dir
                     .as_ref()
@@ -1188,26 +1189,22 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             "recipe.json".to_owned(),
             serde_json::to_string_pretty(&recipe)?,
         )];
-        let language = if path
-            .extension()
-            .is_some_and(|extension| extension == "star")
-        {
-            "starlark"
-        } else {
-            "json"
-        };
+        let language = snapshot.language.as_str();
         let source_artifact = if language == "starlark" {
             "recipe.star"
         } else {
             "recipe.source.json"
         };
-        let source_name = path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned();
+        let source_name = snapshot.source_name.clone();
+        if snapshot.lock_source.is_some() {
+            artifacts.push((
+                "recipe.bundle.json".into(),
+                serde_json::to_string_pretty(&snapshot)?,
+            ));
+            summary["recipe_bundle"] = json!({"artifact":"recipe.bundle.json","replay":"cad build recipe.bundle.json (supply original --param overrides)","source_bundle_hash":snapshot.bundle_hash()});
+        }
         artifacts.push((source_artifact.to_owned(), source_text.to_owned()));
-        summary["recipe_source_hash"] = json!(blake3::hash(&source_bytes).to_hex().to_string());
+        summary["recipe_source_hash"] = json!(blake3::hash(source_bytes).to_hex().to_string());
         summary["recipe_source"] = json!({
             "name": source_name,
             "language": language,
@@ -1216,6 +1213,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         });
         summary["recipe_context_hash"] = json!(blake3::hash(&serde_json::to_vec(&json!({
             "source_hash": summary["recipe_source_hash"],
+            "source_bundle_hash": snapshot.bundle_hash(),
             "source": summary["recipe_source"],
             "generation_mode": summary["generation_mode"],
             "scope": summary["scope"],
@@ -1279,6 +1277,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 ));
             }
             let context = cad_preview::RecipeContext {
+                modules: snapshot.modules.clone(),
+                source_bundle_hash: snapshot.bundle_hash(),
                 language: language.to_owned(),
                 source: source_text.to_owned(),
                 source_name: source_name.clone(),
@@ -1411,6 +1411,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                 ));
             }
             let context = cad_preview::RecipeContext {
+                modules: snapshot.modules.clone(),
+                source_bundle_hash: snapshot.bundle_hash(),
                 language: language.to_owned(),
                 source: source_text.to_owned(),
                 source_name: source_name.clone(),
@@ -1482,7 +1484,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         for (id, view) in &build.section_views {
             filename(&format!("section-{id}"))?;
             let mut view_report =
-                section::bind_view_report(&recipe, &build, view, &source_bytes, &parameters)?;
+                section::bind_view_report(&recipe, &build, view, source_bytes, &parameters)?;
+            snapshot.bind(&mut view_report);
             // Execution counters belong in the build manifest. Source-owned view
             // bytes must remain identical when the same build is served from cache.
             view_report

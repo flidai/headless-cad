@@ -987,7 +987,8 @@ in exports. Fixed inputs/toolchain produce deterministic STEP/STL/B-rep output;
 cross-platform bit-identical floating-point geometry is not promised. Manifests
 contain cache statistics, so warm and cold builds can differ there.
 
-No filesystem, network, clock, or module-loading API is exposed to recipes.
+Recipes have no ambient filesystem, network or clock API. Starlark `load` resolves
+only explicitly supplied, locked local module sources (see below).
 Starlark has stack, heap, tick, feature-count, and output-count limits. Those
 limits are not an OS security sandbox. Running hostile recipes as a service
 requires process isolation and resource limits outside this CLI.
@@ -2004,3 +2005,38 @@ bevel = chamfer_faces(id = "bevel", body = stock, faces = [
 Both references must resolve to exactly one adjacent planar face on `body`.
 Ambiguous, deleted or unrelated references fail before cached geometry can be
 reused. The guide-block recipe uses these references for its two top bevels.
+
+## Locked recipe modules
+
+Shared Starlark functions live in ordinary Git-versioned `.star` files:
+
+```python
+load("recipe_modules/drive_parts.star", "rail_part", "carriage_part")
+rail = rail_part("rail", length = 160, setback = 2)
+```
+
+The adjacent `modular_linear_stage.star.lock.json` pins each transitive module:
+
+```json
+{"schema_version":1,"modules":{"recipe_modules/drive_parts.star":{"blake3":"<64 lowercase hexadecimal characters>"}}}
+```
+
+Module labels are relative to the root recipe directory, including loads inside
+other modules. Include every transitive module in the lockfile. Builds verify the
+pinned bytes before evaluation; they never fetch dependencies or update pins.
+Cycles, unsafe paths, missing modules and digest mismatches fail without replacing
+the previous generation. The Rust API accepts an explicit in-memory module map;
+ordinary source-string evaluation cannot read files on its own.
+
+Build `examples/modular_linear_stage.star` for two shared beveled rails and two
+drilled carriages, with mass and section assertions. Its `recipe.bundle.json`
+captures the root, lock and modules. Replay it without the original project:
+
+```sh
+cad build out/modular_linear_stage/recipe.bundle.json --out-dir replay
+```
+
+Use the same explicit `--param` overrides when reproducing a nondefault build.
+The viewer's **Recipe → Source file** picker shows captured module text. This is
+read-only source browsing; automatic feature-to-module line navigation remains
+future work. Module and lock edits are watched alongside the root recipe.

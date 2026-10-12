@@ -11,6 +11,8 @@ fn context(hash: &str) -> RecipeContext {
         language: "starlark".into(),
         source: SOURCE.into(),
         source_name: "pair.star".into(),
+        modules: Default::default(),
+        source_bundle_hash: None,
         output_name: "pair".into(),
         feature_id: "pair".into(),
         parameters: Default::default(),

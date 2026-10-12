@@ -225,6 +225,28 @@
         "chamfer-publication",
         "chamfer-independent"
       ]
+    },
+    {
+      "id": "authoring.locked-local-modules",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "solid.chamfer"
+      ],
+      "supported_domain": "Explicit digest-pinned local Starlark module bundles with transitive load validation, shared graph/parameters, bounded interpreter work, captured offline replay and read-only source inspection. Linear-stage fixture combines semantic planar chamfers and drilled carriages across 27 configurations with three independent STEP/replay cases.",
+      "exclusions": [
+        "Remote package resolution and network fetches",
+        "Automatic feature-to-module source spans",
+        "Hosted sandboxing or a process-RSS guarantee",
+        "Automatic lockfile repinning"
+      ],
+      "fixture": "examples/modular_linear_stage.star",
+      "checks": [
+        "module-recipe",
+        "module-cli",
+        "module-product",
+        "module-independent"
+      ]
     }
   ],
   "checks": [
@@ -598,6 +620,60 @@
         "cad-recipe",
         "--test",
         "chamfer_faces"
+      ]
+    },
+    {
+      "id": "module-recipe",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-recipe",
+        "--test",
+        "modules"
+      ]
+    },
+    {
+      "id": "module-cli",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "modules"
+      ]
+    },
+    {
+      "id": "module-product",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "modular_linear_stage"
+      ]
+    },
+    {
+      "id": "module-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_modular_stage_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/modular_stage"
       ]
     }
   ]

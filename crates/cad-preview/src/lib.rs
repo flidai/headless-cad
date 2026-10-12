@@ -40,6 +40,11 @@ pub struct RecipeContext {
     pub language: String,
     pub source: String,
     pub source_name: String,
+    /// Captured locked module sources, never fetched from the working tree.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub modules: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_bundle_hash: Option<String>,
     pub output_name: String,
     pub feature_id: String,
     pub parameters: BTreeMap<String, f64>,
@@ -711,6 +716,8 @@ mod tests {
             language: "starlark".into(),
             source: "# </script><script>globalThis.pwned=true</script>\n# <img src=x onerror=alert(1)> & <!--\n# separators:\u{2028}\u{2029}\n# /*SCENE_DATA*/null /*RECIPE_DATA*/null\noutput(\"part\", body)\n".into(),
             source_name: "<recipe>.star".into(),
+            modules: BTreeMap::from([("lib/unsafe.star".into(), "# </script><script>globalThis.moduleInjected=true</script>\ndef make():\n    return 1\n".into())]),
+            source_bundle_hash: Some("bundle-test".into()),
             output_name: "part".into(),
             feature_id: "body".into(),
             parameters: BTreeMap::from([("width".into(), 12.5)]),
@@ -748,6 +755,8 @@ mod tests {
             language: "starlark".into(),
             source: String::new(),
             source_name: "part.star".into(),
+            modules: Default::default(),
+            source_bundle_hash: None,
             output_name: "part".into(),
             feature_id: "body".into(),
             parameters: BTreeMap::from([("width".into(), f64::NAN)]),
@@ -770,6 +779,8 @@ mod tests {
             language: "starlark".into(),
             source: String::new(),
             source_name: "part.star".into(),
+            modules: Default::default(),
+            source_bundle_hash: None,
             output_name: "part".into(),
             feature_id: "body".into(),
             parameters: BTreeMap::new(),

@@ -3,6 +3,7 @@
 //! Watch status is human-readable stderr only. Successful generations retain
 //! their machine-readable manifest; stdout is not a stream of partial reports.
 use std::error::Error;
+#[cfg(test)]
 use std::fs;
 use std::path::Path;
 use std::time::Duration;
@@ -13,7 +14,7 @@ type BuildAttempt = Result<Value, Box<dyn Error>>;
 
 #[derive(PartialEq, Eq)]
 enum SourceState {
-    Bytes(Vec<u8>),
+    Bytes(crate::source::Snapshot),
     Unreadable(String),
 }
 
@@ -29,8 +30,12 @@ enum PollResult {
 }
 
 impl WatchState {
-    fn poll(&mut self, path: &Path, build: &mut impl FnMut(&[u8]) -> BuildAttempt) -> PollResult {
-        let current = match fs::read(path) {
+    fn poll(
+        &mut self,
+        path: &Path,
+        build: &mut impl FnMut(&crate::source::Snapshot) -> BuildAttempt,
+    ) -> PollResult {
+        let current = match crate::source::Snapshot::read(path) {
             Ok(bytes) => SourceState::Bytes(bytes),
             Err(error) => SourceState::Unreadable(error.to_string()),
         };
@@ -72,11 +77,11 @@ fn concise(message: &str) -> String {
 /// successful artifacts. The callback receives the exact observed bytes and
 /// must not reload the path, since edits can race with the geometry build.
 /// The process runs until interrupted (normally Ctrl-C).
-/// It watches the root recipe; imported dependencies are not currently supported.
+/// It watches an immutable root/lock/module snapshot, including invalid lock edits.
 pub(super) fn run(
     recipe: &Path,
     interval: Duration,
-    mut build: impl FnMut(&[u8]) -> BuildAttempt,
+    mut build: impl FnMut(&crate::source::Snapshot) -> BuildAttempt,
 ) -> BuildAttempt {
     if interval.is_zero() {
         return Err("watch interval must be greater than zero".into());
@@ -117,9 +122,9 @@ mod tests {
         fs::write(&recipe, "initial").unwrap();
         let mut watcher = WatchState::default();
         let mut attempts = 0;
-        let mut build = |bytes: &[u8]| {
+        let mut build = |snapshot: &crate::source::Snapshot| {
             attempts += 1;
-            if bytes == b"broken" {
+            if snapshot.source == "broken" {
                 Err("recipe is broken".into())
             } else {
                 Ok(json!({"outputs":{},"stats":{}}))
@@ -157,7 +162,7 @@ mod tests {
         let recipe = directory.path().join("part.star");
         let mut watcher = WatchState::default();
         let mut attempts = 0;
-        let mut build = |_bytes: &[u8]| {
+        let mut build = |_snapshot: &crate::source::Snapshot| {
             attempts += 1;
             Ok(json!({}))
         };
@@ -188,7 +193,9 @@ mod tests {
     }
 
     fn plate(width: f64) -> String {
-        format!("p=rectangle(id='profile',width={width},depth=4)\ns=extrude(id='body',profile=p,height=2)\noutput(name='plate',feature=s)\n")
+        format!(
+            "p=rectangle(id='profile',width={width},depth=4)\ns=extrude(id='body',profile=p,height=2)\noutput(name='plate',feature=s)\n"
+        )
     }
 
     fn artifacts(path: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
@@ -212,7 +219,7 @@ mod tests {
         let cache = directory.path().join("cache");
         fs::write(&recipe, plate(10.0)).unwrap();
         let mut watcher = WatchState::default();
-        let mut build = |bytes: &[u8]| {
+        let mut build = |snapshot: &crate::source::Snapshot| {
             crate::run_with_source(
                 crate::Cli {
                     command: crate::Command::Build {
@@ -224,7 +231,7 @@ mod tests {
                     params: vec![],
                     cache_dir: Some(cache.clone()),
                 },
-                Some(bytes),
+                Some(snapshot),
             )
         };
         let PollResult::Built(first) = watcher.poll(&recipe, &mut build) else {
@@ -264,6 +271,50 @@ mod tests {
     }
 
     #[test]
+    fn watches_locked_modules_and_builds_the_captured_bundle() {
+        let directory = tempfile::tempdir().unwrap();
+        let recipe = directory.path().join("part.star");
+        let module = directory.path().join("lib.star");
+        let lock = directory.path().join("part.star.lock.json");
+        fs::write(&recipe, "load('lib.star', 'width')\n").unwrap();
+        let pin = |text: &str| {
+            fs::write(&lock, serde_json::to_vec(&json!({"schema_version":1,"modules":{"lib.star":{"blake3":blake3::hash(text.as_bytes()).to_hex().to_string()}}})).unwrap()).unwrap();
+        };
+        fs::write(&module, "width=10").unwrap();
+        pin("width=10");
+        let mut watcher = WatchState::default();
+        let mut observed = Vec::new();
+        let mut build = |snapshot: &crate::source::Snapshot| {
+            observed.push(snapshot.modules["lib.star"].clone());
+            // Source can change after polling; the evaluated bytes stay captured.
+            fs::write(&module, "width=99")?;
+            Ok(json!({}))
+        };
+        assert!(matches!(
+            watcher.poll(&recipe, &mut build),
+            PollResult::Built(_)
+        ));
+        assert!(matches!(
+            watcher.poll(&recipe, &mut build),
+            PollResult::Failed(_)
+        ));
+        assert!(matches!(
+            watcher.poll(&recipe, &mut build),
+            PollResult::Unchanged
+        ));
+        pin("width=99");
+        assert!(matches!(
+            watcher.poll(&recipe, &mut build),
+            PollResult::Built(_)
+        ));
+        assert!(matches!(
+            watcher.poll(&recipe, &mut build),
+            PollResult::Unchanged
+        ));
+        assert_eq!(observed, ["width=10", "width=99"]);
+    }
+
+    #[test]
     fn zero_interval_is_rejected_before_building() {
         assert!(
             run(Path::new("unused.star"), Duration::ZERO, |_bytes| panic!(
@@ -280,7 +331,7 @@ mod tests {
         let output = directory.path().join("out");
         fs::write(&recipe, plate(10.0)).unwrap();
         let mut watcher = WatchState::default();
-        let mut build = |snapshot: &[u8]| {
+        let mut build = |snapshot: &crate::source::Snapshot| {
             // Simulate an editor changing the source between polling and the
             // ordinary recipe-loading point, then reverting before the next poll.
             fs::write(&recipe, plate(20.0))?;

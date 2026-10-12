@@ -9,6 +9,7 @@ pub(super) fn implementation_id() -> &'static str {
         for source in [
             include_str!("section.rs"),
             include_str!("main.rs"),
+            include_str!("source.rs"),
             include_str!("../../cad-export/src/section.rs"),
             include_str!("../../cad-build/src/section_views.rs"),
             include_str!("../../../Cargo.lock"),

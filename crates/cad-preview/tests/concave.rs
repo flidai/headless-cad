@@ -76,6 +76,8 @@ assembly_output(name="assembly",assembly=s)
         language: "starlark".into(),
         source: source.into(),
         source_name: "concave.star".into(),
+        modules: Default::default(),
+        source_bundle_hash: None,
         output_name: "assembly".into(),
         feature_id: assembly.assembly_id.clone(),
         parameters: Default::default(),

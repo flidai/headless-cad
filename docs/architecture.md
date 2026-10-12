@@ -348,7 +348,26 @@ resolved interchange/debug form. YAML need not become a second programming
 language. Reconsider a custom language only when concrete domain ergonomics
 justify its parser, tooling, migration, and compatibility costs.
 
-Evolve today's recipe frontend toward modules resolved from a checked lockfile,
+The initial local module contract now uses explicit in-memory Starlark bundles.
+The CLI verifies a strict adjacent `<recipe>.lock.json` with BLAKE3-pinned
+transitive `.star` sources before evaluation. All labels are relative to the root
+project, with no network fetching or ambient interpreter filesystem access.
+A captured `recipe.bundle.json` is replayable through the ordinary CLI without
+its original working tree; source identities include module bytes, and watch
+tracks dependency changes. Canvas and GPU inspectors expose the captured modules
+through a read-only source-file picker. Module-to-feature source spans, remote
+package resolution and a hosted isolation boundary remain target work.
+
+Modules evaluate once per build in dependency order, sharing the build's graph
+and parameter declarations. Resource accounting limits module count, aggregate
+source bytes, interpreter ticks and evaluation heap; these are not a process-RSS
+guarantee. Missing/cyclic imports, mismatched digests and unsupported paths cannot
+publish a new generation. Independent module edits with unchanged geometry still
+change the source context and its evidence. The modular linear-stage fixture
+combines reusable functions, semantic chamfers, repeated drilled parts, mass and
+section obligations with offline source replay and imported STEP checks.
+
+Evolve the local locked-module frontend toward remote package resolution,
 dimension-aware values, named coordinate systems, declarative sketches, reusable
 part definitions, patterns, instances, configurations, materials, and assertions.
 External assets use explicit content references; evaluation does not fetch
@@ -386,8 +405,9 @@ use implementation constants where available; executable parser-alignment and
 example-compilation tests guard the curated contract against drift.
 
 This is capability discovery, not a complete JSON Schema, a solver for input
-feasibility or the target release-evidence ledger. Locked module resolution,
-source-span mappings and hosted job controls are not implied by the catalog. Every input still passes structural and geometric
+feasibility or the target release-evidence ledger. The CLI authoring contract
+describes local locked modules; source-span mappings and hosted job controls are
+not implied by the catalog. Every input still passes structural and geometric
 validation. Starlark call syntax remains distinct from JSON IR argument names.
 
 `cad capabilities --operation feature.sketch` and
@@ -2268,7 +2288,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 
 | Area | Implemented now | Target work |
 | --- | --- | --- |
-| Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
+| Authoring | Starlark functions/loops/parameters and locked local modules with captured replay bundles; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Remote package resolution, unit types, source maps, full public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |

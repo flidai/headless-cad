@@ -511,3 +511,13 @@ a published supported-workflow matrix, measured assembly and regeneration
 behavior, reliable manufacturing exchange/deliverables, reproducible source-driven
 workflows, and completed gates for its declared scope. Unsupported cases remain
 explicit. The overall project goal stays active as these milestones are built.
+
+### Locked source-library increment
+
+M7 now includes explicitly pinned local Starlark module bundles, transitive load
+validation, captured offline replay, dependency-aware watch and module inspection.
+The modular linear-stage example reuses beveled rails and drilled carriages and
+checks mass/sections across parameter revisions. This advances source-driven team
+and agent workflows; remote package resolution, source-span navigation and hosted
+worker isolation remain open. Module-only edits must rebind publication evidence
+even when the compiled geometry is unchanged.

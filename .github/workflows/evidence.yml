@@ -14,6 +14,8 @@ jobs:
             capability: machining.countersunk-bearing-cover
           - case: sections
             capability: query.native-planar-section
+          - case: modules
+            capability: authoring.locked-local-modules
           - case: chamfer
             capability: modeling.planar-edge-chamfer
           - case: circle-dimensions

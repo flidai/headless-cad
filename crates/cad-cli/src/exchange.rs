@@ -36,6 +36,7 @@ pub(crate) fn report(
         "output_name": name,
         "source_content_hash": source_content_hash,
         "recipe_source_hash": summary["recipe_source_hash"],
+        "source_bundle_hash": summary["source_bundle_hash"],
         "recipe_context_hash": summary["recipe_context_hash"],
         "artifacts": exports,
     }))?)

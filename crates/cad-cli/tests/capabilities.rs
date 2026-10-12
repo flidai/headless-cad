@@ -83,10 +83,16 @@ fn advertised_examples_compile_and_exercise_every_feature_operation() {
         for example in examples {
             let example = example.as_str().unwrap();
             let recipe = compiled.entry(example.to_owned()).or_insert_with(|| {
-                let source = std::fs::read_to_string(root.join(example)).unwrap();
-                let recipe = cad_recipe::from_starlark(example, &source)
-                    .unwrap_or_else(|error| panic!("{example}: {error}"));
-                serde_json::to_value(recipe).unwrap()
+                let result = cli(
+                    directory.path(),
+                    &["compile", root.join(example).to_str().unwrap()],
+                );
+                assert!(
+                    result.status.success(),
+                    "{example}: {}",
+                    String::from_utf8_lossy(&result.stderr)
+                );
+                serde_json::from_slice(&result.stdout).unwrap()
             });
             assert!(
                 recipe["features"]
@@ -248,9 +254,14 @@ fn compiled_corpus_matches_recursive_catalog_argument_types() {
         if path.extension().and_then(|ext| ext.to_str()) != Some("star") {
             continue;
         }
-        let source = std::fs::read_to_string(&path).unwrap();
-        let recipe = cad_recipe::from_starlark(path.to_str().unwrap(), &source).unwrap();
-        let recipe = serde_json::to_value(recipe).unwrap();
+        let result = cli(directory.path(), &["compile", path.to_str().unwrap()]);
+        assert!(
+            result.status.success(),
+            "{}: {}",
+            path.display(),
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let recipe: Value = serde_json::from_slice(&result.stdout).unwrap();
         check_type(
             &recipe,
             &serde_json::json!({"kind":"object","type_id":"recipe"}),
