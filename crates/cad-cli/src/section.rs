@@ -88,6 +88,17 @@ pub(super) fn bind_view_report(
                 .to_hex()
                 .to_string());
     }
+    if !view.dimensions.is_empty() {
+        report["section_view"]["dimensions"] = serde_json::to_value(&view.dimensions)?;
+        let context = json!({
+            "base_query_context_hash":report["snapshot"]["query_context_hash"],
+            "projected_datum_dimensions":view.dimensions,
+        });
+        report["snapshot"]["query_context_hash"] =
+            json!(blake3::hash(&serde_json::to_vec(&context)?)
+                .to_hex()
+                .to_string());
+    }
     Ok(report)
 }
 
@@ -112,6 +123,12 @@ pub(super) fn bind_report(
                    "actual_area":view.query.section.area,"target_content_hash":view.query.content_hash});
         if let Some(witness) = &view.anchor_witness {
             check["anchor_witness"] = json!(witness);
+        }
+        if !view.dimensions.is_empty() {
+            check["dimensions"] = json!(view.dimensions.iter().map(|d| json!({
+                "id":d.declaration.id,"status":d.status,"value_mm":d.value_mm,
+                "signed_delta_mm":d.signed_delta_mm
+            })).collect::<Vec<_>>());
         }
         (id, check)
     }).collect();
@@ -159,7 +176,32 @@ pub(super) fn svg(report: &Value) -> Result<String, Box<dyn Error>> {
             centroid: None,
         });
     }
-    let mut svg = cad_export::sections_to_svg(&sections, &label)?;
+    let dimensions: Vec<cad_export::SectionDimensionAnnotation> = report["section_view"]
+        ["dimensions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|d| {
+            Ok(cad_export::SectionDimensionAnnotation {
+                id: d["declaration"]["id"]
+                    .as_str()
+                    .ok_or("missing dimension id")?
+                    .into(),
+                from: serde_json::from_value(d["from_point"].clone())?,
+                to: serde_json::from_value(d["to_point"].clone())?,
+                axis: match d["declaration"]["axis"].as_str() {
+                    Some("x") => 0,
+                    Some("y") => 1,
+                    _ => return Err("invalid dimension axis".into()),
+                },
+                offset: d["declaration"]["offset"]
+                    .as_f64()
+                    .ok_or("missing dimension offset")?,
+                value_mm: d["value_mm"].as_f64().ok_or("missing dimension value")?,
+            })
+        })
+        .collect::<Result<_, Box<dyn Error>>>()?;
+    let mut svg = cad_export::annotated_sections_to_svg(&sections, &label, &dimensions)?;
     let metadata = serde_json::to_string(report)?
         .replace('&', "&amp;")
         .replace('<', "&lt;")

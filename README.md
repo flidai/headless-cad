@@ -1882,6 +1882,36 @@ Placement or datum edits re-evaluate the view while reusing unchanged native
 geometry. Missing paths/datums and planes that hit unsupported topology events
 fail globally, as do area bounds on the resulting complete section.
 
+Add a projected dimension after declaring its assembly section:
+
+```python
+section_dimension(
+    view = "mounted_seat", id = "station_pitch",
+    from_instance_path = ["left", "cover"], from_datum = "seat",
+    to_instance_path = ["right", "cover"], to_datum = "seat",
+    axis = "x", offset = -30, min = 89.999999, max = 90.000001,
+)
+```
+
+Dimensions project the two named datum origins onto the resolved view plane.
+`axis` is `"x"` or `"y"`; the value is the absolute projected separation, not
+3D distance. The signed separation and both projected points remain in the
+report. `offset` is the absolute perpendicular coordinate of the dimension line
+in view millimetres. Datum origins may lie outside the section plane.
+`min` and `max` are optional inclusive design assertions, not manufacturing
+fits or tolerance annotations. Zero-length projections at modeling tolerance,
+missing or ambiguous references, unsupported numeric precision and failed bounds
+reject publication globally. Each view permits 32 dimensions and a recipe 1024.
+
+JSON IR stores declarations in the view's `dimensions` array, with `from` and
+`to` anchor objects. JSON/SVG/manifest reports retain both resolved datum witnesses,
+including semantic face provenance. SVG adds extension lines, arrows and a
+measured label; the canvas includes their extents. Labels round to six decimal
+places (scientific notation for tiny nonzero values); metadata retains the
+computed value. The `datum_section_fixture`
+example checks station pitch in a rotated, repeated assembly. These are
+associative inspection dimensions; full drawing sheets, fits and GD&T remain open.
+
 `cad build` publishes `section-seat.json` and `section-seat.svg` in the same
 managed generation as the captured recipe and model artifacts. Their metadata
 binds source, effective parameters, target geometry, query and generation.

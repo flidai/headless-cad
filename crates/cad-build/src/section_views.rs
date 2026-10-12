@@ -2,12 +2,85 @@
 use super::*;
 use cad_kernel::{PlanarSection, SectionLoop, SectionPlane};
 pub const MAX_SECTION_VIEWS: usize = 128;
+pub const MAX_SECTION_DIMENSIONS_PER_VIEW: usize = 32;
+pub const MAX_SECTION_DIMENSIONS: usize = 1024;
 pub const MAX_SECTION_VIEW_WORK: usize = 10_000_000;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SectionAnchor {
     pub instance_path: Vec<String>,
     pub datum: String,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SectionDimensionAxis {
+    X,
+    Y,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SectionDimension {
+    pub id: String,
+    pub from: SectionAnchor,
+    pub to: SectionAnchor,
+    pub axis: SectionDimensionAxis,
+    pub offset: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct SectionDimensionReport {
+    pub declaration: SectionDimension,
+    pub status: String,
+    pub value_mm: f64,
+    pub signed_delta_mm: f64,
+    pub from_point: [f64; 2],
+    pub to_point: [f64; 2],
+    pub from_witness: SectionAnchorWitness,
+    pub to_witness: SectionAnchorWitness,
+}
+fn safe_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+}
+fn valid_anchor(anchor: &SectionAnchor) -> bool {
+    let valid = |id: &str| !id.is_empty() && id.len() <= 1024 && id.trim() == id;
+    !anchor.instance_path.is_empty()
+        && anchor.instance_path.len() <= 64
+        && anchor.instance_path.iter().all(|id| valid(id))
+        && valid(&anchor.datum)
+}
+impl SectionDimension {
+    pub fn validate(&self) -> Result<(), String> {
+        if !safe_id(&self.id) {
+            return Err(
+                "dimension id must contain 1..128 ASCII letters, digits, underscores or hyphens"
+                    .into(),
+            );
+        }
+        if !valid_anchor(&self.from) || !valid_anchor(&self.to) {
+            return Err(
+                "dimension endpoints require bounded literal leaf paths and datum names".into(),
+            );
+        }
+        if !self.offset.is_finite()
+            || [self.min, self.max]
+                .into_iter()
+                .flatten()
+                .any(|v| !v.is_finite() || v < 0.)
+            || matches!((self.min,self.max),(Some(a),Some(b)) if a>b)
+        {
+            return Err(
+                "dimension offset must be finite; bounds finite nonnegative and ordered".into(),
+            );
+        }
+        Ok(())
+    }
 }
 #[derive(Debug, Clone, Serialize)]
 pub struct SectionAnchorWitness {
@@ -28,6 +101,8 @@ pub struct SectionAnchorWitness {
 pub struct SectionView {
     pub id: String,
     pub output: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dimensions: Vec<SectionDimension>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anchor: Option<SectionAnchor>,
     pub origin: [f64; 3],
@@ -83,6 +158,17 @@ impl SectionView {
                 return Err(fail("anchor needs a literal leaf path of 1..64 IDs and datum; IDs must be nonempty, at most 1024 bytes, without surrounding whitespace"));
             }
         }
+        if self.dimensions.len() > MAX_SECTION_DIMENSIONS_PER_VIEW {
+            return Err(fail("at most 32 dimensions per section view"));
+        }
+        let mut ids = BTreeSet::new();
+        for d in &self.dimensions {
+            d.validate()
+                .map_err(|e| fail(&format!("dimension '{}': {e}", d.id)))?;
+            if !ids.insert(d.id.to_ascii_lowercase()) {
+                return Err(fail("duplicate dimension ID within view"));
+            }
+        }
         self.plane().validate().map_err(|e| fail(&e.to_string()))?;
         if [self.min_area, self.max_area]
             .into_iter()
@@ -129,6 +215,7 @@ pub struct SectionViewReport {
     pub declaration: SectionView,
     pub status: String,
     pub query: SectionQuery,
+    pub dimensions: Vec<SectionDimensionReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_witness: Option<SectionAnchorWitness>,
 }
@@ -241,6 +328,18 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
             limit: MAX_SECTION_VIEWS,
         });
     }
+    if recipe
+        .section_views
+        .iter()
+        .map(|v| v.dimensions.len())
+        .sum::<usize>()
+        > MAX_SECTION_DIMENSIONS
+    {
+        return Err(BuildError::ResourceLimit {
+            resource: "section dimensions",
+            limit: MAX_SECTION_DIMENSIONS,
+        });
+    }
     let outputs: BTreeSet<_> = recipe
         .outputs
         .iter()
@@ -250,10 +349,12 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     let mut ids = BTreeSet::new();
     for v in &recipe.section_views {
         v.validate()?;
-        if v.anchor.is_some() && !recipe.assembly_outputs.iter().any(|o| o.name == v.output) {
+        if (v.anchor.is_some() || !v.dimensions.is_empty())
+            && !recipe.assembly_outputs.iter().any(|o| o.name == v.output)
+        {
             return Err(BuildError::InvalidSectionView {
                 id: v.id.clone(),
-                message: "anchored section target must be an assembly output".into(),
+                message: "anchored or dimensioned section target must be an assembly output".into(),
             });
         }
         if !ids.insert(v.id.to_ascii_lowercase()) || !outputs.contains(&v.output) {
@@ -330,6 +431,120 @@ fn resolve_anchor(
     }))
 }
 
+fn dimensions(
+    view: &SectionView,
+    plane: SectionPlane,
+    face_datums: &ResolvedFaceDatums,
+    assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
+    tolerance: Tolerance,
+) -> Result<Vec<SectionDimensionReport>, BuildError> {
+    let mut reports = vec![];
+    let (n, x) = (plane.normal, plane.x_direction);
+    let y = [
+        n[1] * x[2] - n[2] * x[1],
+        n[2] * x[0] - n[0] * x[2],
+        n[0] * x[1] - n[1] * x[0],
+    ];
+    for d in &view.dimensions {
+        let fail = |message: String, actual_value| BuildError::SectionDimensionFailed {
+            view: view.id.clone(),
+            id: d.id.clone(),
+            output: view.output.clone(),
+            message,
+            actual_value,
+        };
+        let resolve = |anchor: &SectionAnchor| {
+            let mut endpoint = view.clone();
+            endpoint.anchor = Some(anchor.clone());
+            endpoint.origin = [0.; 3];
+            endpoint.normal = [0., 0., 1.];
+            endpoint.x_direction = [1., 0., 0.];
+            endpoint.dimensions.clear();
+            resolve_anchor(&endpoint, face_datums, assemblies, tolerance)
+                .map_err(|e| fail(e.to_string(), None))?
+                .ok_or_else(|| fail("missing dimension endpoint witness".into(), None))
+        };
+        let from_witness = resolve(&d.from)?;
+        let to_witness = resolve(&d.to)?;
+        let project = |p: [f64; 3]| {
+            let delta = std::array::from_fn::<_, 3, _>(|i| p[i] - plane.origin[i]);
+            [0, 1].map(|i| {
+                delta
+                    .iter()
+                    .zip(if i == 0 { x } else { y })
+                    .map(|(a, b)| a * b)
+                    .sum::<f64>()
+            })
+        };
+        let from_point = project(from_witness.world_frame.translation);
+        let to_point = project(to_witness.world_frame.translation);
+        let axis = match d.axis {
+            SectionDimensionAxis::X => 0,
+            SectionDimensionAxis::Y => 1,
+        };
+        let direction = if axis == 0 { x } else { y };
+        let signed_delta_mm = (0..3)
+            .map(|i| {
+                (to_witness.world_frame.translation[i] - from_witness.world_frame.translation[i])
+                    * direction[i]
+            })
+            .sum::<f64>();
+        let value_mm = signed_delta_mm.abs();
+        if !d.offset.is_finite()
+            || from_point
+                .into_iter()
+                .chain(to_point)
+                .any(|v| !v.is_finite())
+            || !value_mm.is_finite()
+        {
+            return Err(fail(
+                "dimension projection exceeds numeric range".into(),
+                None,
+            ));
+        }
+        let scale = from_witness
+            .world_frame
+            .translation
+            .into_iter()
+            .chain(to_witness.world_frame.translation)
+            .chain(plane.origin)
+            .map(f64::abs)
+            .fold(value_mm, f64::max);
+        if scale * 128. * f64::EPSILON > tolerance.linear / 16.
+            || ((to_point[axis] - from_point[axis]) - signed_delta_mm).abs()
+                > scale.max(1.) * 128. * f64::EPSILON
+        {
+            return Err(fail(
+                "dimension projection exceeds modeling precision".into(),
+                None,
+            ));
+        }
+        if value_mm <= tolerance.linear {
+            return Err(fail(
+                "projected dimension is degenerate at modeling tolerance".into(),
+                Some(value_mm),
+            ));
+        }
+        if d.min.is_some_and(|a| value_mm < a) || d.max.is_some_and(|a| value_mm > a) {
+            return Err(fail(
+                "projected dimension lies outside declared bounds".into(),
+                Some(value_mm),
+            ));
+        }
+        reports.push(SectionDimensionReport {
+            declaration: d.clone(),
+            status: "passed".into(),
+            value_mm,
+            signed_delta_mm,
+            from_point,
+            to_point,
+            from_witness,
+            to_witness,
+        });
+    }
+    Ok(reports)
+}
+
 pub(super) fn evaluate(
     recipe: &Recipe,
     face_datums: &ResolvedFaceDatums,
@@ -375,6 +590,13 @@ pub(super) fn evaluate(
                 n.saturating_add(charge(&a.parts[&i.part].result.model))
             }),
         });
+        if let SectionSource::Assembly(a) = &source {
+            work = work.saturating_add(
+                a.instances
+                    .len()
+                    .saturating_mul(v.dimensions.len().saturating_mul(2)),
+            );
+        }
         if work > MAX_SECTION_VIEW_WORK {
             return Err(BuildError::ResourceLimit {
                 resource: "section view geometry work",
@@ -401,6 +623,7 @@ pub(super) fn evaluate(
                 actual_area: Some(area),
             });
         }
+        let dimensions = dimensions(v, plane, face_datums, assemblies, tolerance)?;
         reports.insert(
             v.id.clone(),
             SectionViewReport {
@@ -408,6 +631,7 @@ pub(super) fn evaluate(
                 status: "passed".into(),
                 query,
                 anchor_witness,
+                dimensions,
             },
         );
     }
@@ -552,6 +776,144 @@ mod tests {
         let mut value = serde_json::to_value(anchored_recipe()).unwrap();
         value["section_views"][0]["anchor"]["unknown"] = true.into();
         assert!(serde_json::from_value::<Recipe>(value).is_err());
+    }
+    fn dimension() -> SectionDimension {
+        SectionDimension {
+            id: "spacing".into(),
+            from: SectionAnchor {
+                instance_path: vec!["left".into(), "leaf".into()],
+                datum: "center".into(),
+            },
+            to: SectionAnchor {
+                instance_path: vec!["right".into(), "leaf".into()],
+                datum: "center".into(),
+            },
+            axis: SectionDimensionAxis::X,
+            offset: -30.,
+            min: Some(75.99999),
+            max: Some(76.00001),
+        }
+    }
+    #[test]
+    fn projected_dimensions_follow_exact_paths_rotated_frames_and_cache_edits() {
+        let mut r = anchored_recipe();
+        r.section_views[0].dimensions = vec![dimension()];
+        let mut engine = BuildEngine::default();
+        let a = engine.build_outputs(&r, &["body".into()]).unwrap();
+        let d = &a.section_views["local"].dimensions[0];
+        assert!((d.value_mm - 76.).abs() < 1e-10);
+        assert!((d.signed_delta_mm + 76.).abs() < 1e-10);
+        assert_eq!(d.from_witness.instance_path, vec!["left", "leaf"]);
+        assert_eq!(d.to_witness.instance_path, vec!["right", "leaf"]);
+        assert!(d.from_point[0] > 75.99);
+        assert!(d.to_point[0].abs() < 1e-10);
+        let declaration = &mut r.section_views[0].dimensions[0];
+        std::mem::swap(&mut declaration.from, &mut declaration.to);
+        declaration.offset = 40.;
+        let b = engine.build_outputs(&r, &["body".into()]).unwrap();
+        assert_eq!(b.stats.computed_solids, 0);
+        assert_eq!(a.feature_hashes, b.feature_hashes);
+        assert!((b.section_views["local"].dimensions[0].signed_delta_mm - 76.).abs() < 1e-10);
+        r.section_views[0].x_direction = [0., 1., 0.];
+        r.section_views[0].dimensions[0].min = Some(11.99999);
+        r.section_views[0].dimensions[0].max = Some(12.00001);
+        let c = engine.build(&r).unwrap();
+        assert!((c.section_views["local"].dimensions[0].value_mm - 12.).abs() < 1e-10);
+        r.section_views[0].dimensions[0].max = Some(11.);
+        r.section_views[0].dimensions[0].min = None;
+        assert!(matches!(
+            engine.build_outputs(&r, &["body".into()]),
+            Err(BuildError::SectionDimensionFailed {
+                actual_value: Some(_),
+                ..
+            })
+        ));
+    }
+    #[test]
+    fn dimensions_carry_semantic_witness_and_reject_missing_or_degenerate_endpoints() {
+        let mut r = anchored_recipe();
+        r.parts[0].datums.clear();
+        r.face_datums.push(FaceDatumDefinition {
+            part: "part".into(),
+            name: "center".into(),
+            anchor_feature: "b".into(),
+            role: "end_cap".into(),
+            x_direction: [1., 0., 0.],
+            offset: [0.; 3],
+        });
+        r.section_views[0].origin = [0., 0., -4.];
+        r.section_views[0].dimensions = vec![dimension()];
+        let b = build(&r).unwrap();
+        let d = &b.section_views["local"].dimensions[0];
+        assert!(d.from_witness.semantic_datum.is_some());
+        assert!(d.to_witness.semantic_datum.is_some());
+        // Datum origins sit 4mm above the section, but projected distance remains76mm.
+        assert!((d.value_mm - 76.).abs() < 1e-10);
+        let endpoint = r.section_views[0].dimensions[0].from.clone();
+        r.section_views[0].dimensions[0].to = endpoint;
+        assert!(
+            matches!(build(&r),Err(BuildError::SectionDimensionFailed{actual_value:Some(v),..}) if v<=1e-7)
+        );
+        r.section_views[0].dimensions[0].to.instance_path = vec!["missing".into()];
+        assert!(matches!(
+            build(&r),
+            Err(BuildError::SectionDimensionFailed {
+                actual_value: None,
+                ..
+            })
+        ));
+    }
+    #[test]
+    fn dimension_schema_limits_and_body_targets_fail_preflight() {
+        for mutation in 0..7 {
+            let mut r = anchored_recipe();
+            r.section_views[0].dimensions = vec![dimension()];
+            match mutation {
+                0 => r.section_views[0].dimensions[0].offset = f64::NAN,
+                1 => r.section_views[0].dimensions[0].min = Some(-1.),
+                2 => r.section_views[0].dimensions[0].id = "../bad".into(),
+                3 => {
+                    let mut d = dimension();
+                    d.id = "SPACING".into();
+                    r.section_views[0].dimensions.push(d);
+                }
+                4 => r.section_views[0].dimensions = vec![dimension(); 33],
+                5 => {
+                    r.section_views[0].anchor = None;
+                    r.section_views[0].output = "body".into();
+                }
+                _ => r.section_views[0].dimensions[0].from.instance_path.clear(),
+            }
+            assert!(build(&r).is_err(), "mutation {mutation}");
+        }
+        let mut over = anchored_recipe();
+        let template = over.section_views[0].clone();
+        over.section_views = (0..33)
+            .map(|i| {
+                let mut view = template.clone();
+                view.id = format!("view_{i}");
+                view.dimensions = (0..32)
+                    .map(|j| {
+                        let mut d = dimension();
+                        d.id = format!("dimension_{j}");
+                        d
+                    })
+                    .collect();
+                view
+            })
+            .collect();
+        assert!(matches!(
+            preflight(&over),
+            Err(BuildError::ResourceLimit {
+                resource: "section dimensions",
+                limit: 1024
+            })
+        ));
+        let mut r = anchored_recipe();
+        r.section_views[0].dimensions = vec![dimension()];
+        let mut v = serde_json::to_value(r).unwrap();
+        v["section_views"][0]["dimensions"][0]["axis"] = "z".into();
+        assert!(serde_json::from_value::<Recipe>(v).is_err());
     }
     #[test]
     fn declarations_are_strict_bounded_and_safe() {

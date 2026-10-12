@@ -38,6 +38,12 @@ part frames, including semantic planar face datums. The repeated housing fixture
 checks 27 native configurations and three independently imported STEP poses;
 these associative sections still leave projected views, dimensions and GD&T open.
 
+Projected X/Y datum-to-datum dimensions now attach to section views, carry
+semantic endpoint witnesses and enforce global design bounds. The repeated
+housing example dimensions station pitch through assembly rotations. Continue
+toward geometric edge/curve dimensions, projected views, annotation layout and
+manufacturing semantics; this increment does not close the drawing release gate.
+
 Use the architecture's [delivery priorities](architecture.md#delivery-priorities-and-completion-authority)
 to select and review increments across modeling, assembly scale, inspection,
 constraints, manufacturing and automation. Report the supported domain and

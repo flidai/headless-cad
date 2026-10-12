@@ -1719,6 +1719,30 @@ the query without rebuilding unchanged native solid geometry. Missing exact
 paths or datums, unsupported resolved planes and failed inclusive area bounds
 reject the entire generation, including selected and display-only builds.
 
+Source-authored `section_dimension` declarations now attach projected X/Y
+linear dimensions to an existing assembly section view. Endpoints resolve exact
+leaf paths and named datums, including semantic planar face datums. Both datum
+origins are projected into the resolved drawing frame; signed delta and absolute
+length are calculated from native rigid frames, independently of tessellation.
+Out-of-plane datum origins are permitted because this is explicitly a projected
+measurement. It does not report Euclidean distance or imply that a datum lies on
+the cut material. Offset is an absolute perpendicular drawing coordinate and
+changes annotation placement only.
+
+The schema retains source declaration, status, value in mm, signed delta,
+projected endpoints and both resolution witnesses. Query identity binds these
+measurements; SVG metadata and manifest retain identical evidence. Global view
+summaries use compact dimension results instead of duplicating every endpoint
+witness across every view. Optional inclusive bounds are design assertions.
+Degenerate projections, missing references, numeric precision failures and bound
+violations block all publication modes atomically. Limits are 32 dimensions per
+view and 1024 per recipe; endpoint occurrence lookup contributes to the existing
+work cap. SVG labels/arrows/extension lines participate in canvas bounds. The
+`manufacturing.projected-datum-dimensions` evidence case combines the 27-case
+native fixture, publication failures, exporter checks and independent placed STEP
+pin-centre distances in three poses. General geometry dimensions, angular/radial
+annotations, collision-free label layout, drawing standards and GD&T remain open.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in

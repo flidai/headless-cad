@@ -158,12 +158,50 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     anchor.obligations.extend(["assembly output only; exact literal leaf occurrence path, no flattened-ID guessing or navigation", "path length 1..64; each component and datum name nonempty, no surrounding whitespace, at most 1024 UTF-8 bytes", "section plane interpreted relative to named part datum; resolved through occurrence placement times datum frame; missing path/datum fails globally", "Starlark section_view instance_path and datum must be supplied together; source local plane remains unchanged and result includes placement witness"]);
+    let mut dimension = object_spec(
+        "section_dimension",
+        vec![
+            arg("id", T::String),
+            arg("from", object("section_anchor")),
+            arg("to", object("section_anchor")),
+            arg(
+                "axis",
+                T::Enum {
+                    values: vec!["x", "y"],
+                },
+            ),
+            arg("offset", T::Number),
+            optional(
+                arg(
+                    "min",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+            optional(
+                arg(
+                    "max",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+        ],
+    );
+    dimension.obligations.extend(["projected datum-origin distance along resolved section X or Y, not 3D distance; endpoints need not lie in the plane", "value_mm is absolute axis delta; signed_delta_mm and projected endpoints retained; value <= modeling tolerance fails as degenerate", "offset is an absolute dimension-line coordinate on the perpendicular drawing axis in mm, not a measurement adjustment", "IDs case-insensitive unique within view; same safe identifier rules as section_view; finite offset and finite nonnegative ordered bounds", "Starlark section_dimension(view,id,from_instance_path,from_datum,to_instance_path,to_datum,offset,axis='x',min=None,max=None) attaches to an already declared assembly section", "at most 32 per view and 1024 per recipe; all measurements are global native obligations including cache hits and selected builds; datum/face/placement witnesses retained"]);
     let mut section = object_spec(
         "section_view",
         vec![
             arg("id", T::String),
             arg("output", reference("output")),
             arg("origin", numbers(3)),
+            optional(
+                arg("dimensions", array(object("section_dimension"), None)),
+                json!([]),
+            ),
             optional(
                 arg(
                     "anchor",
@@ -205,6 +243,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         exchange,
         section,
         anchor,
+        dimension,
     ]
 }
 

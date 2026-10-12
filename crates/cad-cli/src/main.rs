@@ -1632,6 +1632,20 @@ fn main() {
                         report["diagnostic"] = json!(message);
                         report["actual_area_mm2"] = json!(actual_area);
                     }
+                    cad_build::BuildError::SectionDimensionFailed {
+                        view,
+                        id,
+                        output,
+                        message,
+                        actual_value,
+                    } => {
+                        report["code"] = json!("section_dimension_failed");
+                        report["section_view_id"] = json!(view);
+                        report["dimension_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                        report["actual_value_mm"] = json!(actual_value);
+                    }
                     cad_build::BuildError::InvalidPropertyAssertion { id, .. } => {
                         report["code"] = json!("invalid_property_assertion");
                         report["assertion_id"] = json!(id);

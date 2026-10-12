@@ -21,7 +21,10 @@ pub use fidelity::{
     exchange_fidelity, ExchangeFidelityReport, ExchangeFormat, ExchangeSource, FidelityEntry,
     FidelityStatus,
 };
-pub use section::{section_to_svg, sections_to_svg};
+pub use section::{
+    annotated_section_to_svg, annotated_sections_to_svg, section_to_svg, sections_to_svg,
+    SectionDimensionAnnotation,
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

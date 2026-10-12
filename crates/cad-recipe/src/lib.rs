@@ -523,6 +523,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             _ => None,
         };
         let view = cad_build::SectionView {
+            dimensions: vec![],
             id: id.into(),
             output: output.into(),
             anchor,
@@ -554,6 +555,72 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "duplicate section view ID"
         );
         views.push(serde_json::to_value(view)?);
+        Ok(NoneType)
+    }
+
+    /// Annotate a declared assembly section with a projected datum distance.
+    fn section_dimension(
+        view: &str,
+        id: &str,
+        from_instance_path: Value,
+        from_datum: &str,
+        to_instance_path: Value,
+        to_datum: &str,
+        offset: Value,
+        axis: Option<&str>,
+        min: Option<Value>,
+        max: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let dimension = cad_build::SectionDimension {
+            id: id.into(),
+            from: cad_build::SectionAnchor {
+                instance_path: occurrence_path(from_instance_path, "from_instance_path")?,
+                datum: from_datum.into(),
+            },
+            to: cad_build::SectionAnchor {
+                instance_path: occurrence_path(to_instance_path, "to_instance_path")?,
+                datum: to_datum.into(),
+            },
+            axis: match axis.unwrap_or("x") {
+                "x" => cad_build::SectionDimensionAxis::X,
+                "y" => cad_build::SectionDimensionAxis::Y,
+                _ => anyhow::bail!("section dimension axis must be x or y"),
+            },
+            offset: number(offset)?,
+            min: min.filter(|v| !v.is_none()).map(number).transpose()?,
+            max: max.filter(|v| !v.is_none()).map(number).transpose()?,
+        };
+        dimension.validate().map_err(anyhow::Error::msg)?;
+        let graph = store(eval)?;
+        let mut views = graph.section_views.borrow_mut();
+        let total: usize = views
+            .iter()
+            .map(|v| v["dimensions"].as_array().map_or(0, Vec::len))
+            .sum();
+        anyhow::ensure!(
+            total < cad_build::MAX_SECTION_DIMENSIONS,
+            "too many section dimensions"
+        );
+        let target = views
+            .iter_mut()
+            .find(|v| v["id"].as_str() == Some(view))
+            .ok_or_else(|| anyhow::anyhow!("section_dimension view must already be declared"))?;
+        if target.get("dimensions").is_none() {
+            target["dimensions"] = serde_json::json!([]);
+        }
+        let dimensions = target["dimensions"].as_array_mut().unwrap();
+        anyhow::ensure!(
+            dimensions.len() < cad_build::MAX_SECTION_DIMENSIONS_PER_VIEW,
+            "too many dimensions in view"
+        );
+        anyhow::ensure!(
+            !dimensions.iter().any(|d| d["id"]
+                .as_str()
+                .is_some_and(|old| old.eq_ignore_ascii_case(id))),
+            "duplicate section dimension id"
+        );
+        dimensions.push(serde_json::to_value(dimension)?);
         Ok(NoneType)
     }
 
@@ -2384,6 +2451,43 @@ mod exchange_requirement_tests {
 mod section_view_tests {
     use super::*;
     const SOURCE:&str="b=extrude(id='b',profile=rectangle(id='p',width=10,depth=12),height=8)\noutput(name='body',feature=b)\n";
+    #[test]
+    fn projected_dimension_directive_attaches_to_existing_view_with_strict_defaults() {
+        let source=format!("{SOURCE}p=part(id='part',body=b,datums={{'mid':datum(offset=[0,0,4])}})\nassembly_output(name='machine',assembly=assembly(id='root',instances=[instance(id='left',part=p),instance(id='right',part=p,offset=[20,0,0])]))\nsection_view(id='drawing',output='machine',origin=[0,0,4])\n");
+        let args="view='drawing',id='spacing',from_instance_path=['left'],from_datum='mid',to_instance_path=['right'],to_datum='mid',offset=-5,min=20,max=20";
+        let r = from_starlark(
+            "dimension.star",
+            &format!("{source}section_dimension({args})"),
+        )
+        .unwrap();
+        assert_eq!(
+            r.section_views[0].dimensions[0].axis,
+            cad_build::SectionDimensionAxis::X
+        );
+        assert_eq!(
+            cad_build::build(&r).unwrap().section_views["drawing"].dimensions[0].value_mm,
+            20.
+        );
+        for bad in [
+            args.replace("view='drawing'", "view='missing'"),
+            format!("{args},axis='z'"),
+            args.replace("offset=-5", "offset='bad'"),
+            args.replace("min=20", "min=-1"),
+            args.replace("from_instance_path=['left']", "from_instance_path=[]"),
+        ] {
+            assert!(
+                from_starlark("bad.star", &format!("{source}section_dimension({bad})")).is_err()
+            );
+        }
+        assert!(from_starlark(
+            "duplicate.star",
+            &format!(
+                "{source}section_dimension({args})\nsection_dimension({})",
+                args.replace("id='spacing'", "id='SPACING'")
+            )
+        )
+        .is_err());
+    }
     #[test]
     fn section_anchor_arguments_are_paired_and_strict() {
         let assembly=format!("{SOURCE}p=part(id='part',body=b,datums={{'mid':datum(offset=[0,0,4])}})\nassembly_output(name='machine',assembly=assembly(id='root',instances=[instance(id='leaf',part=p)]))\n");

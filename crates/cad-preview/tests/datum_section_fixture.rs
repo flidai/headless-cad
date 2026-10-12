@@ -60,6 +60,20 @@ fn twenty_seven_configurations_preserve_associative_section_geometry_and_world_f
                     let report = &build.section_views[id];
                     assert_eq!(report.status, "passed");
                     close(report.query.section.area, expected_area);
+                    assert_eq!(report.dimensions.len(), 1);
+                    let dimension = &report.dimensions[0];
+                    close(dimension.value_mm, spacing);
+                    close(
+                        dimension.signed_delta_mm,
+                        if station == "left" { spacing } else { -spacing },
+                    );
+                    assert_eq!(dimension.status, "passed");
+                    assert_eq!(
+                        dimension.from_witness.instance_path,
+                        vec!["carrier", station, "housing"]
+                    );
+                    assert!(dimension.from_witness.semantic_datum.is_some());
+                    assert!(dimension.to_witness.semantic_datum.is_some());
                     let centroid = report.query.section.centroid.unwrap();
                     close(centroid[0], centroid_x);
                     close(centroid[1], 0.);

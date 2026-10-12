@@ -157,6 +157,27 @@
         "datum-section-publication",
         "datum-section-independent"
       ]
+    },
+    {
+      "id": "manufacturing.projected-datum-dimensions",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "query.planar_section"
+      ],
+      "supported_domain": "Projected X/Y dimensions between exact nested occurrence datum origins in assembly section views, including semantic face datums, global inclusive bounds, atomic JSON/SVG publication and independent STEP pin-centre measurements in three rigid poses.",
+      "exclusions": [
+        "Euclidean, angular, radial and general curve dimensions",
+        "Automatic annotation layout, standards-compliant drawings, fits and GD&T",
+        "Degenerate projections, missing references and unsupported numeric ranges"
+      ],
+      "fixture": "examples/datum_section_fixture.star",
+      "checks": [
+        "datum-section-native",
+        "dimension-publication",
+        "dimension-svg",
+        "dimension-independent"
+      ]
     }
   ],
   "checks": [
@@ -393,6 +414,46 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/section_anchors"
+      ]
+    },
+    {
+      "id": "dimension-publication",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "section_dimensions"
+      ]
+    },
+    {
+      "id": "dimension-svg",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-export",
+        "--test",
+        "section_svg"
+      ]
+    },
+    {
+      "id": "dimension-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_section_dimensions_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/section_dimensions"
       ]
     }
   ]

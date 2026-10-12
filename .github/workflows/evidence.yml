@@ -14,6 +14,8 @@ jobs:
             capability: machining.countersunk-bearing-cover
           - case: sections
             capability: query.native-planar-section
+          - case: section-dimensions
+            capability: manufacturing.projected-datum-dimensions
           - case: datum-sections
             capability: manufacturing.datum-section-views
           - case: recipe-sections

@@ -43,3 +43,8 @@ expected_area = 2*(60*40-pi*section_radius*section_radius+pi*2.8*2.8)
 # Areas sum occurrences; these bounds are validation checks, not tolerances.
 section_view(id = "left_seat", output = "datum_section_fixture", instance_path = ["carrier","left","housing"], datum = "top", origin = [0,0,-depth/2], min_area = expected_area-0.000001, max_area = expected_area+0.000001)
 section_view(id = "right_seat", output = "datum_section_fixture", instance_path = ["carrier","right","housing"], datum = "top", origin = [0,0,-depth/2], min_area = expected_area-0.000001, max_area = expected_area+0.000001)
+
+# Associative projected dimensions between semantic datum origins.
+# Bounds validate design intent; these are not fit or manufacturing tolerances.
+section_dimension(view = "left_seat", id = "station_pitch", from_instance_path = ["carrier","left","housing"], from_datum = "top", to_instance_path = ["carrier","right","housing"], to_datum = "top", axis = "x", offset = -30, min = spacing-0.000001, max = spacing+0.000001)
+section_dimension(view = "right_seat", id = "station_pitch", from_instance_path = ["carrier","right","housing"], from_datum = "top", to_instance_path = ["carrier","left","housing"], to_datum = "top", axis = "x", offset = -30, min = spacing-0.000001, max = spacing+0.000001)

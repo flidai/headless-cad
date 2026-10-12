@@ -39,6 +39,28 @@ fn invalid() -> ExportError {
 /// This inspection artifact carries exact circular arcs; it is not a drawing,
 /// tolerance specification, manufacturing approval, or replacement for source.
 pub fn section_to_svg(section: &PlanarSection, label: &str) -> Result<String, ExportError> {
+    annotated_section_to_svg(section, label, &[])
+}
+
+/// Projected linear inspection annotation in section-plane millimetres.
+/// `axis` is 0 (X) or 1 (Y); `offset` is the absolute perpendicular coordinate
+/// of the dimension line. This carries no fit, tolerance, or GD&T meaning.
+#[derive(Debug, Clone)]
+pub struct SectionDimensionAnnotation {
+    pub id: String,
+    pub from: [f64; 2],
+    pub to: [f64; 2],
+    pub axis: usize,
+    pub offset: f64,
+    pub value_mm: f64,
+}
+
+/// Render section geometry and projected dimensions in a common bounded canvas.
+pub fn annotated_section_to_svg(
+    section: &PlanarSection,
+    label: &str,
+    dimensions: &[SectionDimensionAnnotation],
+) -> Result<String, ExportError> {
     let label = escape(label)?;
     if !section.area.is_finite()
         || section.area < 0.
@@ -134,8 +156,9 @@ pub fn section_to_svg(section: &PlanarSection, label: &str) -> Result<String, Ex
         bounds = [-1., -1., 1., 1.];
     }
     let span = (bounds[2] - bounds[0]).max(bounds[3] - bounds[1]).max(1.);
-    let margin = span * 0.06;
     let font = span * 0.025;
+    let annotations = dimension_svg(dimensions, font, &mut bounds)?;
+    let margin = span * 0.06;
     let width = bounds[2] - bounds[0] + 2. * margin;
     let height = bounds[3] - bounds[1] + 2. * margin + font * 6.;
     let left = bounds[0] - margin;
@@ -155,6 +178,7 @@ pub fn section_to_svg(section: &PlanarSection, label: &str) -> Result<String, Ex
     );
     let mut out=format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}mm\" height=\"{}mm\" viewBox=\"{} {} {} {}\" role=\"img\">\n<title>{label}</title>\n<desc>Exact native section; coordinates in millimetres, X right, Y up. {}. Inspection only; no manufacturing tolerances or GD&amp;T.</desc>\n",number(width),number(height),number(left),number(top),number(width),number(height),escape(&frame)?);
     writeln!(out,"<path id=\"section-contours\" d=\"{}\" fill=\"#cbd5e1\" fill-rule=\"evenodd\" stroke=\"#0f172a\" stroke-width=\"{}\" stroke-linejoin=\"round\"/>",path.trim(),number(span*0.0015)).unwrap();
+    out.push_str(&annotations);
     let y = -bounds[1] + margin + font;
     for (row, text) in [
         format!("{label} — section, mm; area {} mm²", number(section.area)),
@@ -178,6 +202,15 @@ pub fn section_to_svg(section: &PlanarSection, label: &str) -> Result<String, Ex
 /// Render separate occurrences in one common section frame. Each occurrence has
 /// its own even-odd path: overlapping solids stay filled rather than cancelling.
 pub fn sections_to_svg(sections: &[PlanarSection], label: &str) -> Result<String, ExportError> {
+    annotated_sections_to_svg(sections, label, &[])
+}
+
+/// Render each occurrence separately, with shared projected dimension annotations.
+pub fn annotated_sections_to_svg(
+    sections: &[PlanarSection],
+    label: &str,
+    dimensions: &[SectionDimensionAnnotation],
+) -> Result<String, ExportError> {
     let first = sections.first().ok_or_else(invalid)?;
     if sections.iter().any(|section| section.plane != first.plane) {
         return Err(ExportError::InvalidModel(
@@ -204,7 +237,7 @@ pub fn sections_to_svg(sections: &[PlanarSection], label: &str) -> Result<String
             }))
         },
     };
-    let base = section_to_svg(&aggregate, label)?.replace(
+    let base = annotated_section_to_svg(&aggregate, label, dimensions)?.replace(
         "Exact native section;",
         "Native occurrence sections; overlapping occurrence areas are summed;",
     );
@@ -232,6 +265,130 @@ pub fn sections_to_svg(sections: &[PlanarSection], label: &str) -> Result<String
         } else {
             writeln!(out, "{line}").unwrap();
         }
+    }
+    Ok(out)
+}
+
+fn dimension_svg(
+    dimensions: &[SectionDimensionAnnotation],
+    font: f64,
+    bounds: &mut [f64; 4],
+) -> Result<String, ExportError> {
+    let mut out = String::new();
+    let mut ids = std::collections::BTreeSet::new();
+    for dimension in dimensions {
+        let SectionDimensionAnnotation {
+            id,
+            from,
+            to,
+            axis,
+            offset,
+            value_mm,
+        } = dimension;
+        if *axis > 1
+            || id.is_empty()
+            || !ids.insert(id)
+            || from
+                .iter()
+                .chain(to)
+                .chain([offset, value_mm])
+                .any(|v| !v.is_finite())
+            || *value_mm <= 0.
+        {
+            return Err(invalid());
+        }
+        let actual = (to[*axis] - from[*axis]).abs();
+        // Serialization and rigid-frame arithmetic may introduce roundoff;
+        // this is consistency validation, not an engineering tolerance claim.
+        let coordinate_scale = from[*axis].abs().max(to[*axis].abs());
+        let tolerance = 128. * f64::EPSILON * actual.max(*value_mm).max(coordinate_scale);
+        if !actual.is_finite()
+            || actual <= 0.
+            // A rounding budget comparable to the measurement cannot establish
+            // endpoint/value consistency. Reject instead of drawing false precision.
+            || tolerance / actual.min(*value_mm) >= 0.01
+            || (actual - value_mm).abs() > tolerance
+        {
+            return Err(ExportError::InvalidModel(
+                "section dimension does not match its projected endpoints".into(),
+            ));
+        }
+        let escaped_id = escape(id)?
+            .replace('\n', "&#10;")
+            .replace('\r', "&#13;")
+            .replace('\t', "&#9;");
+        let mut value = format!("{value_mm:.6}");
+        while value.ends_with('0') {
+            value.pop();
+        }
+        if value.ends_with('.') {
+            value.pop();
+        }
+        // Do not label a nonzero sub-micrometre projection as zero.
+        if value == "0" {
+            value = format!("{value_mm:.6e}");
+        }
+        let label = format!("{id}: {value} mm");
+        let escaped_label = escape(&label)?;
+        let text_width = label.chars().count() as f64 * font * 0.7;
+        let mut a = *from;
+        let mut b = *to;
+        a[1 - *axis] = *offset;
+        b[1 - *axis] = *offset;
+        let direction = (b[*axis] - a[*axis]).signum();
+        let arrow = (font * 0.6).min(actual * 0.2);
+        let mut arrows = [[a; 3], [b; 3]];
+        for (index, points) in arrows.iter_mut().enumerate() {
+            let inward = if index == 0 { direction } else { -direction };
+            points[1][*axis] += inward * arrow;
+            points[2][*axis] += inward * arrow;
+            points[1][1 - *axis] += arrow * 0.4;
+            points[2][1 - *axis] -= arrow * 0.4;
+        }
+        let midpoint = [a[0] * 0.5 + b[0] * 0.5, a[1] * 0.5 + b[1] * 0.5];
+        let text_center = if *axis == 0 {
+            midpoint[0]
+        } else {
+            midpoint[0] + font + text_width * 0.5
+        };
+        let text_baseline = midpoint[1] + font;
+        // Explicit textLength makes the visible label's width match its bound,
+        // including escaped IDs and fonts supplied by different SVG consumers.
+        let label_min = [text_center - text_width * 0.5, text_baseline - font * 0.4];
+        let label_max = [text_center + text_width * 0.5, text_baseline + font * 1.2];
+        for p in [*from, *to, a, b, label_min, label_max]
+            .into_iter()
+            .chain(arrows.into_iter().flatten())
+        {
+            if p.iter().any(|v| !v.is_finite()) {
+                return Err(invalid());
+            }
+            bounds[0] = bounds[0].min(p[0]);
+            bounds[1] = bounds[1].min(p[1]);
+            bounds[2] = bounds[2].max(p[0]);
+            bounds[3] = bounds[3].max(p[1]);
+        }
+        writeln!(out, "<g class=\"section-dimension\" data-id=\"{escaped_id}\" data-value-mm=\"{}\" fill=\"#334155\" stroke=\"#334155\" stroke-width=\"{}\">", number(*value_mm),number(font*0.05)).unwrap();
+        for (start, end) in [(*from, a), (*to, b), (a, b)] {
+            writeln!(
+                out,
+                "  <line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"/>",
+                number(start[0]),
+                number(-start[1]),
+                number(end[0]),
+                number(-end[1])
+            )
+            .unwrap();
+        }
+        for points in arrows {
+            writeln!(
+                out,
+                "  <polygon points=\"{}\"/>",
+                points.map(point).join(" ")
+            )
+            .unwrap();
+        }
+        writeln!(out,"  <text x=\"{}\" y=\"{}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"{}\" textLength=\"{}\" lengthAdjust=\"spacingAndGlyphs\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_center),number(-text_baseline),number(font),number(text_width)).unwrap();
     }
     Ok(out)
 }

@@ -31,9 +31,10 @@ mod demand;
 mod exchange_requirements;
 mod section_views;
 pub use section_views::{
-    query_section, SectionAnchor, SectionAnchorWitness, SectionOccurrence, SectionQuery,
-    SectionSource, SectionSummary, SectionView, SectionViewReport, MAX_SECTION_VIEWS,
-    MAX_SECTION_VIEW_WORK,
+    query_section, SectionAnchor, SectionAnchorWitness, SectionDimension, SectionDimensionAxis,
+    SectionDimensionReport, SectionOccurrence, SectionQuery, SectionSource, SectionSummary,
+    SectionView, SectionViewReport, MAX_SECTION_DIMENSIONS, MAX_SECTION_DIMENSIONS_PER_VIEW,
+    MAX_SECTION_VIEWS, MAX_SECTION_VIEW_WORK,
 };
 mod property_assertions;
 pub use demand::{BuildMode, BuildScope};
@@ -733,6 +734,14 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("section dimension '{id}' in view '{view}' on output '{output}' failed: {message}")]
+    SectionDimensionFailed {
+        view: String,
+        id: String,
+        output: String,
+        message: String,
+        actual_value: Option<f64>,
+    },
     #[error("section views require recipe schema version 2")]
     SectionViewSchema,
     #[error("invalid section view '{id}': {message}")]
