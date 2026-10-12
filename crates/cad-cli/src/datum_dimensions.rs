@@ -12,7 +12,7 @@ fn escape(text: &str) -> String {
 pub(super) fn publish(
     build: &BuildResult,
     summary: &Value,
-    artifacts: &mut Vec<(String, String)>,
+    artifacts: &mut artifact_sink::ArtifactSink,
 ) -> Result<(), Box<dyn Error>> {
     if build.datum_dimensions.is_empty() {
         return Ok(());
@@ -23,10 +23,7 @@ pub(super) fn publish(
         "dimensions":build.datum_dimensions,
         "semantics":"Directed separation of parallel native planar face supports, resolved through semantic datums and exact occurrence paths. Numerical bounds describe measurement arithmetic; authored size tolerances are separate design requirements. Not general closest-surface clearance, contact, GD&T or manufactured-part conformance."});
     let data = serde_json::to_string_pretty(&report)?;
-    let source = if artifacts
-        .iter()
-        .any(|(name, _)| name == "recipe.bundle.json")
-    {
+    let source = if artifacts.contains("recipe.bundle.json") {
         "recipe.bundle.json"
     } else {
         summary["recipe_source"]["artifact"]
@@ -55,10 +52,7 @@ pub(super) fn publish(
         .map(|d| &d.declaration.output)
         .collect::<BTreeSet<_>>()
     {
-        if artifacts
-            .iter()
-            .any(|(name, _)| name == &format!("{output}.preview.html"))
-        {
+        if artifacts.contains(&format!("{output}.preview.html")) {
             html.push_str(&format!(
                 "<a href=\"{}.preview.html\">Inspect {}</a> ",
                 escape(output),
@@ -69,7 +63,7 @@ pub(super) fn publish(
     html.push_str("</nav><details><summary>Native faces, occurrence frames and source evidence</summary><pre>");
     html.push_str(&escape(&data));
     html.push_str("</pre></details></main></body></html>");
-    artifacts.push(("datum-dimensions.json".into(), data));
-    artifacts.push(("datum-dimensions.html".into(), html));
+    artifacts.push(("datum-dimensions.json".into(), data))?;
+    artifacts.push(("datum-dimensions.html".into(), html))?;
     Ok(())
 }

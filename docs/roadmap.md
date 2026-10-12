@@ -834,3 +834,11 @@ requested chunks and a final full seal gates client publication. The original
 per-read integrity path remains available. Identical-byte delivery comparisons
 and mutation/restart tests are required evidence; hosted transfer, resumable
 external synchronization and the commercial lifecycle gate remain open.
+
+
+CLI export now spools completed artifacts to a private, verified stage instead of
+retaining the whole generated delivery in memory. Late policy failures preserve
+the prior generation; shared assets retain exact byte checks. A many-unique-part
+release comparison measures RSS and export equivalence. This advances export
+residency without claiming bounds on exact bodies, single artifact producers or
+preview bundles; assembly-scale admission and release gates remain open.

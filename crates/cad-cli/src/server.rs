@@ -271,6 +271,10 @@ fn respond(
     Ok(())
 }
 
+fn private_stage_directory(name: &str) -> bool {
+    name.starts_with(".cad-stage-") || name.starts_with(".cad-previous-")
+}
+
 fn decode_path(target: &str) -> Result<PathBuf, ()> {
     let target = target.split('?').next().ok_or(())?;
     if !target.starts_with('/') {
@@ -293,7 +297,12 @@ fn decode_path(target: &str) -> Result<PathBuf, ()> {
     }
     let decoded = String::from_utf8(decoded).map_err(|_| ())?;
     let components: Vec<_> = decoded.split('/').filter(|part| !part.is_empty()).collect();
-    if components.iter().any(|part| matches!(*part, "." | "..")) {
+    if components.iter().any(|part| matches!(*part, "." | ".."))
+        || components
+            .iter()
+            .take(components.len().saturating_sub(1))
+            .any(|part| private_stage_directory(part))
+    {
         return Err(());
     }
     Ok(components.iter().collect())
@@ -348,6 +357,9 @@ fn gallery(directory: &Dir) -> String {
             let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
                 continue;
             };
+            if kind.is_dir() && private_stage_directory(&name) {
+                continue;
+            }
             let path = format!("{prefix}{name}");
             if kind.is_dir() {
                 if let Ok(child) = directory.open_dir(&name) {
@@ -659,6 +671,49 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let response = request(dir.path(), b"GET /%2e%2e/secret HTTP/1.1\r\n\r\n");
         assert!(response.starts_with("HTTP/1.1 400"));
+    }
+
+    #[test]
+    fn unpublished_stages_are_not_discovered_or_served() {
+        let root = tempfile::tempdir().unwrap();
+        for directory in [
+            ".cad-stage-active",
+            "nested/.cad-stage-active",
+            ".cad-previous-old",
+        ] {
+            let path = root.path().join(directory);
+            std::fs::create_dir_all(&path).unwrap();
+            std::fs::write(
+                path.join("partial.preview.html"),
+                "unpublished stage marker",
+            )
+            .unwrap();
+            for prefix in [directory.to_owned(), directory.replace('.', "%2e")] {
+                let response = request(
+                    root.path(),
+                    format!("GET /{prefix}/partial.preview.html HTTP/1.1\r\n\r\n").as_bytes(),
+                );
+                assert!(response.starts_with("HTTP/1.1 400"));
+                assert!(!response.contains("unpublished stage marker"));
+            }
+        }
+        std::fs::create_dir(root.path().join("published")).unwrap();
+        std::fs::write(
+            root.path().join("published/complete.preview.html"),
+            "published model",
+        )
+        .unwrap();
+        let gallery = request(root.path(), b"GET / HTTP/1.1\r\n\r\n");
+        assert!(gallery.contains("published/complete.preview.html"));
+        assert!(!gallery.contains("partial.preview.html"));
+        assert!(!gallery.contains(".cad-stage-"));
+        assert!(!gallery.contains(".cad-previous-"));
+        let response = request(
+            root.path(),
+            b"GET /published/complete.preview.html HTTP/1.1\r\n\r\n",
+        );
+        assert!(response.starts_with("HTTP/1.1 200"));
+        assert!(response.contains("published model"));
     }
 
     #[cfg(unix)]

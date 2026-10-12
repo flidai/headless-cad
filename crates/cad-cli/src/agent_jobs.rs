@@ -1210,12 +1210,14 @@ mod tests {
         let publisher = thread::spawn(move || {
             for i in 0..200 {
                 let payload = format!("generation {i}");
-                let manifest = json!({"artifact_files":["manifest.json","part.json"]});
+                let manifest = json!({"manifest_schema_version":crate::integrity::MANIFEST_SCHEMA_VERSION,
+                    "artifact_files":["part.json","manifest.json"],
+                    "artifact_integrity":crate::integrity::inventory(&[("part.json".into(),payload.clone())]).unwrap()});
                 crate::publish(
                     &directory.join("generation"),
                     &[
-                        ("manifest.json".into(), manifest.to_string()),
                         ("part.json".into(), payload),
+                        ("manifest.json".into(), manifest.to_string()),
                     ],
                 )
                 .unwrap();

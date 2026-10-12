@@ -1,0 +1,53 @@
+{
+  "valid": true,
+  "exact_geometry_files_or_definitions": 34,
+  "geometry": [
+    "housing.step",
+    "bearing_fit_inspection.stl",
+    "washer.stl",
+    "washer.step",
+    "retaining_ring.stl",
+    "drive_module_release.stl",
+    "housing.stl",
+    "base.stl",
+    "sleeve.stl",
+    "base.step",
+    "drive_disc.stl",
+    "drive_disc.step",
+    "drive_module_release.step",
+    "shaft.step",
+    "sleeve.step",
+    "parallel_key.step",
+    "bearing_fit_inspection.step",
+    "retaining_ring.step",
+    "shaft.stl",
+    "parallel_key.stl",
+    "definition:base",
+    "definition:clamp_bar",
+    "definition:clamp_bolt_envelope",
+    "definition:drive_disc",
+    "definition:housing",
+    "definition:nut_envelope",
+    "definition:parallel_key",
+    "definition:retaining_ring",
+    "definition:shaft",
+    "definition:sleeve",
+    "definition:washer",
+    "definition:housing",
+    "definition:shaft",
+    "definition:sleeve"
+  ],
+  "engineering_reports_equal": true,
+  "section_reports_equal_except_explicit_implementation_context": [
+    "section-bearing_section.json",
+    "section-mounting_plan.json"
+  ],
+  "excluded_section_identity_fields": [
+    "query_context_hash",
+    "recipe_context_hash",
+    "renderer_build_id",
+    "section_build_id"
+  ],
+  "before_binary_sha256": "de7ef35ec7d7af1435d7682630dc2e0ab6680d81dce8c004848992bd732bedc4",
+  "after_binary_sha256": "97d4bb43cafb37994f7dced894e42205890477c232be8be5390a81a65ece2cdf"
+}

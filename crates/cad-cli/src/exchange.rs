@@ -1,32 +1,34 @@
 //! Bind exporter fidelity declarations to the actual published source and bytes.
+use super::artifact_sink::ArtifactSink;
 use cad_export::{exchange_fidelity, ExchangeFormat, ExchangeSource};
 use cad_kernel::Tolerance;
 use serde_json::{json, Value};
 use std::error::Error;
 
+// Exchange reports are compact metadata; cap the one report re-read during enforcement.
+const MAX_EXCHANGE_REPORT_READ_BYTES: u64 = 64 * 1024 * 1024;
+
 pub(crate) fn report(
     name: &str,
     source_content_hash: &str,
     summary: &Value,
-    artifacts: &[(String, String)],
+    artifacts: &ArtifactSink,
     source: ExchangeSource<'_>,
     tolerance: Tolerance,
 ) -> Result<String, Box<dyn Error>> {
     let mut exports = serde_json::Map::new();
     for (extension, format) in [("step", ExchangeFormat::Step), ("stl", ExchangeFormat::Stl)] {
         let filename = format!("{name}.{extension}");
-        let content = &artifacts
-            .iter()
-            .find(|(file, _)| file == &filename)
-            .ok_or_else(|| format!("missing generated exchange artifact '{filename}'"))?
-            .1;
+        let artifact = artifacts
+            .get(&filename)
+            .ok_or_else(|| format!("missing generated exchange artifact '{filename}'"))?;
         exports.insert(
             extension.into(),
             json!({
                 "file": filename,
                 "algorithm": "blake3",
-                "digest": blake3::hash(content.as_bytes()).to_hex().to_string(),
-                "bytes": content.len(),
+                "digest": artifact.digest,
+                "bytes": artifact.bytes,
                 "report": exchange_fidelity(source, format, tolerance)?,
             }),
         );
@@ -80,7 +82,7 @@ pub(crate) fn pending(requirements: &[cad_build::ExchangeRequirement]) -> Value 
 /// Inspect/check cannot evaluate export fidelity and leave these explicitly pending.
 pub(crate) fn enforce(
     requirements: &[cad_build::ExchangeRequirement],
-    artifacts: &[(String, String)],
+    artifacts: &ArtifactSink,
     display_only: bool,
 ) -> Result<Value, Box<dyn Error>> {
     let mut results = serde_json::Map::new();
@@ -101,9 +103,8 @@ pub(crate) fn enforce(
             ));
         }
         let filename = format!("{}.exchange.json", requirement.output);
-        let content = &artifacts
-            .iter()
-            .find(|(name, _)| name == &filename)
+        let digest = artifacts
+            .get(&filename)
             .ok_or_else(|| {
                 fail(
                     "required output was not selected for full publication",
@@ -111,8 +112,10 @@ pub(crate) fn enforce(
                     None,
                 )
             })?
-            .1;
-        let report: Value = serde_json::from_str(content)?;
+            .digest
+            .clone();
+        let content = artifacts.read_text(&filename, MAX_EXCHANGE_REPORT_READ_BYTES)?;
+        let report: Value = serde_json::from_str(&content)?;
         let entries = report["artifacts"][&requirement.format]["report"]["entries"]
             .as_array()
             .ok_or_else(|| fail("required export report is unavailable", None, None))?;
@@ -135,7 +138,7 @@ pub(crate) fn enforce(
                 "requirement": requirement,
                 "status": "passed",
                 "report_file": filename,
-                "report_digest": blake3::hash(content.as_bytes()).to_hex().to_string(),
+                "report_digest": digest,
                 "source_content_hash": report["source_content_hash"],
                 "observed_status": status,
                 "source_count": count,

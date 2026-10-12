@@ -10,7 +10,7 @@ fn escape(text: &str) -> String {
 pub(super) fn publish(
     build: &BuildResult,
     summary: &Value,
-    artifacts: &mut Vec<(String, String)>,
+    artifacts: &mut artifact_sink::ArtifactSink,
 ) -> Result<(), Box<dyn Error>> {
     if build.clearance_checks.is_empty() {
         return Ok(());
@@ -21,10 +21,7 @@ pub(super) fn publish(
         "checks":build.clearance_checks,
         "semantics":"Each check covers either its initial pose or the entire declared right-local translation or fixed-axis rotation over time 0..1. Top-level bounds enclose the minimum distance over that scope; sweep intervals provide continuous Lipschitz certificates; rotation symmetry certificates instead cover the complete path explicitly. A common rigid rotation of both named endpoints preserves the initial distance. These are not sample-only claims. Query retains initial-pose witnesses; sweep samples have their own times, native methods and motion uncertainty. Bounds include native, placement and path arithmetic. Witness axes need not be global separating planes. Only declared pairs and motions are checked; no manufacturing tolerance inflation."});
     let data = serde_json::to_string_pretty(&report)?;
-    let source_artifact = if artifacts
-        .iter()
-        .any(|(name, _)| name == "recipe.bundle.json")
-    {
+    let source_artifact = if artifacts.contains("recipe.bundle.json") {
         "recipe.bundle.json"
     } else {
         summary["recipe_source"]["artifact"]
@@ -71,10 +68,7 @@ pub(super) fn publish(
         .map(|check| &check.declaration.output)
         .collect::<BTreeSet<_>>()
     {
-        if artifacts
-            .iter()
-            .any(|(name, _)| name == &format!("{output}.preview.html"))
-        {
+        if artifacts.contains(&format!("{output}.preview.html")) {
             html.push_str(&format!(
                 "<a href=\"{}.preview.html\">Inspect {}</a> ",
                 escape(output),
@@ -91,7 +85,7 @@ pub(super) fn publish(
     html.push_str("</small></p><details><summary>Native witnesses, occurrence frames and bounds</summary><pre>");
     html.push_str(&escape(&data));
     html.push_str("</pre></details></main></body></html>");
-    artifacts.push(("clearance-checks.json".into(), data));
-    artifacts.push(("clearance-checks.html".into(), html));
+    artifacts.push(("clearance-checks.json".into(), data))?;
+    artifacts.push(("clearance-checks.html".into(), html))?;
     Ok(())
 }

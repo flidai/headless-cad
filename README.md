@@ -189,6 +189,10 @@ on each call. Add `--stream-artifacts` to the walkthrough command above to use
 the streaming path. [The delivery benchmark](tools/bench-agent-stream.py) compares
 both paths for the same retained job and checks identical SHA-256 file inventories.
 
+Builds spool completed exports into a private stage and publish only after the
+complete generation verifies. This reduces memory retained across many outputs;
+individual exporters and exact-body residency still have separate limits.
+
 ## Review a complete source revision
 
 The experimental bearing-drive walkthrough changes shaft diameter from 12 to

@@ -3329,3 +3329,53 @@ Both copies passed native integrity verification and independent SHA-256 byte
 comparison. The report pins executable bytes and manifest identity. This observed
 approximately 42× improvement is not a general performance guarantee: cache state
 and concurrent background activity were not controlled.
+
+
+### Transactional export spooling
+
+CLI builds spool completed artifact strings into a private staging directory in
+the output directory's parent. The sink retains insertion-ordered filenames,
+lengths and BLAKE3 digests, rather than all finished STEP/STL/BRep/viewer strings.
+Each artifact is written and flushed immediately. Shared assets are compared
+against staged bytes through bounded reads, preserving exact duplicate-content
+checks. Manifest file order and sorted integrity membership keep their existing
+contracts; the manifest is written last.
+
+Exchange reports use staged length/digest metadata. Consumers that require content
+perform bounded, hash-checked reads: exchange policy reports at most 64 MiB,
+section/drawing and rotation-preview reads at most 256 MiB. These limits govern
+re-reads, not the producer's temporary strings or the parsed JSON representation.
+The final staged generation passes the native integrity verifier before atomic
+publication. Ordinary generation, drawing, policy or verification failures remove
+the stage and preserve the previous published directory. The read-only viewer
+excludes reserved staging/backup directories from both gallery discovery and
+artifact requests, including encoded and nested paths. Concurrent destination
+identity changes observed before commit refuse. Rename/exchange remains the
+publication commit point; this does not provide distributed compare-and-swap.
+Unix directory syncing supports durability; a sync error after commit explicitly
+reports that publication already occurred. Portable fallback behavior retains its
+existing platform limitations.
+
+This removes retention proportional to the sum of completed artifact contents.
+It does not bound an individual exporter, a preview bundle, exact bodies retained
+by the build/selection graphs, mesh-cache residency, manifest JSON or allocator
+memory. A killed process can leave an unreferenced staging directory; cleanup
+must not delete a stage belonging to another live writer. Exact-body admission,
+spilling, streaming individual exporters and safe stale-stage management remain
+separate requirements. R1/R2 and the commercial release gates remain open.
+
+Acceptance combines late export-policy refusal preserving every previous byte,
+shared-definition publication, full CLI regressions and a sequential release-binary
+comparison on 512 unique circular parts. The comparison records peak process RSS,
+wall time, total/maximum artifact bytes, exact native BRep/STEP/STL equality and
+engineering-report equality with implementation identities treated separately.
+
+The retained [local export comparison](evidence/export-spool-local.json) produced
+3,075 artifacts (102,514,143 bytes) with each executable. Peak RSS decreased from
+158,280 KiB to 56,636 KiB, an observed 64.2% reduction on this Linux worker. All
+1,536 native BRep/STEP/STL files were byte-identical; both deliveries passed native
+verification, and normalized exchange reports and manifests agreed. This is one
+sequential measurement, not a throughput guarantee or a total-memory bound.
+The [drive-module comparison](evidence/export-spool-drive.json) also preserves
+geometry, assembly placement, clearance, rotation, dimension and tolerance results;
+section comparisons exclude only explicitly recorded implementation identities.

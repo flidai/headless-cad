@@ -1,5 +1,7 @@
 mod agent_jobs;
 mod agent_mcp;
+mod artifact_sink;
+use artifact_sink::ArtifactSink;
 #[cfg(target_os = "linux")]
 mod agent_store;
 #[cfg(not(target_os = "linux"))]
@@ -369,92 +371,14 @@ fn initialize(directory: &Path) -> Result<Value, Box<dyn Error>> {
     Ok(json!({ "created": path }))
 }
 
-// Publish a complete generation in a single directory rename/exchange. Existing
-// nonempty directories must carry our manifest, and may contain only its files.
-// A failed build leaves the previous generation available and unchanged.
+// Unit fixtures exercise the same staged publisher as real builds.
+#[cfg(test)]
 fn publish(out_dir: &Path, artifacts: &[(String, String)]) -> Result<(), Box<dyn Error>> {
-    let absolute = std::path::absolute(out_dir)?;
-    let parent = absolute
-        .parent()
-        .ok_or("output must have a parent directory")?;
-    if absolute.file_name().is_none() {
-        return Err("output cannot be a filesystem root".into());
+    let mut sink = ArtifactSink::new(out_dir)?;
+    for artifact in artifacts {
+        sink.push(artifact.clone())?;
     }
-    fs::create_dir_all(parent)?;
-    let existing = match fs::symlink_metadata(&absolute) {
-        Ok(metadata) => {
-            if !metadata.is_dir() || metadata.file_type().is_symlink() {
-                return Err("output path must be a real directory, not a symlink or file".into());
-            }
-            let entries = fs::read_dir(&absolute)?.collect::<Result<Vec<_>, _>>()?;
-            if !entries.is_empty() {
-                let manifest_path = absolute.join("manifest.json");
-                let old: Value =
-                    serde_json::from_str(&fs::read_to_string(manifest_path).map_err(|_| {
-                        "refusing to replace a nonempty directory without a CAD build manifest"
-                    })?)?;
-                let files = old["artifact_files"].as_array().ok_or("existing directory has no owned-artifact manifest; use a dedicated empty output directory")?;
-                let owned: BTreeSet<&str> = files.iter().filter_map(Value::as_str).collect();
-                for entry in entries {
-                    if !entry.file_type()?.is_file()
-                        || !owned.contains(entry.file_name().to_string_lossy().as_ref())
-                    {
-                        return Err(format!(
-                            "output directory contains unmanaged file '{}'",
-                            entry.file_name().to_string_lossy()
-                        )
-                        .into());
-                    }
-                }
-            }
-            true
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
-        Err(error) => return Err(error.into()),
-    };
-    let staging = tempfile::Builder::new()
-        .prefix(".cad-stage-")
-        .tempdir_in(parent)?;
-    for (name, content) in artifacts {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(staging.path().join(name))?;
-        file.write_all(content.as_bytes())?;
-        file.sync_all()?;
-    }
-    if existing {
-        #[cfg(target_os = "linux")]
-        rustix::fs::renameat_with(
-            rustix::fs::CWD,
-            staging.path(),
-            rustix::fs::CWD,
-            &absolute,
-            rustix::fs::RenameFlags::EXCHANGE,
-        )?;
-        #[cfg(not(target_os = "linux"))]
-        {
-            // Portable fallback: complete generations only, but readers can see
-            // a short missing-directory interval. Restore the old one on error.
-            let backup = tempfile::Builder::new()
-                .prefix(".cad-previous-")
-                .tempdir_in(parent)?;
-            fs::remove_dir(backup.path())?;
-            fs::rename(&absolute, backup.path())?;
-            if let Err(error) = fs::rename(staging.path(), &absolute) {
-                if let Err(rollback) = fs::rename(backup.path(), &absolute) {
-                    let preserved = backup.keep();
-                    return Err(format!("publication failed: {error}; rollback failed: {rollback}; previous generation preserved at {}", preserved.display()).into());
-                }
-                return Err(error.into());
-            }
-        }
-    } else {
-        fs::rename(staging.path(), &absolute)?;
-    }
-    // After exchange the temporary directory contains the previous generation.
-    // Its drop removes old artifacts, including outputs removed from the recipe.
-    Ok(())
+    sink.commit()
 }
 
 fn difference(before: &Value, after: &Value) -> Value {
@@ -1267,10 +1191,11 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 return Err("output directory cannot contain the source recipe or cache".into());
             }
         }
-        let mut artifacts = vec![(
+        let mut artifacts = ArtifactSink::new(out_dir)?;
+        artifacts.push((
             "recipe.json".to_owned(),
             serde_json::to_string_pretty(&recipe)?,
-        )];
+        ))?;
         let language = snapshot.language.as_str();
         let source_artifact = if language == "starlark" {
             "recipe.star"
@@ -1282,10 +1207,10 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             artifacts.push((
                 "recipe.bundle.json".into(),
                 serde_json::to_string_pretty(&snapshot)?,
-            ));
+            ))?;
             summary["recipe_bundle"] = json!({"artifact":"recipe.bundle.json","replay":"cad build recipe.bundle.json (supply original --param overrides)","source_bundle_hash":snapshot.bundle_hash()});
         }
-        artifacts.push((source_artifact.to_owned(), source_text.to_owned()));
+        artifacts.push((source_artifact.to_owned(), source_text.to_owned()))?;
         summary["recipe_source_hash"] = json!(blake3::hash(source_bytes).to_hex().to_string());
         summary["recipe_source"] = json!({
             "name": source_name,
@@ -1325,20 +1250,20 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             }
             let tolerance = recipe.tolerance.unwrap_or_default();
             let model = &output.result.model;
-            let artifact_start = artifacts.len();
+            let artifact_start = artifacts.records().len();
             if !display_only {
                 artifacts.push((
                     format!("{name}.brep.json"),
                     serde_json::to_string_pretty(&*output.result)?,
-                ));
+                ))?;
                 artifacts.push((
                     format!("{name}.step"),
                     cad_export::to_step(model, tolerance)?,
-                ));
+                ))?;
                 artifacts.push((
                     format!("{name}.stl"),
                     cad_export::to_stl_with_cache(model, tolerance, &mut mesh_cache)?,
-                ));
+                ))?;
                 artifacts.push((
                     format!("{name}.exchange.json"),
                     exchange::report(
@@ -1349,7 +1274,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                         cad_export::ExchangeSource::Body(model),
                         tolerance,
                     )?,
-                ));
+                ))?;
                 artifacts.push((
                     format!("{name}.preview.svg"),
                     cad_preview::to_svg_with_cache(
@@ -1357,7 +1282,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                         recipe.tolerance.unwrap_or_default(),
                         &mut mesh_cache,
                     )?,
-                ));
+                ))?;
             }
             let context = cad_preview::RecipeContext {
                 modules: snapshot.modules.clone(),
@@ -1383,14 +1308,15 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                     recipe.tolerance.unwrap_or_default(),
                     &mut mesh_cache,
                 )?,
-            ));
-            summary["outputs"][name]["available_files"] = json!(artifacts[artifact_start..]
+            ))?;
+            summary["outputs"][name]["available_files"] = json!(artifacts.records()
+                [artifact_start..]
                 .iter()
-                .map(|(name, _)| name)
+                .map(|record| &record.name)
                 .collect::<Vec<_>>());
         }
         let mut definition_assets = BTreeSet::new();
-        let mut shared_display_assets = BTreeMap::<String, usize>::new();
+        let mut shared_display_assets = BTreeSet::<String>::new();
         for (name, assembly) in &build.assemblies {
             filename(name)?;
             if !names.insert(name.to_ascii_lowercase()) {
@@ -1399,7 +1325,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 )
                 .into());
             }
-            let artifact_start = artifacts.len();
+            let artifact_start = artifacts.records().len();
             let mut dependencies = BTreeSet::new();
             if !display_only {
                 let mut definitions = serde_json::Map::new();
@@ -1409,7 +1335,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                     dependencies.insert(asset.clone());
                     if definition_assets.insert(asset.clone()) {
                         artifacts
-                            .push((asset.clone(), serde_json::to_string_pretty(&*part.result)?));
+                            .push((asset.clone(), serde_json::to_string_pretty(&*part.result)?))?;
                     }
                     definitions.insert(part_id.clone(), json!({
                     "feature_id": part.feature_id,
@@ -1436,13 +1362,13 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 artifacts.push((
                     format!("{name}.assembly.json"),
                     serde_json::to_string_pretty(&manifest)?,
-                ));
+                ))?;
                 let bom = assembly.bill_of_materials(recipe.tolerance.unwrap_or_default())?;
                 artifacts.push((
                     format!("{name}.bom.json"),
                     serde_json::to_string_pretty(&bom_document(&bom)?)?,
-                ));
-                artifacts.push((format!("{name}.bom.csv"), cad_export::bom_to_csv(&bom)?));
+                ))?;
+                artifacts.push((format!("{name}.bom.csv"), cad_export::bom_to_csv(&bom)?))?;
             }
             artifacts.push((
                 format!("{name}.display.json"),
@@ -1459,12 +1385,12 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                         &mut mesh_cache,
                     )?
                 },
-            ));
+            ))?;
             if !display_only {
                 artifacts.push((
                     format!("{name}.step"),
                     cad_export::assembly_to_step(assembly, recipe.tolerance.unwrap_or_default())?,
-                ));
+                ))?;
                 artifacts.push((
                     format!("{name}.stl"),
                     cad_export::assembly_to_stl_with_cache(
@@ -1472,7 +1398,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                         recipe.tolerance.unwrap_or_default(),
                         &mut mesh_cache,
                     )?,
-                ));
+                ))?;
                 artifacts.push((
                     format!("{name}.exchange.json"),
                     exchange::report(
@@ -1483,7 +1409,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                         cad_export::ExchangeSource::Assembly(assembly),
                         recipe.tolerance.unwrap_or_default(),
                     )?,
-                ));
+                ))?;
                 artifacts.push((
                     format!("{name}.preview.svg"),
                     cad_preview::to_assembly_svg_with_cache(
@@ -1491,7 +1417,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                         recipe.tolerance.unwrap_or_default(),
                         &mut mesh_cache,
                     )?,
-                ));
+                ))?;
             }
             let context = cad_preview::RecipeContext {
                 modules: snapshot.modules.clone(),
@@ -1515,7 +1441,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                         recipe.tolerance.unwrap_or_default(),
                         &mut mesh_cache,
                     )?,
-                ));
+                ))?;
             }
             artifacts.push((
                 format!("{name}.gpu.html"),
@@ -1526,7 +1452,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                     recipe.tolerance.unwrap_or_default(),
                     &mut mesh_cache,
                 )?,
-            ));
+            ))?;
             let bundle = cad_preview::to_assembly_stream_bundle_with_cache(
                 assembly,
                 &context,
@@ -1534,26 +1460,26 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 recipe.tolerance.unwrap_or_default(),
                 &mut mesh_cache,
             )?;
-            artifacts.push((format!("{name}.stream.html"), bundle.html));
-            artifacts.push((format!("{name}.paged.html"), bundle.paged_html));
-            artifacts.push((format!("{name}.stream.json"), bundle.scene_json));
-            artifacts.push((format!("{name}.metadata.json"), bundle.metadata_index_json));
+            artifacts.push((format!("{name}.stream.html"), bundle.html))?;
+            artifacts.push((format!("{name}.paged.html"), bundle.paged_html))?;
+            artifacts.push((format!("{name}.stream.json"), bundle.scene_json))?;
+            artifacts.push((format!("{name}.metadata.json"), bundle.metadata_index_json))?;
             for asset in bundle.assets.into_iter().chain(bundle.metadata_assets) {
                 filename(&asset.name)?;
                 dependencies.insert(asset.name.clone());
-                if let Some(&index) = shared_display_assets.get(&asset.name) {
-                    if artifacts[index].1 != asset.content {
+                if shared_display_assets.contains(&asset.name) {
+                    if !artifacts.same_bytes(&asset.name, &asset.content)? {
                         return Err("shared display asset digest collision".into());
                     }
                 } else {
-                    shared_display_assets.insert(asset.name.clone(), artifacts.len());
-                    artifacts.push((asset.name, asset.content));
+                    shared_display_assets.insert(asset.name.clone());
+                    artifacts.push((asset.name, asset.content))?;
                 }
             }
             dependencies.extend(
-                artifacts[artifact_start..]
+                artifacts.records()[artifact_start..]
                     .iter()
-                    .map(|(name, _)| name.clone()),
+                    .map(|record| record.name.clone()),
             );
             summary["outputs"][name]["available_files"] = json!(dependencies);
         }
@@ -1588,11 +1514,11 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 "fidelity":"Solved samples only; no continuous-path, collision or dynamics certification. Static assembly artifacts retain the source mechanism pose."});
             let json_file = format!("motion-{id}.json");
             let html_file = format!("motion-{id}.study.html");
-            artifacts.push((json_file.clone(), serde_json::to_string_pretty(&document)?));
+            artifacts.push((json_file.clone(), serde_json::to_string_pretty(&document)?))?;
             artifacts.push((
                 html_file.clone(),
                 cad_preview::to_motion_study_html(&mechanism.input, &study.solution, &context)?,
-            ));
+            ))?;
             summary["motion_studies"][id]["artifacts"] =
                 json!({"json":json_file,"inspector":html_file});
         }
@@ -1629,8 +1555,8 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             summary["section_views"][id]["snapshot"] = view_report["snapshot"].clone();
             summary["section_views"][id]["fidelity"] =
                 view_report["publication"]["fidelity"].clone();
-            artifacts.push((json_file, json_text));
-            artifacts.push((svg_file, svg_text));
+            artifacts.push((json_file, json_text))?;
+            artifacts.push((svg_file, svg_text))?;
         }
         drawing::publish(&build, &mut summary, &mut artifacts)?;
         datum_dimensions::publish(&build, &summary, &mut artifacts)?;
@@ -1638,24 +1564,22 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         clearance::publish(&build, &summary, &mut artifacts)?;
         rigid_rotation::publish(&build, &summary, &mut artifacts)?;
         summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
-        let mut artifact_names = BTreeSet::new();
-        for (name, _) in &artifacts {
-            if !artifact_names.insert(name.to_ascii_lowercase()) {
-                return Err(format!("generated artifact filename collision: '{name}'").into());
-            }
-        }
-        let mut files: Vec<_> = artifacts.iter().map(|(name, _)| name.clone()).collect();
+        let mut files: Vec<_> = artifacts
+            .records()
+            .iter()
+            .map(|record| record.name.clone())
+            .collect();
         files.push("manifest.json".into());
         summary["artifact_files"] = json!(files);
         summary["manifest_schema_version"] = json!(integrity::MANIFEST_SCHEMA_VERSION);
-        summary["artifact_integrity"] = integrity::inventory(&artifacts)?;
+        summary["artifact_integrity"] = artifacts.inventory()?;
         let manifest = serde_json::to_string_pretty(&summary)?;
         integrity::check_manifest_size(manifest.len() as u64)?;
-        artifacts.push(("manifest.json".into(), manifest));
-        publish(out_dir, &artifacts)?;
-        summary["artifacts"] = json!(artifacts
+        artifacts.push(("manifest.json".into(), manifest))?;
+        artifacts.commit()?;
+        summary["artifacts"] = json!(files
             .iter()
-            .map(|(name, _)| out_dir.join(name))
+            .map(|name| out_dir.join(name))
             .collect::<Vec<_>>());
     }
     Ok(summary)

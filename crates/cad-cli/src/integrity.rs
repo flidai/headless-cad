@@ -8,7 +8,9 @@
 use cap_std::fs::Dir;
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::{json, Value};
-use std::collections::{BTreeMap, BTreeSet};
+#[cfg(test)]
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Read};
@@ -58,6 +60,7 @@ fn digest_valid(hash: &str) -> bool {
             .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
 }
 
+#[cfg(test)]
 pub fn inventory(artifacts: &[(String, String)]) -> Result<Value, IntegrityError> {
     if artifacts.len() > MAX_PAYLOAD_FILES {
         return Err(fail("payload file count exceeds 100000"));

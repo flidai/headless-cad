@@ -1,6 +1,9 @@
 //! Revision-bound native section sheets staged with their engineering generation.
 use super::*;
 
+// A drawing reads one previously staged section report at a time.
+const MAX_SECTION_REPORT_READ_BYTES: u64 = 256 * 1024 * 1024;
+
 fn implementation_id() -> String {
     let mut hash = blake3::Hasher::new();
     for source in [
@@ -19,7 +22,7 @@ fn implementation_id() -> String {
 pub(super) fn publish(
     build: &BuildResult,
     summary: &mut Value,
-    artifacts: &mut Vec<(String, String)>,
+    artifacts: &mut artifact_sink::ArtifactSink,
 ) -> Result<(), Box<dyn Error>> {
     for (id, report) in &build.drawing_sheets {
         let declaration = &report.declaration;
@@ -27,11 +30,12 @@ pub(super) fn publish(
         let mut evidence = Vec::new();
         for viewport in &declaration.views {
             let name = format!("section-{}.json", viewport.view);
-            let section_json = artifacts
-                .iter()
-                .find(|(file, _)| file == &name)
+            let digest = artifacts
+                .get(&name)
                 .ok_or("drawing references unpublished section report")?;
-            let section_report: Value = serde_json::from_str(&section_json.1)?;
+            let digest = digest.digest.clone();
+            let section_json = artifacts.read_text(&name, MAX_SECTION_REPORT_READ_BYTES)?;
+            let section_report: Value = serde_json::from_str(&section_json)?;
             let geometry = section::drawing_geometry(&section_report)?;
             views.push(cad_export::DrawingSheetView {
                 id: viewport.view.clone(),
@@ -46,7 +50,7 @@ pub(super) fn publish(
                 circles: geometry.circles,
             });
             evidence.push(json!({"view":viewport.view,"section_report":name,
-                "algorithm":"blake3","digest":blake3::hash(section_json.1.as_bytes()).to_hex().to_string(),
+                "algorithm":"blake3","digest":digest,
                 "snapshot":section_report["snapshot"],"viewport":viewport}));
         }
         let context = summary["recipe_context_hash"]
@@ -72,8 +76,8 @@ pub(super) fn publish(
             "fidelity":"Native analytic section curves and supported dimensions at explicit scale; optional authored manufacturing size limits; no projected hidden lines, fit classes, GD&T or manufactured-part conformance."});
         summary["drawing_sheets"][id]["artifacts"] = json!({"svg":svg_name,"json":json_name});
         summary["drawing_sheets"][id]["status"] = json!("published");
-        artifacts.push((svg_name, svg));
-        artifacts.push((json_name, serde_json::to_string_pretty(&witness)?));
+        artifacts.push((svg_name, svg))?;
+        artifacts.push((json_name, serde_json::to_string_pretty(&witness)?))?;
     }
     Ok(())
 }

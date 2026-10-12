@@ -13,7 +13,7 @@ fn escape(value: &str) -> String {
 pub(super) fn publish(
     build: &BuildResult,
     summary: &Value,
-    artifacts: &mut Vec<(String, String)>,
+    artifacts: &mut artifact_sink::ArtifactSink,
 ) -> Result<(), Box<dyn Error>> {
     if build.tolerance_stacks.is_empty() {
         return Ok(());
@@ -24,23 +24,22 @@ pub(super) fn publish(
         for term in &stack.declaration.terms {
             if term.datum_dimension.is_some() {
                 let filename = "datum-dimensions.json";
-                let bytes = &artifacts
-                    .iter()
-                    .find(|(name, _)| name == filename)
+                let digest = &artifacts
+                    .get(filename)
                     .ok_or("missing stack datum dimension report")?
-                    .1;
-                datum_report = Some(
-                    json!({"file":filename,"algorithm":"blake3","digest":blake3::hash(bytes.as_bytes()).to_hex().to_string()}),
-                );
+                    .digest;
+                datum_report = Some(json!({"file":filename,"algorithm":"blake3","digest":digest}));
                 continue;
             }
             let filename = format!("section-{}.json", term.view);
-            let bytes = &artifacts
-                .iter()
-                .find(|(name, _)| name == &filename)
+            let digest = &artifacts
+                .get(&filename)
                 .ok_or("missing stack section report")?
-                .1;
-            sections.insert(term.view.clone(), json!({"file":filename,"algorithm":"blake3","digest":blake3::hash(bytes.as_bytes()).to_hex().to_string()}));
+                .digest;
+            sections.insert(
+                term.view.clone(),
+                json!({"file":filename,"algorithm":"blake3","digest":digest}),
+            );
         }
     }
     let report = json!({"schema_version":2,"kind":"worst_case_linear_dimensional_stacks","units":"mm",
@@ -48,10 +47,7 @@ pub(super) fn publish(
         "executor_build_id":cad_build::executor_build_id(),"section_reports":sections,"datum_dimension_report":datum_report,"stacks":build.tolerance_stacks,
         "semantics":"Independent bounded size intervals combined with signed coefficients and outward-rounded binary64 arithmetic. Whole authored interval must satisfy source requirements. Datum-only stacks also certify a propagated native measurement interval. Legacy section stacks report scalar arithmetic only, marked measurement_interval_certified=false; section measurement error is not certified. Not alignment, collision clearance, fit classification, RSS, GD&T or manufactured-part conformance."});
     let json = serde_json::to_string_pretty(&report)?;
-    let source_artifact = if artifacts
-        .iter()
-        .any(|(name, _)| name == "recipe.bundle.json")
-    {
+    let source_artifact = if artifacts.contains("recipe.bundle.json") {
         "recipe.bundle.json"
     } else {
         summary["recipe_source"]["artifact"]
@@ -96,7 +92,7 @@ pub(super) fn publish(
     html.push_str("</small></p><details><summary>Terms, source bindings and numerical evidence</summary><pre>");
     html.push_str(&escape(&json));
     html.push_str("</pre></details></main></body></html>");
-    artifacts.push(("tolerance-stacks.json".into(), json));
-    artifacts.push(("tolerance-stacks.html".into(), html));
+    artifacts.push(("tolerance-stacks.json".into(), json))?;
+    artifacts.push(("tolerance-stacks.html".into(), html))?;
     Ok(())
 }
