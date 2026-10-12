@@ -96,6 +96,13 @@ pub(super) fn solids(
                 let axis = placement(step, c.origin, c.axis, c.x_direction);
                 step.add(format!("CIRCLE('',#{axis},{})", real(c.radius)))
             }
+            Curve::CircularArc(a) => {
+                let c = &a.circle;
+                let axis = placement(step, c.origin, c.axis, c.x_direction);
+                // EDGE_CURVE endpoints trim this support. Its same_sense below
+                // preserves the signed sweep, including major arcs.
+                step.add(format!("CIRCLE('',#{axis},{})", real(c.radius)))
+            }
             Curve::Line(l) => {
                 let p = step.add(format!("CARTESIAN_POINT('',({}))", triple(l.origin)));
                 let d = step.add(format!("DIRECTION('',({}))", triple(l.direction)));
@@ -107,12 +114,16 @@ pub(super) fn solids(
                     matches!(face.surface, Surface::Cylinder(_) | Surface::Cone(_))
                         .then_some(i)
                         .filter(|_| {
-                            face.loops.iter().any(|id| {
-                                model.loops[id.0]
-                                    .edges
-                                    .iter()
-                                    .any(|u| u.edge.0 == edge_index)
-                            })
+                            // Only a double use on one periodic face is a seam.
+                            // An ordinary edge of a partial cylindrical wall
+                            // belongs once to each adjacent face.
+                            let uses: Vec<_> = face
+                                .loops
+                                .iter()
+                                .flat_map(|id| model.loops[id.0].edges.iter())
+                                .filter(|u| u.edge.0 == edge_index)
+                                .collect();
+                            uses.len() == 2 && uses[0].reversed != uses[1].reversed
                         })
                 });
                 if let Some(wall) = wall {
@@ -131,8 +142,14 @@ pub(super) fn solids(
             }
         };
         edges.push(step.add(format!(
-            "EDGE_CURVE('',#{},#{},#{curve},.T.)",
-            vertices[edge.vertices[0].0], vertices[edge.vertices[1].0]
+            "EDGE_CURVE('',#{},#{},#{curve},{})",
+            vertices[edge.vertices[0].0],
+            vertices[edge.vertices[1].0],
+            if matches!(&edge.curve, Curve::CircularArc(a) if a.sweep_radians < 0.) {
+                ".F."
+            } else {
+                ".T."
+            }
         )));
     }
     let mut faces = Vec::new();
@@ -581,5 +598,90 @@ mod tests {
             .sum();
         let exact = std::f64::consts::PI * 64. * 60.;
         assert!(volume < exact && (exact - volume) / exact < 0.002);
+    }
+}
+
+#[cfg(test)]
+mod arc_tests {
+    use super::*;
+    use cad_kernel::{CircleHole, PathSegment, PlanarPath};
+    #[test]
+    fn arc_wall_boundaries_are_not_periodic_seams() {
+        let t = Tolerance::default();
+        let path = PlanarPath {
+            start: [-10., -5.],
+            segments: vec![
+                PathSegment::LineTo { end: [10., -5.] },
+                PathSegment::ArcTo {
+                    center: [10., 0.],
+                    end: [10., 5.],
+                    clockwise: false,
+                },
+                PathSegment::LineTo { end: [-10., 5.] },
+                PathSegment::ArcTo {
+                    center: [-10., 0.],
+                    end: [-10., -5.],
+                    clockwise: false,
+                },
+            ],
+        };
+        for holes in [
+            vec![],
+            vec![CircleHole {
+                center: [0., 0.],
+                radius: 2.,
+            }],
+        ] {
+            let model = cad_kernel::extrude_path(&path, &holes, 8., t)
+                .unwrap()
+                .model;
+            for model in [
+                model.clone(),
+                cad_kernel::transform(&model, [12., -7., 4.], [0.5, 0.5, 0., 0.5_f64.sqrt()], t)
+                    .unwrap()
+                    .model,
+            ] {
+                let step = to_step(&model, t).unwrap();
+                assert_eq!(step.matches("CIRCLE(").count(), 4 + 2 * holes.len());
+                assert_eq!(
+                    step.matches("CYLINDRICAL_SURFACE(").count(),
+                    2 + holes.len()
+                );
+                assert_eq!(step.matches("SEAM_CURVE(").count(), holes.len());
+                assert_eq!(step.matches("PCURVE(").count(), 2 * holes.len());
+                assert_eq!(step.matches("ADVANCED_FACE(").count(), 6 + holes.len());
+                let stl = to_stl(&model, t).unwrap();
+                let points: Vec<Point> = stl
+                    .lines()
+                    .filter_map(|l| l.trim().strip_prefix("vertex "))
+                    .map(|l| {
+                        let p: Vec<f64> =
+                            l.split_whitespace().map(|s| s.parse().unwrap()).collect();
+                        [p[0], p[1], p[2]]
+                    })
+                    .collect();
+                let mut incidence = std::collections::BTreeMap::new();
+                let mut volume = 0.;
+                for p in points.as_chunks::<3>().0 {
+                    let normal = cross(sub(p[1], p[0]), sub(p[2], p[0]));
+                    assert!(dot(normal, normal) > 0.);
+                    volume += dot(p[0], cross(p[1], p[2])) / 6.;
+                    for i in 0..3 {
+                        let key = |v: Point| v.map(|x| if x == 0. { 0 } else { x.to_bits() });
+                        let a = key(p[i]);
+                        let b = key(p[(i + 1) % 3]);
+                        let (edge, sign) = if a < b { ((a, b), 1) } else { ((b, a), -1) };
+                        let value = incidence.entry(edge).or_insert((0, 0));
+                        value.0 += 1;
+                        value.1 += sign;
+                    }
+                }
+                assert!(incidence
+                    .values()
+                    .all(|&(count, sign)| count == 2 && sign == 0));
+                let exact = (200. + (25. - 4. * holes.len() as f64) * std::f64::consts::PI) * 8.;
+                assert!((volume - exact).abs() / exact < 0.002);
+            }
+        }
     }
 }

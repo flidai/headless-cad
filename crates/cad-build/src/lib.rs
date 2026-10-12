@@ -7,7 +7,7 @@ use cad_kernel::{
     boolean, extrude_rectangle, transform, translate, validate_transform, BooleanOp,
     OperationResult, Tolerance, KERNEL_BUILD_ID, KERNEL_VERSION,
 };
-pub use cad_kernel::{CircleHole, MAX_POLYGON_HOLES, MAX_POLYGON_POINTS};
+pub use cad_kernel::{CircleHole, PathSegment, PlanarPath, MAX_POLYGON_HOLES, MAX_POLYGON_POINTS};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
@@ -179,6 +179,14 @@ impl<'de> Deserialize<'de> for Recipe {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Feature {
+    Path {
+        id: String,
+        #[serde(flatten)]
+        path: PlanarPath,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        circular_holes: Vec<CircleHole>,
+        op_version: u32,
+    },
     Circle {
         id: String,
         radius: f64,
@@ -269,6 +277,8 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut depth = None;
                 let mut profile = None;
                 let mut points = None;
+                let mut start = None;
+                let mut segments = None;
                 let mut holes = None;
                 let mut circular_holes = None;
                 let mut height = None;
@@ -297,6 +307,8 @@ impl<'de> Deserialize<'de> for Feature {
                         "depth" => read_field!(depth, f64),
                         "profile" => read_field!(profile, String),
                         "points" => read_field!(points, Vec<[f64; 2]>),
+                        "start" => read_field!(start, [f64; 2]),
+                        "segments" => read_field!(segments, Vec<PathSegment>),
                         "holes" => read_field!(holes, Vec<Vec<[f64; 2]>>),
                         "circular_holes" => {
                             read_field!(circular_holes, Vec<cad_kernel::CircleHole>)
@@ -320,6 +332,8 @@ impl<'de> Deserialize<'de> for Feature {
                                     "depth",
                                     "profile",
                                     "points",
+                                    "start",
+                                    "segments",
                                     "holes",
                                     "circular_holes",
                                     "height",
@@ -338,6 +352,14 @@ impl<'de> Deserialize<'de> for Feature {
                 let id = id.ok_or_else(|| M::Error::missing_field("id"))?;
                 let op_version = op_version.unwrap_or_else(operation_version);
                 let allowed: &[&str] = match op.as_str() {
+                    "path" => &[
+                        "op",
+                        "id",
+                        "op_version",
+                        "start",
+                        "segments",
+                        "circular_holes",
+                    ],
                     "circle" => &["op", "id", "op_version", "radius", "inner_radius"],
                     "rectangle" => &["op", "id", "op_version", "width", "depth"],
                     "polygon" => &[
@@ -362,6 +384,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "circle",
                                 "rectangle",
                                 "polygon",
+                                "path",
                                 "extrude",
                                 "revolve",
                                 "translate",
@@ -379,6 +402,16 @@ impl<'de> Deserialize<'de> for Feature {
                     }
                 }
                 Ok(match op.as_str() {
+                    "path" => Feature::Path {
+                        id,
+                        op_version,
+                        path: PlanarPath {
+                            start: start.ok_or_else(|| M::Error::missing_field("start"))?,
+                            segments: segments
+                                .ok_or_else(|| M::Error::missing_field("segments"))?,
+                        },
+                        circular_holes: circular_holes.unwrap_or_default(),
+                    },
                     "circle" => Feature::Circle {
                         id,
                         op_version,
@@ -458,6 +491,7 @@ impl Feature {
             Self::Circle { id, .. }
             | Self::Rectangle { id, .. }
             | Self::Polygon { id, .. }
+            | Self::Path { id, .. }
             | Self::Extrude { id, .. }
             | Self::Revolve { id, .. }
             | Self::Translate { id, .. }
@@ -469,7 +503,10 @@ impl Feature {
     }
     pub fn dependencies(&self) -> Vec<&str> {
         match self {
-            Self::Circle { .. } | Self::Rectangle { .. } | Self::Polygon { .. } => vec![],
+            Self::Circle { .. }
+            | Self::Rectangle { .. }
+            | Self::Polygon { .. }
+            | Self::Path { .. } => vec![],
             Self::Extrude { profile, .. } | Self::Revolve { profile, .. } => vec![profile],
             Self::Translate { body, .. } | Self::Transform { body, .. } => vec![body],
             Self::Union { left, right, .. }
@@ -480,7 +517,7 @@ impl Feature {
     pub fn is_solid(&self) -> bool {
         !matches!(
             self,
-            Self::Circle { .. } | Self::Rectangle { .. } | Self::Polygon { .. }
+            Self::Circle { .. } | Self::Rectangle { .. } | Self::Polygon { .. } | Self::Path { .. }
         )
     }
     fn version(&self) -> u32 {
@@ -488,6 +525,7 @@ impl Feature {
             Self::Circle { op_version, .. }
             | Self::Rectangle { op_version, .. }
             | Self::Polygon { op_version, .. }
+            | Self::Path { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Revolve { op_version, .. }
             | Self::Translate { op_version, .. }
@@ -502,6 +540,7 @@ impl Feature {
             Self::Circle { .. } => "circle",
             Self::Rectangle { .. } => "rectangle",
             Self::Polygon { .. } => "polygon",
+            Self::Path { .. } => "path",
             Self::Extrude { .. } => "extrude",
             Self::Revolve { .. } => "revolve",
             Self::Translate { .. } => "translate",
@@ -766,6 +805,44 @@ fn hash_feature(
         hash.update(hashes[dependency].as_bytes());
     }
     match feature {
+        Feature::Path {
+            path,
+            circular_holes,
+            ..
+        } => {
+            for coordinate in path.start {
+                hash.update(&coordinate.to_le_bytes());
+            }
+            hash.update(&(path.segments.len() as u64).to_le_bytes());
+            for segment in &path.segments {
+                match segment {
+                    PathSegment::LineTo { end } => {
+                        hash.update(b"line_to");
+                        for coordinate in end {
+                            hash.update(&coordinate.to_le_bytes());
+                        }
+                    }
+                    PathSegment::ArcTo {
+                        center,
+                        end,
+                        clockwise,
+                    } => {
+                        hash.update(b"arc_to");
+                        for coordinate in center.iter().chain(end.iter()) {
+                            hash.update(&coordinate.to_le_bytes());
+                        }
+                        hash.update(&[u8::from(*clockwise)]);
+                    }
+                }
+            }
+            hash.update(&(circular_holes.len() as u64).to_le_bytes());
+            for hole in circular_holes {
+                for coordinate in hole.center.into_iter().chain([hole.radius]) {
+                    hash.update(&coordinate.to_le_bytes());
+                }
+            }
+        }
+
         Feature::Circle {
             radius,
             inner_radius,
@@ -1053,6 +1130,19 @@ impl BuildEngine {
                     dimension(id, "width", *width)?;
                     dimension(id, "depth", *depth)?;
                 }
+                Feature::Path {
+                    id,
+                    path,
+                    circular_holes,
+                    ..
+                } => {
+                    cad_kernel::validate_path(path, circular_holes, tolerance).map_err(|error| {
+                        BuildError::PolygonProfile {
+                            feature: id.clone(),
+                            message: error.to_string(),
+                        }
+                    })?
+                }
                 Feature::Polygon {
                     id,
                     points,
@@ -1183,6 +1273,11 @@ impl BuildEngine {
                         Feature::Extrude {
                             profile, height, ..
                         } => match &recipe.features[indices[profile.as_str()]] {
+                            Feature::Path {
+                                path,
+                                circular_holes,
+                                ..
+                            } => cad_kernel::extrude_path(path, circular_holes, *height, tolerance),
                             Feature::Circle {
                                 radius,
                                 inner_radius,
@@ -1236,7 +1331,8 @@ impl BuildEngine {
                         }
                         Feature::Circle { .. }
                         | Feature::Rectangle { .. }
-                        | Feature::Polygon { .. } => unreachable!(),
+                        | Feature::Polygon { .. }
+                        | Feature::Path { .. } => unreachable!(),
                     };
                     let result = operation.map_err(|e| BuildError::Kernel {
                         feature: feature.id().into(),

@@ -30,6 +30,24 @@ pub struct ValidationReport {
 }
 
 pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> ValidationReport {
+    if model
+        .edges
+        .iter()
+        .any(|e| matches!(e.curve, crate::Curve::CircularArc(_)))
+    {
+        let result = crate::arc_prism::recognize(model, tolerance);
+        return ValidationReport {
+            valid: result.is_ok(),
+            issues: result
+                .err()
+                .map(|e| ValidationIssue {
+                    code: "invalid_arc_prism".into(),
+                    message: e.to_string(),
+                })
+                .into_iter()
+                .collect(),
+        };
+    }
     if model.has_curved_geometry() {
         let result = if tolerance.is_valid() {
             crate::analytic::recognize(model, Some(tolerance))

@@ -2346,3 +2346,113 @@ fn unselected_revolve_still_requires_valid_meridian_and_version() {
         .build_outputs(&recipe, &["other".into()])
         .is_err());
 }
+
+fn arc_path_recipe() -> Recipe {
+    serde_json::from_value(serde_json::json!({
+        "schema_version":2,"units":"mm","features":[
+            {"op":"path","id":"outline","start":[0,-5.25],"segments":[
+                {"kind":"line_to","end":[20.5,-5.25]},
+                {"kind":"arc_to","center":[20.5,0],"end":[20.5,5.25]},
+                {"kind":"line_to","end":[0,5.25]},
+                {"kind":"arc_to","center":[0,0],"end":[0,-5.25]}
+            ],"circular_holes":[{"center":[8.25,0],"radius":1.25}]},
+            {"op":"extrude","id":"link","profile":"outline","height":3.75},
+            {"op":"rectangle","id":"r","width":2,"depth":3},
+            {"op":"extrude","id":"other","profile":"r","height":1}
+        ],"outputs":[{"name":"link","feature":"link"},{"name":"other","feature":"other"}]
+    }))
+    .unwrap()
+}
+
+#[test]
+fn arc_path_json_roundtrips_fractional_geometry_and_changes_only_its_dependency() {
+    let mut recipe = arc_path_recipe();
+    let serialized = serde_json::to_string(&recipe).unwrap();
+    let decoded: Recipe = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(serde_json::to_string(&decoded).unwrap(), serialized);
+    let mut engine = BuildEngine::default();
+    let initial = engine.build(&recipe).unwrap();
+    let expected =
+        (2. * 5.25 * 20.5 + std::f64::consts::PI * (5.25_f64.powi(2) - 1.25_f64.powi(2))) * 3.75;
+    assert!((initial.outputs["link"].result.model.volume() - expected).abs() < 1e-8);
+    assert_eq!(initial.stats.computed_solids, 2);
+    assert_eq!(engine.build(&decoded).unwrap().stats.computed_solids, 0);
+    if let Feature::Path { circular_holes, .. } = &mut recipe.features[0] {
+        circular_holes[0].center[1] = 1.;
+    }
+    let moved = engine.build(&recipe).unwrap();
+    assert_eq!(moved.stats.computed_solids, 1);
+    assert_ne!(
+        moved.feature_hashes["outline"],
+        initial.feature_hashes["outline"]
+    );
+    assert_ne!(moved.feature_hashes["link"], initial.feature_hashes["link"]);
+    assert_eq!(
+        moved.feature_hashes["other"],
+        initial.feature_hashes["other"]
+    );
+    let old_center = initial.outputs["link"]
+        .result
+        .model
+        .mass_properties(Tolerance::default())
+        .unwrap()
+        .centroid
+        .unwrap();
+    let new_center = moved.outputs["link"]
+        .result
+        .model
+        .mass_properties(Tolerance::default())
+        .unwrap()
+        .centroid
+        .unwrap();
+    assert!(new_center[1] < old_center[1]);
+    recipe.features.reverse();
+    assert_eq!(
+        engine.build(&recipe).unwrap().feature_hashes,
+        moved.feature_hashes
+    );
+}
+
+#[test]
+fn path_schema_and_unselected_validation_fail_before_modeling() {
+    for raw in [
+        r#"{"op":"path","id":"p","segments":[]}"#,
+        r#"{"op":"path","id":"p","start":[0,0]}"#,
+        r#"{"op":"path","id":"p","start":[0,0],"start":[1,1],"segments":[]}"#,
+        r#"{"op":"path","id":"p","start":[0,0],"segments":[],"holes":[]}"#,
+        r#"{"op":"path","id":"p","start":[0,0],"segments":[{"kind":"line_to","end":[1,2],"clockwise":false}]}"#,
+        r#"{"op":"path","id":"p","start":[0,0],"segments":[{"kind":"arc_to","end":[1,2]}]}"#,
+        r#"{"op":"path","id":"p","start":[0,0],"segments":[{"kind":"arc_to","center":[0,2],"end":[1,2],"clockwise":null}]}"#,
+        r#"{"op":"path","id":"p","start":[0,0],"segments":[{"kind":"arc_to","center":[0,2],"end":[1,2],"end":[1,3]}]}"#,
+        r#"{"op":"path","id":"p","start":[0,0],"segments":[{"kind":"bezier","end":[1,2]}]}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<Feature>(raw).is_err(),
+            "accepted {raw}"
+        );
+    }
+    let mut recipe = arc_path_recipe();
+    if let Feature::Path { path, .. } = &mut recipe.features[0] {
+        if let PathSegment::ArcTo { center, .. } = &mut path.segments[1] {
+            center[0] += 0.01;
+        }
+    }
+    assert!(
+        matches!(BuildEngine::default().build_outputs(&recipe,&["other".into()]),Err(BuildError::PolygonProfile{feature,..}) if feature=="outline")
+    );
+    let mut recipe = arc_path_recipe();
+    if let Feature::Path { op_version, .. } = &mut recipe.features[0] {
+        *op_version = 2;
+    }
+    assert!(matches!(
+        BuildEngine::default().build_outputs(&recipe, &["other".into()]),
+        Err(BuildError::OperationVersion { .. })
+    ));
+    let mut recipe = arc_path_recipe();
+    recipe.features[1] = Feature::Revolve {
+        id: "link".into(),
+        profile: "outline".into(),
+        op_version: 1,
+    };
+    assert!(matches!(build(&recipe), Err(BuildError::InputType { .. })));
+}

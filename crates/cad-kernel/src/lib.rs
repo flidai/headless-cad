@@ -6,6 +6,9 @@
 //! inner loops where needed. Orthogonal Boolean faces stay rectangular and share
 //! explicit edges and vertices; open pockets, through-holes, empty results, and
 //! disconnected solids are supported in that domain.
+//! Convex CCW line/arc paths additionally extrude to native trimmed circular edges
+//! and cylindrical wall patches, with optional circular through-holes. Arc sweeps
+//! are bounded to at most a half-turn; tangent joins retain source vertices.
 //! Circular extrusions additionally retain exact circles, planar caps, a cylindrical
 //! wall, and an explicit periodic seam. Full-turn piecewise-linear meridian revolutions
 //! additionally support connected stepped shafts and coaxial counterbores with
@@ -26,11 +29,13 @@
 //! native physical properties never integrate those approximations.
 
 mod analytic;
+mod arc_prism;
 mod convex_intersection;
 mod face_frame;
 mod mass_properties;
 mod math;
 mod orthogonal;
+mod path_serde;
 mod polygon;
 mod prism;
 mod profile_prism;
@@ -44,6 +49,7 @@ mod validation;
 pub use analytic::{
     extrude_annulus, extrude_circle, validate_annulus, validate_circle, CylinderGeometry,
 };
+pub use arc_prism::{extrude_path, validate_path, ArcPrismGeometry, PathSegment, PlanarPath};
 pub use face_frame::FaceFrame;
 pub use mass_properties::MassProperties;
 pub use math::Tolerance;
@@ -113,6 +119,14 @@ pub struct Circle {
 pub enum Curve {
     Line(Line),
     Circle(Circle),
+    CircularArc(CircularArc),
+}
+/// Trimmed circle whose start radial direction is the support X direction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CircularArc {
+    pub circle: Circle,
+    pub sweep_radians: f64,
 }
 fn is_false(value: &bool) -> bool {
     !value
@@ -264,6 +278,24 @@ impl ModelSnapshot {
         };
         // Periodic circles carry analytic extrema absent from seam vertices.
         for edge in &self.edges {
+            if let Curve::CircularArc(arc) = &edge.curve {
+                let c = &arc.circle;
+                let y = cross(c.axis, c.x_direction);
+                for (axis, y_component) in y.iter().enumerate() {
+                    let maximum = y_component.atan2(c.x_direction[axis]);
+                    for angle in [maximum, maximum + std::f64::consts::PI] {
+                        let progress =
+                            (angle * arc.sweep_radians.signum()).rem_euclid(std::f64::consts::TAU);
+                        if progress <= arc.sweep_radians.abs() + 64. * f64::EPSILON {
+                            let value = c.origin[axis]
+                                + c.radius
+                                    * (c.x_direction[axis] * angle.cos() + y[axis] * angle.sin());
+                            result.min[axis] = result.min[axis].min(value);
+                            result.max[axis] = result.max[axis].max(value);
+                        }
+                    }
+                }
+            }
             if let Curve::Circle(circle) = &edge.curve {
                 let y = cross(circle.axis, circle.x_direction);
                 for (axis, y_component) in y.iter().enumerate() {
@@ -306,6 +338,13 @@ impl ModelSnapshot {
     /// Empty models have volume zero. Validate deserialized or edited snapshots
     /// first: invalid references or unsupported integration terms yield NaN.
     pub fn volume(&self) -> f64 {
+        if self
+            .edges
+            .iter()
+            .any(|e| matches!(e.curve, Curve::CircularArc(_)))
+        {
+            return arc_prism::volume(self).unwrap_or(f64::NAN);
+        }
         if self.has_curved_geometry() {
             return analytic::recognize(self, None)
                 .map(|g| g.volume())

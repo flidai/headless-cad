@@ -15,7 +15,7 @@ See the [dependency license inventory](docs/dependency-licenses.md).
 A local, CLI-first CAD product built around our own Rust B-rep kernel. Recipes
 are plain text suitable for Git, results are inspectable JSON, and exports are
 STEP and STL. Modeling currently supports **orthogonal solids and simple polygon extrusions, including nonconvex
-outlines and simple polygonal through-holes, plus true circular extrusions and stepped/tapered revolutions**: slotted brackets, open trays, triangular ramps, and polygonal
+outlines and simple polygonal through-holes, plus true circular extrusions, convex line/arc profiles and stepped/tapered revolutions**: slotted brackets, open trays, triangular ramps, and polygonal
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union and cut remain orthogonal-only; intersection also supports bounded,
@@ -452,7 +452,8 @@ output(name = "bracket", feature = finished)
 | --- | --- |
 | `rectangle(id, width, depth)` | Profile on XY, starting at the origin |
 | `polygon(id, points, holes=[])` | Simple CCW outer XY ring (convex or nonconvex) with optional simple CW holes; 256 total vertices, at most 32 holes |
-| `extrude(id, profile, height)` | Extrude a rectangle or supported polygon profile along positive Z |
+| `path(id, start, segments, circular_holes=[])` | Closed convex CCW line/arc profile; native arcs up to a half-turn, tangent joins and circular through-holes |
+| `extrude(id, profile, height)` | Extrude a supported rectangle, polygon, circle or line/arc profile along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
 | `transform(id, body, offset, rotation)` | Rotate exact geometry using unit quaternion `[x,y,z,w]`, then translate; both default to identity |
 | `union(id, left, right)` | Combine orthogonal material |
@@ -1002,6 +1003,48 @@ reused bolt assemblies. Parameters change plate thickness, bearing bore and bolt
 radius. The sleeve and shaft attach to the remaining cap's material centroid.
 Prescribed clearances are design intent, not a certified interference result.
 
+### Native line and arc profiles
+
+`path(id, start, segments, circular_holes=[])` defines a closed convex CCW
+profile for `extrude`. Each segment is a `line_to` with an `end`, or an `arc_to`
+with a `center` and `end`; `clockwise` defaults to false. Current outer arcs
+must be counterclockwise, nonzero and at most π radians. The final endpoint must
+exactly equal `start`. Tangent line/arc joins are supported; unsupported winding,
+major arcs, mismatched radii, open paths and unresolved numerical inputs fail
+explicitly. Limits are 256 segments and 32 circular holes with strict separation.
+
+```python
+slot = path(id = "slot_profile", start = [-10,-5], segments = [
+    {"kind":"line_to", "end":[10,-5]},
+    {"kind":"arc_to", "center":[10,0], "end":[10,5]},
+    {"kind":"line_to", "end":[-10,5]},
+    {"kind":"arc_to", "center":[-10,0], "end":[-10,-5]},
+])
+body = extrude(id = "slot_body", profile = slot, height = 8)
+```
+
+Trimmed circular edges and cylindrical walls remain analytic in the native model
+and STEP. Signed analytic boundary integrals supply volume, centroid, full
+inertia and cap datums. `segment_i` names each source wall; `start_cap`, `end_cap`,
+`walls` and `circular_hole_i_wall` preserve their normal meanings. Line-only
+paths lower to the existing polygon-prism implementation with segment aliases.
+Display meshes share arc samples, include endpoint arithmetic in their chord-error
+budget and independently certify cap coverage. A requested coarse mesh that
+closes a native clearance fails explicitly; reducing chord error can resolve it.
+This does not add general curved Booleans, concave arc paths or partial revolution.
+
+[rounded_clevis.star](examples/rounded_clevis.star) combines a rounded base,
+two shared arched cheeks, a capsule link and a pin: five occurrences from four
+part definitions. Independent formulas check material volumes, link centroid and
+full inertia, assembly mass, bounds and datum placements across 27 parameter
+combinations. Editing `link_length` rebuilds one definition, `clevis_gap` two,
+and `corner_radius` one. Native property assertions also run for selected-body
+builds. The pose is prescribed by datums, without a joint or load-solver claim.
+Independent STEP checks cover hierarchy, placements and native properties.
+Browser acceptance checks capsule and rounded-rectangle caps, curved walls and
+bores against analytic rays in Canvas, GPU and streamed views, including oblique
+instances; source inspection fetches no exact geometry.
+
 ### Revolved stepped and tapered parts
 
 `revolve(id, profile)` turns a polygon's `[radius, height]` coordinates through
@@ -1109,6 +1152,7 @@ npm run test:bvh
 npm run test:revolve
 npm run test:apex
 npm run test:serpentine
+npm run test:arc
 npm run test:counts
 npm run test:cone
 ```

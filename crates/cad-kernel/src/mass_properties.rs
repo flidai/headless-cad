@@ -106,6 +106,9 @@ impl ModelSnapshot {
         if !tolerance.is_valid() {
             return Err(KernelError::InvalidTolerance);
         }
+        if let Some(g) = self.arc_prism_geometry(tolerance)? {
+            return g.properties(tolerance);
+        }
         if self.has_curved_geometry() {
             return crate::analytic::recognize(self, Some(tolerance))
                 .and_then(|g| g.properties())

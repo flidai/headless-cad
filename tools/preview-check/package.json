@@ -28,7 +28,8 @@
     "test:lod": "node lod-check.cjs",
     "test:apex": "node apex-check.cjs",
     "test:counts": "node counts-check.cjs",
-    "test:serpentine": "node serpentine-check.cjs"
+    "test:serpentine": "node serpentine-check.cjs",
+    "test:arc": "node arc-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

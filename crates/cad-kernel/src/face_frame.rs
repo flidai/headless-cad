@@ -121,7 +121,14 @@ impl ModelSnapshot {
         let centroid = if self.has_curved_geometry() {
             // The validated circular caps have their exact area centroid at
             // the supporting plane origin, independent of tessellation.
-            if let Some(g) = self.profile_prism_geometry(tolerance)? {
+            if let Some(g) = self.arc_prism_geometry(tolerance)? {
+                if face_id.0 < 2 {
+                    g.cap_centroid(face_id, tolerance)?
+                } else {
+                    let points = self.loop_points(face.loops[0]).unwrap();
+                    std::array::from_fn(|i| points.iter().map(|p| p[i] / points.len() as f64).sum())
+                }
+            } else if let Some(g) = self.profile_prism_geometry(tolerance)? {
                 if face_id == g.start_cap || face_id == g.end_cap {
                     g.cap_centroid(face_id, tolerance)?
                 } else {

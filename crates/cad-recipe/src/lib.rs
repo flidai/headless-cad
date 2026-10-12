@@ -151,6 +151,58 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         number(value)
     }
 
+    /// Closed convex line/arc profile; the last endpoint explicitly equals start.
+    /// Segment order is semantic. Geometry is validated by the headless builder.
+    fn path(
+        id: &str,
+        start: Value,
+        segments: Value,
+        circular_holes: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let start: [f64; 2] = serde_json::from_str(&start.to_json()?)
+            .map_err(|_| anyhow::anyhow!("path start must be a coordinate pair"))?;
+        let segments: Vec<cad_build::PathSegment> = serde_json::from_str(&segments.to_json()?)
+            .map_err(|e| anyhow::anyhow!("invalid path segments: {e}"))?;
+        anyhow::ensure!(
+            !segments.is_empty() && segments.len() <= MAX_POLYGON_POINTS,
+            "path requires 1..={MAX_POLYGON_POINTS} segments"
+        );
+        anyhow::ensure!(
+            start.iter().all(|v| v.is_finite()),
+            "path start must be finite"
+        );
+        for segment in &segments {
+            match segment {
+                cad_build::PathSegment::LineTo { end } => anyhow::ensure!(
+                    end.iter().all(|v| v.is_finite()),
+                    "path endpoints must be finite"
+                ),
+                cad_build::PathSegment::ArcTo { center, end, .. } => anyhow::ensure!(
+                    center.iter().chain(end.iter()).all(|v| v.is_finite()),
+                    "arc coordinates must be finite"
+                ),
+            }
+        }
+        let circular_holes: Vec<cad_build::CircleHole> = match circular_holes {
+            Some(value) => serde_json::from_str(&value.to_json()?)
+                .map_err(|_| anyhow::anyhow!("circular_holes must contain center and radius"))?,
+            None => vec![],
+        };
+        anyhow::ensure!(
+            circular_holes.len() <= MAX_POLYGON_HOLES,
+            "too many path holes"
+        );
+        anyhow::ensure!(
+            circular_holes
+                .iter()
+                .all(|h| h.radius.is_finite() && h.center.iter().all(|v| v.is_finite())),
+            "circular hole values must be finite"
+        );
+        store(eval)?.feature(serde_json::json!({"op":"path","id":id,"start":start,"segments":segments,"circular_holes":circular_holes,"op_version":1}))?;
+        Ok(id.to_owned())
+    }
+
     /// Simple counter-clockwise outer ring and optional clockwise simple holes.
     /// Rings omit their repeated closing point; hole order is semantic.
     fn polygon(
@@ -1994,5 +2046,53 @@ mod property_assertion_tests {
             .unwrap_err()
             .to_string()
             .contains("1000"));
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+    #[test]
+    fn line_arc_paths_preserve_fractional_source_and_typed_json() {
+        let source = r#"
+r = param(name = "radius", default = 5.25)
+outline = path(id = "outline", start = [0,-r], segments = [
+    {"kind":"line_to","end":[20.5,-r]},
+    {"kind":"arc_to","center":[20.5,0],"end":[20.5,r]},
+    {"kind":"line_to","end":[0,r]},
+    {"kind":"arc_to","center":[0,0],"end":[0,-r]},
+], circular_holes = [{"center":[8.25,0.5],"radius":1.25}])
+output(name = "link", feature = extrude(id = "body", profile = outline, height = 3.75))
+"#;
+        for r in [5.25, 6.125] {
+            let recipe = from_starlark_with_params(
+                "fractional_arc.star",
+                source,
+                &BTreeMap::from([("radius".into(), r)]),
+            )
+            .unwrap();
+            let json = serde_json::to_string(&recipe).unwrap();
+            let decoded: Recipe = serde_json::from_str(&json).unwrap();
+            assert_eq!(serde_json::to_string(&decoded).unwrap(), json);
+            let built = cad_build::build(&decoded).unwrap();
+            let expected = (2. * r * 20.5 + std::f64::consts::PI * (r * r - 1.25 * 1.25)) * 3.75;
+            assert!((built.outputs["link"].result.model.volume() - expected).abs() < 1e-8);
+        }
+    }
+    #[test]
+    fn path_segment_schema_rejects_ambiguous_or_ignored_fields() {
+        for segment in [
+            r#"{"kind":"line_to","end":[1,2],"center":[0,0]}"#,
+            r#"{"kind":"arc_to","end":[1,2],"center":[0,0],"clockwise":1}"#,
+            r#"{"kind":"arc_to","end":[1,2]}"#,
+            r#"{"kind":"line_to","end":[1,2,3]}"#,
+            r#"{"kind":"arc_to","center":[0,0],"end":[1,2],"repair":True}"#,
+        ] {
+            let source = format!("p=path(id='p',start=[0,0],segments=[{segment}])");
+            assert!(
+                from_starlark("bad_arc.star", &source).is_err(),
+                "accepted {segment}"
+            );
+        }
     }
 }

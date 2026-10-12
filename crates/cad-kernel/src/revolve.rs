@@ -373,6 +373,7 @@ pub(crate) fn recognize(m: &ModelSnapshot, tol: Tolerance) -> Result<RevolveGeom
                 let point = |edge_use: EdgeUse| -> Result<[f64; 2], KernelError> {
                     let edge = m.edges.get(edge_use.edge.0).ok_or_else(unsupported)?;
                     match &edge.curve {
+                        Curve::CircularArc(_) => Err(unsupported()),
                         Curve::Circle(c) => Ok([c.radius, dot(sub(c.origin, g.origin), g.axis)]),
                         Curve::Line(_) => {
                             let id = edge.vertices[usize::from(edge_use.reversed)];
@@ -660,6 +661,12 @@ pub(crate) fn volume(m: &ModelSnapshot) -> Result<f64, KernelError> {
                 circle.radius,
             ],
             Curve::Line(line) => [line.origin[0], line.origin[1], line.origin[2], 0.],
+            Curve::CircularArc(a) => [
+                a.circle.origin[0],
+                a.circle.origin[1],
+                a.circle.origin[2],
+                a.circle.radius,
+            ],
         }))
         .map(f64::abs)
         .fold(0., f64::max);

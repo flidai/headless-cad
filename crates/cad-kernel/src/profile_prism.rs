@@ -414,6 +414,7 @@ impl ModelSnapshot {
             recognize(self, tol)
                 .map(Some)
                 .or_else(|_| crate::revolve::recognize(self, tol).map(|_| None))
+                .or_else(|_| crate::arc_prism::recognize(self, tol).map(|_| None))
         } else {
             let r = self.validate(tol);
             if r.valid {

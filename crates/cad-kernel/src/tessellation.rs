@@ -129,7 +129,7 @@ pub fn tessellate_cylinder(
     })
 }
 
-fn circle_resolution(
+pub(crate) fn circle_resolution(
     radius: f64,
     height: f64,
     origin: [f64; 3],
@@ -181,6 +181,9 @@ pub fn tessellate_analytic(
     tolerance: Tolerance,
     policy: TessellationPolicy,
 ) -> Result<CylinderMesh, KernelError> {
+    if let Some(g) = model.arc_prism_geometry(tolerance)? {
+        return crate::arc_prism::tessellate(model, &g, policy);
+    }
     if let Some(geometry) = model.revolve_geometry(tolerance)? {
         return tessellate_revolve(model, &geometry, policy);
     }

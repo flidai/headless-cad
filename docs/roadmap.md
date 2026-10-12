@@ -34,7 +34,7 @@ open acceptance corpus remain independently usable.
 | --- | --- | --- | --- |
 | M0: executable foundation | Recipes, orthogonal B-rep, validated builds, STEP/STL, HTTP inspection, source panel, watch. Plate → bracket → tray → fixture → vented enclosure | Analytic volume/bounds/topology checks, parameter edits, independent STEP imports, cache/publication/browser tests | Working bounded baseline; maintain continuously |
 | M1: design identity and assembly model | Versioned part definitions, instances, rigid transforms, datums, semantic references, lineage. Fixtures become true component assemblies; repeated fasteners share one definition | One definition edit computes once; placement changes compute no new geometry; 500 committed reference/edit sequences have no silent retargeting | In progress: nested instances, named part datums with part/rigid-module attachments, shared assets/hierarchical STEP, scoped face-role queries and orthogonal lineage implemented; associative planar face datums implemented; broader selectors and downstream solid-modeling consumers remain |
-| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; arcs, partial revolution, general Booleans and generalized trim/seam handling remain |
+| M2: general planar and analytic geometry | Planar profiles with holes, general rigid transforms, circles/arcs/cylinders, revolution, correct trim/seam handling and scoped Booleans. Angled fixture → drilled mounting bracket → shaft/collar → supported bearing housing | Independent formula/integral checks, thin/tangent/coincident adversarial cases, explicit unsupported inputs, analytic STEP checks | In progress: simple polygon outer profiles with simple nonconvex holes, exact rigid transforms of supported prisms, and bounded convex planar intersection with lineage implemented; analytic disk/annular extrusions, mixed polygon/circular through-hole prisms and their periodic seams implemented; full-turn piecewise-linear-profile revolution including regular conical frusta and conical poles implemented; convex line/arc path extrusion with circular holes implemented; concave arc paths, arcs in revolved meridians, partial revolution, general Booleans and generalized trim/seam handling remain |
 | M3: scalable inspection | Meshing interface, shared display assets, GPU instancing, metadata-first loading, bounded residency, LOD/cluster refinement. Parametric rack with thousands of repeated components | 10k-instance initial benchmark then 25k gate; zero exact loads for overview; fixed camera traces and stated hardware/error budgets | In progress: opt-in WebGL2 shared-mesh instancing, depth-tested picking, display-only publication and repeat/unique workload harness; selective verified mesh streaming, occurrence-BVH frustum culling and bounded cache and analytic whole-part LOD implemented; metadata paging, cluster LOD, part spatial indexes and hardware gates remain |
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Four-bar mechanism → slider fixture → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | Planned |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | Planned; subdivide by operation |
@@ -122,9 +122,22 @@ bores using datum attachments, supported by drilled holders and a base. Its
 length/clearance/depth parameter corpus checks bounds, native material properties,
 balance and seating frames. Depth edits rebuild two definitions while preserving
 total material volume; release assertions remain active for selected-body builds.
-This does not certify contact, clearance or interference. Partial turns, profile
-arcs, isolated axis contacts, pinched shells and general curved Booleans remain
+This does not certify contact, clearance or interference. Partial turns, arcs in revolved
+meridians, isolated axis contacts, pinched shells and general curved Booleans remain
 unsupported.
+`rounded_clevis.star` now exercises native trimmed circular edges in convex
+line/arc-profile extrusions: a rounded base, two shared arched cheeks, a capsule
+link and pin form five occurrences from four definitions. Kernel and independent
+exchange acceptance passes; analytic browser rays check cap, arc-wall and bore
+picking through all three display clients, including oblique occurrences.
+Independent component formulas and a 27-case parameter corpus check link volume,
+centroid/full inertia, assembly material properties, bounds and datum placement.
+Length/radius edits rebuild one definition each, gap edits two. Preserve explicit
+CCW convex-profile, half-turn-arc, strict circular-hole separation and numerical
+limits; concave arc profiles, arc meridians and general curved Booleans remain
+future extensions. Native engineering assertions remain build gates even for
+selected-body publication.
+
 Subsequent examples should combine new operations with
 reference-preserving parameter edits and engineering deliverables, not only add
 more copies of existing parts.

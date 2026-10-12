@@ -121,6 +121,11 @@ pub fn transform(
                 line.origin = point(line.origin)?;
                 line.direction = vector(line.direction);
             }
+            Curve::CircularArc(arc) => {
+                arc.circle.origin = point(arc.circle.origin)?;
+                arc.circle.axis = vector(arc.circle.axis);
+                arc.circle.x_direction = vector(arc.circle.x_direction);
+            }
             Curve::Circle(circle) => {
                 circle.origin = point(circle.origin)?;
                 circle.axis = vector(circle.axis);
