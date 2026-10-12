@@ -500,13 +500,32 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         x_direction: Option<Value>,
         min_area: Option<Value>,
         max_area: Option<Value>,
+        instance_path: Option<Value>,
+        datum: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let vector =
             |v: Value| -> anyhow::Result<[f64; 3]> { Ok(serde_json::from_str(&v.to_json()?)?) };
+        let instance_path = instance_path.filter(|v| !v.is_none());
+        let datum = datum
+            .filter(|v| !v.is_none())
+            .map(|v| -> anyhow::Result<String> { Ok(serde_json::from_str(&v.to_json()?)?) })
+            .transpose()?;
+        anyhow::ensure!(
+            instance_path.is_some() == datum.is_some(),
+            "section_view instance_path and datum must be provided together"
+        );
+        let anchor = match (instance_path, datum) {
+            (Some(path), Some(datum)) => Some(cad_build::SectionAnchor {
+                instance_path: occurrence_path(path, "instance_path")?,
+                datum,
+            }),
+            _ => None,
+        };
         let view = cad_build::SectionView {
             id: id.into(),
             output: output.into(),
+            anchor,
             origin: vector(origin)?,
             normal: normal
                 .filter(|v| !v.is_none())
@@ -2365,6 +2384,39 @@ mod exchange_requirement_tests {
 mod section_view_tests {
     use super::*;
     const SOURCE:&str="b=extrude(id='b',profile=rectangle(id='p',width=10,depth=12),height=8)\noutput(name='body',feature=b)\n";
+    #[test]
+    fn section_anchor_arguments_are_paired_and_strict() {
+        let assembly=format!("{SOURCE}p=part(id='part',body=b,datums={{'mid':datum(offset=[0,0,4])}})\nassembly_output(name='machine',assembly=assembly(id='root',instances=[instance(id='leaf',part=p)]))\n");
+        let r=from_starlark("anchor.star",&format!("{assembly}section_view(id='view',output='machine',origin=[0,0,0],instance_path=['leaf'],datum='mid')")).unwrap();
+        assert_eq!(
+            r.section_views[0].anchor.as_ref().unwrap().instance_path,
+            vec!["leaf"]
+        );
+        let result = cad_build::build(&r).unwrap();
+        assert_eq!(result.section_views["view"].query.section.area, 120.);
+        for args in [
+            "instance_path=['leaf']",
+            "datum='mid'",
+            "instance_path=[],datum='mid'",
+            "instance_path='leaf',datum='mid'",
+            "instance_path=[' leaf'],datum='mid'",
+            "instance_path=['leaf'],datum=''",
+            "instance_path=['leaf'],datum=None",
+        ] {
+            assert!(
+                from_starlark(
+                    "bad.star",
+                    &format!(
+                        "{assembly}section_view(id='view',output='machine',origin=[0,0,0],{args})"
+                    )
+                )
+                .is_err(),
+                "{args}"
+            );
+        }
+        let r=from_starlark("none.star",&format!("{SOURCE}section_view(id='view',output='body',origin=[0,0,4],instance_path=None,datum=None)")).unwrap();
+        assert!(r.section_views[0].anchor.is_none());
+    }
     #[test]
     fn section_view_defaults_and_bounds_lower_to_schema_two() {
         let r=from_starlark("view.star",&format!("{SOURCE}section_view(id='plan',output='body',origin=[0,0,4],min_area=120,max_area=120)\n")).unwrap();

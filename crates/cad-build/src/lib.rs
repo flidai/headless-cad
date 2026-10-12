@@ -31,8 +31,9 @@ mod demand;
 mod exchange_requirements;
 mod section_views;
 pub use section_views::{
-    query_section, SectionOccurrence, SectionQuery, SectionSource, SectionSummary, SectionView,
-    SectionViewReport, MAX_SECTION_VIEWS, MAX_SECTION_VIEW_WORK,
+    query_section, SectionAnchor, SectionAnchorWitness, SectionOccurrence, SectionQuery,
+    SectionSource, SectionSummary, SectionView, SectionViewReport, MAX_SECTION_VIEWS,
+    MAX_SECTION_VIEW_WORK,
 };
 mod property_assertions;
 pub use demand::{BuildMode, BuildScope};
@@ -1690,6 +1691,7 @@ impl BuildEngine {
         )?;
         result.section_views = section_views::evaluate(
             recipe,
+            &result.face_datums,
             &result.feature_hashes,
             &evaluated,
             &assertion_assemblies,

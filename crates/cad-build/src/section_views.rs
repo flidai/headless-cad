@@ -5,9 +5,31 @@ pub const MAX_SECTION_VIEWS: usize = 128;
 pub const MAX_SECTION_VIEW_WORK: usize = 10_000_000;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct SectionAnchor {
+    pub instance_path: Vec<String>,
+    pub datum: String,
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct SectionAnchorWitness {
+    pub instance_id: String,
+    pub instance_path: Vec<String>,
+    pub part_id: String,
+    pub part_content_hash: String,
+    pub datum: String,
+    pub datum_frame: cad_assembly::RigidTransform,
+    pub occurrence_frame: cad_assembly::RigidTransform,
+    pub world_frame: cad_assembly::RigidTransform,
+    pub resolved_plane: SectionPlane,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub semantic_datum: Option<FaceDatumResolution>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SectionView {
     pub id: String,
     pub output: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<SectionAnchor>,
     pub origin: [f64; 3],
     #[serde(default = "normal")]
     pub normal: [f64; 3],
@@ -50,6 +72,16 @@ impl SectionView {
         }
         if self.output.is_empty() || self.output.trim() != self.output {
             return Err(fail("output must be a nonempty identifier"));
+        }
+        if let Some(anchor) = &self.anchor {
+            let valid = |id: &str| !id.is_empty() && id.len() <= 1024 && id.trim() == id;
+            if anchor.instance_path.is_empty()
+                || anchor.instance_path.len() > 64
+                || !anchor.instance_path.iter().all(|id| valid(id))
+                || !valid(&anchor.datum)
+            {
+                return Err(fail("anchor needs a literal leaf path of 1..64 IDs and datum; IDs must be nonempty, at most 1024 bytes, without surrounding whitespace"));
+            }
         }
         self.plane().validate().map_err(|e| fail(&e.to_string()))?;
         if [self.min_area, self.max_area]
@@ -97,6 +129,8 @@ pub struct SectionViewReport {
     pub declaration: SectionView,
     pub status: String,
     pub query: SectionQuery,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anchor_witness: Option<SectionAnchorWitness>,
 }
 pub enum SectionSource<'a> {
     Body {
@@ -216,6 +250,12 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     let mut ids = BTreeSet::new();
     for v in &recipe.section_views {
         v.validate()?;
+        if v.anchor.is_some() && !recipe.assembly_outputs.iter().any(|o| o.name == v.output) {
+            return Err(BuildError::InvalidSectionView {
+                id: v.id.clone(),
+                message: "anchored section target must be an assembly output".into(),
+            });
+        }
         if !ids.insert(v.id.to_ascii_lowercase()) || !outputs.contains(&v.output) {
             return Err(BuildError::InvalidSectionView {
                 id: v.id.clone(),
@@ -225,8 +265,74 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     }
     Ok(())
 }
+fn resolve_anchor(
+    view: &SectionView,
+    face_datums: &ResolvedFaceDatums,
+    assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
+    tolerance: Tolerance,
+) -> Result<Option<SectionAnchorWitness>, BuildError> {
+    let Some(anchor) = &view.anchor else {
+        return Ok(None);
+    };
+    let fail = |message: String| BuildError::SectionViewFailed {
+        id: view.id.clone(),
+        output: view.output.clone(),
+        message,
+        actual_area: None,
+    };
+    let assembly = assemblies
+        .get(&view.output)
+        .ok_or_else(|| fail("anchor requires resolved assembly output".into()))?;
+    let mut matches = assembly
+        .instances
+        .iter()
+        .filter(|i| assembly.instance_paths.get(&i.id) == Some(&anchor.instance_path));
+    let instance = matches.next().ok_or_else(|| {
+        fail(format!(
+            "anchor leaf path {:?} does not exist",
+            anchor.instance_path
+        ))
+    })?;
+    if matches.next().is_some() {
+        return Err(fail("anchor path is ambiguous".into()));
+    }
+    let part = &assembly.parts[&instance.part];
+    let datum_frame = *part.datums.get(&anchor.datum).ok_or_else(|| {
+        fail(format!(
+            "datum '{}' does not exist on anchor part '{}'",
+            anchor.datum, instance.part
+        ))
+    })?;
+    let occurrence_frame = instance.transform;
+    let world_frame = occurrence_frame
+        .compose(&datum_frame, tolerance)
+        .map_err(|e| fail(e.to_string()))?;
+    let resolved_plane = SectionPlane {
+        origin: world_frame.point(view.origin),
+        normal: world_frame.vector(view.normal),
+        x_direction: world_frame.vector(view.x_direction),
+    };
+    resolved_plane.validate().map_err(|e| fail(e.to_string()))?;
+    Ok(Some(SectionAnchorWitness {
+        instance_id: instance.id.clone(),
+        instance_path: anchor.instance_path.clone(),
+        part_id: instance.part.clone(),
+        part_content_hash: part.content_hash.clone(),
+        datum: anchor.datum.clone(),
+        datum_frame,
+        occurrence_frame,
+        world_frame,
+        resolved_plane,
+        semantic_datum: face_datums
+            .get(&instance.part)
+            .and_then(|d| d.get(&anchor.datum))
+            .cloned(),
+    }))
+}
+
 pub(super) fn evaluate(
     recipe: &Recipe,
+    face_datums: &ResolvedFaceDatums,
     hashes: &BTreeMap<String, String>,
     models: &HashMap<String, Arc<OperationResult>>,
     assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
@@ -275,14 +381,17 @@ pub(super) fn evaluate(
                 limit: MAX_SECTION_VIEW_WORK,
             });
         }
-        let query = query_section(source, v.plane(), tolerance).map_err(|e| {
-            BuildError::SectionViewFailed {
+        let anchor_witness = resolve_anchor(v, face_datums, assemblies, tolerance)?;
+        let plane = anchor_witness
+            .as_ref()
+            .map_or(v.plane(), |a| a.resolved_plane);
+        let query =
+            query_section(source, plane, tolerance).map_err(|e| BuildError::SectionViewFailed {
                 id: v.id.clone(),
                 output: v.output.clone(),
                 message: e.to_string(),
                 actual_area: None,
-            }
-        })?;
+            })?;
         let area = query.section.area;
         if v.min_area.is_some_and(|a| area < a) || v.max_area.is_some_and(|a| area > a) {
             return Err(BuildError::SectionViewFailed {
@@ -298,6 +407,7 @@ pub(super) fn evaluate(
                 declaration: v.clone(),
                 status: "passed".into(),
                 query,
+                anchor_witness,
             },
         );
     }
@@ -343,6 +453,105 @@ mod tests {
                 ..
             })
         ));
+    }
+    fn anchored_recipe() -> Recipe {
+        let mut value = serde_json::to_value(recipe()).unwrap();
+        value["parts"] = serde_json::json!([{"id":"part","feature":"b","datums":{"center":{"translation":[5,6,4],"rotation":[1,0,0,0]}}}]);
+        value["assemblies"] = serde_json::json!([
+            {"id":"child","instances":[{"id":"leaf","part":"part","transform":{"translation":[2,3,0],"rotation":[0,0,std::f64::consts::FRAC_1_SQRT_2,std::f64::consts::FRAC_1_SQRT_2]}}]},
+            {"id":"root","assemblies":[{"id":"left","assembly":"child","transform":{"translation":[-40,0,0]}},{"id":"right","assembly":"child","transform":{"translation":[40,0,0],"rotation":[0,0,std::f64::consts::FRAC_1_SQRT_2,std::f64::consts::FRAC_1_SQRT_2]}}]}
+        ]);
+        value["assembly_outputs"] = serde_json::json!([{"name":"machine","assembly":"root"}]);
+        value["section_views"] = serde_json::json!([{"id":"local","output":"machine","origin":[0,0,0],"anchor":{"instance_path":["right","leaf"],"datum":"center"},"min_area":239.99999,"max_area":240.00001}]);
+        serde_json::from_value(value).unwrap()
+    }
+    #[test]
+    fn nested_exact_path_anchor_composes_datum_and_tracks_cached_placement_edits() {
+        let mut r = anchored_recipe();
+        let mut engine = BuildEngine::default();
+        let first = engine.build_outputs(&r, &["body".into()]).unwrap();
+        let report = &first.section_views["local"];
+        let witness = report.anchor_witness.as_ref().unwrap();
+        assert_eq!(witness.instance_path, vec!["right", "leaf"]);
+        assert_eq!(witness.part_id, "part");
+        for (actual, expected) in witness.resolved_plane.normal.into_iter().zip([0., 0., -1.]) {
+            assert!((actual - expected).abs() <= 128. * f64::EPSILON);
+        }
+        assert_eq!(report.declaration.origin, [0., 0., 0.]);
+        assert_eq!(report.query.section.plane, witness.resolved_plane);
+        assert!((report.query.section.area - 240.).abs() < 1e-8);
+        let old = witness.resolved_plane.origin;
+        r.assemblies[1].assemblies[1].transform.translation[0] += 7.;
+        let second = engine.build_outputs(&r, &["body".into()]).unwrap();
+        assert_eq!(first.feature_hashes, second.feature_hashes);
+        assert_eq!(
+            second.section_views["local"]
+                .anchor_witness
+                .as_ref()
+                .unwrap()
+                .part_content_hash,
+            witness.part_content_hash
+        );
+        assert!(
+            (second.section_views["local"].query.section.plane.origin[0] - old[0] - 7.).abs()
+                < 1e-8
+        );
+        assert_ne!(
+            report.query.content_hash,
+            second.section_views["local"].query.content_hash
+        );
+        r.parts[0].datums.clear();
+        assert!(matches!(
+            engine.build_outputs(&r, &["body".into()]),
+            Err(BuildError::SectionViewFailed { .. })
+        ));
+    }
+    #[test]
+    fn associative_anchor_retains_native_face_selection_evidence() {
+        let mut r = anchored_recipe();
+        r.parts[0].datums.clear();
+        r.face_datums.push(FaceDatumDefinition {
+            part: "part".into(),
+            name: "center".into(),
+            anchor_feature: "b".into(),
+            role: "end_cap".into(),
+            x_direction: [1., 0., 0.],
+            offset: [0.; 3],
+        });
+        r.section_views[0].origin = [0., 0., -4.];
+        let result = build(&r).unwrap();
+        let witness = result.section_views["local"]
+            .anchor_witness
+            .as_ref()
+            .unwrap();
+        let semantic = witness.semantic_datum.as_ref().unwrap();
+        assert_eq!(semantic.target_content_hash, witness.part_content_hash);
+        assert_eq!(semantic.frame, witness.datum_frame);
+        assert_eq!(semantic.selection.status, FaceResolutionStatus::Resolved);
+        assert_eq!(semantic.definition.role, "end_cap");
+        assert!((result.section_views["local"].query.section.area - 240.).abs() < 1e-8);
+        r.face_datums[0].role = "missing_role".into();
+        assert!(build(&r).is_err());
+    }
+    #[test]
+    fn anchor_missing_path_datum_and_malformed_options_fail() {
+        for mutation in 0..7 {
+            let mut r = anchored_recipe();
+            let v = &mut r.section_views[0];
+            match mutation {
+                0 => v.anchor.as_mut().unwrap().instance_path = vec!["leaf".into()],
+                1 => v.anchor.as_mut().unwrap().datum = "deleted".into(),
+                2 => v.anchor.as_mut().unwrap().instance_path = vec!["..".into(), "leaf".into()],
+                3 => v.anchor.as_mut().unwrap().instance_path = vec![],
+                4 => v.anchor.as_mut().unwrap().instance_path = vec!["right".into(); 65],
+                5 => v.anchor.as_mut().unwrap().datum = "bad ".into(),
+                _ => v.output = "body".into(),
+            }
+            assert!(build(&r).is_err(), "mutation {mutation}");
+        }
+        let mut value = serde_json::to_value(anchored_recipe()).unwrap();
+        value["section_views"][0]["anchor"]["unknown"] = true.into();
+        assert!(serde_json::from_value::<Recipe>(value).is_err());
     }
     #[test]
     fn declarations_are_strict_bounded_and_safe() {

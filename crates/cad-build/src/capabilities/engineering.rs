@@ -147,12 +147,32 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         "global across selected-output builds and cache hits; unselected required outputs and display-only publication fail",
         "exporter declarations are not independent downstream fidelity evidence or manufacturing certification",
     ]);
+    let mut anchor = object_spec(
+        "section_anchor",
+        vec![
+            arg(
+                "instance_path",
+                array(reference("occurrence_path_component"), None),
+            ),
+            arg("datum", reference("part_datum")),
+        ],
+    );
+    anchor.obligations.extend(["assembly output only; exact literal leaf occurrence path, no flattened-ID guessing or navigation", "path length 1..64; each component and datum name nonempty, no surrounding whitespace, at most 1024 UTF-8 bytes", "section plane interpreted relative to named part datum; resolved through occurrence placement times datum frame; missing path/datum fails globally", "Starlark section_view instance_path and datum must be supplied together; source local plane remains unchanged and result includes placement witness"]);
     let mut section = object_spec(
         "section_view",
         vec![
             arg("id", T::String),
             arg("output", reference("output")),
             arg("origin", numbers(3)),
+            optional(
+                arg(
+                    "anchor",
+                    T::Nullable {
+                        value: Box::new(object("section_anchor")),
+                    },
+                ),
+                json!(null),
+            ),
             optional(arg("normal", numbers(3)), json!([0, 0, 1])),
             optional(arg("x_direction", numbers(3)), json!([1, 0, 0])),
             optional(
@@ -184,6 +204,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         datum,
         exchange,
         section,
+        anchor,
     ]
 }
 

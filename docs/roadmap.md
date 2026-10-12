@@ -13,6 +13,12 @@ team automation (M7). None is closed by completing a renderer or accumulating
 passing examples. First-party delivery remains Apache-2.0, with an original Rust
 kernel and source-authoritative modeling throughout.
 
+Use the [feature-brief acceptance scenarios](architecture.md#feature-brief-acceptance-scenarios)
+to turn these tracks into release checks. Increase unique geometry complexity,
+feature-history depth, occurrence count, constraint coupling and annotation count
+independently. Record failures and unsupported inputs as well as successful runs;
+neither instance count nor test count alone measures commercial readiness.
+
 The [first competitive release contract](architecture.md#first-competitive-release-contract)
 requires five distinct scenarios: large-machine inspection, component revision,
 mechanical-intent validation, manufacturing release, and reproducible human/agent
@@ -27,6 +33,10 @@ obligations even for selected outputs and cache hits. Four bearing-cover views
 follow source parameters and retain body/occurrence provenance. Continue M6 toward
 semantic annotation references, projected/hidden-line views and dimensions; these
 parameter-associated planes alone do not satisfy the drawing release gate.
+Datum-anchored section planes now follow exact nested leaf occurrences and named
+part frames, including semantic planar face datums. The repeated housing fixture
+checks 27 native configurations and three independently imported STEP poses;
+these associative sections still leave projected views, dimensions and GD&T open.
 
 Use the architecture's [delivery priorities](architecture.md#delivery-priorities-and-completion-authority)
 to select and review increments across modeling, assembly scale, inspection,

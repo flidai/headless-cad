@@ -1481,22 +1481,14 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         // their target is omitted from selected/display-only geometry exports.
         for (id, view) in &build.section_views {
             filename(&format!("section-{id}"))?;
-            let mut view_report = section::bind_report(
-                &recipe,
-                &build,
-                &view.declaration.output,
-                &view.query,
-                &source_bytes,
-                &parameters,
-            )?;
+            let mut view_report =
+                section::bind_view_report(&recipe, &build, view, &source_bytes, &parameters)?;
             // Execution counters belong in the build manifest. Source-owned view
             // bytes must remain identical when the same build is served from cache.
             view_report
                 .as_object_mut()
                 .expect("section report")
                 .remove("stats");
-            view_report["section_view"] =
-                json!({"declaration":view.declaration,"status":view.status});
             // These are staged publication reports, not standalone native queries:
             // carry the same satisfied exchange receipts as their generation.
             view_report["exchange_requirements"] = summary["exchange_requirements"].clone();

@@ -135,6 +135,28 @@
       "fixture": "examples/spindle_line.star",
       "checks": [],
       "kind": "performance"
+    },
+    {
+      "id": "manufacturing.datum-section-views",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "query.planar_section",
+        "boolean.countersink"
+      ],
+      "supported_domain": "Schema-2 source-owned assembly sections anchored to exact nested leaf paths and named part datums, including semantic planar face datums. Repeated countersunk housing fixture exercises identity, quarter-turn and oblique common assembly poses with global area assertions and retained JSON/SVG resolution witnesses.",
+      "exclusions": [
+        "General associative dimensions, projected hidden-line drawings and GD&T",
+        "Oblique curved intersections and topology-event planes",
+        "Automatic repair of deleted or ambiguous semantic references",
+        "Material union of overlapping assembly parts"
+      ],
+      "fixture": "examples/datum_section_fixture.star",
+      "checks": [
+        "datum-section-native",
+        "datum-section-publication",
+        "datum-section-independent"
+      ]
     }
   ],
   "checks": [
@@ -331,6 +353,46 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/section_views"
+      ]
+    },
+    {
+      "id": "datum-section-native",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "datum_section_fixture"
+      ]
+    },
+    {
+      "id": "datum-section-publication",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "section_anchors"
+      ]
+    },
+    {
+      "id": "datum-section-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_section_anchors_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/section_anchors"
       ]
     }
   ]

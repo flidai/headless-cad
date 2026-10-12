@@ -1853,6 +1853,35 @@ inclusive engineering assertions in mm². View IDs use ASCII letters, digits,
 underscores or hyphens. A recipe can declare at most 128 views; capability
 discovery reports the aggregate geometry-work limit.
 
+For an assembly output, anchor the plane to a named part datum at an exact leaf
+occurrence path:
+
+```python
+section_view(
+    id = "mounted_seat", output = "assembly",
+    instance_path = ["module", "cover"], datum = "seat",
+    origin = [0, 0, -1], normal = [0, 0, 1], x_direction = [1, 0, 0],
+)
+```
+
+Supply `instance_path` and `datum` together. Path components are literal,
+case-sensitive instance IDs from the output assembly root to a leaf; prefixes,
+wildcards and leaf-name searches are not accepted. The plane coordinates are
+local to that datum, then transformed through the occurrence into the assembly
+frame. The view still sections the whole output assembly, with overlapping
+occurrence areas summed. Without an anchor, coordinates remain in the output
+frame. JSON IR records the pair as `anchor: {"instance_path": [...], "datum": "seat"}`.
+
+Published JSON, SVG metadata and the manifest retain an `anchor_witness` with
+the exact path, part identity/content hash, datum and occurrence frames, composed
+world frame and resolved plane. A datum derived from a semantic face selection
+also retains `semantic_datum` and its selection/content witnesses. Anchor intent
+and the resolved witness participate in query identity, so changing the named
+datum remains reviewable even when its plane is geometrically identical.
+Placement or datum edits re-evaluate the view while reusing unchanged native
+geometry. Missing paths/datums and planes that hit unsupported topology events
+fail globally, as do area bounds on the resulting complete section.
+
 `cad build` publishes `section-seat.json` and `section-seat.svg` in the same
 managed generation as the captured recipe and model artifacts. Their metadata
 binds source, effective parameters, target geometry, query and generation.

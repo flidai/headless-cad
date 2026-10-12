@@ -173,6 +173,45 @@ kernel, solver, or manufacturing milestone.
 These requirements govern the roadmap and example progression. Performance
 targets below are proposed release gates, not results inferred from the notes.
 
+### Feature-brief acceptance scenarios
+
+The two supplied briefs are design inputs, not benchmark evidence about other
+products. Their architectural lessons become the following executable scenarios.
+Keep these scenarios in the release plan as the kernel and examples grow; passing
+one bounded fixture does not establish the general capability.
+
+| Brief concern | Required acceptance scenario | Evidence to retain |
+| --- | --- | --- |
+| Lightweight large assemblies | Open the same machine with repeated definitions and with many unique definitions; then revise one internal component and export the complete machine | Exact-body loads, metadata/display residency, peak process memory, cold/warm latency and export completion measured separately |
+| Robust geometry and recovery | Perturb a demanding housing around tangent, near-coincident and thin-wall cases, including an intentionally unsupported edit | Native validity, independent geometric results, declared tolerance/deviation, structured failure and preservation of the previous valid generation |
+| Persistent references | Change a bore or upstream profile so faces split, merge or disappear while downstream datums and annotations refer to them | Selection lineage and resolution witnesses; explicit deletion/ambiguity instead of a plausible but incorrect replacement face |
+| Mechanical constraint solving | Sweep a mechanism through regular, singular and conflicting configurations and repeat from different initial guesses | Residuals, remaining degrees of freedom, branch/continuation diagnostics and separately evaluated collision evidence |
+| Virtualized detailed geometry | Traverse from machine overview into a small internal feature, reverse the camera during refinement, and evict or corrupt a requested page | Time to coverage and requested detail, measured error, resource budgets, fallback coverage and generation-correct occurrence/face/source selection |
+| Manufacturing and teamwork | Review a source revision, regenerate its drawing/BOM/exchange pack, then reproduce it offline from the pinned revision | Annotation associations, export semantic-loss checks, revision/configuration identity and a verified immutable artifact manifest |
+
+GPU acceleration belongs initially to derived display work. Cluster streaming
+must work with a replaceable backend and a supported fallback; mesh shaders are
+not a prerequisite for authoring, exact queries or manufacturing release. An
+analytic GPU preview remains a display approximation with its own picking and
+error contract. It cannot supply authoritative dimensions or replace native
+intersection, topology and tolerance algorithms.
+
+Scale examples along independent axes: unique geometric complexity, feature-history
+depth, occurrence count, constraint coupling and manufacturing annotation count.
+Do not substitute more copies of one simple part for progress on all five axes.
+For each scenario, pin inputs, supported domain, expected outcome, toolchain,
+hardware where relevant, and the retained evidence revision. Failed and unsupported
+cases belong in the results alongside successful cases.
+
+Before promoting an engineering workload to release acceptance, commit numeric
+budgets for p95 topology-changing regeneration latency, peak resident memory,
+and end-to-end validated STEP release time and peak memory on its pinned hardware.
+Declare sample count, cold/warm cache conditions and the validation included in
+timings. These engineering budgets are currently unestablished and therefore an
+open release gate; viewer performance thresholds cannot stand in for them. Choose
+and review budgets before the acceptance run, rather than fitting them to its
+results.
+
 ### Reference engineering workflow
 
 Use a configurable bearing-supported drive module as the first complete target
@@ -1660,6 +1699,26 @@ inclusive area bounds are native engineering assertions in mm². They are not
 manufacturing tolerance annotations. The build SDK and standalone CLI share one
 section evaluator, including occurrence frames and material-sum semantics.
 
+An optional datum anchor binds an assembly view to a leaf occurrence. Starlark
+uses paired `instance_path` and `datum` arguments; schema-2 JSON stores
+`anchor: {instance_path, datum}`. Paths match the full, case-sensitive sequence
+of literal instance IDs from the selected assembly root, without wildcard,
+prefix or leaf-name matching. The declaration's origin, normal and x direction
+are local to the named part datum. Composing the occurrence and datum frames
+produces the world plane used to section the complete assembly, not just the
+anchoring occurrence. Unanchored declarations keep output-frame coordinates.
+
+The evaluated `anchor_witness` records occurrence path/ID, part ID and content
+hash, datum name, datum/occurrence/world frames and resolved plane. For a datum
+resolved from semantic face intent, `semantic_datum` also retains its definition,
+selection, frame and target/anchor content hashes. Publication carries the
+witness into JSON, SVG metadata and the manifest; query identity binds both
+anchor intent and resolution. This makes an anchor-only edit visible even when
+it resolves to the same geometric plane. Placement and datum changes re-evaluate
+the query without rebuilding unchanged native solid geometry. Missing exact
+paths or datums, unsupported resolved planes and failed inclusive area bounds
+reject the entire generation, including selected and display-only builds.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in
@@ -1673,8 +1732,9 @@ The current view limit is 128 with a separately exposed aggregate geometry-work
 cap. This bounds admitted query work, not total job memory. The bearing-cover
 corpus varies its four source-owned views over 27 configurations; independent
 STEP intersections verify three retained configurations and their per-occurrence
-assembly sections. These are parameter-associated plane views, not face-selected
-associative annotations or a complete drawing-release system. The scoped evidence
+assembly sections. Parameter-associated and named-datum-anchored planes are
+supported, including datums resolved from semantic faces; general associative
+annotations and a complete drawing-release system remain future work. The scoped evidence
 entry is `manufacturing.recipe-section-views`.
 
 Expose accuracy explicitly: visual approximation, conservative bound, or

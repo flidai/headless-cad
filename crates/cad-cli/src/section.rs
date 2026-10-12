@@ -57,6 +57,40 @@ pub(super) fn report(
     bind_report(recipe, build, output, &query, source, parameters)
 }
 
+pub(super) fn bind_view_report(
+    recipe: &Recipe,
+    build: &BuildResult,
+    view: &cad_build::SectionViewReport,
+    source: &[u8],
+    parameters: &BTreeMap<String, f64>,
+) -> Result<Value, Box<dyn Error>> {
+    let mut report = bind_report(
+        recipe,
+        build,
+        &view.declaration.output,
+        &view.query,
+        source,
+        parameters,
+    )?;
+    report["section_view"] = json!({"declaration":view.declaration,"status":view.status});
+    if let Some(witness) = &view.anchor_witness {
+        report["section_view"]["anchor_witness"] = serde_json::to_value(witness)?;
+        // Equal world planes with different semantic anchors remain distinct
+        // reviewable queries. The base context binds native source/query inputs.
+        let context = json!({
+            "base_query_context_hash":report["snapshot"]["query_context_hash"],
+            "anchor":view.declaration.anchor,
+            "anchor_witness":witness,
+            "resolved_plane":view.query.section.plane,
+        });
+        report["snapshot"]["query_context_hash"] =
+            json!(blake3::hash(&serde_json::to_vec(&context)?)
+                .to_hex()
+                .to_string());
+    }
+    Ok(report)
+}
+
 pub(super) fn bind_report(
     recipe: &Recipe,
     build: &BuildResult,
@@ -74,8 +108,12 @@ pub(super) fn bind_report(
     // Keep global obligation evidence, without embedding every other view's
     // curves in every report/SVG (quadratic geometry duplication).
     let section_checks: BTreeMap<_, _> = build.section_views.iter().map(|(id, view)| {
-        (id, json!({"declaration":view.declaration,"status":view.status,
-                   "actual_area":view.query.section.area,"target_content_hash":view.query.content_hash}))
+        let mut check = json!({"declaration":view.declaration,"status":view.status,
+                   "actual_area":view.query.section.area,"target_content_hash":view.query.content_hash});
+        if let Some(witness) = &view.anchor_witness {
+            check["anchor_witness"] = json!(witness);
+        }
+        (id, check)
     }).collect();
     let source_hash = blake3::hash(source).to_hex().to_string();
     let query_context = json!({"recipe_source_hash":source_hash,"section_build_id":implementation_id(),"parameter_overrides":parameters,"output_name":output,"content_hash":content_hash,"assembly_build_id":if kind=="assembly"{Some(cad_assembly::assembly_build_id())}else{None},"plane":plane,"tolerance":tolerance,"kernel_build_id":cad_kernel::KERNEL_BUILD_ID,"executor_build_id":cad_build::executor_build_id()});
@@ -125,7 +163,10 @@ pub(super) fn svg(report: &Value) -> Result<String, Box<dyn Error>> {
     let metadata = serde_json::to_string(report)?
         .replace('&', "&amp;")
         .replace('<', "&lt;")
-        .replace('>', "&gt;");
+        .replace('>', "&gt;")
+        // JSON permits these scalar values, but XML 1.0 text does not.
+        .replace('\u{fffe}', "\\ufffe")
+        .replace('\u{ffff}', "\\uffff");
     let at = svg.find('>').ok_or("invalid SVG root")? + 1;
     svg.insert_str(at, &format!("\n<metadata>{metadata}</metadata>"));
     Ok(svg)
