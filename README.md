@@ -2254,11 +2254,11 @@ a lower distance bound; witness separation supplies the upper bound. Placement
 arithmetic widens the interval. Acceptance uses the lower bound, not the visual
 mesh, bounding-box distance or an unverified candidate estimate.
 
-The initial supported domain is two nonempty, validated, single convex planar
-solids. Each operand is limited to 128 vertices, 256 edges and 128 single-loop
+The supported domain is two nonempty, validated convex planar solids, recognized
+finite solid cylinders, or one of each. Each operand is limited to 128 vertices, 256 edges and 128 single-loop
 faces; recipes admit 64 checks and ten million path-resolution work units.
-Curved and nonconvex inputs, contact/intersection, unresolved precision
-and resource excess fail explicitly. Failure does not classify collision or
+Other curved or nonconvex inputs (including annular tubes), contact/intersection,
+unresolved precision and resource excess fail explicitly. Failure does not classify collision or
 penetration depth. Only declared pairs are checked; this is not whole-assembly
 or continuous-motion certification and does not inflate manufactured tolerances.
 
@@ -2271,6 +2271,22 @@ occurrence paths and native witnesses. JSON records source context, part/assembl
 hashes, frames and both distance bounds. Checks run globally during selected
 builds and cache hits. Placement-only edits reuse part geometry; failed checks
 preserve the previous generation and captured bundles replay the obligations.
+
+`cylinder_clearance.star` extends the query to analytic roller pairs and a tilted
+planar guard. Cylinder supports use recovered native axis, radius, height and
+caps; neither seam vertices nor tessellation approximate the curved surface.
+A bounded support search maintains convex-combination witnesses and checks an
+independent analytic support-gap certificate. Failure to converge within 256
+iterations is explicit. The existing native planar candidate path is retained.
+
+```sh
+cad build examples/cylinder_clearance.star --out-dir out/cylinder_clearance
+```
+
+The example varies relative roller tilt, axial/radial offsets and the whole
+assembly pose. It also includes an intentionally unsupported `tube=1` case.
+Clearance remains a nominal-geometry requirement, separate from dimensional
+manufacturing envelopes and continuous-motion collision certification.
 
 ### Native planar edge chamfers
 

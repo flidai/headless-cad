@@ -70,7 +70,7 @@ fn explicit_curved_nonconvex_contact_and_unresolved_domains_fail() {
         ));
     }
     let mut v = value();
-    v["features"][0] = json!({"op":"circle","id":"p","radius":1});
+    v["features"][0] = json!({"op":"circle","id":"p","radius":1,"inner_radius":0.5});
     assert!(matches!(
         cad_build::build(&parse(v)),
         Err(BuildError::ClearanceCheckFailed { .. })
@@ -163,4 +163,72 @@ fn oversized_source_operand_is_rejected_before_placement() {
     assert!(
         matches!(cad_build::build(&parse(v)), Err(BuildError::ClearanceCheckFailed {message,..}) if message.starts_with("pre-placement clearance limit:"))
     );
+}
+
+#[test]
+fn solid_cylinders_and_mixed_pairs_are_global_native_clearance_obligations() {
+    for (mixed, tilted) in [(false, false), (true, false), (false, true), (true, true)] {
+        let mut v = value();
+        v["features"][0] = json!({"op":"circle","id":"p","radius":1});
+        v["assemblies"][1]["assemblies"][1]["transform"]["translation"] = json!([5, 0, 0]);
+        if mixed {
+            v["features"].as_array_mut().unwrap().extend([
+                json!({"op":"rectangle","id":"q","width":2,"depth":3}),
+                json!({"op":"extrude","id":"box","profile":"q","height":4}),
+            ]);
+            v["parts"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"id":"box_part","feature":"box"}));
+            v["assemblies"].as_array_mut().unwrap().insert(
+                1,
+                json!({"id":"box_cell","instances":[{"id":"leaf/a","part":"box_part"}]}),
+            );
+            v["assemblies"][2]["assemblies"][1]["assembly"] = json!("box_cell");
+        }
+        if tilted {
+            let root = if mixed { 2 } else { 1 };
+            let q = [
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+                0.,
+                std::f64::consts::FRAC_1_SQRT_2,
+            ];
+            v["assemblies"][root]["assemblies"][0]["transform"] =
+                json!({"translation":[10,-20,30],"rotation":q});
+            v["assemblies"][root]["assemblies"][1]["transform"] =
+                json!({"translation":[10,-20,25],"rotation":q});
+        }
+        let expected = if mixed { 4. } else { 3. };
+        v["clearance_checks"][0]["min_clearance"] = json!(expected - 1e-5);
+        let mut r = parse(v);
+        let mut engine = BuildEngine::default();
+        let b = engine.build_outputs(&r, &["body".into()]).unwrap();
+        let c = &b.clearance_checks["gap"];
+        assert!(c.lower_bound_mm <= expected && c.upper_bound_mm >= expected);
+        if !mixed && !tilted {
+            // Full cylinder bounds span 2+2+4 mm; seam vertices alone
+            // would understate the placement arithmetic operands.
+            assert!(c.placement_uncertainty_mm >= 21. * 1024. * f64::EPSILON);
+        }
+        assert!(c.upper_bound_mm - c.lower_bound_mm < 1e-7);
+        assert!(b.assemblies.is_empty());
+        r.clearance_checks[0].min_clearance = expected + 1e-5;
+        assert!(matches!(
+            engine.build_outputs(&r, &["body".into()]),
+            Err(BuildError::ClearanceCheckFailed {
+                lower_bound_mm: Some(_),
+                ..
+            })
+        ));
+        r.clearance_checks[0].min_clearance = expected - 1e-5;
+        assert_eq!(
+            engine
+                .build_outputs(&r, &["body".into()])
+                .unwrap()
+                .stats
+                .computed_solids,
+            0
+        );
+    }
 }

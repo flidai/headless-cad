@@ -2041,8 +2041,22 @@ JSON and static HTML publish atomically with geometry. `clearance_station.star`
 exercises oblique convex jaws and independently rotated nested placements.
 Unsupported curves/nonconvexity, contact, intersection and unresolved calculations
 fail explicitly; failure is not a collision classification. Complete assembly
-pair traversal, curved minimum-distance queries, penetration depth, motion sweeps
+pair traversal, general curved minimum-distance queries, penetration depth, motion sweeps
 and manufactured tolerance envelopes remain separate implementation obligations.
+
+The native clearance query now also admits recognized finite solid circular
+extrusions and their pairing with validated convex planar solids. Cylinder support
+values are analytic over the complete caps and wall; seam vertices and display
+meshes do not define the shape. A bounded support-mapping search maintains feasible
+convex-combination witnesses and independently checks the analytic support lower
+bound against the witness upper bound. Nonconvergence after 256 iterations fails
+explicitly. Raw native surface/frame consistency and complete radius/height extents
+participate in precision admission, including placement arithmetic. The original
+planar enumeration branch is unchanged. `cylinder_clearance.star` exercises skew
+roller pairs, a tilted planar guard, parallel radial/axial/diagonal separation and
+root-pose invariance. Independent STEP measurements compare both distances and
+witness membership. Annular tubes, general trimmed curved solids and nonconvex
+shapes remain unsupported rather than being replaced by their convex hulls.
 
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.

@@ -5,6 +5,9 @@ pub const MAX_CLEARANCE_VERTICES: usize = 128;
 pub const MAX_CLEARANCE_EDGES: usize = 256;
 pub const MAX_CLEARANCE_FACES: usize = 128;
 pub const MAX_CLEARANCE_CANDIDATES: usize = 200_000;
+pub const MAX_CLEARANCE_ITERATIONS: usize = 256;
+#[path = "convex_clearance_support.rs"]
+mod support;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ConvexClearance {
@@ -16,7 +19,7 @@ pub struct ConvexClearance {
     pub axis: [f64; 3],
 }
 fn unsupported() -> KernelError {
-    KernelError::Unsupported("convex clearance requires two separated, validated single convex planar solids with a resolved support certificate".into())
+    KernelError::Unsupported("convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders with a resolved support certificate".into())
 }
 fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
     std::array::from_fn(|i| a[i] + b[i])
@@ -103,8 +106,9 @@ fn preflight(m: &ModelSnapshot) -> Result<(), KernelError> {
     Ok(())
 }
 impl ModelSnapshot {
-    /// Certify strictly positive Euclidean clearance using native planar geometry.
-    /// Curves, nonconvexity, contact/intersection and unresolved precision fail;
+    /// Certify strictly positive Euclidean clearance for native convex planar solids
+    /// and finite solid circular cylinders in arbitrary rigid orientations.
+    /// Other curves, nonconvexity, contact/intersection and unresolved precision fail;
     /// failure is not a collision classification. Bounds include arithmetic and
     /// accepted support/witness uncertainty and must differ by at most tolerance.
     pub fn convex_clearance(
@@ -114,6 +118,9 @@ impl ModelSnapshot {
     ) -> Result<ConvexClearance, KernelError> {
         if !tolerance.is_valid() {
             return Err(KernelError::InvalidTolerance);
+        }
+        if self.has_curved_geometry() || other.has_curved_geometry() {
+            return support::query(self, other, tolerance);
         }
         for m in [self, other] {
             preflight(m)?;

@@ -36,7 +36,7 @@ mod convex_clearance;
 mod convex_intersection;
 pub use convex_clearance::{
     ConvexClearance, MAX_CLEARANCE_CANDIDATES, MAX_CLEARANCE_EDGES, MAX_CLEARANCE_FACES,
-    MAX_CLEARANCE_VERTICES,
+    MAX_CLEARANCE_ITERATIONS, MAX_CLEARANCE_VERTICES,
 };
 pub use convex_intersection::chamfer;
 mod face_frame;

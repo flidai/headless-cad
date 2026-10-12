@@ -207,9 +207,22 @@ pub(super) fn evaluate(
             {
                 return Err(fail("pre-placement clearance limit: 128 vertices, 256 edges, 128 single-loop faces and 512 loop-edge references per operand".into(), None, None));
             }
-            if m.has_curved_geometry() || m.vertices.is_empty() {
+            let supported_geometry = if m.has_curved_geometry() {
+                m.cylinder_geometry(tolerance)
+                    .map_err(|e| {
+                        fail(
+                            format!("pre-placement cylinder validation: {e}"),
+                            None,
+                            None,
+                        )
+                    })?
+                    .is_some_and(|c| c.inner_radius == 0.)
+            } else {
+                true
+            };
+            if !supported_geometry || m.vertices.is_empty() {
                 return Err(fail(
-                    "pre-placement clearance requires nonempty planar native geometry".into(),
+                    "pre-placement clearance requires a nonempty convex planar solid or validated finite solid cylinder".into(),
                     None,
                     None,
                 ));
@@ -219,12 +232,16 @@ pub(super) fn evaluate(
             |instance: &cad_assembly::Instance, path: &Vec<String>| -> Result<_, BuildError> {
                 let part = &assembly.parts[&instance.part];
                 let model = &part.result.model;
-                let source_scale = model
-                    .vertices
-                    .iter()
-                    .flat_map(|v| v.position)
+                // Native bounds include full analytic circular extrema, which may
+                // be absent from the periodic boundary's seam vertices.
+                let bounds = model.bounds();
+                let source_scale = bounds
+                    .min
+                    .into_iter()
+                    .chain(bounds.max)
                     .map(f64::abs)
-                    .fold(0., f64::max);
+                    .fold(0., f64::max)
+                    .max((0..3).map(|i| bounds.max[i] - bounds.min[i]).sum());
                 let placement_scale = instance
                     .transform
                     .translation

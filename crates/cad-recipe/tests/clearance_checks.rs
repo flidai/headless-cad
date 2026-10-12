@@ -26,3 +26,18 @@ fn malformed_source_clearance_rejects_before_build() {
     )
     .is_err());
 }
+
+#[test]
+fn source_solid_cylinder_clearance_uses_analytic_geometry() {
+    let source = SOURCE
+        .replace(
+            "rectangle(id='p',width=2,depth=3)",
+            "circle(id='p',radius=1)",
+        )
+        .replace("offset=[5,7,0]", "offset=[5,0,0]");
+    let check = CHECK.replace("min_clearance=4.99", "min_clearance=2.99");
+    let r = cad_recipe::from_starlark("cylinder.star", &format!("{source}{check}")).unwrap();
+    let b = cad_build::build(&r).unwrap();
+    let q = &b.clearance_checks["gap"];
+    assert!(q.lower_bound_mm <= 3. && q.upper_bound_mm >= 3.);
+}

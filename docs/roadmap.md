@@ -81,11 +81,18 @@ exercise section-depth changes and repeated rotated occurrences with independent
 STEP circle checks. Partial or ambiguous intersections reject rather than becoming
 mesh measurements; broader drawing semantics remain a release obligation.
 
+Analytic clearance extends the native query to finite solid cylinders in arbitrary
+rigid poses and mixed cylinder/convex-planar pairs. `cylinder_clearance.star` adds
+skew rollers and a tilted guard with independent STEP distance/witness acceptance.
+Supports remain analytic and nonconvergence is explicit; annular/nonconvex bodies,
+general trimmed curves, continuous motion and manufacturing-envelope clearance
+remain open.
+
 Geometric clearance now has a separate bounded native convex-planar query and
 source-owned occurrence-pair obligation. `clearance_station.star` exercises nested
 rotations and oblique jaws; independent STEP minimum-distance and witness checks
 are required alongside native numerical and failed-publication tests. This advances
-engineering validation beyond size-only stacks, while curved/nonconvex queries,
+engineering validation beyond size-only stacks, while general curved/nonconvex queries,
 whole-assembly pair traversal and continuous-motion collisions remain open.
 
 M6 now also includes bounded worst-case linear dimensional stacks, referencing
