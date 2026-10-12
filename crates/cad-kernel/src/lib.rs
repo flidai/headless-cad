@@ -33,6 +33,7 @@ mod arc_prism;
 mod bored_prism;
 mod circular_boolean;
 mod convex_clearance;
+mod convex_trim_clearance;
 mod hub_keyway;
 mod keyseat;
 mod rotation_clearance;

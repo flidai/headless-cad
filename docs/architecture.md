@@ -3094,3 +3094,29 @@ interior violation while endpoint/midpoint samples remain clear; global native
 failure must preserve the accepted output, including selected-output builds.
 This advances mechanical revision coverage without claiming general nonconvex
 clearance, dynamics, contact or all-pairs motion certification.
+
+
+### Surviving witnesses on drilled rounded prisms
+
+`convex_trim_witness` extends solid clearance to recognized curved line/arc right
+prisms with circular through holes. Original topology, loop/reference budgets
+and native validity are checked before extraction. Canonical hole incidence
+permits removal of only the trailing bore primitives and cap inner loops; the
+outer envelope retains the raw original vertices, curves and surfaces. Convex
+admission and the existing support certificate still apply to this envelope.
+
+Actual material is a subset of that envelope, so its lower distance bound is
+conservative. Its upper bound is reusable only after proving that the nearby
+native material witnesses survive every bore. The support solver exposes its
+witness-displacement and arithmetic budgets internally. Hole exclusion adds
+independent allowances for admitted center, radius and axis deviations plus
+projection/cap reconstruction; it does not substitute modeling tolerance for
+these budgets. Both operands' witnesses are checked when both are trimmed.
+
+The query rejects overlapping envelopes, candidates inside or near any bore,
+and unresolved precision. This path does not certify a shaft's gap inside a
+bore; existing material-domain methods remain separate. The drilled-rotor fixture
+adds three real through holes, native bore/radius dimensions and full-turn
+external-roller evidence. Independent OCCT subtraction builds the reference
+material, and every reported sample checks actual STEP boundary membership and
+analytic distance. Failed interior-motion edits preserve the accepted generation.

@@ -234,6 +234,7 @@ pub(super) fn consistency(
                 circle(&a.circle, &b.circle)
                     && (a.sweep_radians - b.sweep_radians).abs() * b.circle.radius <= error
             }
+            (Curve::Circle(a), Curve::Circle(b)) => circle(a, b),
             _ => false,
         };
         if !valid {
@@ -448,7 +449,10 @@ mod tests {
             .model;
         let hollow = boolean(&a, &bore, BooleanOp::Difference, t).unwrap().model;
         assert!(hollow.validate_convex_clearance_operand(t).is_err());
-        assert!(hollow.clearance(&b, t).is_err());
+        assert_eq!(
+            hollow.clearance(&b, t).unwrap().method,
+            ClearanceMethod::ConvexTrimWitness
+        );
         let concave = extrude_path(
             &PlanarPath {
                 start: [0., 0.],

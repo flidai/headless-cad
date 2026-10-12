@@ -778,3 +778,10 @@ Exact sample formulas, independent STEP witness checks and complete native
 interval coverage accompany the source-owned read-only motion inspector.
 Holed/nonconvex curved clearance and general contact remain open; this increment
 does not close the R3 mechanical-intent gate.
+
+
+The drilled-rotor progression combines rounded edges and real through bores with
+continuous external clearance. An explicit surviving-witness proof distinguishes
+removed material from a filled outer envelope; native and independent tests cover
+hole exclusion, whole-turn edits and atomic failure. General cavity/shaft nesting,
+nonconvex curved distance and contact remain separate open obligations.

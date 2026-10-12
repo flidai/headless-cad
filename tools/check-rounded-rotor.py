@@ -47,15 +47,16 @@ def nominal(radius,offset,theta):
     return math.hypot(x,y)-radius-2
 
 
-def case(cad,root,radius,pose,sign):
+def case(cad,root,radius,pose,sign,drilled=False):
     tag=f'r{radius}-p{pose}-s{sign}';out=root/tag
     params={'corner_radius':radius,'pose':pose,'turn_radians':sign*math.tau}
-    p=c.run(cad,k.ROOT/'examples/rounded_rotor_fixture.star',out,params);k.require(p.returncode==0,p.stderr)
+    name='drilled_rotor_fixture' if drilled else 'rounded_rotor_fixture'
+    p=c.run(cad,k.ROOT/f'examples/{name}.star',out,params);k.require(p.returncode==0,p.stderr)
     manifest=json.loads(p.stdout);f.run(cad,'verify',out)
     group=json.loads((out/'rigid-rotation-groups.json').read_text())['groups']['rotor_rotation']
     k.require(group['coverage']=='named_pairs_only' and group['status']=='named_pairs_passed','named-pair continuous proof')
     k.require(len(group['members'])==1 and group['members'][0]['instance_path']==['rig','rotor'],'one exact moving occurrence')
-    k.require(group['assembly_content_hash']==manifest['outputs']['rounded_rotor_fixture']['content_hash'],'group assembly identity')
+    k.require(group['assembly_content_hash']==manifest['outputs'][name]['content_hash'],'group assembly identity')
     check=manifest['clearance_checks']['rotor_roller_path'];sweep=check['rotation_sweep']
     k.require(check['left']['instance_path']==['rig','roller'] and check['right']['instance_path']==['rig','rotor'],'authored endpoint identity')
     k.require(sweep['proof_kind']=='lipschitz_subdivision' and sweep.get('symmetry') is None,'genuine whole-path subdivision')
@@ -66,10 +67,14 @@ def case(cad,root,radius,pose,sign):
     rotation=group['rotation_world'];k.close(rotation['angle_radians'],sign*math.tau)
     k.require(sweep['speed_bound_mm']>=sweep['radius_bound_mm']*abs(rotation['angle_radians']),'Lipschitz speed bound')
     k.require(sweep['radius_bound_mm']>=math.hypot(math.hypot(10-radius,6-radius)+radius,3),'true farthest native radius covered')
-    leaves=c.imported_leaves(out/'rounded_rotor_fixture.step')
+    leaves=c.imported_leaves(out/f'{name}.step')
     k.require(set(leaves)=={('rig','rotor'),('rig','roller')},'two exact STEP occurrences')
     rotor=leaves[('rig','rotor')]['shape'];roller=leaves[('rig','roller')]['shape']
     expected_rotor=f.filleted([[-10,-6],[10,-6],[10,6],[-10,6]],6,radius,[0,1,2,3])
+    if drilled:
+        for x,r in [(0,2),(-5,1),(5,1)]:
+            drill=BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(x,0,-1),gp_Dir(0,0,1)),r,8).Shape()
+            expected_rotor=k.boolean(BRepAlgoAPI_Cut,expected_rotor,drill)
     expected_roller=BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(18,0,0),gp_Dir(0,0,1)),2,6).Shape()
     for actual,expected in [(rotor,expected_rotor),(roller,expected_roller)]:
         expected=BRepBuilderAPI_Transform(expected,pose_transform(pose),True).Shape()
@@ -77,7 +82,7 @@ def case(cad,root,radius,pose,sign):
     max_distance_error=0.;max_boundary_error=0.
     for sample in sweep['samples']:
         time=sample['time'];exact=nominal(radius,18,sign*math.tau*time);query=sample['query']
-        k.require(query['method']=='convex_support','native convex curved support method')
+        k.require(query['method']==('convex_trim_witness' if drilled else 'convex_support'),'native convex curved support method')
         k.require(sample['lower_bound_mm']<=exact<=sample['upper_bound_mm'],'closed-form sample enclosed')
         moved=rotated(rotor,rotation,time);distance=c.distance(roller,moved)
         c.close(distance,exact);max_distance_error=max(max_distance_error,abs(distance-exact))
@@ -100,8 +105,8 @@ def case(cad,root,radius,pose,sign):
     replay=root/(tag+'-replay');args=[]
     for key,value in params.items():args += ['--param',f'{key}={value}']
     f.run(cad,'build',out/'recipe.star','--out-dir',replay,*args)
-    k.require((replay/'rounded_rotor_fixture.step').read_bytes()==(out/'rounded_rotor_fixture.step').read_bytes(),'captured source and parameters reproduce STEP')
-    return {'case':tag,'parameters':params,'true_full_turn_minimum_mm':minimum,
+    k.require((replay/f'{name}.step').read_bytes()==(out/f'{name}.step').read_bytes(),'captured source and parameters reproduce STEP')
+    return {'case':tag,'drilled':drilled,'parameters':params,'true_full_turn_minimum_mm':minimum,
             'native_interval_mm':[check['lower_bound_mm'],check['upper_bound_mm']],
             'queries':sweep['query_count'],'certified_intervals':len(intervals),
             'max_occt_distance_error_mm':max_distance_error,'max_witness_boundary_distance_mm':max_boundary_error,
@@ -110,10 +115,12 @@ def case(cad,root,radius,pose,sign):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--cad',type=Path,default=k.ROOT/'target/release/cad');p.add_argument('--out-dir',type=Path,required=True)
+    p.add_argument('--drilled',action='store_true',help='Check actual through-drilled rotor and material-witness clearance')
     args=p.parse_args();root=args.out_dir.resolve();root.mkdir(parents=True,exist_ok=False);cad=args.cad.resolve()
-    cases=[case(cad,root,*config) for config in [(2,0,1),(2,1,-1),(3,1,1)]]
+    cases=[case(cad,root,*config,drilled=args.drilled) for config in [(2,0,1),(2,1,-1),(3,1,1)]]
     accepted=root/'r2-p0-s1';before=c.inventory(accepted)
-    failure=f.run(cad,'build',k.ROOT/'examples/rounded_rotor_fixture.star','--param','corner_radius=1','--output','rotor_inspection','--out-dir',accepted,success=False)
+    source=k.ROOT/('examples/drilled_rotor_fixture.star' if args.drilled else 'examples/rounded_rotor_fixture.star')
+    failure=f.run(cad,'build',source,'--param','corner_radius=1','--output','rotor_inspection','--out-dir',accepted,success=False)
     k.require(c.inventory(accepted)==before,'interior-path failed edit preserved generation')
     k.require(nominal(1,18,0)==6 and nominal(1,18,math.pi)==6,'failed edit has clear endpoints and midpoint')
     true_failed=16-(math.hypot(9,5)+1);k.require(true_failed<5,'independent true failed interior minimum')

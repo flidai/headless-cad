@@ -2889,3 +2889,18 @@ remain authoritative. `tools/check-rounded-rotor.py` compares every reported sam
 with a closed-form distance and independent STEP geometry, checks witness
 membership, and verifies the whole-path interval coverage. This fixture proves
 clearance for the named pair; it does not model a contacting transmission.
+
+
+The `drilled_rotor_fixture.star` extension cuts a real central bore and two
+mounting holes into that rotor. Its continuous external-roller check uses the
+explicit `convex_trim_witness` method. A raw outer envelope supplies a conservative
+lower bound; a distance witness is accepted only when it survives every through
+bore with the complete arithmetic and support-projection allowance. Geometry,
+four corner radii and the central bore diameter remain source-bound.
+
+This bounded path supports recognized curved line/arc prisms with circular
+through holes and admitted convex partners. Overlapping outer envelopes,
+witnesses inside or too near a hole, and unresolved numerical cases reject.
+It does not establish clearance for a shaft nested inside the bore. Run
+`tools/check-rounded-rotor.py --drilled` with the optional test oracle to compare
+the actual drilled STEP solids, motion samples and native material witnesses.

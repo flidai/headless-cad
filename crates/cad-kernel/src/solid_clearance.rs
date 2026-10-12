@@ -8,6 +8,7 @@ mod parallel;
 #[serde(rename_all = "snake_case")]
 pub enum ClearanceMethod {
     ConvexSupport,
+    ConvexTrimWitness,
     CoaxialMeridian,
     ParallelAnnular,
     NativeTrimWitness,
@@ -236,7 +237,9 @@ impl ModelSnapshot {
     /// keyed circular extrusion. Pair alignment,
     /// native support consistency and separation still require `clearance`.
     pub fn validate_clearance_operand(&self, t: Tolerance) -> Result<(), KernelError> {
-        if self.validate_convex_clearance_operand(t).is_ok() {
+        if self.validate_convex_clearance_operand(t).is_ok()
+            || crate::convex_trim_clearance::admit(self, t).is_ok()
+        {
             Ok(())
         } else {
             if crate::trim_clearance::is_keyed(self, t) {
@@ -260,6 +263,11 @@ impl ModelSnapshot {
                 right_point: q.right_point,
                 axis: q.axis,
             });
+        }
+        if crate::convex_trim_clearance::is_candidate(self, t)
+            || crate::convex_trim_clearance::is_candidate(other, t)
+        {
+            return crate::convex_trim_clearance::query(self, other, t);
         }
         if crate::trim_clearance::is_keyed(self, t) || crate::trim_clearance::is_keyed(other, t) {
             return crate::trim_clearance::query(self, other, t);

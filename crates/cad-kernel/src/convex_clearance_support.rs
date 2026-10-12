@@ -472,14 +472,37 @@ pub(super) fn query(
     b: &ModelSnapshot,
     t: Tolerance,
 ) -> Result<ConvexClearance, KernelError> {
+    query_bounded(a, b, t, MAX_CLEARANCE_ITERATIONS).map(|certificate| certificate.query)
+}
+pub(crate) struct SupportCertificate {
+    pub query: ConvexClearance,
+    /// Bounds the displacement of either reported convex-combination witness
+    /// from material of its admitted convex operand, including small reflex joins.
+    pub witness_padding: f64,
+    /// World and normalized support arithmetic bound used by the query.
+    pub arithmetic_error: f64,
+}
+pub(crate) fn query_certificate(
+    a: &ModelSnapshot,
+    b: &ModelSnapshot,
+    t: Tolerance,
+) -> Result<SupportCertificate, KernelError> {
     query_bounded(a, b, t, MAX_CLEARANCE_ITERATIONS)
+}
+pub(crate) fn arc_consistency(
+    m: &ModelSnapshot,
+    g: &ArcPrismGeometry,
+    error: f64,
+    t: Tolerance,
+) -> Result<(), KernelError> {
+    arc::consistency(m, g, error, t)
 }
 fn query_bounded(
     a: &ModelSnapshot,
     b: &ModelSnapshot,
     t: Tolerance,
     iterations: usize,
-) -> Result<ConvexClearance, KernelError> {
+) -> Result<SupportCertificate, KernelError> {
     let geometries = [validate(a, t)?, validate(b, t)?];
     let reference = geometries[0]
         .as_ref()
@@ -591,12 +614,16 @@ fn query_bounded(
         let upper = distance.max(norm(sub(right_point, left_point))) + padding;
 
         if lower > t.linear && upper >= lower && upper - lower <= t.linear {
-            return Ok(ConvexClearance {
-                lower_bound_mm: lower,
-                upper_bound_mm: upper,
-                left_point,
-                right_point,
-                axis,
+            return Ok(SupportCertificate {
+                query: ConvexClearance {
+                    lower_bound_mm: lower,
+                    upper_bound_mm: upper,
+                    left_point,
+                    right_point,
+                    axis,
+                },
+                witness_padding: padding,
+                arithmetic_error: error,
             });
         }
         let next = support(&shapes[0], &shapes[1], axis);
