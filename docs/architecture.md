@@ -493,10 +493,11 @@ compares topology and bounded geometry; it does not trust operation provenance.
 Positive annular axial slices provide compensated volume/centroid/inertia
 integration, with independent composite-cylinder formulas and OCCT STEP checks.
 Planar datums use the axis-centered material centroid. Derived meshes share ring
-samples across shoulder and wall faces. Regular conical frusta support sloped profiles with positive endpoint radii.
+samples across shoulder and wall faces. Sloped profiles support regular conical
+frusta and conical ends terminating at the axis.
 Positive polynomial coefficients integrate annular-frustum moments without
-subtracting nearly equal fourth powers. Apex singularities, partial turns,
-general trim topology and curved Booleans remain future work.
+subtracting nearly equal fourth powers. Partial turns, profile arcs, general trim
+topology and curved Booleans remain future work.
 `stepped_spindle.star` exercises connected solids, parameter edits and analytic
 STEP alongside an exploded assembly inspection view.
 
@@ -507,8 +508,30 @@ imports check both taper directions, inward walls and oblique placement. The
 native 3D seam and STEP pcurve agree under the axial-distance parameterization.
 See the [STEP conical-surface definition](https://steptools.com/stds/smrl/data/resource_docs/geometric_and_topological_representation/sys/4_schema.htm).
 Derived conical patches share exact sampled rings with their neighboring faces,
-and exported facet normals match the chordal trapezoids. `tapered_nozzle.star`
+and exported facet normals match the chordal trapezoids or pole triangles. `tapered_nozzle.star`
 extends the corpus with chamfers, countersinks and a parameterized long taper.
+
+Conical poles use real vertices and a three-use boundary loop: one circular
+edge and the periodic seam traversed in opposite directions. There is no
+zero-radius circle, degenerate model edge or synthetic cap. The conical support
+may have reference radius zero at its lower axial endpoint; canonical recognition
+recovers that endpoint from the seam, then compares the complete model against
+the reconstructed meridian. A single contiguous axis interval admits solid
+cones, two-tip solids and pointed blind bores. Isolated axis contacts and pinched
+shells remain rejected. Circle samples are shared with adjacent faces and pole
+fans contain nondegenerate triangles. Independent cone formulas, topology
+mutations, cyclic profile starts, scale changes, oblique transforms and external
+STEP readback cover this bounded singularity contract.
+
+`centering_fixture.star` integrates the capability into a between-centers layout:
+two instances of a shared steel pin seat in opposite conical blind bores, with
+two shared drilled holders, an aluminum workpiece and a base. Datum attachments
+set the frames; these are prescribed placements, not contact or collision
+certification. Parameter tests cover workpiece length, radial bore clearance and
+tip depth. Changing only tip depth rebuilds two native definitions and conserves
+total material volume while changing density-weighted mass. Recipe assertions
+check native volume, mass budget and longitudinal balance. The viewer continues
+to inspect captured source and validated evidence without running modeling tools.
 
 ## Constraints and assemblies
 
@@ -1206,7 +1229,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped/tapered revolutions with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with convex polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |

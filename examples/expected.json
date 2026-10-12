@@ -1106,5 +1106,55 @@
         ]
       ]
     }
+  },
+  "centering_fixture.star": {
+    "centering_fixture": {
+      "volume_mm3": 181532.66713761372,
+      "solids": 6,
+      "bounds_mm": [
+        [
+          -30,
+          -30,
+          0
+        ],
+        [
+          110,
+          30,
+          56
+        ]
+      ]
+    },
+    "center_pin": {
+      "volume_mm3": 4473.627938711866,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -8,
+          -8,
+          0
+        ],
+        [
+          8,
+          8,
+          32
+        ]
+      ]
+    },
+    "workpiece": {
+      "volume_mm3": 63435.0388612851,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          -16,
+          -16,
+          0
+        ],
+        [
+          16,
+          16,
+          80
+        ]
+      ]
+    }
   }
 }

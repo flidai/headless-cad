@@ -9,9 +9,9 @@
 //! Circular extrusions additionally retain exact circles, planar caps, a cylindrical
 //! wall, and an explicit periodic seam. Full-turn piecewise-linear meridian revolutions
 //! additionally support connected stepped shafts and coaxial counterbores with
-//! exact planar shoulders, cylindrical walls, and regular conical frusta. Cone
-//! apex singularities, enclosed cavities, and general curved
-//! Booleans, and nonmanifold contacts remain unsupported.
+//! exact planar shoulders, cylindrical walls, conical frusta, and conical poles.
+//! Enclosed cavities, general curved Booleans, and nonmanifold contacts remain
+//! unsupported.
 //! General rigid rotations support a single strictly convex solid or a validated
 //! right prism with a simple outer boundary and convex disjoint through holes. Exactly represented axis
 //! permutations also retain the orthogonal solid domain. Multi-loop prism caps
@@ -130,8 +130,8 @@ pub struct Cylinder {
     #[serde(default, skip_serializing_if = "is_false")]
     pub inward: bool,
 }
-/// Regular conical support, excluding the apex. Radius at axial coordinate z
-/// is `radius + slope*z`; origin lies at the lower trimming circle center.
+/// Conical support, optionally trimmed at an apex. Radius at axial coordinate z
+/// is `radius + slope*z`; origin lies at the lower trimming circle center or pole.
 /// The outward support normal follows radial - slope*axis (then inward reversal).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

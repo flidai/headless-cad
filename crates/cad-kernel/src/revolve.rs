@@ -35,12 +35,11 @@ pub fn validate_revolve_profile(points: &[[f64; 2]], tol: Tolerance) -> Result<(
         }
         if a[0] != b[0]
             && a[1] != b[1]
-            && (a[0] == 0.
-                || b[0] == 0.
-                || (b[0] - a[0]).abs() <= tol.linear
-                || (b[1] - a[1]).abs() <= tol.linear)
+            && ((b[0] - a[0]).abs() <= tol.linear || (b[1] - a[1]).abs() <= tol.linear)
         {
-            return Err(KernelError::Unsupported("conical edges require positive endpoint radii and radial/axial spans above tolerance; apex singularities unsupported".into()));
+            return Err(KernelError::Unsupported(
+                "conical edges require radial and axial spans above tolerance".into(),
+            ));
         }
         if a[0] != b[0] && a[1] != b[1] {
             let slope = (b[0] - a[0]) / (b[1] - a[1]);
@@ -57,7 +56,7 @@ pub fn validate_revolve_profile(points: &[[f64; 2]], tol: Tolerance) -> Result<(
             axis_edges += 1;
         }
     }
-    // A single axis interval is a regular disk-ended solid. Multiple disjoint
+    // A single axis interval admits disk ends and conical poles. Multiple disjoint
     // contacts would create touching components or a noncanonical axial cavity.
     if axis_edges > 1 || points.iter().filter(|p| p[0] == 0.).count() != axis_edges * 2 {
         return Err(unsupported());
@@ -77,14 +76,24 @@ fn construct(mut g: RevolveGeometry) -> (ModelSnapshot, RevolveGeometry) {
         solids: vec![],
     };
     let mut circles = vec![None; g.profile.len()];
+    let mut vertices = vec![None; g.profile.len()];
     for (i, &p) in g.profile.iter().enumerate() {
         if p[0] == 0. {
+            let prev = g.profile[(i + g.profile.len() - 1) % g.profile.len()];
+            let next = g.profile[(i + 1) % g.profile.len()];
+            if [prev, next].iter().any(|q| q[0] > 0. && q[1] != p[1]) {
+                vertices[i] = Some(VertexId(m.vertices.len()));
+                m.vertices.push(Vertex {
+                    position: world(&g, 0., p[1]),
+                });
+            }
             continue;
         }
         let v = VertexId(m.vertices.len());
         m.vertices.push(Vertex {
             position: world(&g, p[0], p[1]),
         });
+        vertices[i] = Some(v);
         circles[i] = Some(EdgeId(m.edges.len()));
         m.edges.push(Edge {
             vertices: [v, v],
@@ -127,17 +136,21 @@ fn construct(mut g: RevolveGeometry) -> (ModelSnapshot, RevolveGeometry) {
                 normal: g.axis.map(|v| if positive { v } else { -v }),
             })
         } else {
-            let ca = circles[i].unwrap();
-            let cb = circles[j].unwrap();
+            let ca = circles[i];
+            let cb = circles[j];
             let s = EdgeId(m.edges.len());
             seam = Some(s);
             let down = b[1] < a[1];
-            let (lo, hi) = if down { (cb, ca) } else { (ca, cb) };
+            let (lo, hi) = if down {
+                (vertices[j].unwrap(), vertices[i].unwrap())
+            } else {
+                (vertices[i].unwrap(), vertices[j].unwrap())
+            };
             let lower = if down { b } else { a };
             let slope = (b[0] - a[0]) / (b[1] - a[1]);
             let length = slope.hypot(1.);
             m.edges.push(Edge {
-                vertices: [m.edges[lo.0].vertices[0], m.edges[hi.0].vertices[0]],
+                vertices: [lo, hi],
                 curve: Curve::Line(Line {
                     origin: world(&g, lower[0], lower[1]),
                     direction: std::array::from_fn(|i| {
@@ -147,7 +160,13 @@ fn construct(mut g: RevolveGeometry) -> (ModelSnapshot, RevolveGeometry) {
             });
             loops.push(LoopId(m.loops.len()));
             m.loops.push(Loop {
-                edges: vec![eu(ca, false), eu(s, down), eu(cb, true), eu(s, !down)],
+                edges: ca
+                    .map(|e| eu(e, false))
+                    .into_iter()
+                    .chain([eu(s, down)])
+                    .chain(cb.map(|e| eu(e, true)))
+                    .chain([eu(s, !down)])
+                    .collect(),
             });
             if a[0] != b[0] {
                 Surface::Cone(Cone {
@@ -192,11 +211,18 @@ pub fn revolve_polygon(
     tol: Tolerance,
 ) -> Result<OperationResult, KernelError> {
     validate_revolve_profile(points, tol)?;
+    // Axis edges have no boundary face. Start construction at the first actual
+    // surface so canonical recognition recovers the same vertex ordering even
+    // when the caller begins its meridian on the omitted axis interval.
+    let mut profile = points.to_vec();
+    if profile[0][0] == 0. && profile[1][0] == 0. {
+        profile.rotate_left(1);
+    }
     let (model, g) = construct(RevolveGeometry {
         origin: [0.; 3],
         axis: [0., 0., 1.],
         x_direction: [1., 0., 0.],
-        profile: points.to_vec(),
+        profile,
         segments: vec![],
     });
     g.properties()?;
@@ -341,20 +367,31 @@ pub(crate) fn recognize(m: &ModelSnapshot, tol: Tolerance) -> Result<RevolveGeom
                     return Err(unsupported());
                 }
                 let l = m.loops.get(f.loops[0].0).ok_or_else(unsupported)?;
-                if l.edges.len() != 4 {
+                if !(3..=4).contains(&l.edges.len()) {
                     return Err(unsupported());
                 }
-                let ca = get_circle(l.edges[0].edge)?;
-                let cb = get_circle(l.edges[2].edge)?;
-                (
-                    [ca.radius, dot(sub(ca.origin, g.origin), g.axis)],
-                    [cb.radius, dot(sub(cb.origin, g.origin), g.axis)],
-                )
+                let point = |edge_use: EdgeUse| -> Result<[f64; 2], KernelError> {
+                    let edge = m.edges.get(edge_use.edge.0).ok_or_else(unsupported)?;
+                    match &edge.curve {
+                        Curve::Circle(c) => Ok([c.radius, dot(sub(c.origin, g.origin), g.axis)]),
+                        Curve::Line(_) => {
+                            let id = edge.vertices[usize::from(edge_use.reversed)];
+                            let v = m.vertices.get(id.0).ok_or_else(unsupported)?;
+                            Ok([0., dot(sub(v.position, g.origin), g.axis)])
+                        }
+                    }
+                };
+                let start_is_circle = matches!(
+                    m.edges.get(l.edges[0].edge.0).map(|e| &e.curve),
+                    Some(Curve::Circle(_))
+                );
+                let end_index = if start_is_circle { 2 } else { 1 };
+                (point(l.edges[0])?, point(l.edges[end_index])?)
             }
         };
         pairs.push((a, b));
     }
-    if pairs.len() < 3 {
+    if pairs.len() < 2 {
         return Err(unsupported());
     }
     // Recover shared axial levels from circle centers. Roundoff from projecting
@@ -778,7 +815,6 @@ mod tests {
             assert!(bad.revolve_geometry(t).is_err());
         }
         let invalid = [
-            vec![[0., 0.], [5., 0.], [0., 10.]],
             vec![[-1., 0.], [5., 0.], [5., 10.], [-1., 10.]],
             vec![[0., 0.], [0., 10.], [5., 10.], [5., 0.]],
         ];
@@ -892,7 +928,6 @@ mod tests {
             assert!(bad.revolve_geometry(t).is_err());
         }
         for p in [
-            vec![[0., 0.], [2., 0.], [0., 3.]],
             vec![[0., 0.], [2., 0.], [2. + t.linear / 2., 3.], [0., 3.]],
             vec![[0., 0.], [2., 0.], [3., t.linear / 2.], [0., t.linear / 2.]],
         ] {
@@ -909,6 +944,142 @@ mod tests {
             .unwrap()
             .model;
             near(m.volume(), 39. * std::f64::consts::PI * scale.powi(3));
+        }
+    }
+    #[test]
+    fn conical_poles_have_exact_properties_and_closed_meshes() {
+        let t = Tolerance::default();
+        let pi = std::f64::consts::PI;
+        for flipped in [false, true] {
+            let profile = if flipped {
+                vec![[0., 0.], [4., 12.], [0., 12.]]
+            } else {
+                vec![[0., 0.], [4., 0.], [0., 12.]]
+            };
+            let op = revolve_polygon(&profile, t).unwrap();
+            let m = &op.model;
+            assert_eq!((m.faces.len(), m.edges.len(), m.vertices.len()), (2, 2, 2));
+            assert_eq!(m.loops.iter().map(|l| l.edges.len()).sum::<usize>(), 4);
+            let p = m.mass_properties(t).unwrap();
+            let volume = 64. * pi;
+            near(p.volume, volume);
+            near(m.volume(), volume);
+            near(p.centroid.unwrap()[2], if flipped { 9. } else { 3. });
+            near(p.central_inertia.unwrap()[2][2], volume * 3. * 16. / 10.);
+            near(
+                p.central_inertia.unwrap()[0][0],
+                volume * (3. * 16. / 20. + 3. * 144. / 80.),
+            );
+            assert!(!op.history.generated_faces.contains_key(if flipped {
+                "start_cap"
+            } else {
+                "end_cap"
+            }));
+            let mesh =
+                crate::tessellate_analytic(m, t, crate::TessellationPolicy::default()).unwrap();
+            assert!(mesh.patches.iter().all(|p| p.points.len() == 3));
+            let mut edges = BTreeMap::<([u64; 3], [u64; 3]), i32>::new();
+            for patch in mesh.patches {
+                let normal = crate::math::cross(
+                    sub(patch.points[1], patch.points[0]),
+                    sub(patch.points[2], patch.points[0]),
+                );
+                assert!(dot(normal, patch.normal) > 0.);
+                for i in 0..3 {
+                    let a = patch.points[i].map(f64::to_bits);
+                    let b = patch.points[(i + 1) % 3].map(f64::to_bits);
+                    let (key, sign) = if a < b { ((a, b), 1) } else { ((b, a), -1) };
+                    *edges.entry(key).or_default() += sign;
+                }
+            }
+            assert!(edges.values().all(|v| *v == 0));
+            let angle = 0.71_f64;
+            let moved = transform(
+                m,
+                [12., -7., 4.],
+                [0., (angle / 2.).sin(), 0., (angle / 2.).cos()],
+                t,
+            )
+            .unwrap()
+            .model;
+            let q = moved.mass_properties(t).unwrap();
+            near(q.volume, volume);
+            near(
+                q.centroid.unwrap()[0],
+                12. + p.centroid.unwrap()[2] * angle.sin(),
+            );
+            assert!(moved.validate(t).valid);
+            for mutation in 0..3 {
+                let mut bad = m.clone();
+                match mutation {
+                    0 => bad.vertices[1].position[2] += 0.1,
+                    1 => {
+                        bad.loops
+                            .iter_mut()
+                            .find(|l| l.edges.len() == 3)
+                            .unwrap()
+                            .edges[1]
+                            .reversed ^= true
+                    }
+                    _ => bad.edges[1].vertices.swap(0, 1),
+                }
+                assert!(!bad.validate(t).valid);
+            }
+        }
+        let double = revolve_polygon(&[[0., 0.], [4., 6.], [0., 12.]], t)
+            .unwrap()
+            .model;
+        near(double.volume(), 64. * pi);
+        near(double.mass_properties(t).unwrap().centroid.unwrap()[2], 6.);
+        let bored = revolve_polygon(
+            &[[0., 0.], [8., 0.], [8., 20.], [3., 20.], [3., 8.], [0., 5.]],
+            t,
+        )
+        .unwrap()
+        .model;
+        let p = bored.mass_properties(t).unwrap();
+        near(p.volume, (1280. - 108. - 9.) * pi);
+        near(
+            p.centroid.unwrap()[2],
+            (12800. - 108. * 14. - 9. * 7.25) / 1163.,
+        );
+        // An isolated axis contact creates a pinched boundary and stays unsupported.
+        assert!(revolve_polygon(&[[2., 0.], [4., 0.], [0., 8.]], t).is_err());
+    }
+    #[test]
+    fn apex_profiles_are_scale_and_start_vertex_independent() {
+        for source in [
+            vec![[0., 0.], [4., 0.], [0., 12.]],
+            vec![[0., 0.], [4., 6.], [0., 12.]],
+            vec![[0., 0.], [8., 0.], [8., 20.], [3., 20.], [3., 8.], [0., 5.]],
+        ] {
+            for scale in [1e-6, 1., 1e3] {
+                let t = Tolerance {
+                    linear: scale * 1e-8,
+                };
+                let mut profile: Vec<_> = source.iter().map(|p| p.map(|v| v * scale)).collect();
+                let expected = revolve_polygon(&profile, t)
+                    .unwrap()
+                    .model
+                    .mass_properties(t)
+                    .unwrap();
+                for _ in 0..profile.len() {
+                    profile.rotate_left(1);
+                    let m = revolve_polygon(&profile, t).unwrap().model;
+                    let p = m.mass_properties(t).unwrap();
+                    assert!((p.volume / expected.volume - 1.).abs() < 1e-12);
+                    near(
+                        p.centroid.unwrap()[2] / scale,
+                        expected.centroid.unwrap()[2] / scale,
+                    );
+                    assert!(crate::tessellate_analytic(
+                        &m,
+                        t,
+                        crate::TessellationPolicy::default()
+                    )
+                    .is_ok());
+                }
+            }
         }
     }
     #[test]

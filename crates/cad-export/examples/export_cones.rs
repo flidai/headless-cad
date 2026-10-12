@@ -11,6 +11,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("tapered_sleeve", tapered),
         ("flared_sleeve", flared),
         ("oblique_tapered_sleeve", moved),
+        (
+            "upper_apex",
+            revolve_polygon(&[[0., 0.], [8., 0.], [0., 12.]], t)?.model,
+        ),
+        (
+            "upper_apex_oblique",
+            transform(
+                &revolve_polygon(&[[0., 0.], [8., 0.], [0., 12.]], t)?.model,
+                [12., -7., 4.],
+                [0.5, 0.5, 0., 0.5_f64.sqrt()],
+                t,
+            )?
+            .model,
+        ),
+        (
+            "lower_apex",
+            revolve_polygon(&[[0., 0.], [8., 12.], [0., 12.]], t)?.model,
+        ),
+        (
+            "double_apex",
+            revolve_polygon(&[[0., 0.], [8., 6.], [0., 12.]], t)?.model,
+        ),
+        (
+            "blind_apex",
+            revolve_polygon(&[[0., 0.], [10., 0.], [10., 20.], [6., 20.], [0., 8.]], t)?.model,
+        ),
     ] {
         std::fs::write(
             directory.join(format!("{name}.step")),

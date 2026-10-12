@@ -366,8 +366,9 @@ fn tessellate_revolve(
     let mut patches = Vec::with_capacity(n * geometry.segments.len());
     for segment in &geometry.segments {
         if segment.start[1] != segment.end[1] {
-            let start = &rings[&segment.start_circle.unwrap()];
-            let end = &rings[&segment.end_circle.unwrap()];
+            let pole = |z: f64| std::array::from_fn(|a| geometry.origin[a] + geometry.axis[a] * z);
+            let start = segment.start_circle.map(|id| &rings[&id]);
+            let end = segment.end_circle.map(|id| &rings[&id]);
             let sign = (segment.end[1] - segment.start[1]).signum();
             let slope = (segment.end[0] - segment.start[0]) / (segment.end[1] - segment.start[1]);
             // Use the normal of the planar chordal trapezoid exported to STL.
@@ -377,15 +378,30 @@ fn tessellate_revolve(
             for i in 0..n {
                 let j = (i + 1) % n;
                 let (s, c) = (std::f64::consts::TAU * (i as f64 + 0.5) / n as f64).sin_cos();
+                let (points, boundary_edges) = match (start, end) {
+                    (Some(start), Some(end)) => (
+                        vec![start[i], start[j], end[j], end[i]],
+                        vec![segment.start_circle, None, segment.end_circle, None],
+                    ),
+                    (Some(start), None) => (
+                        vec![start[i], start[j], pole(segment.end[1])],
+                        vec![segment.start_circle, None, None],
+                    ),
+                    (None, Some(end)) => (
+                        vec![pole(segment.start[1]), end[j], end[i]],
+                        vec![None, segment.end_circle, None],
+                    ),
+                    (None, None) => unreachable!("axis segments have no surface"),
+                };
                 patches.push(MeshPatch {
                     face: segment.face,
-                    points: vec![start[i], start[j], end[j], end[i]],
+                    points,
                     normal: std::array::from_fn(|a| {
                         sign * (c * geometry.x_direction[a] + s * y[a]
                             - facet_slope * geometry.axis[a])
                             / normal_length
                     }),
-                    boundary_edges: vec![segment.start_circle, None, segment.end_circle, None],
+                    boundary_edges,
                 });
             }
         } else {

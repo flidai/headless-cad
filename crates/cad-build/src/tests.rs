@@ -2323,9 +2323,17 @@ fn revolve_schema_is_strict_and_profile_type_is_explicit() {
 #[test]
 fn unselected_revolve_still_requires_valid_meridian_and_version() {
     let mut recipe = revolved_recipe();
-    // Valid simple polygon, but a cone apex on the revolution axis is unsupported.
+    // A solid cone is supported, even when this output is not requested.
     if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
         *points = vec![[0., 0.], [5., 0.], [0., 10.]];
+    }
+    assert!(BuildEngine::default()
+        .build_outputs(&recipe, &["other".into()])
+        .is_ok());
+    // An isolated axis contact would pinch the revolved shell at one point.
+    // It is a valid planar polygon but remains outside the solid contract.
+    if let Feature::Polygon { points, .. } = &mut recipe.features[0] {
+        *points = vec![[0., 5.], [5., 0.], [5., 10.]];
     }
     assert!(
         matches!(BuildEngine::default().build_outputs(&recipe, &["other".into()]), Err(BuildError::Kernel { feature, .. }) if feature == "shaft")

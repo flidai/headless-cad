@@ -317,6 +317,33 @@ mod tests {
                 1,
                 1,
             ),
+            // Pointed ends have one real ring and a three-use seam loop.
+            // Neither topology nor STEP may invent a zero-radius circle.
+            (
+                vec![[0., 0.], [8., 0.], [0., 12.]],
+                256. * std::f64::consts::PI,
+                0,
+                1,
+            ),
+            (
+                vec![[0., 0.], [8., 12.], [0., 12.]],
+                256. * std::f64::consts::PI,
+                0,
+                1,
+            ),
+            (
+                vec![[0., 0.], [8., 6.], [0., 12.]],
+                256. * std::f64::consts::PI,
+                0,
+                2,
+            ),
+            // A blind conical bore terminates at an inward singularity.
+            (
+                vec![[0., 0.], [10., 0.], [10., 20.], [6., 20.], [0., 8.]],
+                1856. * std::f64::consts::PI,
+                1,
+                1,
+            ),
         ] {
             let model = cad_kernel::revolve_polygon(&profile, t).unwrap().model;
             for model in [
@@ -343,6 +370,16 @@ mod tests {
                     assert!(angle > 0. && angle < std::f64::consts::FRAC_PI_2);
                 }
                 assert!(!step.contains("FACETED_BREP("));
+                for line in step.lines().filter(|line| line.contains("CIRCLE(")) {
+                    let radius: f64 = line
+                        .rsplit(',')
+                        .next()
+                        .unwrap()
+                        .trim_end_matches(");")
+                        .parse()
+                        .unwrap();
+                    assert!(radius > 0., "singularities must not invent a circle");
+                }
                 let stl = to_stl(&model, t).unwrap();
                 let points: Vec<Point> = stl
                     .lines()
