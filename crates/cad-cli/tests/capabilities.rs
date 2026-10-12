@@ -33,7 +33,7 @@ fn discovery_is_deterministic_without_a_recipe_or_output_directory() {
         "catalog must not depend on process or working directory"
     );
     let document: Value = serde_json::from_slice(&first.stdout).unwrap();
-    assert_eq!(document["schema_version"], 1);
+    assert_eq!(document["schema_version"], 2);
     assert_eq!(
         document["cli"]["authoring"]["viewer"],
         "read_only_inspection"
@@ -150,7 +150,7 @@ fn check_arguments(value: &Value, arguments: &[Value], catalog: &Value) {
     for argument in arguments {
         let name = argument["name"].as_str().unwrap();
         match value.get(name) {
-            Some(value) if !value.is_null() => check_type(value, &argument["value_type"], catalog),
+            Some(value) => check_type(value, &argument["value_type"], catalog),
             _ => assert_ne!(argument["required"], true, "missing {name} in {value}"),
         }
     }
@@ -163,6 +163,18 @@ fn check_type(value: &Value, spec: &Value, catalog: &Value) {
         "integer" => value.is_i64() || value.is_u64(),
         "boolean" => value.is_boolean(),
         "enum" => spec["values"].as_array().unwrap().contains(value),
+        "nullable" => {
+            if !value.is_null() {
+                check_type(value, &spec["value"], catalog);
+            }
+            true
+        }
+        "map" => {
+            for entry in value.as_object().unwrap().values() {
+                check_type(entry, &spec["values"], catalog);
+            }
+            true
+        }
         "array" => {
             let values = value.as_array().unwrap();
             if let Some(length) = spec["length"].as_u64() {
@@ -182,7 +194,14 @@ fn check_type(value: &Value, spec: &Value, catalog: &Value) {
                 .find(|object| object["id"] == spec["type_id"])
                 .unwrap();
             check_arguments(value, object["arguments"].as_array().unwrap(), catalog);
+            let mut declared: std::collections::BTreeSet<&str> = object["arguments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|argument| argument["name"].as_str().unwrap())
+                .collect();
             if let Some(discriminator) = object["discriminator"].as_str() {
+                declared.insert(discriminator);
                 let variant = object["variants"]
                     .as_array()
                     .unwrap()
@@ -190,6 +209,20 @@ fn check_type(value: &Value, spec: &Value, catalog: &Value) {
                     .find(|variant| variant["tag_value"] == value[discriminator])
                     .unwrap_or_else(|| panic!("unrecognized {discriminator} in {value}"));
                 check_arguments(value, variant["arguments"].as_array().unwrap(), catalog);
+                declared.extend(
+                    variant["arguments"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|argument| argument["name"].as_str().unwrap()),
+                );
+            }
+            for key in value.as_object().unwrap().keys() {
+                assert!(
+                    declared.contains(key.as_str()),
+                    "uncatalogued field {key} in {}: {value}",
+                    spec["type_id"]
+                );
             }
             true
         }
@@ -216,6 +249,11 @@ fn compiled_corpus_matches_recursive_catalog_argument_types() {
         let source = std::fs::read_to_string(&path).unwrap();
         let recipe = cad_recipe::from_starlark(path.to_str().unwrap(), &source).unwrap();
         let recipe = serde_json::to_value(recipe).unwrap();
+        check_type(
+            &recipe,
+            &serde_json::json!({"kind":"object","type_id":"recipe"}),
+            &catalog,
+        );
         for feature in recipe["features"].as_array().unwrap() {
             let operation = catalog["operations"]
                 .as_array()
@@ -280,4 +318,267 @@ fn compiled_corpus_matches_recursive_catalog_argument_types() {
         covered_objects,
         BTreeSet::from(["sketch_path", "path_segment"])
     );
+}
+
+#[test]
+fn recipe_envelope_defaults_and_populated_metadata_roundtrip_match_catalog() {
+    let directory = tempfile::tempdir().unwrap();
+    let result = cli(directory.path(), &["capabilities"]);
+    assert!(result.status.success());
+    let catalog: Value = serde_json::from_slice(&result.stdout).unwrap();
+    let recipe_type = serde_json::json!({"kind":"object","type_id":"recipe"});
+    let envelope = catalog["object_types"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|spec| spec["id"] == "recipe")
+        .unwrap();
+    for field in [
+        "parts",
+        "assemblies",
+        "assembly_outputs",
+        "face_assertions",
+        "property_assertions",
+        "face_datums",
+    ] {
+        let argument = envelope["arguments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|argument| argument["name"] == field)
+            .unwrap();
+        assert_eq!(argument["recipe_schema_versions"], serde_json::json!([2]));
+        let mut forbidden = serde_json::json!({"schema_version":1,"units":"mm","features":[]});
+        forbidden[field] = serde_json::json!([]);
+        assert!(
+            serde_json::from_value::<cad_build::Recipe>(forbidden).is_err(),
+            "schema 1 accepted {field}"
+        );
+        let mut null_array = serde_json::json!({"schema_version":2,"units":"mm","features":[]});
+        null_array[field] = Value::Null;
+        assert!(
+            serde_json::from_value::<cad_build::Recipe>(null_array).is_err(),
+            "null array accepted: {field}"
+        );
+    }
+    for schema in [1, 2] {
+        let source = serde_json::json!({"schema_version":schema,"units":"mm","features":[]});
+        check_type(&source, &recipe_type, &catalog);
+        let recipe: cad_build::Recipe = serde_json::from_value(source).unwrap();
+        let serialized = serde_json::to_value(recipe).unwrap();
+        assert_eq!(serialized["tolerance"], Value::Null);
+        assert_eq!(serialized["outputs"], serde_json::json!([]));
+        check_type(&serialized, &recipe_type, &catalog);
+        let _: cad_build::Recipe = serde_json::from_value(serialized).unwrap();
+    }
+    let source = serde_json::json!({
+        "schema_version":2,"units":"mm","tolerance":{"linear":1e-7},
+        "features":[{"op":"rectangle","id":"outline","width":20,"depth":10},
+                    {"op":"extrude","id":"body","profile":"outline","height":4}],
+        "outputs":[{"name":"body","feature":"body"}],
+        "parts":[{"id":"part","feature":"body","datums":{"origin":{}},
+                  "metadata":{"material":null,"revision":null}}],
+        "assemblies":[
+            {"id":"child","instances":[{"id":"leaf","part":"part","attachment":null}]},
+            {"id":"root","assemblies":[
+                {"id":"first","assembly":"child"},
+                {"id":"second","assembly":"child","attachment":{
+                    "instance":"first","target_path":["leaf"],"source_path":["leaf"],
+                    "datum":"origin","target_datum":"origin"}}],
+             "instances":[{"id":"attached_part","part":"part","attachment":{
+                "instance":"first","target_path":["leaf"],"datum":"origin","target_datum":"origin"}}]}
+        ],
+        "assembly_outputs":[{"name":"assembly","assembly":"root"}]
+    });
+    check_type(&source, &recipe_type, &catalog);
+    let mut recipe: cad_build::Recipe = serde_json::from_value(source).unwrap();
+    recipe.parts[0].metadata = cad_build::PartMetadata {
+        part_number: Some("PN-001".into()),
+        revision: Some("A".into()),
+        description: Some("Acceptance fixture with explicit material".into()),
+        material: Some(cad_build::Material {
+            name: "Aluminum".into(),
+            density_kg_per_m3: 2700.,
+        }),
+    };
+    recipe.parts[0].metadata.validate().unwrap();
+    let serialized = serde_json::to_value(recipe).unwrap();
+    check_type(&serialized, &recipe_type, &catalog);
+    assert_eq!(
+        serialized["parts"][0]["metadata"]["material"]["density_kg_per_m3"],
+        2700.
+    );
+    assert_eq!(
+        serialized["parts"][0]["datums"]["origin"]["rotation"],
+        serde_json::json!([0., 0., 0., 1.])
+    );
+    let reparsed: cad_build::Recipe = serde_json::from_value(serialized.clone()).unwrap();
+    assert_eq!(serde_json::to_value(reparsed).unwrap(), serialized);
+    // Metadata has named, typed extension fields; arbitrary extra attributes
+    // are not a supported material/part contract.
+    let mut unknown_metadata = serialized;
+    unknown_metadata["parts"][0]["metadata"]["attributes"] =
+        serde_json::json!({"finish":"anodized"});
+    assert!(serde_json::from_value::<cad_build::Recipe>(unknown_metadata).is_err());
+}
+
+#[test]
+fn focused_operation_discovery_returns_only_inline_type_and_domain_closure() {
+    let directory = tempfile::tempdir().unwrap();
+    let full = cli(directory.path(), &["capabilities"]);
+    assert!(full.status.success());
+    let full: Value = serde_json::from_slice(&full.stdout).unwrap();
+    assert_eq!(full["scope"], serde_json::json!({"kind":"full"}));
+    for (id, expected_types) in [
+        (
+            "feature.sketch",
+            vec![
+                "sketch",
+                "sketch_circle_hole",
+                "sketch_constraint",
+                "sketch_path",
+                "sketch_path_segment",
+                "sketch_point",
+            ],
+        ),
+        ("feature.cut", vec![]),
+    ] {
+        let result = cli(directory.path(), &["capabilities", "--operation", id]);
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert!(result.stderr.is_empty());
+        let focused: Value = serde_json::from_slice(&result.stdout).unwrap();
+        assert_eq!(
+            focused["scope"],
+            serde_json::json!({"kind":"operation","id":id})
+        );
+        assert_eq!(focused["identities"], full["identities"]);
+        assert_eq!(focused["schema_version"], full["schema_version"]);
+        for (key, value) in full.as_object().unwrap() {
+            if !["scope", "operations", "object_types", "domains"].contains(&key.as_str()) {
+                assert_eq!(
+                    &focused[key], value,
+                    "focused catalog changed metadata {key}"
+                );
+            }
+        }
+        let operation = full["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|op| op["id"] == id)
+            .unwrap();
+        assert_eq!(focused["operations"], serde_json::json!([operation]));
+        let actual_types: Vec<_> = focused["object_types"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|spec| spec["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(actual_types, expected_types);
+        for spec in focused["object_types"].as_array().unwrap() {
+            assert!(full["object_types"].as_array().unwrap().contains(spec));
+        }
+        let mut actual_domains: Vec<_> = focused["domains"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|domain| domain["id"].as_str().unwrap())
+            .collect();
+        let mut expected_domains: Vec<_> = operation["domain_ids"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|id| id.as_str().unwrap())
+            .collect();
+        actual_domains.sort();
+        expected_domains.sort();
+        assert_eq!(actual_domains, expected_domains);
+        assert_eq!(
+            cli(directory.path(), &["capabilities", "--operation", id]).stdout,
+            result.stdout
+        );
+    }
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn focused_assembly_type_discovery_follows_nullable_inline_objects_not_references() {
+    let directory = tempfile::tempdir().unwrap();
+    for (id, expected_types) in [
+        (
+            "assembly_definition",
+            vec![
+                "assembly_attachment",
+                "assembly_definition",
+                "assembly_instance",
+                "datum_attachment",
+                "part_instance",
+                "rigid_transform",
+            ],
+        ),
+        (
+            "part_definition",
+            vec!["datum", "material", "part_definition", "part_metadata"],
+        ),
+    ] {
+        let result = cli(directory.path(), &["capabilities", "--type", id]);
+        assert!(
+            result.status.success(),
+            "{}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        assert!(result.stderr.is_empty());
+        let focused: Value = serde_json::from_slice(&result.stdout).unwrap();
+        assert_eq!(
+            focused["scope"],
+            serde_json::json!({"kind":"object_type","id":id})
+        );
+        assert_eq!(focused["operations"], serde_json::json!([]));
+        assert_eq!(focused["domains"], serde_json::json!([]));
+        let actual: Vec<_> = focused["object_types"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|spec| spec["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(actual, expected_types);
+        assert_eq!(
+            cli(directory.path(), &["capabilities", "--type", id]).stdout,
+            result.stdout
+        );
+    }
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn focused_discovery_rejects_unknown_ids_and_conflicting_flags_without_writes() {
+    let directory = tempfile::tempdir().unwrap();
+    for args in [
+        vec!["capabilities", "--operation", "feature.fillet"],
+        vec!["capabilities", "--type", "missing_type"],
+    ] {
+        let result = cli(directory.path(), &args);
+        assert!(!result.status.success());
+        assert!(result.stdout.is_empty());
+        let error: Value = serde_json::from_slice(&result.stderr).unwrap();
+        assert_eq!(error["code"], "invalid_request", "{error}");
+    }
+    let conflict = cli(
+        directory.path(),
+        &[
+            "capabilities",
+            "--operation",
+            "feature.cut",
+            "--type",
+            "assembly_definition",
+        ],
+    );
+    assert!(!conflict.status.success());
+    assert!(conflict.stdout.is_empty());
+    assert!(!conflict.stderr.is_empty());
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
 }

@@ -58,15 +58,18 @@ portable route across operating systems.
 
 ```sh
 cad capabilities
+cad capabilities --operation feature.cut
+cad capabilities --type assembly_definition
 cad compile examples/machined_bearing_support.star
 cad check examples/machined_bearing_support.star
 ```
 
 `capabilities` returns a deterministic, versioned JSON catalog without reading a
 recipe, evaluating geometry or creating a cache. It identifies the running
-catalog/kernel/executor/solver implementations, supported recipe schema versions,
-operation arguments,
-nested profile/sketch types, geometry domains, exclusions and resource limits.
+catalog/kernel/executor/assembly/solver implementations, supported recipe schema versions,
+operation arguments, the recipe envelope, nested profile/sketch types, assemblies,
+attachments, materials, face references, engineering assertions, geometry domains,
+exclusions and resource limits.
 Rust clients use `cad_build::capability_catalog()` for the same modeling catalog;
 the CLI adds command and authoring-workflow metadata. Neither `--param` nor
 `--cache-dir` applies to discovery.
@@ -75,8 +78,15 @@ Argument names describe the **JSON recipe IR**, not Starlark signatures. Use
 `compile` to inspect the IR of a source recipe. The catalog is a planning aid,
 not a complete JSON Schema or a guarantee that a particular geometry will work;
 `check` evaluates the supported domain and all validation obligations. The scope
-is current feature/profile/sketch operations. Full assembly authoring schemas,
-release policies and a hosted agent protocol remain future work.
+covers the current recipe argument structure; release policies and a hosted agent
+protocol remain future work. Catalog schema 2 introduces map and nullable types,
+and marks fields restricted to particular recipe schema versions. Catalog and
+recipe schema versions are separate contracts.
+
+Use `--operation ID` or `--type ID` to retrieve a focused contract and its nested
+inline types. Logical references remain IDs rather than expanding referenced
+objects. Global limits and implementation identities remain present; the `scope`
+field distinguishes full and focused CLI reports.
 
 Runtime failures return JSON on stderr and a nonzero exit status. Native operation
 failures retain `code: "kernel_operation_failed"` and a `feature` identifier,

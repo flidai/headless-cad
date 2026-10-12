@@ -362,13 +362,15 @@ moments, selective invalidation and failed-publication obligations cover this
 machining sequence. Advance toward crossing cuts and blind pockets; isolated
 through-bores do not establish general material-removal capability.
 
-The AI-native authoring interface now exposes a versioned feature capability
-catalog through the CLI and Rust SDK, with JSON IR argument shapes, geometry
-domains, exclusions, limits and implementation identities. Parser alignment,
+The AI-native authoring interface now exposes a schema-2 capability
+catalog through the CLI and Rust SDK, with JSON IR recipe, feature, assembly and
+engineering-check argument shapes, geometry domains, exclusions, limits and
+implementation identities. Focused operation/type views include nested inline
+types and retain logical references as IDs. Parser alignment,
 example compilation, side-effect-free discovery and source-correction/replay
 acceptance cover this boundary. Native operation failures identify the failing
 feature as structured data. This advances automation infrastructure; it does not
-close hosted M7 services, full assembly schemas or actual AI design acceptance.
+close hosted M7 services, release-evidence policies or actual AI design acceptance.
 
 ## Example policy
 

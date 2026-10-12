@@ -5,8 +5,9 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
+mod engineering;
 
-pub const CAPABILITY_SCHEMA_VERSION: u32 = 1;
+pub const CAPABILITY_SCHEMA_VERSION: u32 = 2;
 
 /// Identity of the discovery implementation and the implementations it describes.
 /// This is not a hash of the serialized catalog document or a geometry cache key.
@@ -17,6 +18,8 @@ pub fn catalog_build_id() -> &'static str {
         for bytes in [
             b"headless-cad/capability-catalog-build/v1".as_slice(),
             include_bytes!("capabilities.rs").as_slice(),
+            include_bytes!("capabilities/engineering.rs").as_slice(),
+            cad_assembly::assembly_build_id().as_bytes(),
             cad_kernel::KERNEL_BUILD_ID.as_bytes(),
             crate::executor_build_id().as_bytes(),
             crate::solver_build_id().as_bytes(),
@@ -31,6 +34,12 @@ pub fn catalog_build_id() -> &'static str {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ArgumentType {
+    Map {
+        values: Box<ArgumentType>,
+    },
+    Nullable {
+        value: Box<ArgumentType>,
+    },
     String,
     Number,
     Integer,
@@ -55,6 +64,8 @@ pub struct ArgumentSpec {
     pub name: &'static str,
     pub value_type: ArgumentType,
     pub required: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recipe_schema_versions: Vec<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -102,6 +113,7 @@ pub struct DomainCapability {
 }
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ImplementationIdentities {
+    pub assembly_build_id: &'static str,
     pub catalog_build_id: &'static str,
     pub kernel_version: &'static str,
     pub kernel_build_id: &'static str,
@@ -152,6 +164,7 @@ fn arg(name: &'static str, value_type: ArgumentType) -> ArgumentSpec {
         name,
         value_type,
         required: true,
+        recipe_schema_versions: vec![],
         default: None,
         units: None,
         constraints: vec![],
@@ -317,7 +330,7 @@ pub fn capability_catalog() -> CapabilityCatalog {
         ],
     });
     constraint.obligations.extend(["circle pair is [center,rim]; line pair is directed [start,end]; tangency is to infinite support, not guaranteed finite-segment contact", "shared point Jacobian terms accumulate; nonzero resolved segment/radius directions required", "parallel/perpendicular are unoriented modulo pi; directed angle branch and wrap-cut uncertainty are explicit"]);
-    let object_types = vec![
+    let mut object_types = vec![
         object_spec(
             "circle_hole",
             vec![arg("center", numbers(2)), dimension("radius")],
@@ -351,6 +364,8 @@ pub fn capability_catalog() -> CapabilityCatalog {
         ),
         sketch_segment,
     ];
+    object_types.extend(envelope_objects(&operations));
+    object_types.extend(engineering::objects());
     let domain = |id, operation_ids, requirements, exclusions| DomainCapability {
         id,
         operation_ids,
@@ -370,10 +385,212 @@ pub fn capability_catalog() -> CapabilityCatalog {
         domain("boolean.circular_cylinders",vec!["feature.union","feature.cut","feature.intersect"],vec!["two recognized solid circular cylinders with parallel or opposite axes", "union requires matching axial intervals; cut requires tool coverage of left height; intersection may trim common axial interval", "native trimmed circle boundaries, major portions split into <= pi arcs; supported containment and empty cases", "world support reconstruction certified within arithmetic envelope; modeling tolerance never snaps support planes"],vec!["annular operands; disconnected curved union; skew axes; unresolved tangency; general curved operands"]),
         domain("boolean.through_bore",vec!["feature.cut"],vec!["canonical polygon/simple-hole/mixed-hole or line/arc prism stock; solid cylindrical tool", "tool covers whole stock height; circle lies strictly inside material and clear of all boundaries/holes", "sequential bores supported; existing stock faces retained; new inward tool wall attributed; tool caps deleted"],vec!["partial-depth pocket; crossing/touching/outside bore; cutter inside existing hole; skew or uncertain alignment"]),
     ];
-    CapabilityCatalog{schema_version:CAPABILITY_SCHEMA_VERSION,interface:"json_recipe_ir",recipe_schema_versions:vec![1,2],latest_recipe_schema_version:crate::RECIPE_SCHEMA_VERSION,units:"mm",default_linear_tolerance_mm:cad_kernel::Tolerance::default().linear,identities:ImplementationIdentities{catalog_build_id:catalog_build_id(),kernel_version:cad_kernel::KERNEL_VERSION,kernel_build_id:cad_kernel::KERNEL_BUILD_ID,executor_build_id:crate::executor_build_id(),sketch_solver_build_id:crate::solver_build_id()},operations,object_types,domains,
+    CapabilityCatalog{schema_version:CAPABILITY_SCHEMA_VERSION,interface:"json_recipe_ir",recipe_schema_versions:vec![1,2],latest_recipe_schema_version:crate::RECIPE_SCHEMA_VERSION,units:"mm",default_linear_tolerance_mm:cad_kernel::Tolerance::default().linear,identities:ImplementationIdentities{assembly_build_id:cad_assembly::assembly_build_id(),catalog_build_id:catalog_build_id(),kernel_version:cad_kernel::KERNEL_VERSION,kernel_build_id:cad_kernel::KERNEL_BUILD_ID,executor_build_id:crate::executor_build_id(),sketch_solver_build_id:crate::solver_build_id()},operations,object_types,domains,
         resource_limits:BTreeMap::from([("features_per_recipe",crate::MAX_FEATURES),("demanded_sketches_per_build",128),("polygon_points_total",crate::MAX_POLYGON_POINTS),("profile_holes_total",crate::MAX_POLYGON_HOLES),("sketch_points_total",cad_sketch::MAX_POINTS),("sketch_constraints_total",cad_sketch::MAX_CONSTRAINTS),("sketch_points_per_island",cad_sketch::MAX_ISLAND_POINTS),("sketch_constraints_per_island",cad_sketch::MAX_ISLAND_CONSTRAINTS),("solver_iterations_per_island",cad_sketch::MAX_ITERATIONS),("parts_per_recipe",crate::MAX_PARTS),("assemblies_per_recipe",crate::MAX_ASSEMBLIES),("instances_per_recipe",crate::MAX_INSTANCES),("outputs_per_recipe",crate::MAX_OUTPUTS)]),
         sketch_policy:SketchPolicy{report_schema_version:3,angular_tolerance_radians:cad_sketch::ANGULAR_TOLERANCE_RADIANS,max_condition_bound:cad_sketch::MAX_CONDITION_BOUND,acceptance:"fully_constrained only; linear residuals in mm and angular residuals in radians checked separately; condition bound is worst local normalized Jacobian condition, not coordinate accuracy"},
         validation_obligations:vec!["recipe units must be mm; schemas 1 and 2 accepted; assembly/assertion/datum fields require schema 2", "strict structural fields, unique identifiers, valid references, acyclic dependencies and aggregate resource budgets", "default tolerance is native Tolerance::default(); requested tolerance must be finite and positive", "numeric bounds, minimum feature clearances, canonical native topology and analytic mass properties validated; a declared family does not guarantee every parameter combination", "semantic face selections and property assertions must resolve; display meshes are derived, never authoritative", "unsupported operations fail explicitly; no implicit repair or dimensional snapping", "example paths are repository fixtures illustrating the domain, not a guarantee that arbitrary parameter edits succeed"],unsupported_operation_ids:vec!["feature.fillet","feature.chamfer","feature.loft","feature.sweep","feature.shell","feature.import_step","feature.general_boolean","assembly.solve_joints"]}
+}
+
+fn nullable(value: ArgumentType) -> ArgumentType {
+    ArgumentType::Nullable {
+        value: Box::new(value),
+    }
+}
+fn map(values: ArgumentType) -> ArgumentType {
+    ArgumentType::Map {
+        values: Box::new(values),
+    }
+}
+fn envelope_objects(operations: &[OperationCapability]) -> Vec<ObjectSpec> {
+    use ArgumentType as T;
+    let optional_null = |name, kind| optional(arg(name, nullable(kind)), Value::Null);
+    let array_default = |name, kind| optional(arg(name, array(kind, None)), json!([]));
+    let identity = json!({"translation":[0.,0.,0.],"rotation":[0.,0.,0.,1.]});
+    let transform_args = || {
+        vec![
+            optional(arg("translation", numbers(3)), json!([0., 0., 0.])),
+            optional(arg("rotation", numbers(4)), json!([0., 0., 0., 1.])),
+        ]
+    };
+    let mut recipe = object_spec(
+        "recipe",
+        vec![
+            arg("schema_version", T::Integer),
+            arg("units", T::Enum { values: vec!["mm"] }),
+            optional_null("tolerance", object("tolerance")),
+            arg("features", array(object("feature"), None)),
+            array_default("outputs", object("output")),
+        ],
+    );
+    recipe.arguments[0]
+        .constraints
+        .push("supported values: 1, 2");
+    for (name, kind) in [
+        ("parts", "part_definition"),
+        ("assemblies", "assembly_definition"),
+        ("assembly_outputs", "assembly_output"),
+        ("face_assertions", "face_assertion"),
+        ("property_assertions", "property_assertion"),
+        ("face_datums", "face_datum"),
+    ] {
+        let mut a = array_default(name, object(kind));
+        a.recipe_schema_versions = vec![2];
+        a.constraints
+            .push("schema 1 rejects field presence, even an empty array; null is invalid");
+        recipe.arguments.push(a);
+    }
+    recipe.obligations.extend(["unique definition/output IDs, typed references and bounded acyclic graphs", "default tolerance is used for omitted or null tolerance; accepted recipe geometry is always validated"]);
+    let feature = ObjectSpec {
+        id: "feature",
+        arguments: vec![],
+        discriminator: Some("op"),
+        variants: operations
+            .iter()
+            .map(|op| ObjectVariant {
+                tag_value: op.json_op,
+                arguments: op
+                    .arguments
+                    .iter()
+                    .filter(|a| a.name != "op")
+                    .cloned()
+                    .collect(),
+            })
+            .collect(),
+        obligations: vec![
+            "operation-specific fields only; native validation remains authoritative",
+        ],
+    };
+    let mut tolerance = object_spec("tolerance", vec![arg("linear", T::Number)]);
+    tolerance.arguments[0].units = Some("mm");
+    tolerance.arguments[0]
+        .constraints
+        .push("finite and strictly positive");
+    let mut material = object_spec(
+        "material",
+        vec![arg("name", T::String), arg("density_kg_per_m3", T::Number)],
+    );
+    material.arguments[0]
+        .constraints
+        .push("nonempty; no surrounding whitespace");
+    material.arguments[1].units = Some("kg/m^3");
+    material.arguments[1]
+        .constraints
+        .push("finite and positive");
+    let mut metadata = object_spec(
+        "part_metadata",
+        vec![
+            optional_null("part_number", T::String),
+            optional_null("revision", T::String),
+            optional_null("description", T::String),
+            optional_null("material", object("material")),
+        ],
+    );
+    metadata.obligations.extend([
+        "part_number and revision, when present, must be nonempty without surrounding whitespace",
+        "description, when present, must contain non-whitespace text; no arbitrary attributes map",
+    ]);
+    let mut part = object_spec(
+        "part_definition",
+        vec![
+            arg("id", T::String),
+            arg("feature", reference("solid_feature")),
+            optional(arg("metadata", object("part_metadata")), json!({})),
+            optional(arg("datums", map(object("datum"))), json!({})),
+        ],
+    );
+    part.obligations.extend(["datum map keys are literal datum names; at most 1024 combined explicit and derived datums per part", "part geometry remains immutable and shared across occurrences"]);
+    let mut frame = object_spec("rigid_transform", transform_args());
+    frame.obligations.extend(["translation in mm; unit quaternion [x,y,z,w], finite values; no normalization/scaling/shear"]);
+    let mut datum = object_spec("datum", transform_args());
+    datum.obligations.extend([
+        "local part rigid frame stored as the value of the datums map; the map key names the datum",
+        "same finite/unit-quaternion validation as rigid_transform",
+    ]);
+    let mut attachment = object_spec(
+        "datum_attachment",
+        vec![
+            arg("instance", reference("sibling_occurrence")),
+            array_default("target_path", reference("occurrence_path_component")),
+            arg("datum", reference("source_part_datum")),
+            arg("target_datum", reference("target_part_datum")),
+        ],
+    );
+    attachment.obligations.extend(["instance identifies target root occurrence within this assembly definition; target_path contains literal descendant occurrence IDs and must end at a part", "empty target_path targets a sibling leaf; bounded acyclic attachment dependencies, not a nonlinear assembly solver"]);
+    let mut assembly_attachment = object_spec(
+        "assembly_attachment",
+        vec![
+            arg("instance", reference("sibling_occurrence")),
+            array_default("target_path", reference("occurrence_path_component")),
+            arg(
+                "source_path",
+                array(reference("occurrence_path_component"), None),
+            ),
+            arg("datum", reference("source_part_datum")),
+            arg("target_datum", reference("target_part_datum")),
+        ],
+    );
+    assembly_attachment.obligations.extend(["source_path is nonempty and ends at a part inside this child assembly; target_path resolves relative to the target root occurrence", "paths use literal occurrence IDs, not slash-encoded strings; depth/work/resource limits apply"]);
+    let mut part_instance = object_spec(
+        "part_instance",
+        vec![
+            arg("id", T::String),
+            arg("part", reference("part_definition")),
+            optional(
+                arg("transform", object("rigid_transform")),
+                identity.clone(),
+            ),
+            optional_null("attachment", object("datum_attachment")),
+        ],
+    );
+    part_instance.obligations.push("transform is local placement; with attachment it is the offset composed between target datum and inverse source datum");
+    let mut assembly_instance = object_spec(
+        "assembly_instance",
+        vec![
+            arg("id", T::String),
+            arg("assembly", reference("assembly_definition")),
+            optional(arg("transform", object("rigid_transform")), identity),
+            optional_null("attachment", object("assembly_attachment")),
+        ],
+    );
+    assembly_instance.obligations.push("child definition is instantiated rigidly, with optional descendant datum attachment and local offset; no joint solving");
+    let mut assembly = object_spec(
+        "assembly_definition",
+        vec![
+            arg("id", T::String),
+            array_default("instances", object("part_instance")),
+            array_default("assemblies", object("assembly_instance")),
+        ],
+    );
+    assembly.obligations.extend(["part and child occurrence IDs share one namespace per definition; nesting must be acyclic and within expansion budgets", "occurrences may overlap; assembly material volume/mass sums occurrences rather than Boolean union; placement is not collision certification"]);
+    vec![
+        recipe,
+        feature,
+        tolerance,
+        object_spec(
+            "output",
+            vec![
+                arg("name", T::String),
+                arg("feature", reference("solid_feature")),
+            ],
+        ),
+        part,
+        metadata,
+        material,
+        frame,
+        datum,
+        assembly,
+        part_instance,
+        assembly_instance,
+        attachment,
+        assembly_attachment,
+        object_spec(
+            "assembly_output",
+            vec![
+                arg("name", T::String),
+                arg("assembly", reference("assembly_definition")),
+            ],
+        ),
+    ]
 }
 
 #[cfg(test)]
@@ -454,6 +671,112 @@ mod tests {
         }
     }
     #[test]
+    fn recipe_envelope_presence_and_assembly_defaults_match_serde() {
+        let catalog = capability_catalog();
+        let recipe_spec = catalog
+            .object_types
+            .iter()
+            .find(|o| o.id == "recipe")
+            .unwrap();
+        let base = json!({"schema_version":1,"units":"mm","features":[]});
+        let recipe: crate::Recipe = serde_json::from_value(base.clone()).unwrap();
+        assert!(recipe.outputs.is_empty());
+        assert!(recipe.tolerance.is_none());
+        for arg in recipe_spec
+            .arguments
+            .iter()
+            .filter(|a| a.recipe_schema_versions == [2])
+        {
+            let mut source = base.clone();
+            source[arg.name] = json!([]);
+            assert!(
+                serde_json::from_value::<crate::Recipe>(source.clone()).is_err(),
+                "schema1 presence {}",
+                arg.name
+            );
+            source["schema_version"] = json!(2);
+            assert!(serde_json::from_value::<crate::Recipe>(source.clone()).is_ok());
+            source[arg.name] = Value::Null;
+            assert!(
+                serde_json::from_value::<crate::Recipe>(source).is_err(),
+                "null array {}",
+                arg.name
+            );
+        }
+        let source = json!({"schema_version":2,"units":"mm","tolerance":null,"features":[],"parts":[{"id":"part","feature":"body","metadata":{"part_number":"PN-1","revision":null,"description":"A part","material":{"name":"steel","density_kg_per_m3":7800}},"datums":{"mount":{}}}],"assemblies":[{"id":"root","instances":[{"id":"base","part":"part","attachment":null},{"id":"follower","part":"part","attachment":{"instance":"base","datum":"mount","target_datum":"mount"}}],"assemblies":[{"id":"child","assembly":"nested","attachment":{"instance":"base","source_path":["leaf"],"datum":"mount","target_datum":"mount"}}]},{"id":"nested","instances":[{"id":"leaf","part":"part"}]}],"assembly_outputs":[{"name":"root","assembly":"root"}]});
+        let recipe: crate::Recipe = serde_json::from_value(source).unwrap();
+        assert!(recipe.tolerance.is_none());
+        assert_eq!(
+            recipe.parts[0].datums["mount"],
+            crate::RigidTransform::default()
+        );
+        assert_eq!(
+            recipe.assemblies[0].instances[0].transform,
+            crate::RigidTransform::default()
+        );
+        assert!(recipe.assemblies[0].instances[1]
+            .attachment
+            .as_ref()
+            .unwrap()
+            .target_path
+            .is_empty());
+        assert_eq!(
+            recipe.assemblies[0].assemblies[0]
+                .attachment
+                .as_ref()
+                .unwrap()
+                .source_path,
+            ["leaf"]
+        );
+        assert!(recipe.assemblies[0].assemblies[0]
+            .attachment
+            .as_ref()
+            .unwrap()
+            .target_path
+            .is_empty());
+        assert_eq!(
+            recipe.parts[0]
+                .metadata
+                .material
+                .as_ref()
+                .unwrap()
+                .density_kg_per_m3,
+            7800.
+        );
+        let part: crate::PartDefinition =
+            serde_json::from_value(json!({"id":"p","feature":"body"})).unwrap();
+        assert_eq!(part.metadata, crate::PartMetadata::default());
+        assert!(part.datums.is_empty());
+        assert!(serde_json::from_value::<crate::PartMetadata>(
+            json!({"attributes":{"custom":"x"}})
+        )
+        .is_err());
+        assert!(serde_json::from_value::<crate::PartDefinition>(
+            json!({"id":"p","feature":"body","metadata":null})
+        )
+        .is_err());
+        assert!(serde_json::from_value::<crate::Instance>(
+            json!({"id":"i","part":"p","transform":null})
+        )
+        .is_err());
+        for id in [
+            "recipe",
+            "part_definition",
+            "part_metadata",
+            "material",
+            "rigid_transform",
+            "datum",
+            "assembly_definition",
+            "part_instance",
+            "assembly_instance",
+            "datum_attachment",
+            "assembly_attachment",
+            "assembly_output",
+        ] {
+            assert!(catalog.object_types.iter().any(|o| o.id == id));
+        }
+    }
+    #[test]
     fn discovery_is_deterministic_closed_and_backed_by_repository_examples() {
         let a = capability_catalog();
         let b = capability_catalog();
@@ -481,6 +804,8 @@ mod tests {
             match t {
                 ArgumentType::Object { type_id } => assert!(objects.contains(type_id)),
                 ArgumentType::Array { items, .. } => check_type(items, objects),
+                ArgumentType::Map { values } => check_type(values, objects),
+                ArgumentType::Nullable { value } => check_type(value, objects),
                 _ => {}
             }
         }

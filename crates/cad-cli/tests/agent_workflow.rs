@@ -27,7 +27,7 @@ fn good(args: &[&str]) -> Value {
 #[test]
 fn discover_diagnose_patch_and_replay_an_engineering_revision() {
     let catalog = good(&["capabilities"]);
-    assert_eq!(catalog["schema_version"], 1);
+    assert_eq!(catalog["schema_version"], 2);
     let dir = tempfile::tempdir().unwrap();
     let recipe = dir.path().join("part.star");
     let source = recipe.to_str().unwrap();

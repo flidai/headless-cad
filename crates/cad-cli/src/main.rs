@@ -8,6 +8,7 @@ use cad_build::{BuildEngine, BuildResult, Recipe};
 use clap::{Parser, Subcommand};
 use serde_json::{json, Value};
 
+mod capabilities;
 mod server;
 mod watch;
 
@@ -61,7 +62,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Describe supported recipe operations, limits and headless workflows as JSON.
-    Capabilities,
+    Capabilities {
+        /// Return one operation and its inline type/domain dependencies.
+        #[arg(long, conflicts_with = "object_type")]
+        operation: Option<String>,
+        /// Return one object type and its transitive inline object dependencies.
+        #[arg(long = "type", conflicts_with = "operation")]
+        object_type: Option<String>,
+    },
     /// Integrate volume, centroid and central inertia from exact output geometry.
     Properties {
         recipe: PathBuf,
@@ -775,17 +783,20 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             Command::Init { .. }
                 | Command::Validate { .. }
                 | Command::Serve { .. }
-                | Command::Capabilities
+                | Command::Capabilities { .. }
         )
     {
         return Err("parameter overrides apply only to recipe commands".into());
     }
     match &cli.command {
-        Command::Capabilities => {
+        Command::Capabilities {
+            operation,
+            object_type,
+        } => {
             if cli.cache_dir.is_some() {
                 return Err("capabilities does not use a geometry cache; omit --cache-dir".into());
             }
-            let mut document = serde_json::to_value(cad_build::capabilities::capability_catalog())?;
+            let mut document = capabilities::report(operation.as_deref(), object_type.as_deref())?;
             document["cli"] = json!({
                 "version": env!("CARGO_PKG_VERSION"),
                 "authoring": {

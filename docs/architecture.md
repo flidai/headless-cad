@@ -267,9 +267,14 @@ current Starlark interpreter limits alone are not this service boundary.
 ### Implemented capability discovery
 
 `cad capabilities` and `cad_build::capability_catalog()` expose a deterministic
-schema-1 catalog of current JSON IR feature operations, argument shapes, nested
-profile/sketch types, supported geometry domains, exclusions and resource limits.
-Implementation identities pin the catalog, kernel, executor and sketch solver;
+schema-2 catalog of current JSON IR feature operations, the recipe envelope,
+profile/sketch types, nested assemblies, attachments, materials, face references
+and engineering assertions, supported geometry domains, exclusions and resource
+limits. Map and nullable argument types make schema 2 incompatible with strict
+schema-1 catalog readers; recipe schema versions remain independent. Field
+annotations identify recipe-version restrictions, including fields whose mere
+presence is forbidden in recipe schema 1.
+Implementation identities pin the catalog, kernel, executor, assembly and sketch solver;
 the catalog fingerprint also changes when its own contract source changes. The CLI
 adds its version, authoring guidance and recipe-command publication semantics.
 Discovery requires no recipe, geometry, network or cache. Numeric/resource values
@@ -277,10 +282,18 @@ use implementation constants where available; executable parser-alignment and
 example-compilation tests guard the curated contract against drift.
 
 This is capability discovery, not a complete JSON Schema, a solver for input
-feasibility or the target release-evidence ledger. Assembly authoring, locked
-module resolution, source-span mappings and hosted job controls are not implied
-by the feature catalog. Every input still passes structural and geometric
+feasibility or the target release-evidence ledger. Locked module resolution,
+source-span mappings and hosted job controls are not implied by the catalog. Every input still passes structural and geometric
 validation. Starlark call syntax remains distinct from JSON IR argument names.
+
+`cad capabilities --operation feature.sketch` and
+`cad capabilities --type assembly_definition` provide bounded focused views.
+They include the transitive closure of inline object types, including map values,
+nullable values and discriminator variants; logical references remain IDs. The
+CLI reports `scope`, retains global limits and identities, and returns an error
+for unknown IDs. Full-recipe corpus validation, parser defaults/nullability and
+version-presence checks, deterministic output and side-effect-free focused
+discovery guard this boundary.
 
 The CLI retains `kernel_operation_failed` and the failing feature for native
 operation failures, and now adds diagnostic text and implementation identities. It does not yet
@@ -1755,7 +1768,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 
 | Area | Implemented now | Target work |
 | --- | --- | --- |
-| Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned feature capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
+| Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Locked modules, unit types, source maps, full public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through-bores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
