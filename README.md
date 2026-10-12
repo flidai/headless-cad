@@ -1,4 +1,9 @@
-# Headless CAD
+# Headless CAD — Experimental
+
+> **Experimental research and development software.** Geometry support is bounded,
+> APIs and artifact formats may change, and the commercial release gates remain
+> open. This project is not yet production-ready CAD. Validate engineering and
+> manufacturing outputs independently before relying on them.
 
 **Write a recipe. Build a part. Inspect it. Export it.**
 
@@ -10,7 +15,7 @@ its current bounded geometry support is not the product's target scope.
 The [competitive release contract](docs/architecture.md#first-competitive-release-contract)
 covers reliable revisions, large assemblies, mechanical constraints,
 manufacturing deliverables and reproducible human/AI workflows. The overall
-product goal remains active as these capabilities are implemented and validated.
+product goal remains incomplete as these capabilities are implemented and validated.
 The [commercial release readiness ledger](docs/architecture.md#commercial-release-readiness)
 records the five open product gates and the work that still blocks release.
 
