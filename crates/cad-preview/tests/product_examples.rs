@@ -121,8 +121,13 @@ fn product_recipes_match_independent_analytical_expectations() {
                 (model.volume(), model.solids.len(), model.bounds())
             };
             let expected_volume = expected["volume_mm3"].as_f64().unwrap();
+            // Numerical sketch solutions carry a dimensional residual budget.
+            // Their fixtures state separately propagated volume/position bounds;
+            // existing directly constructed fixtures retain the stricter default.
+            let volume_tolerance = expected["volume_tolerance_mm3"].as_f64().unwrap_or(1e-7);
+            let linear_tolerance = expected["linear_tolerance_mm"].as_f64().unwrap_or(1e-7);
             assert!(
-                (volume - expected_volume).abs() < 1e-7,
+                (volume - expected_volume).abs() < volume_tolerance,
                 "{filename}:{name}: actual {} expected {expected_volume}",
                 volume
             );
@@ -130,11 +135,11 @@ fn product_recipes_match_independent_analytical_expectations() {
             for axis in 0..3 {
                 assert!(
                     (bounds.min[axis] - expected["bounds_mm"][0][axis].as_f64().unwrap()).abs()
-                        < 1e-7
+                        < linear_tolerance
                 );
                 assert!(
                     (bounds.max[axis] - expected["bounds_mm"][1][axis].as_f64().unwrap()).abs()
-                        < 1e-7
+                        < linear_tolerance
                 );
             }
         }

@@ -14,6 +14,12 @@ use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
+mod sketch_profiles;
+pub use cad_sketch::{Constraint, ConstraintKind, Sketch, SketchPoint, SolveReport, SolveStatus};
+pub fn solver_build_id() -> &'static str {
+    cad_sketch::SOLVER_BUILD_ID
+}
+
 mod assembly;
 mod demand;
 mod property_assertions;
@@ -54,6 +60,7 @@ pub fn executor_build_id() -> &'static str {
         for source in [
             include_bytes!("lib.rs").as_slice(),
             include_bytes!("assembly.rs").as_slice(),
+            include_bytes!("sketch_profiles.rs").as_slice(),
             include_bytes!("demand.rs").as_slice(),
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
@@ -179,6 +186,12 @@ impl<'de> Deserialize<'de> for Recipe {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Feature {
+    Sketch {
+        id: String,
+        sketch: Sketch,
+        loops: Vec<Vec<String>>,
+        op_version: u32,
+    },
     Path {
         id: String,
         #[serde(flatten)]
@@ -279,6 +292,8 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut points = None;
                 let mut start = None;
                 let mut segments = None;
+                let mut sketch = None;
+                let mut loops = None;
                 let mut holes = None;
                 let mut circular_holes = None;
                 let mut height = None;
@@ -309,6 +324,8 @@ impl<'de> Deserialize<'de> for Feature {
                         "points" => read_field!(points, Vec<[f64; 2]>),
                         "start" => read_field!(start, [f64; 2]),
                         "segments" => read_field!(segments, Vec<PathSegment>),
+                        "sketch" => read_field!(sketch, Sketch),
+                        "loops" => read_field!(loops, Vec<Vec<String>>),
                         "holes" => read_field!(holes, Vec<Vec<[f64; 2]>>),
                         "circular_holes" => {
                             read_field!(circular_holes, Vec<cad_kernel::CircleHole>)
@@ -334,6 +351,8 @@ impl<'de> Deserialize<'de> for Feature {
                                     "points",
                                     "start",
                                     "segments",
+                                    "sketch",
+                                    "loops",
                                     "holes",
                                     "circular_holes",
                                     "height",
@@ -352,6 +371,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let id = id.ok_or_else(|| M::Error::missing_field("id"))?;
                 let op_version = op_version.unwrap_or_else(operation_version);
                 let allowed: &[&str] = match op.as_str() {
+                    "sketch" => &["op", "id", "op_version", "sketch", "loops"],
                     "path" => &[
                         "op",
                         "id",
@@ -385,6 +405,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "rectangle",
                                 "polygon",
                                 "path",
+                                "sketch",
                                 "extrude",
                                 "revolve",
                                 "translate",
@@ -402,6 +423,12 @@ impl<'de> Deserialize<'de> for Feature {
                     }
                 }
                 Ok(match op.as_str() {
+                    "sketch" => Feature::Sketch {
+                        id,
+                        op_version,
+                        sketch: sketch.ok_or_else(|| M::Error::missing_field("sketch"))?,
+                        loops: loops.ok_or_else(|| M::Error::missing_field("loops"))?,
+                    },
                     "path" => Feature::Path {
                         id,
                         op_version,
@@ -491,6 +518,7 @@ impl Feature {
             Self::Circle { id, .. }
             | Self::Rectangle { id, .. }
             | Self::Polygon { id, .. }
+            | Self::Sketch { id, .. }
             | Self::Path { id, .. }
             | Self::Extrude { id, .. }
             | Self::Revolve { id, .. }
@@ -506,6 +534,7 @@ impl Feature {
             Self::Circle { .. }
             | Self::Rectangle { .. }
             | Self::Polygon { .. }
+            | Self::Sketch { .. }
             | Self::Path { .. } => vec![],
             Self::Extrude { profile, .. } | Self::Revolve { profile, .. } => vec![profile],
             Self::Translate { body, .. } | Self::Transform { body, .. } => vec![body],
@@ -517,7 +546,11 @@ impl Feature {
     pub fn is_solid(&self) -> bool {
         !matches!(
             self,
-            Self::Circle { .. } | Self::Rectangle { .. } | Self::Polygon { .. } | Self::Path { .. }
+            Self::Sketch { .. }
+                | Self::Circle { .. }
+                | Self::Rectangle { .. }
+                | Self::Polygon { .. }
+                | Self::Path { .. }
         )
     }
     fn version(&self) -> u32 {
@@ -525,6 +558,7 @@ impl Feature {
             Self::Circle { op_version, .. }
             | Self::Rectangle { op_version, .. }
             | Self::Polygon { op_version, .. }
+            | Self::Sketch { op_version, .. }
             | Self::Path { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Revolve { op_version, .. }
@@ -540,6 +574,7 @@ impl Feature {
             Self::Circle { .. } => "circle",
             Self::Rectangle { .. } => "rectangle",
             Self::Polygon { .. } => "polygon",
+            Self::Sketch { .. } => "sketch",
             Self::Path { .. } => "path",
             Self::Extrude { .. } => "extrude",
             Self::Revolve { .. } => "revolve",
@@ -583,6 +618,7 @@ pub struct BuildStats {
 
 #[derive(Debug)]
 pub struct BuildResult {
+    pub sketch_reports: BTreeMap<String, SolveReport>,
     pub scope: BuildScope,
     pub outputs: BTreeMap<String, BuiltOutput>,
     pub assemblies: BTreeMap<String, cad_assembly::BuiltAssembly>,
@@ -596,6 +632,14 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("invalid sketch feature '{feature}': {message}")]
+    Sketch { feature: String, message: String },
+    #[error("sketch feature '{feature}' did not solve completely")]
+    SketchSolveFailed {
+        feature: String,
+        report: Box<SolveReport>,
+        content_hash: String,
+    },
     #[error("property assertions require recipe schema version 2")]
     PropertyAssertionSchema,
     #[error("invalid property assertion '{id}': {message}")]
@@ -805,6 +849,12 @@ fn hash_feature(
         hash.update(hashes[dependency].as_bytes());
     }
     match feature {
+        Feature::Sketch { sketch, loops, .. } => {
+            hash.update(cad_sketch::SOLVER_BUILD_ID.as_bytes());
+            hash.update(
+                &serde_json::to_vec(&(sketch, loops)).expect("validated sketch serializes"),
+            );
+        }
         Feature::Path {
             path,
             circular_holes,
@@ -1113,6 +1163,9 @@ impl BuildEngine {
         let order = ordered_features(recipe, &indices)?;
         for feature in &recipe.features {
             match feature {
+                Feature::Sketch {
+                    id, sketch, loops, ..
+                } => sketch_profiles::validate(id, sketch, loops)?,
                 Feature::Circle {
                     id,
                     radius,
@@ -1241,6 +1294,9 @@ impl BuildEngine {
             .iter()
             .map(String::as_str)
             .collect();
+        sketch_profiles::budget(recipe, &wanted)?;
+        let mut sketch_reports = BTreeMap::new();
+        let mut solved_profiles = BTreeMap::new();
         let mut hashes = BTreeMap::new();
         let mut evaluated: HashMap<String, Arc<OperationResult>> = HashMap::new();
         let mut stats = BuildStats::default();
@@ -1250,6 +1306,14 @@ impl BuildEngine {
                 continue;
             }
             let hash = hash_feature(recipe, tolerance, feature, &hashes);
+            if let Feature::Sketch {
+                id, sketch, loops, ..
+            } = feature
+            {
+                let (report, rings) = sketch_profiles::solve(id, sketch, loops, tolerance, &hash)?;
+                sketch_reports.insert(id.clone(), report);
+                solved_profiles.insert(id.clone(), rings);
+            }
             if feature.is_solid() {
                 let result = if let Some(cached) = self.solids.get(&hash) {
                     stats.cache_hits += 1;
@@ -1273,6 +1337,15 @@ impl BuildEngine {
                         Feature::Extrude {
                             profile, height, ..
                         } => match &recipe.features[indices[profile.as_str()]] {
+                            Feature::Sketch { id, .. } => {
+                                let rings = &solved_profiles[id];
+                                cad_kernel::extrude_polygon_with_holes(
+                                    &rings[0],
+                                    &rings[1..],
+                                    *height,
+                                    tolerance,
+                                )
+                            }
                             Feature::Path {
                                 path,
                                 circular_holes,
@@ -1332,6 +1405,7 @@ impl BuildEngine {
                         Feature::Circle { .. }
                         | Feature::Rectangle { .. }
                         | Feature::Polygon { .. }
+                        | Feature::Sketch { .. }
                         | Feature::Path { .. } => unreachable!(),
                     };
                     let result = operation.map_err(|e| BuildError::Kernel {
@@ -1380,6 +1454,7 @@ impl BuildEngine {
             .collect();
         let selection_graph = selection::SelectionGraph::new(recipe, order, evaluated.clone());
         let mut result = BuildResult {
+            sketch_reports,
             scope,
             outputs,
             assemblies: BTreeMap::new(),

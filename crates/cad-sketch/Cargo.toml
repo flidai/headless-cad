@@ -1,0 +1,16 @@
+[package]
+name = "cad-sketch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
+
+[build-dependencies]
+blake3.workspace = true

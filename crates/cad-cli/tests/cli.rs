@@ -2568,3 +2568,85 @@ fn custom_tolerance_flows_to_holed_body_and_assembly_previews() {
     fs::write(&input, serde_json::to_vec(&recipe).unwrap()).unwrap();
     assert!(!cli(&["check", input.to_str().unwrap()]).status.success());
 }
+
+#[test]
+fn sketch_diagnostics_and_failed_solves_preserve_last_valid_publication() {
+    let directory = tempfile::tempdir().unwrap();
+    let source_path = directory.path().join("fixture.star");
+    let output = directory.path().join("out");
+    let source = fs::read_to_string(example("constrained_slope_fixture.star")).unwrap();
+    fs::write(&source_path, &source).unwrap();
+    let run = || {
+        cli(&[
+            "build",
+            source_path.to_str().unwrap(),
+            "--out-dir",
+            output.to_str().unwrap(),
+        ])
+    };
+    let valid = run();
+    assert!(
+        valid.status.success(),
+        "{}",
+        String::from_utf8_lossy(&valid.stderr)
+    );
+    let report: serde_json::Value = serde_json::from_slice(&valid.stdout).unwrap();
+    let sketch = &report["sketch_reports"]["support_sketch"];
+    assert_eq!(sketch["status"], "fully_constrained");
+    assert_eq!(sketch["degrees_of_freedom"], 0);
+    assert_eq!(sketch["rank"], 6);
+    assert!(sketch["max_residual_mm"].as_f64().unwrap() <= 1e-7);
+    assert_ne!(sketch["points"]["c"], serde_json::json!([28, 30]));
+    assert_eq!(sketch["solver_build_id"], report["solver_build_id"]);
+    let manifest = fs::read(output.join("manifest.json")).unwrap();
+    let step = fs::read(output.join("constrained_slope_fixture.step")).unwrap();
+    let captured = fs::read(output.join("recipe.star")).unwrap();
+    let underconstrained=source.replace("    {\"id\":\"right_length\", \"kind\":\"distance\", \"a\":\"b\", \"b\":\"c\", \"value\":right_length},\n","");
+    assert_ne!(underconstrained, source);
+    let conflicting=source.replace("], outline =", "    {\"id\":\"conflict\",\"kind\":\"fixed\",\"point\":\"b\",\"position\":[span+10,0]},\n], outline =");
+    for (text, status) in [
+        (underconstrained, "underconstrained"),
+        (conflicting, "not_converged"),
+    ] {
+        fs::write(&source_path, text).unwrap();
+        let failed = run();
+        assert!(!failed.status.success());
+        let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+        assert_eq!(error["code"], "sketch_solve_failed", "{error}");
+        assert_eq!(error["feature"], "support_sketch");
+        assert_eq!(error["target_content_hash"].as_str().unwrap().len(), 64);
+        assert_eq!(error["solver_build_id"], error["sketch"]["solver_build_id"]);
+        assert_eq!(error["sketch"]["status"], status, "{error}");
+        assert!(error["sketch"]["constraint_residuals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|v| v["residual_mm"].as_f64().is_some_and(f64::is_finite)));
+        assert_eq!(fs::read(output.join("manifest.json")).unwrap(), manifest);
+        assert_eq!(
+            fs::read(output.join("constrained_slope_fixture.step")).unwrap(),
+            step
+        );
+        assert_eq!(fs::read(output.join("recipe.star")).unwrap(), captured);
+    }
+    fs::write(&source_path, &source).unwrap();
+    assert!(run().status.success());
+    let revised = directory.path().join("revised.star");
+    fs::write(&revised, source.replace("default = 60)", "default = 62)")).unwrap();
+    let diff = cli(&[
+        "diff",
+        source_path.to_str().unwrap(),
+        revised.to_str().unwrap(),
+    ]);
+    assert!(
+        diff.status.success(),
+        "{}",
+        String::from_utf8_lossy(&diff.stderr)
+    );
+    let diff: serde_json::Value = serde_json::from_slice(&diff.stdout).unwrap();
+    assert_eq!(diff["sketches"]["support_sketch"]["status"], "changed");
+    assert_ne!(
+        diff["sketches"]["support_sketch"]["before_hash"],
+        diff["sketches"]["support_sketch"]["after_hash"]
+    );
+}

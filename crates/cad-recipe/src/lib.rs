@@ -151,6 +151,42 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         number(value)
     }
 
+    /// Dimension-driven polygon profile. Positions are initial guesses; solving
+    /// belongs to the headless builder, never to Starlark evaluation or picking.
+    fn sketch(
+        id: &str,
+        points: Value,
+        constraints: Value,
+        outline: Value,
+        holes: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let definition: cad_build::Sketch = serde_json::from_str(&format!(
+            "{{\"points\":{},\"constraints\":{}}}",
+            points.to_json()?,
+            constraints.to_json()?
+        ))
+        .map_err(|error| anyhow::anyhow!("invalid sketch definition: {error}"))?;
+        let outline: Vec<String> = serde_json::from_str(&outline.to_json()?)
+            .map_err(|_| anyhow::anyhow!("sketch outline must contain point identifiers"))?;
+        let holes: Vec<Vec<String>> = match holes {
+            Some(value) => serde_json::from_str(&value.to_json()?)
+                .map_err(|_| anyhow::anyhow!("sketch holes must contain point identifier rings"))?,
+            None => vec![],
+        };
+        anyhow::ensure!(holes.len() <= MAX_POLYGON_HOLES, "too many sketch holes");
+        let loops: Vec<Vec<String>> = std::iter::once(outline).chain(holes).collect();
+        anyhow::ensure!(
+            loops.iter().all(|ring| ring.len() >= 3)
+                && loops.iter().map(Vec::len).sum::<usize>() <= MAX_POLYGON_POINTS,
+            "sketch rings require at least 3 points and at most {MAX_POLYGON_POINTS} total vertices"
+        );
+        store(eval)?.feature(serde_json::json!({
+            "op":"sketch", "id":id, "sketch":definition, "loops":loops, "op_version":1
+        }))?;
+        Ok(id.to_owned())
+    }
+
     /// Closed convex line/arc profile; the last endpoint explicitly equals start.
     /// Segment order is semantic. Geometry is validated by the headless builder.
     fn path(
@@ -2092,6 +2128,56 @@ output(name = "link", feature = extrude(id = "body", profile = outline, height =
             assert!(
                 from_starlark("bad_arc.star", &source).is_err(),
                 "accepted {segment}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod sketch_tests {
+    use super::*;
+    const TRIANGLE: &str = r#"
+p=sketch(id='p',points=[{'id':'a','position':[0,0]},{'id':'b','position':[7.5,0.2]},{'id':'c','position':[2.1,4.5]}], constraints=[
+ {'id':'ground','kind':'fixed','point':'a','position':[0,0]},
+ {'id':'horizontal','kind':'horizontal','a':'a','b':'b'},
+ {'id':'base','kind':'distance','a':'a','b':'b','value':8.25},
+ {'id':'left','kind':'distance','a':'a','b':'c','value':6.125},
+ {'id':'right','kind':'distance','a':'b','b':'c','value':7.75},
+],outline=['a','b','c'])
+output(name='triangle',feature=extrude(id='body',profile=p,height=2.5))
+"#;
+    #[test]
+    fn fractional_sketch_dimensions_round_trip_and_solve_in_builder() {
+        let recipe = from_starlark("triangle.star", TRIANGLE).unwrap();
+        let json = serde_json::to_string(&recipe).unwrap();
+        let decoded: cad_build::Recipe = serde_json::from_str(&json).unwrap();
+        let built = cad_build::build(&decoded).unwrap();
+        let report = &built.sketch_reports["p"];
+        assert!(report.is_fully_constrained());
+        let x = (6.125_f64.powi(2) + 8.25_f64.powi(2) - 7.75_f64.powi(2)) / (2. * 8.25);
+        let y = (6.125_f64.powi(2) - x * x).sqrt();
+        assert!((report.points["c"][0] - x).abs() < 1e-6);
+        assert!((report.points["c"][1] - y).abs() < 1e-6);
+        assert!(
+            (built.outputs["triangle"].result.model.volume() - 8.25 * y * 2.5 / 2.).abs() < 1e-5
+        );
+    }
+    #[test]
+    fn frontend_keeps_unsolved_intent_and_rejects_malformed_constraint_fields() {
+        // Compilation captures intent; numerical underconstraint belongs to build.
+        let source="p=sketch(id='p',points=[{'id':'a','position':[0,0]},{'id':'b','position':[8,0]},{'id':'c','position':[2,4]}],constraints=[],outline=['a','b','c'])\noutput(name='body',feature=extrude(id='body',profile=p,height=2))";
+        let recipe = from_starlark("free.star", source).unwrap();
+        assert!(matches!(
+            cad_build::build(&recipe),
+            Err(cad_build::BuildError::SketchSolveFailed { .. })
+        ));
+        for replacement in [
+            "'value':'8.25'",
+            "'value':8.25,'unexpected':1",
+            "'value':None",
+        ] {
+            assert!(
+                from_starlark("bad.star", &TRIANGLE.replace("'value':8.25", replacement)).is_err()
             );
         }
     }

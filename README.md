@@ -453,6 +453,7 @@ output(name = "bracket", feature = finished)
 | `rectangle(id, width, depth)` | Profile on XY, starting at the origin |
 | `polygon(id, points, holes=[])` | Simple CCW outer XY ring (convex or nonconvex) with optional simple CW holes; 256 total vertices, at most 32 holes |
 | `path(id, start, segments, circular_holes=[])` | Closed convex CCW line/arc profile; native arcs up to a half-turn, tangent joins and circular through-holes |
+| `sketch(id, points, constraints, outline, holes=[])` | Dimension-driven polygon profile; named point guesses, fixed/coincident/horizontal/vertical/distance constraints; requires a converged, locally fully constrained solution |
 | `extrude(id, profile, height)` | Extrude a supported rectangle, polygon, circle or line/arc profile along positive Z |
 | `translate(id, body, offset)` | Translate by `[x, y, z]`; named `x`, `y`, `z` also supported |
 | `transform(id, body, offset, rotation)` | Rotate exact geometry using unit quaternion `[x,y,z,w]`, then translate; both default to identity |
@@ -778,9 +779,10 @@ Starlark / JSON / Rust Feature values
                   │
                   ▼
  cad-build: typed graph, validation, provenance, memory/disk cache
+                  ├── cad-sketch: bounded 2D constraint solving and diagnostics
                   │
                   ▼
- cad-kernel: lines + planes, oriented B-rep, coordinate-cell operations
+ cad-kernel: analytic geometry, oriented B-rep, bounded modeling operations
                   │
           ┌───────┴────────┐
           ▼                ▼
@@ -919,7 +921,7 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 - Explicit rejection of enclosed cavities, nonmanifold contacts, unsupported
   geometry, and computations outside the numerical/resource envelope.
 
-Round-hole cutting in arbitrary solids, general rotated nonconvex modeling, sketch constraints, general
+Round-hole cutting in arbitrary solids, general rotated nonconvex modeling, general sketch constraints, general
 polygon union/cut and nonconvex polygon Booleans, general trimmed curved surfaces,
 fillets, offsets, NURBS, STEP import, and GPU
 modeling are **not implemented**. STEP uses AP214 `FACETED_BREP` with planar
@@ -1002,6 +1004,44 @@ chamfered plate, two relief slots, five bores, a bronze sleeve, a shaft, and fou
 reused bolt assemblies. Parameters change plate thickness, bearing bore and bolt
 radius. The sleeve and shaft attach to the remaining cap's material centroid.
 Prescribed clearances are design intent, not a certified interference result.
+
+### Dimension-driven sketches
+
+`sketch(id, points, constraints, outline, holes=[])` records design intent for
+the headless builder. Each point has an `id` and a two-coordinate `position`
+initial guess. Each constraint has a unique `id` and a `kind`: `fixed` uses
+`point` and `position`; `coincident`, `horizontal` and `vertical` use `a` and `b`;
+`distance` adds a positive `value` in millimetres. `outline` lists named vertices
+in CCW order, and optional hole rings use CW order. Rings omit the closing point.
+The solved profile feeds `extrude`; sketch-driven revolution is not yet supported.
+
+The original Rust `cad-sketch` service uses analytic Jacobians and a bounded
+local nonlinear solve. It reports constraint residuals, local rank and degrees
+of freedom, redundant equation count, conditioning and implementation identity.
+Fixed/coincident residuals are Euclidean distances. Initial guesses select a
+local branch; convergence does not prove a unique solution or continuity across
+edits. There is no automatic geometry repair or arbitrary placement of free
+points. Underconstrained, unconverged or numerically unresolved results cannot
+publish geometry; the previous generation remains available.
+
+Limits are 32 points, 128 constraints and 256 iterations per sketch, with at most
+128 demanded sketches per build. All definitions are structurally checked;
+selected builds solve their dependency closure and global validation obligations.
+Cached solids do not bypass solving or discard diagnostics. Build/check manifests
+contain `sketch_reports`, keyed by feature ID and paired with `feature_hashes`;
+failure JSON includes the affected feature, input hash, solver identity and report.
+These are numerical results under the declared tolerance, not symbolic coordinates.
+
+[constrained_slope_fixture.star](examples/constrained_slope_fixture.star) solves
+a triangle from three side lengths, then seats a deck and two shared rails on
+its inclined face. A rounded mounting base and four bolts complete nine
+occurrences using five definitions. The recipe contains starting guesses rather
+than a formula for the triangle apex. Independent circle-intersection formulas
+check 27 dimension combinations, support inertia, mass, bounds and deck placement.
+Changing one side length rebuilds the support extrusion and transform while
+reusing the deck, rails, base and bolts. The viewer remains an inspection client;
+changing dimensions requires a recipe build. Circles/arcs in constrained sketches,
+angles, tangency, branch-continuation policies and assembly joints remain future work.
 
 ### Native line and arc profiles
 
@@ -1153,6 +1193,7 @@ npm run test:revolve
 npm run test:apex
 npm run test:serpentine
 npm run test:arc
+npm run test:sketch
 npm run test:counts
 npm run test:cone
 ```

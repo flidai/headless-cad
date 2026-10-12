@@ -181,7 +181,7 @@ are inherently cyclic. Constraints also form graphs with loops. An assembly is
 not a Boolean union of its parts. Fixtures and enclosures use explicit part
 instances; the modular rack reuses nested rows and carriages. Older examples can
 still use disjoint unions. Named part frames and deterministic part/rigid-module datum
-attachments are implemented; joints and nonlinear constraint solving remain
+attachments are implemented; joints and nonlinear assembly constraint solving remain
 target work.
 
 ## Authoring and AI-native execution
@@ -592,7 +592,7 @@ claim joint solving or mechanical load validation.
 
 ## Constraints and assemblies
 
-Stage solver acceptance separately from today's attachment DAG: first a grounded
+Stage assembly-solver acceptance separately from today's attachment DAG: first a grounded
 four-bar closed loop, then coupled mechanisms, then flexible occurrences. The
 four-bar fixture must verify degrees of freedom, residual limits, contradictory
 constraints, singular positions and solution-branch continuity under parameter
@@ -685,7 +685,38 @@ source-intent round trips, invalid source paths, mixed dependency cycles and
 independent imported STEP child placements. Both examples share the same
 physical volume formula but exercise different authored placement contracts.
 
-Build a constraint service separately from geometric construction. The 2D sketch
+The first constraint service is now `cad-sketch`, independent of the geometric
+kernel. Named 2D point guesses and fixed, coincident, horizontal, vertical and
+distance equations feed a deterministic scaled/recentered local solve. Analytic
+Jacobians drive damped least squares; pivoted QR assesses local rank and a
+conditioning bound. A successful profile requires convergence within the stated
+millimetre tolerance, zero local degrees of freedom, supported conditioning and
+subsequent native polygon validity. Fixed/coincident errors use Euclidean norms.
+Residuals and rank describe the returned world coordinates, including arithmetic
+limits; unresolved precision fails explicitly. Limits are 32 points, 128
+constraints, 256 iterations per solve and 128 demanded sketch features per build.
+
+The typed `sketch` feature retains source guesses, named constraints and oriented
+point-ID rings. Every definition receives structural validation, while only the
+demanded dependency closure and global obligations are solved. Reports survive
+memory/disk cache reuse; the solver fingerprint participates in profile hashes.
+Success manifests pair `sketch_reports` with `feature_hashes`; failed solves retain
+the input hash and numerical report without replacing the valid generation.
+Starlark captures intent and the viewer inspects artifacts; neither performs
+constraint solving. A textual recipe edit is the path to a revised solution.
+
+This first solver reports local Jacobian DOF, not a proof of global freedom,
+consistency or unique solutions. Initial guesses select a branch; unchanged
+source is reproducible, but nearby edits do not yet have a branch-continuation
+guarantee. Nonconvergence and residual witnesses are not a minimal conflicting
+constraint set. Redundant equations can be consistent. Constrained arcs, angle
+and tangency equations, sparse island decomposition and assembly joints remain
+target work. `constrained_slope_fixture.star` connects nonlinear sketch dimensions
+to an extruded support, an associative inclined seat and a nine-occurrence
+fixture. Independent three-side triangle formulas validate 27 configurations,
+native moments, material mass and attached deck placement.
+
+Evolve this constraint service separately from geometric construction. The target 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
 solution branches, and convergence limits. Preserve branch/continuation intent
 across small parameter edits; diagnose underconstrained sketches explicitly.
@@ -1333,10 +1364,11 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Kernel | Orthogonal B-rep/Booleans; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and convex line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
+| Sketches | Original Rust bounded 2D point solver, five constraint kinds, local rank/DOF/residual/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Constrained curves, angles/tangency, sparse islands, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
-| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; recipe property assertions with pinned evidence and global validation | Sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
+| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; recipe property assertions with pinned evidence and global validation | Broader sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
 The current working commands are in [README.md](../README.md).

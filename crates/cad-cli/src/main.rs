@@ -210,6 +210,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "kernel_version": cad_kernel::KERNEL_VERSION,
         "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
         "executor_build_id": cad_build::executor_build_id(),
+        "solver_build_id": cad_build::solver_build_id(),
         "schema_version": recipe.schema_version,
         "units": recipe.units,
         "tolerance": recipe.tolerance.unwrap_or_default(),
@@ -218,6 +219,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "feature_hashes": build.feature_hashes,
         "face_assertions": build.face_assertions,
         "property_assertions": build.property_assertions,
+        "sketch_reports": build.sketch_reports,
         "face_datums": build.face_datums,
         "outputs": outputs,
     }))
@@ -484,7 +486,25 @@ fn difference(before: &Value, after: &Value) -> Value {
             (part.clone(), json!(changes))
         })
         .collect();
-    json!({"outputs":changes,"face_assertions":assertions,"property_assertions":properties,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
+    let before_sketches = before["sketch_reports"]
+        .as_object()
+        .expect("sketch reports");
+    let after_sketches = after["sketch_reports"].as_object().expect("sketch reports");
+    let sketches: serde_json::Map<String, Value> = before_sketches.keys()
+        .chain(after_sketches.keys()).collect::<BTreeSet<_>>().into_iter().map(|id| {
+            let a = before_sketches.get(id);
+            let b = after_sketches.get(id);
+            let old_hash = &before["feature_hashes"][id];
+            let new_hash = &after["feature_hashes"][id];
+            let status = match (a,b) {
+                (None,Some(_)) => "added",
+                (Some(_),None) => "removed",
+                (Some(a),Some(b)) if a == b && old_hash == new_hash => "unchanged",
+                _ => "changed",
+            };
+            (id.clone(),json!({"status":status,"before":a,"after":b,"before_hash":old_hash,"after_hash":new_hash}))
+        }).collect();
+    json!({"outputs":changes,"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -779,6 +799,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             result["stats"] = json!(built.stats);
             result["build_scope"] = json!(built.scope);
             result["property_assertions"] = json!(built.property_assertions);
+            result["sketch_reports"] = json!(built.sketch_reports);
             return Ok(result);
         }
         Command::Select {
@@ -809,6 +830,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             let mut report = serde_json::to_value(&resolution)?;
             report["stats"] = json!(build.stats);
             report["property_assertions"] = json!(build.property_assertions);
+            report["sketch_reports"] = json!(build.sketch_reports);
             report["snapshot"] = json!({
                 "recipe_source_hash": blake3::hash(&source_bytes).to_hex().to_string(),
                 "parameter_overrides": parameters,
@@ -941,6 +963,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             &parameters,
         )?;
         result["property_assertions"] = json!(build.property_assertions);
+        result["sketch_reports"] = json!(build.sketch_reports);
         return Ok(result);
     }
     let mut summary = report(&recipe, &build)?;
@@ -1004,6 +1027,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
             "generation_mode": summary["generation_mode"],
             "scope": summary["scope"],
             "property_assertions": summary["property_assertions"],
+            "sketch_reports": summary["sketch_reports"],
+            "solver_build_id": summary["solver_build_id"],
             "kernel_build_id": summary["kernel_build_id"],
             "executor_build_id": summary["executor_build_id"],
         }))?)
@@ -1260,6 +1285,21 @@ fn main() {
             } else if let Some(build) = error.downcast_ref::<cad_build::BuildError>() {
                 report["code"] = json!("invalid_graph");
                 match build {
+                    cad_build::BuildError::Sketch { feature, .. } => {
+                        report["code"] = json!("invalid_sketch");
+                        report["feature"] = json!(feature);
+                    }
+                    cad_build::BuildError::SketchSolveFailed {
+                        feature,
+                        report: solve,
+                        content_hash,
+                    } => {
+                        report["code"] = json!("sketch_solve_failed");
+                        report["feature"] = json!(feature);
+                        report["sketch"] = json!(solve);
+                        report["solver_build_id"] = json!(cad_build::solver_build_id());
+                        report["target_content_hash"] = json!(content_hash);
+                    }
                     cad_build::BuildError::InvalidPropertyAssertion { id, .. } => {
                         report["code"] = json!("invalid_property_assertion");
                         report["assertion_id"] = json!(id);

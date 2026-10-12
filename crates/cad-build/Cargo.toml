@@ -5,10 +5,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+cad-sketch = { path = "../cad-sketch" }
 cad-kernel = { path = "../cad-kernel" }
 cad-assembly = { path = "../cad-assembly" }
 serde = { workspace = true }
-serde_json = { workspace = true }
+# Solved coordinates must survive typed cache decoding without changing bits.
+serde_json = { workspace = true, features = ["float_roundtrip"] }
 thiserror = { workspace = true }
 blake3 = { workspace = true }
 

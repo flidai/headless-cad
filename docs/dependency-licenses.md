@@ -5,6 +5,10 @@ that SPDX identifier and every project crate inherits it. [LICENSE](../LICENSE)
 is the unchanged [canonical Apache License 2.0 text](https://www.apache.org/licenses/LICENSE-2.0.txt).
 No copyright owner or author attribution has been invented.
 
+The `cad-sketch` service adds no new third-party packages: it uses the existing
+Serde, thiserror and BLAKE3 dependencies (plus serde_json for tests). Its solver
+and linear-algebra routines are first-party Apache-2.0 code.
+
 ## Direct Rust dependencies
 
 Checked on 2026-10-11 against the versions resolved by [Cargo.lock](../Cargo.lock),
@@ -16,18 +20,18 @@ crates are omitted from the table.
 | Dependency | Locked version | Declared SPDX license expression | Used by |
 | --- | --- | --- | --- |
 | anyhow | 1.0.104 | MIT OR Apache-2.0 | cad-recipe |
-| blake3 | 1.8.2 | CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception | cad-assembly, cad-build, cad-cli, cad-kernel |
+| blake3 | 1.8.2 | CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception | cad-assembly, cad-build, cad-cli, cad-kernel, cad-sketch |
 | cap-std | 4.0.3 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli |
 | clap | 4.6.7 | MIT OR Apache-2.0 | cad-cli |
 | earcutr | 0.5.0 | ISC | cad-kernel; derived face triangulation |
 | robust | 1.2.0 | MIT OR Apache-2.0 | cad-kernel; adaptive orientation checks |
 | rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | cad-cli, Linux target |
-| serde | 1.0.229 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-kernel, cad-preview |
-| serde_json | 1.0.154 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-cli, cad-kernel, cad-preview, cad-recipe |
+| serde | 1.0.229 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-kernel, cad-preview, cad-sketch |
+| serde_json | 1.0.154 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-cli, cad-kernel, cad-preview, cad-recipe, cad-sketch |
 | sha2 | 0.11.0 | MIT OR Apache-2.0 | cad-preview; SHA-256 identity for fetched display assets |
 | starlark | 0.14.2 | Apache-2.0 | cad-recipe |
 | tempfile | 3.27.0 | MIT OR Apache-2.0 | cad-build, cad-cli |
-| thiserror | 2.0.21 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-export, cad-kernel, cad-preview, cad-recipe |
+| thiserror | 2.0.21 | MIT OR Apache-2.0 | cad-assembly, cad-build, cad-export, cad-kernel, cad-preview, cad-recipe, cad-sketch |
 
 Direct dependencies use permissive licenses. Most offer Apache-2.0; `earcutr`
 uses ISC. Its pinned package license was checked locally and is included in

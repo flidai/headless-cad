@@ -1256,5 +1256,43 @@
         ]
       ]
     }
+  },
+  "constrained_slope_fixture.star": {
+    "support": {
+      "volume_mm3": 81332.65027035576,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          80,
+          40,
+          50.83290641897235
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-06
+    },
+    "constrained_slope_fixture": {
+      "volume_mm3": 121719.07495788347,
+      "solids": 9,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          60,
+          56.83290641897235
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-06
+    }
   }
 }

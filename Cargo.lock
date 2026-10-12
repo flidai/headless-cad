@@ -282,6 +282,7 @@ dependencies = [
  "blake3",
  "cad-assembly",
  "cad-kernel",
+ "cad-sketch",
  "serde",
  "serde_json",
  "tempfile",
@@ -349,6 +350,16 @@ dependencies = [
  "cad-build",
  "serde_json",
  "starlark",
+ "thiserror",
+]
+
+[[package]]
+name = "cad-sketch"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
  "thiserror",
 ]
 
