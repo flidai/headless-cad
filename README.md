@@ -1213,8 +1213,9 @@ prioritizes its mesh. The budget covers encoded payload plus geometry buffers,
 including pending reservations, not total browser or driver memory. Frustum
 culling uses an occurrence bounding-volume hierarchy in both GPU modes, skipping
 off-screen groups before checking individual parts. Original occurrence and face
-IDs remain stable. All occurrence metadata is still loaded at startup; metadata
-paging, cluster streaming and occlusion culling remain future work. The streaming
+IDs remain stable. This legacy streaming viewer loads all occurrence metadata
+at startup; the separate paged viewer below removes that requirement. Cluster
+streaming and occlusion culling remain future work. The streaming
 viewer needs HTTP(S) and Web Crypto; localhost works.
 
 Assembly publication also includes `*.metadata.json`, a small source-bound index
@@ -1229,9 +1230,12 @@ plus pending reservations. It renders unresolved branches as striped regions;
 click a region or zoom in to load part identities and shared geometry. Selecting
 a resolved surface exposes its occurrence, semantic face and captured recipe.
 The mesh cache separately accounts for 64 MiB of encoded data plus geometry VBOs.
-These limits do not measure total browser heap or headless build memory. This
-experimental path uses the finest available mesh; adaptive mesh LOD remains in
-the existing streamed viewer.
+These limits do not measure total browser heap or headless build memory. Curved
+parts bootstrap from coarse meshes and refine toward one physical framebuffer
+pixel, including the shader/rebasing precision allowance. Each shared mesh meets
+the most demanding visible occurrence. Verified surfaces remain visible while a
+replacement loads; insufficient budget or finest available detail is reported.
+Raster coverage and depth-buffer quantization are outside this error target.
 
 `paged_workcell.star` is a compact hierarchical scale fixture. Its default has
 400 occurrences; `--param stations=1000 --display-only` builds 100,000 occurrences
@@ -1245,12 +1249,16 @@ cad build examples/paged_workcell.star --param stations=1000 --display-only --ou
 cad build examples/modular_linear_stage.star --out-dir out/paged_modules
 node tools/preview-check/metadata-stream.cjs
 CAD_BROWSER=/path/to/chromium node tools/preview-check/paged.cjs
+cad build examples/spindle_line.star --param stations=1000 --param columns=40 --param variants=12 --display-only --out-dir out/paged_spindles
+CAD_BROWSER=/path/to/chromium node tools/preview-check/paged-lod.cjs
 ```
 
 The browser harness uses Playwright from `tools/preview-check` and defaults to
 `http://localhost:8080`. It checks sparse overview, distant-region refinement,
 return picks, source/module inspection, resource accounting, corrupt-page fallback
-and mismatched source-generation rejection. SwiftShader results establish local
+and mismatched source-generation rejection. The curved-part harness additionally
+checks delayed fine-mesh fallback, stable face picks, and budget reduction/recovery.
+SwiftShader results establish local
 functional behavior, not a hardware frame-rate or total-memory release gate.
 
 Curved parts now have up to three shared display levels, built with native

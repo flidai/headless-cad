@@ -40,8 +40,9 @@ references. Atomic publication and integrity checks cover the page set. This is
 the M3b artifact foundation. A separate experimental paged inspector now adds
 verified page scheduling, bounded record counts, eviction and subtree proxies.
 Legacy viewers continue to load the complete occurrence catalog. The new path
-still requires adaptive mesh detail integration and the declared hardware/detail
-latency gates; resource accounting is distinct from measured total browser heap.
+now also integrates adaptive whole-part mesh detail, retained coarse coverage and
+explicit unmet-error reporting. Declared hardware/detail latency gates and cluster
+refinement remain open; resource accounting is distinct from measured total browser heap.
 
 Use the [feature-brief acceptance scenarios](architecture.md#feature-brief-acceptance-scenarios)
 to turn these tracks into release checks. Increase unique geometry complexity,

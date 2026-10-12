@@ -1557,8 +1557,15 @@ specific part or face. Loaded occurrences retain their original ordinals and pat
 GPU draw buffers depend on resident visible records rather than total assembly
 count. A separate 64 MiB mesh budget accounts for encoded payloads and geometry
 buffers. These accounting limits are not a total browser-heap bound. This path
-currently loads finest meshes, so combining metadata paging with adaptive LOD,
-certified detail latency and hardware performance acceptance remains open.
+now combines metadata paging with adaptive whole-part LOD. Shared geometry uses
+the worst visible occurrence's projected tessellation and shader/rebasing error,
+coarse bootstrap and retained verified surfaces until a replacement is ready.
+Refinement admission accounts for both old and new meshes; unmet precision,
+finest-mesh and budget limits remain visible. Reducing the explicit mesh budget
+can revoke coverage to proxies, whereas an ordinary refinement budget failure
+retains the active surfaces. Raster coverage and depth quantization are excluded
+from the one-pixel error target. Certified detail latency, clustered refinement
+and hardware performance acceptance remain open.
 
 The `paged_workcell.star` acceptance configuration contains 100,000 occurrences
 through 1,000 shared 100-part cells. Local browser acceptance reaches overview
