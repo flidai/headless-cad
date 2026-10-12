@@ -64,6 +64,7 @@ pub struct DisplayMeshAsset {
 /// Metadata-only streamed scene, viewer HTML, and shared immutable mesh assets.
 #[derive(Debug, Clone)]
 pub struct StreamBundle {
+    pub paged_html: String,
     pub metadata_index_json: String,
     pub metadata_assets: Vec<DisplayMeshAsset>,
     pub scene_json: String,
@@ -479,6 +480,17 @@ pub fn to_assembly_stream_bundle_with_cache(
         &bounds,
     )?;
     Ok(StreamBundle {
+        paged_html: include_str!("paged-viewer.html")
+            .replacen("__CAD_METADATA_STREAM__", include_str!("metadata-stream.js"), 1)
+            .replace(
+                "<script id=\"cad-metadata-data\" type=\"application/json\">__CAD_METADATA_INDEX__</script>",
+                &format!("<script id=\"cad-metadata-data\" type=\"application/json\">{}</script>",
+                    crate::script_json(&serde_json::from_str::<serde_json::Value>(&metadata_index_json)?)?),
+            )
+            .replace(
+                "<script id=\"cad-recipe-data\" type=\"application/json\">__CAD_RECIPE_CONTEXT__</script>",
+                &format!("<script id=\"cad-recipe-data\" type=\"application/json\">{}</script>", crate::script_json(recipe)?),
+            ),
         metadata_index_json,
         metadata_assets,
         scene_json: serde_json::to_string_pretty(&scene)?,
@@ -734,6 +746,20 @@ mod tests {
         let local: serde_json::Value = serde_json::from_str(&asset.content).unwrap();
         assert_eq!(local["faces"].as_array().unwrap().len(), 6);
         assert!(!bundle.html.contains("</script><img"));
+        assert!(!bundle.paged_html.contains("</script><img"));
+        let paged_index = bundle
+            .paged_html
+            .split("<script id=\"cad-metadata-data\" type=\"application/json\">")
+            .nth(1)
+            .unwrap()
+            .split("</script>")
+            .next()
+            .unwrap();
+        let paged_index: serde_json::Value = serde_json::from_str(paged_index).unwrap();
+        assert_eq!(paged_index["total_occurrences"], 2);
+        assert!(paged_index.get("instances").is_none());
+        assert!(bundle.paged_html.contains("class CadMetadataStream"));
+        assert!(!bundle.paged_html.contains("__CAD_METADATA_INDEX__"));
         let embedded = bundle
             .html
             .split("<script id=\"cad-scene-data\" type=\"application/json\">")

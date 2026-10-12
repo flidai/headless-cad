@@ -1506,6 +1506,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 &mut mesh_cache,
             )?;
             artifacts.push((format!("{name}.stream.html"), bundle.html));
+            artifacts.push((format!("{name}.paged.html"), bundle.paged_html));
             artifacts.push((format!("{name}.stream.json"), bundle.scene_json));
             artifacts.push((format!("{name}.metadata.json"), bundle.metadata_index_json));
             for asset in bundle.assets.into_iter().chain(bundle.metadata_assets) {

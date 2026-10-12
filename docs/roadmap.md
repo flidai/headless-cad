@@ -37,9 +37,11 @@ must reconcile idempotent release deliveries and expose partial synchronization.
 The metadata-page producer now publishes a small source-bound index and immutable
 spatial branch/leaf pages with original occurrence identity and independent mesh
 references. Atomic publication and integrity checks cover the page set. This is
-the M3b artifact foundation only: browser page scheduling, bounded decoded-record
-residency, eviction, subtree proxies and the 100k-occurrence acceptance remain
-open. Existing viewers continue to load the complete occurrence catalog.
+the M3b artifact foundation. A separate experimental paged inspector now adds
+verified page scheduling, bounded record counts, eviction and subtree proxies.
+Legacy viewers continue to load the complete occurrence catalog. The new path
+still requires adaptive mesh detail integration and the declared hardware/detail
+latency gates; resource accounting is distinct from measured total browser heap.
 
 Use the [feature-brief acceptance scenarios](architecture.md#feature-brief-acceptance-scenarios)
 to turn these tracks into release checks. Increase unique geometry complexity,

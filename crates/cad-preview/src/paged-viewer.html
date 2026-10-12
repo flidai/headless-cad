@@ -1,0 +1,141 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CAD / Progressive inspection</title><style>
+*{box-sizing:border-box}body{margin:0;background:#edf1eb;color:#203b32;font:14px system-ui,sans-serif}header{padding:16px 22px;background:#173d32;color:white;display:flex;justify-content:space-between}header span{opacity:.8}main{display:grid;grid-template-columns:minmax(0,1fr) 360px;height:calc(100dvh - 52px)}.viewport{position:relative;min-height:400px}canvas{width:100%;height:100%;display:block;touch-action:none}.toolbar{position:absolute;top:16px;left:16px;display:flex;gap:7px;flex-wrap:wrap}button,select{font:inherit;border:1px solid #aebfb3;background:#fffef9;color:inherit;border-radius:6px;padding:8px 11px;cursor:pointer}button:hover{background:#e0ebe2}aside{overflow:auto;padding:22px;background:#fafbf6;border-left:1px solid #c9d4c9}h1{font-size:23px;margin:0 0 8px}h2{font-size:15px;margin:22px 0 8px}.muted{color:#5b7165;font-size:12px;line-height:1.6}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#edf1e9;padding:12px;border-radius:7px;font:12px/1.55 ui-monospace,monospace}#error{position:absolute;bottom:45px;left:15px;right:15px;background:#fff0e5;color:#883922;padding:12px}.hint{position:absolute;bottom:14px;left:16px;font-size:12px;background:#fafbf6dd;padding:7px;border-radius:5px}#source{max-height:450px;overflow:auto}select{max-width:100%;width:100%}@media(max-width:760px){main{grid-template-columns:1fr;height:auto}.viewport{height:65dvh}aside{border-left:0}header span{display:none}}
+</style></head><body><header><strong>CAD / Progressive inspection</strong><span>Read-only · native source · approximate display</span></header><main><div class="viewport"><canvas id="view" aria-label="Progressive CAD assembly inspection" tabindex="0"></canvas><div class="toolbar"><button data-view="iso">Isometric</button><button data-view="top">Top</button><button data-view="front">Front</button><button id="fit">Fit</button><button id="recipe-toggle">Recipe</button></div><div class="hint">Drag to orbit · Shift-drag to pan · Scroll to zoom · Click a region to refine</div><div id="error" role="alert" hidden></div></div><aside><h1 id="title">Assembly</h1><p class="muted">Metadata and shared meshes load progressively. Striped boxes represent unresolved regions, not part geometry.</p><h2>Display residency</h2><p id="status" aria-live="polite"></p><p class="muted">Detail is limited by metadata and mesh budgets. The 64 MiB mesh allowance accounts for encoded assets and geometry buffers, not total browser memory. Zoom into a region to inspect its parts. No recipe evaluation or exact-body loading occurs here.</p><h2>Selection</h2><pre id="selection">Pick a surface to inspect its occurrence and face.</pre><pre id="datums" hidden></pre><section id="recipe-panel" hidden><h2>Captured Starlark</h2><p id="source-label" class="muted"></p><select id="module" aria-label="Captured source module"></select><pre id="source"></pre><pre id="parameters"></pre></section><p class="muted">Engineering measurements come from headless native queries. Display triangles and bounds are approximate. Reload after rebuilding.</p></aside></main>
+<script id="cad-metadata-data" type="application/json">__CAD_METADATA_INDEX__</script><script id="cad-recipe-data" type="application/json">__CAD_RECIPE_CONTEXT__</script><script>__CAD_METADATA_STREAM__</script><script>
+'use strict';
+const index=JSON.parse(document.getElementById('cad-metadata-data').textContent),recipe=JSON.parse(document.getElementById('cad-recipe-data').textContent);
+const stats=window.cadPagedStats={ready:false,errors:[],meshRequests:0,meshUploads:0,geometryUploads:0,residentMeshBytes:0,reservedMeshBytes:0,drawCalls:0,residentEntries:0,proxyCount:0};
+const canvas=document.getElementById('view');
+function fail(e){const text=String(e.message||e);stats.errors.push(text);const el=document.getElementById('error');el.hidden=false;el.textContent=text;}
+const sourceSelect=document.getElementById('module');
+for(const [name,text] of [['',recipe?.source||'Source unavailable'],...Object.entries(recipe?.modules||{})]){const option=document.createElement('option');option.value=name;option.textContent=name||recipe?.source_name||'Root recipe';sourceSelect.append(option)}
+sourceSelect.onchange=()=>document.getElementById('source').textContent=sourceSelect.value?recipe.modules[sourceSelect.value]:recipe?.source||'Source unavailable';sourceSelect.onchange();
+document.getElementById('source-label').textContent=`${recipe?.source_name||''} · generation ${index.content_hash}`;
+document.getElementById('parameters').textContent=JSON.stringify(recipe?.parameters||{},null,2);
+document.getElementById('recipe-toggle').onclick=()=>{const p=document.getElementById('recipe-panel');p.hidden=!p.hidden};
+document.getElementById('title').textContent=index.assembly_id;
+try{start()}catch(e){fail(e)}
+function start(){
+ if(!recipe||index.content_hash!==recipe.content_hash||index.recipe_context_hash!==recipe.recipe_context_hash||(index.source_bundle_hash??null)!==(recipe.source_bundle_hash??null))throw Error('Captured source identity does not match the metadata generation.');
+ const gl=canvas.getContext('webgl2',{antialias:false,alpha:false});if(!gl)throw Error('WebGL2 is unavailable. Use the portable inspection viewer.');
+ const add=(a,b)=>a.map((x,i)=>x+b[i]),sub=(a,b)=>a.map((x,i)=>x-b[i]),dot=(a,b)=>a.reduce((s,x,i)=>s+x*b[i],0);
+ const finite3=p=>Array.isArray(p)&&p.length===3&&p.every(Number.isFinite);
+ const validBounds=b=>Array.isArray(b)&&b.length===2&&b.every(finite3)&&b[0].every((v,i)=>v<=b[1][i]);
+ const center=b=>b[0].map((x,i)=>x+(b[1][i]-x)/2),half=b=>b[0].map((x,i)=>(b[1][i]-x)/2);
+ const bounds=index.root?.bounds||[[0,0,0],[1,1,1]];if(!validBounds(bounds))throw Error('Invalid root bounds');
+ const mid=center(bounds),radius=Math.max(Math.hypot(...half(bounds)),1e-6);
+ const camera={target:mid.slice(),yaw:-Math.PI/3,pitch:Math.PI/5,halfHeight:radius*1.15};let basis,aspect,depthRange;
+ let demandDirty=true;let fbo=null,textures=[],depth=null,scheduled=false,disposed=false,selected=-1,picks=new Map(),drawGroups=[];
+ const resident=new Map(),inflight=new Map(),failed=new Map();let wanted=new Map(),clock=0;
+ const MESH_BUDGET=64*1024*1024;let meshBytes=0,reserved=0;
+ function rotate(q,p){const [x,y,z,w]=q,[a,b,c]=p;return[(1-2*(y*y+z*z))*a+2*(x*y-z*w)*b+2*(x*z+y*w)*c,2*(x*y+z*w)*a+(1-2*(x*x+z*z))*b+2*(y*z-x*w)*c,2*(x*z-y*w)*a+2*(y*z+x*w)*b+(1-2*(x*x+y*y))*c]}
+ function gpuFloat(v){const r=Math.fround(v);if(!Number.isFinite(r)||(v!==0&&Math.abs(r)<1.1754943508222875e-38))throw Error('Display exceeds float32 coordinate range');return r}
+ function updateCamera(){const cy=Math.cos(camera.yaw),sy=Math.sin(camera.yaw),cp=Math.cos(camera.pitch),sp=Math.sin(camera.pitch);basis={right:[-sy,cy,0],up:[-sp*cy,-sp*sy,cp],eye:[cp*cy,cp*sy,sp]};aspect=canvas.width/canvas.height;depthRange=Math.max(radius*2+Math.abs(dot(sub(mid,camera.target),basis.eye)),1e-6)}
+ function intersects(b){const c=sub(center(b),camera.target),h=half(b);return [[basis.right,camera.halfHeight*aspect],[basis.up,camera.halfHeight],[basis.eye,depthRange]].every(([a,e])=>Math.abs(dot(c,a))<=e+h.reduce((s,v,i)=>s+Math.abs(a[i])*v,0)+radius*1e-10)}
+ const coverage=b=>Math.hypot(...half(b))/camera.halfHeight;
+ function resize(){const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2,Math.sqrt(4e6/Math.max(1,r.width*r.height))),w=Math.max(1,Math.round(r.width*d)),h=Math.max(1,Math.round(r.height*d));if(canvas.width===w&&canvas.height===h&&fbo)return;canvas.width=w;canvas.height=h;demandDirty=true;if(fbo){gl.deleteFramebuffer(fbo);textures.forEach(t=>gl.deleteTexture(t));gl.deleteRenderbuffer(depth)}fbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);textures=[0,1].map(i=>{const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0+i,gl.TEXTURE_2D,t,0);return t});depth=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,depth);gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,w,h);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,depth);gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Picking framebuffer unavailable');gl.bindFramebuffer(gl.FRAMEBUFFER,null)}
+  const vertex = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPosition;layout(location=1) in vec3 aNormal;layout(location=2) in float aFace;
+layout(location=3) in vec4 aQuaternion;layout(location=4) in vec3 aTranslation;layout(location=5) in float aInstance;layout(location=6) in vec3 aScale;
+uniform vec3 uRight,uUp,uEye,uScale;out vec3 vNormal;flat out float vInstance;flat out float vFace;
+vec3 rotate(vec4 q,vec3 v){return v+2.0*cross(q.xyz,cross(q.xyz,v)+q.w*v);}
+void main(){vec3 p=rotate(aQuaternion,aPosition*aScale)+aTranslation;gl_Position=vec4(dot(p,uRight)*uScale.x,dot(p,uUp)*uScale.y,-dot(p,uEye)*uScale.z,1.0);vNormal=rotate(aQuaternion,aNormal);vInstance=aInstance;vFace=aFace;}`;
+  const fragment = `#version 300 es
+precision highp float;precision highp int;
+in vec3 vNormal;flat in float vInstance;flat in float vFace;uniform bool uPick,uProxy;uniform float uSelected;
+layout(location=0) out vec4 color;layout(location=1) out vec4 faceColor;
+vec4 encode(uint id){return vec4(float(id&255u),float((id>>8u)&255u),float((id>>16u)&255u),float((id>>24u)&255u))/255.0;}
+void main(){if(uPick){color=encode(uint(vInstance)+1u);faceColor=uProxy?vec4(0):encode(uint(vFace)+1u);}else{float light=.36+.64*max(dot(normalize(vNormal),normalize(vec3(.4,-.6,1.0))),0.0);vec3 base=abs(vInstance-uSelected)<.25?vec3(.94,.62,.19):vec3(.30,.59,.47);if(uProxy)base=mix(vec3(.75,.62,.40),vec3(.92,.84,.68),step(4.,mod(gl_FragCoord.x+gl_FragCoord.y,9.)));color=vec4(base*light,1);faceColor=vec4(0);}}`;
+  function shader(type, source) {
+    const result = gl.createShader(type); gl.shaderSource(result, source); gl.compileShader(result);
+    if (!gl.getShaderParameter(result, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(result) || 'Shader compilation failed');
+    return result;
+  }
+  const program = gl.createProgram(), vs = shader(gl.VERTEX_SHADER, vertex), fs = shader(gl.FRAGMENT_SHADER, fragment);
+  gl.attachShader(program, vs); gl.attachShader(program, fs); gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program) || 'Shader link failed');
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  const uniforms = Object.fromEntries(['uRight', 'uUp', 'uEye', 'uScale', 'uPick', 'uProxy', 'uSelected'].map(name => [name, gl.getUniformLocation(program, name)]));
+function faceTriangles(face){return face.triangles??Array.from({length:face.points.length-2},(_,i)=>[0,i+1,i+2])}
+function validFaceTopology(face){
+ const n=face.points.length,starts=face.loop_starts;
+ if(starts!==undefined&&(!Array.isArray(starts)||starts.length<1||starts.length>33||starts[0]!==0||starts.some((v,i)=>!Number.isInteger(v)||v<0||v>=n||(i>0&&v-starts[i-1]<3))||n-starts.at(-1)<3||!Array.isArray(face.triangles)))return false;
+ return face.triangles===undefined||(Array.isArray(face.triangles)&&face.triangles.length>0&&face.triangles.length<=n+64&&face.triangles.every(t=>Array.isArray(t)&&t.length===3&&new Set(t).size===3&&t.every(i=>Number.isInteger(i)&&i>=0&&i<n)));
+}
+function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.find(s=>s>i)??face.points.length;return i+1===end?starts.findLast(s=>s<=i):i+1}
+  function validateMesh(mesh, descriptor) {
+    if (!mesh || !Array.isArray(mesh.faces) || mesh.faces.length > 50000 || !validBounds(mesh.bounds)) throw Error('Invalid mesh payload.');
+    if (descriptor && descriptor.geometric_error_mm !== undefined && descriptor.geometric_error_mm !== (mesh.tessellation_error_mm ?? 0)) throw Error('Mesh payload disagrees with declared geometric error.');
+    let points = 0, gpuBytes = 0; const ids = new Set();
+    for (const face of mesh.faces) {
+      if (!Number.isInteger(face.id) || face.id < 0 || face.id >= 16777215 || ids.has(face.id)
+          || (face.semantic_face_id !== undefined && (!Number.isInteger(face.semantic_face_id) || face.semantic_face_id < 0 || face.semantic_face_id >= 16777215))
+        || !finite3(face.normal) || Math.abs(Math.hypot(...face.normal) - 1) > 1e-5
+        || !Array.isArray(face.points) || face.points.length < 3 || face.points.length > 256 || !validFaceTopology(face)) throw Error('Invalid bounded face payload.');
+      ids.add(face.id); points += face.points.length; gpuBytes += faceTriangles(face).length * 3 * 28;
+      if (points > 200000) throw Error('Mesh point budget exceeded.');
+      for (const point of face.points) {
+        if (!finite3(point) || !mesh.bounds || point.some((v, i) => v < mesh.bounds[0][i] || v > mesh.bounds[1][i])) throw Error('Mesh point lies outside declared bounds.');
+      }
+    }
+    if (descriptor && (mesh.faces.length !== descriptor.faces || points !== descriptor.points || mesh.vertices !== descriptor.vertices
+      || gpuBytes !== descriptor.gpu_bytes || JSON.stringify(mesh.bounds) !== JSON.stringify(descriptor.bounds))) throw Error('Mesh payload disagrees with verified display metadata.');
+    return gpuBytes;
+  }
+  function upload(mesh, hash, count, proxy = false) {
+    validateMesh(mesh, null);
+    const local = mesh.bounds, center = local ? local[0].map((v, i) => v + (local[1][i] - v) / 2) : [0, 0, 0];
+    const vertices = [];
+    for (const face of mesh.faces) for (const ids of faceTriangles(face)) {
+      for (const point of ids.map(i=>face.points[i])) vertices.push(...sub(point, center), ...face.normal, face.semantic_face_id??face.id);
+    }
+    const floats = new Float32Array(vertices.map(gpuFloat));
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const geometry = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, geometry); gl.bufferData(gl.ARRAY_BUFFER, floats, gl.STATIC_DRAW);
+    for (const [slot, length, offset] of [[0, 3, 0], [1, 3, 12], [2, 1, 24]]) {
+      gl.enableVertexAttribArray(slot); gl.vertexAttribPointer(slot, length, gl.FLOAT, false, 28, offset);
+    }
+    const buffer = gl.createBuffer(), data = new Float32Array(count * 11);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer); gl.bufferData(gl.ARRAY_BUFFER, data.byteLength, gl.DYNAMIC_DRAW);
+    for (const [slot, length, offset] of [[3, 4, 0], [4, 3, 16], [5, 1, 28], [6, 3, 32]]) {
+      gl.enableVertexAttribArray(slot); gl.vertexAttribPointer(slot, length, gl.FLOAT, false, 44, offset); gl.vertexAttribDivisor(slot, 1);
+    }
+    if (!proxy) stats.geometryUploads++;
+    return { hash, center, vao, geometry, buffer, data, vertices: vertices.length / 7, gpuBytes: floats.byteLength, lastUsed: ++clock };
+  }
+  function destroy(group) { gl.deleteBuffer(group.geometry); gl.deleteBuffer(group.buffer); gl.deleteVertexArray(group.vao); }
+  const corners = [[-.5,-.5,-.5],[.5,-.5,-.5],[.5,.5,-.5],[-.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5]];
+  const rings = [[0,3,2,1],[4,5,6,7],[0,1,5,4],[1,2,6,5],[2,3,7,6],[3,0,4,7]];
+  const normals = [[0,0,-1],[0,0,1],[0,-1,0],[1,0,0],[0,1,0],[-1,0,0]];
+  const proxyMesh = { bounds: [[-.5,-.5,-.5],[.5,.5,.5]], faces: rings.map((ring,id) => ({ id, normal: normals[id], points: ring.map(i => corners[i]) })) };
+ const proxyGroup=upload(proxyMesh,'proxy',0,true);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.disable(gl.BLEND);gl.disable(gl.DITHER);gl.disable(gl.CULL_FACE);
+ function schedule(){if(scheduled||disposed)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;try{render()}catch(e){fail(e)}})}
+ const stream=new CadMetadataStream(index,{budgetBytes:8*1024*1024,maxRecords:2048,maxRequests:4,onChange:schedule});
+ function descriptorValid(d){if(!d||!/^mesh-[a-f0-9]{64}\.display\.json$/.test(d.url)||d.url!==`mesh-${d.sha256}.display.json`||!validBounds(d.bounds))throw Error('Invalid mesh descriptor');for(const f of ['byte_length','gpu_bytes','faces','points','vertices'])if(!Number.isSafeInteger(d[f])||d[f]<0)throw Error('Invalid mesh size');if(d.byte_length+d.gpu_bytes>MESH_BUDGET||d.faces>50000||d.points>200000)throw Error('Mesh exceeds display budget');if(!Number.isFinite(d.geometric_error_mm)||d.geometric_error_mm<0)throw Error('Invalid mesh error')}
+ async function fetchMesh(d,signal){const r=await fetch(d.url,{signal,redirect:'error'});if(!r.ok||!r.body)throw Error(`Mesh request failed: ${r.status}`);const reader=r.body.getReader(),chunks=[];let n=0;try{for(;;){const {done,value}=await reader.read();if(done)break;n+=value.length;if(n>d.byte_length)throw Error('Mesh response exceeds declared bytes');chunks.push(value)}}catch(e){await reader.cancel().catch(()=>{});throw e}if(n!==d.byte_length)throw Error('Mesh length mismatch');const bytes=new Uint8Array(n);let at=0;for(const c of chunks){bytes.set(c,at);at+=c.length}const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');if(digest!==d.sha256)throw Error('Mesh digest mismatch');let mesh=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));if(mesh.schema_version!==undefined){if(![2,3].includes(mesh.schema_version)||!mesh.mesh)throw Error('Unsupported mesh schema');mesh=mesh.mesh}validateMesh(mesh,d);return mesh}
+ function pump(){for(const [key,d] of wanted){if(inflight.size>=4)break;if(resident.has(key)||inflight.has(key)||failed.has(key))continue;const charge=d.byte_length+d.gpu_bytes;for(const [k,g] of [...resident].sort((a,b)=>a[1].lastUsed-b[1].lastUsed)){if(meshBytes+reserved+charge<=MESH_BUDGET)break;if(!wanted.has(k)){destroy(g);resident.delete(k);meshBytes-=g.charge}}if(meshBytes+reserved+charge>MESH_BUDGET)continue;const controller=new AbortController();inflight.set(key,controller);reserved+=charge;stats.meshRequests++;fetchMesh(d,controller.signal).then(mesh=>{if(disposed||controller.signal.aborted||!wanted.has(key))return;const g=upload(mesh,key,0);g.charge=charge;resident.set(key,g);meshBytes+=charge;stats.meshUploads++}).catch(e=>{if(e.name!=='AbortError'){failed.set(key,String(e.message));stats.errors.push(String(e.message))}}).finally(()=>{inflight.delete(key);reserved-=charge;schedule()})}}
+ function entryBounds(entry){const b=entry.definition.mesh_asset.bounds,c=center(b),h=half(b),q=entry.instance.transform.rotation,t=entry.instance.transform.translation,w=add(rotate(q,c),t),axes=[[1,0,0],[0,1,0],[0,0,1]].map(a=>rotate(q,a));const extent=[0,1,2].map(i=>axes.reduce((s,a,j)=>s+Math.abs(a[i])*h[j],0));return[w.map((v,i)=>v-extent[i]-radius*1e-10),w.map((v,i)=>v+extent[i]+radius*1e-10)]}
+ function assign(group,data){group.data=new Float32Array(data.map(gpuFloat));gl.bindBuffer(gl.ARRAY_BUFFER,group.buffer);gl.bufferData(gl.ARRAY_BUFFER,group.data,gl.DYNAMIC_DRAW);group.count=data.length/11;group.lastUsed=++clock}
+ function prepare(){resize();updateCamera();if(demandDirty){demandDirty=false;stream.update({intersects,priority:b=>coverage(b),refine:b=>coverage(b)>.16})}const snapshot=stream.snapshot();stats.metadata=snapshot.stats;stats.residentEntries=snapshot.entries.length;stats.totalOccurrences=index.total_occurrences;picks=new Map();wanted=new Map();const items=[],aggregate=[];
+ for(const entry of snapshot.entries){if(entry.empty)continue;const b=entryBounds(entry);if(!intersects(b))continue;const d=entry.definition.mesh_asset;descriptorValid(d);wanted.set(d.sha256,d);items.push({entry,b,d})}
+ for(const descriptor of snapshot.proxies)if(intersects(descriptor.bounds))aggregate.push(descriptor);
+ for(const [key,c] of inflight)if(!wanted.has(key))c.abort();pump();const groups=new Map(),proxy=[];let token=0;
+ function row(q,t,id,scale){return[...q,...sub(t,camera.target),id,...scale]}
+ function proxyRow(b,selection){const id=token++;picks.set(id,selection);proxy.push(...row([0,0,0,1],center(b),id,half(b).map(v=>v*2)))}
+ for(const item of items.sort((a,b)=>a.entry.index-b.entry.index)){const {entry,b,d}=item,g=resident.get(d.sha256);if(!g){proxyRow(b,{entry,b,proxy:true});continue}const id=token++;picks.set(id,{entry,b,proxy:false});const q=entry.instance.transform.rotation,t=add(rotate(q,g.center),entry.instance.transform.translation);if(!groups.has(g))groups.set(g,[]);groups.get(g).push(...row(q,t,id,[1,1,1]))}
+ for(const descriptor of aggregate)proxyRow(descriptor.bounds,{descriptor,b:descriptor.bounds,proxy:true});drawGroups=[];for(const g of resident.values())if(!groups.has(g)&&g.data.length)assign(g,[]);for(const [g,data] of groups){assign(g,data);drawGroups.push(g)}assign(proxyGroup,proxy);stats.proxyCount=proxy.length/11;stats.residentMeshBytes=meshBytes;stats.reservedMeshBytes=reserved;stats.residentMeshes=resident.size;stats.instanceBufferBytes=drawGroups.reduce((s,g)=>s+g.data.byteLength,proxyGroup.data.byteLength);stats.ready=true;
+ document.getElementById('status').textContent=`${index.total_occurrences.toLocaleString()} total occurrences · ${snapshot.entries.length} metadata records resident · ${resident.size} shared meshes · ${stats.proxyCount} unresolved proxies. ${failed.size?'Some mesh requests failed; fallback remains visible.':''} ${snapshot.stats.errors?.length?'Some metadata pages are unavailable; unresolved regions remain visible.':''}`;
+ }
+ function draw(picking=false){gl.bindFramebuffer(gl.FRAMEBUFFER,picking?fbo:null);gl.drawBuffers(picking?[gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]:[gl.BACK]);gl.viewport(0,0,canvas.width,canvas.height);gl.clearColor(...(picking?[0,0,0,0]:[.918,.941,.925,1]));gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(program);gl.uniform3fv(uniforms.uRight,basis.right);gl.uniform3fv(uniforms.uUp,basis.up);gl.uniform3fv(uniforms.uEye,basis.eye);gl.uniform3f(uniforms.uScale,1/(camera.halfHeight*aspect),1/camera.halfHeight,1/depthRange);gl.uniform1i(uniforms.uPick,picking);let selectedToken=-1;for(const [id,p] of picks)if(p.entry?.index===selected)selectedToken=id;gl.uniform1f(uniforms.uSelected,selectedToken);let calls=0;for(const g of [...drawGroups,proxyGroup]){if(!g.count)continue;gl.uniform1i(uniforms.uProxy,g===proxyGroup);gl.bindVertexArray(g.vao);gl.drawArraysInstanced(gl.TRIANGLES,0,g.vertices,g.count);calls++}gl.bindVertexArray(null);stats.drawCalls=calls}
+ function render(){prepare();draw()}
+ function selectEntry(entry,face=-1){selected=entry.index;document.getElementById('selection').textContent=`Occurrence ${entry.index}\n${entry.path.map(p=>JSON.stringify(p)).join(' / ')}\nPart: ${entry.instance.part}\nFeature: ${entry.definition.feature_id}\nFace: ${face<0?'unresolved / bounds only':face}`;const datums=document.getElementById('datums');datums.hidden=false;datums.textContent=JSON.stringify(entry.definition.datums||{},null,2);document.getElementById('recipe-panel').hidden=false;sourceSelect.onchange();schedule();return{instance:entry.index,face,path:entry.path}}
+ function pick(x,y){prepare();draw(true);const r=canvas.getBoundingClientRect();if(x<0||y<0||x>=r.width||y>=r.height)return null;const decode=a=>{const b=new Uint8Array(4);gl.readBuffer(a);gl.readPixels(Math.floor(x*canvas.width/r.width),canvas.height-1-Math.floor(y*canvas.height/r.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,b);return(b[0]+b[1]*256+b[2]*65536+b[3]*16777216)-1};const hit=picks.get(decode(gl.COLOR_ATTACHMENT0)),face=decode(gl.COLOR_ATTACHMENT1);gl.bindFramebuffer(gl.FRAMEBUFFER,null);draw();if(!hit)return null;if(hit.entry)return selectEntry(hit.entry,hit.proxy?-1:face);selected=-1;document.getElementById('selection').textContent=`Unresolved region · ${hit.descriptor.occurrences} occurrences\nLoading finer metadata. No part or face selected.`;document.getElementById('datums').hidden=true;demandDirty=true;camera.target=center(hit.b);camera.halfHeight=Math.max(Math.hypot(...half(hit.b))*.65,radius*1e-7);schedule();return{region:hit.descriptor.url,unresolved:true}}
+ function setCamera(values){demandDirty=true;for(const key of ['yaw','pitch','halfHeight'])if(Number.isFinite(values[key]))camera[key]=values[key];if(Number.isFinite(values.zoom)&&values.zoom>0)camera.halfHeight=radius*1.15/values.zoom;if(finite3(values.target))camera.target=values.target.slice();camera.halfHeight=Math.max(radius*1e-7,Math.min(radius*1e7,camera.halfHeight));schedule()}
+ function setView(name){const v={iso:[-Math.PI/3,Math.PI/5],top:[-Math.PI/2,Math.PI/2],front:[-Math.PI/2,0]}[name];if(v)setCamera({yaw:v[0],pitch:v[1]})}
+ function project(p){resize();updateCamera();const r=canvas.getBoundingClientRect(),v=sub(p,camera.target);return[(dot(v,basis.right)/(camera.halfHeight*aspect)+1)*r.width/2,(1-dot(v,basis.up)/camera.halfHeight)*r.height/2]}
+ async function settle(){for(let n=0;n<500;n++){await new Promise(r=>setTimeout(r,20));if(!scheduled&&!inflight.size&&!stream.snapshot().stats.reservedBytes){gl.finish();return}}throw Error('Progressive inspection did not settle')}
+ window.cadPaged={setCamera,getCamera:()=>({...camera,target:camera.target.slice()}),setView,project,pick,settle,whenIdle:settle,snapshot:()=>({metadata:stream.snapshot(),camera:{...camera},stats:{...stats}}),draw:render,finish:()=>gl.finish(),select:i=>{const e=stream.snapshot().entries.find(e=>e.index===i);return e?selectEntry(e):null}};
+ let drag=null;canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,moved:false};canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>1)drag.moved=true;if(e.shiftKey){const scale=camera.halfHeight*2/canvas.clientHeight;camera.target=camera.target.map((v,i)=>v-dx*scale*basis.right[i]+dy*scale*basis.up[i])}else{camera.yaw-=dx*.006;camera.pitch=Math.max(-Math.PI/2,Math.min(Math.PI/2,camera.pitch+dy*.006))}drag.x=e.clientX;drag.y=e.clientY;demandDirty=true;schedule()});canvas.addEventListener('pointerup',e=>{if(drag&&!drag.moved){const r=canvas.getBoundingClientRect();try{pick(e.clientX-r.left,e.clientY-r.top)}catch(err){fail(err)}}drag=null});canvas.addEventListener('pointercancel',()=>drag=null);canvas.addEventListener('wheel',e=>{e.preventDefault();setCamera({halfHeight:camera.halfHeight*Math.exp(e.deltaY*.001)})},{passive:false});document.getElementById('fit').onclick=()=>setCamera({target:mid.slice(),halfHeight:radius*1.15});document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));window.addEventListener('resize',()=>{demandDirty=true;schedule()});canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();disposed=true;stream.dispose();for(const c of inflight.values())c.abort();fail('GPU context lost. Reload to resume inspection.')});window.addEventListener('pagehide',()=>{disposed=true;stream.dispose();for(const c of inflight.values())c.abort()});render();
+}
+</script></body></html>

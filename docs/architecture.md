@@ -1548,9 +1548,27 @@ instance paths, definition metadata and display references. Pages are limited to
 The producer uses existing display bounds rather than loading or tessellating
 geometry again. This establishes an independently traversable artifact boundary,
 not completion of M3b: generation still owns the complete built assembly and the
-existing viewer still expands all occurrence metadata. The consumer must next
-replace dense occurrence arrays, client-built spatial trees and total-count-sized
-proxy buffers with budgeted page traversal, eviction and unresolved subtree proxies.
+legacy viewers still expand all occurrence metadata. An additional experimental
+`*.paged.html` consumer now traverses pages with at most 2,048 resident occurrence
+records, 256 pages, four requests and an 8 MiB encoded resident/reserved budget.
+Off-demand pages are evicted under pressure; cancelled reads retain reservations
+until they settle. Unresolved branches retain region proxies and cannot claim a
+specific part or face. Loaded occurrences retain their original ordinals and paths;
+GPU draw buffers depend on resident visible records rather than total assembly
+count. A separate 64 MiB mesh budget accounts for encoded payloads and geometry
+buffers. These accounting limits are not a total browser-heap bound. This path
+currently loads finest meshes, so combining metadata paging with adaptive LOD,
+certified detail latency and hardware performance acceptance remains open.
+
+The `paged_workcell.star` acceptance configuration contains 100,000 occurrences
+through 1,000 shared 100-part cells. Local browser acceptance reaches overview
+with zero occurrence records and zero meshes loaded, then resolves surface picks
+in distant cells and after returning to the original cell. Node acceptance also
+forces record-budget eviction, cancelled late responses, duplicate ordinals,
+corrupt hashes and oversized reads. These tests establish bounded counters and
+identity/fallback behavior, not hardware performance, unique-part complexity or
+continuous frame-time guarantees. The viewport and supported resource budgets
+must still be pinned in the commercial benchmark protocol below.
 
 Implement this contract in independently reviewable stages, retaining the current
 portable and WebGL2 inspection paths until a replacement passes their identity

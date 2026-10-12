@@ -1222,8 +1222,36 @@ into SHA-256-addressed spatial metadata pages. Branch pages reference two childr
 leaf pages retain at most 128 occurrence records with paths, part identity and
 display references. Each encoded page is capped at 1 MiB and included in the
 generation's integrity inventory. This is the producer contract for paged
-inspection; the existing viewers still use their complete occurrence arrays.
-It does not yet bound browser metadata residency or headless build memory.
+inspection; the legacy viewers still use their complete occurrence arrays.
+The separate `*.paged.html` inspector consumes those pages on demand, retaining
+at most 2,048 occurrence records, 256 metadata pages and 8 MiB of encoded metadata
+plus pending reservations. It renders unresolved branches as striped regions;
+click a region or zoom in to load part identities and shared geometry. Selecting
+a resolved surface exposes its occurrence, semantic face and captured recipe.
+The mesh cache separately accounts for 64 MiB of encoded data plus geometry VBOs.
+These limits do not measure total browser heap or headless build memory. This
+experimental path uses the finest available mesh; adaptive mesh LOD remains in
+the existing streamed viewer.
+
+`paged_workcell.star` is a compact hierarchical scale fixture. Its default has
+400 occurrences; `--param stations=1000 --display-only` builds 100,000 occurrences
+from one shared part definition. This tests assembly metadata scale, separately
+from unique-part modeling complexity.
+
+Reproduce the paged-client acceptance with the local server serving `out`:
+
+```sh
+cad build examples/paged_workcell.star --param stations=1000 --display-only --out-dir out/paged_scale
+cad build examples/modular_linear_stage.star --out-dir out/paged_modules
+node tools/preview-check/metadata-stream.cjs
+CAD_BROWSER=/path/to/chromium node tools/preview-check/paged.cjs
+```
+
+The browser harness uses Playwright from `tools/preview-check` and defaults to
+`http://localhost:8080`. It checks sparse overview, distant-region refinement,
+return picks, source/module inspection, resource accounting, corrupt-page fallback
+and mismatched source-generation rejection. SwiftShader results establish local
+functional behavior, not a hardware frame-rate or total-memory release gate.
 
 Curved parts now have up to three shared display levels, built with native
 tessellation policies of 0.5, 0.1 and 0.01 mm. The streamed viewer loads a coarse

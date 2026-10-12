@@ -453,6 +453,8 @@ fn gallery(directory: &Dir) -> String {
             output.push_str(&format!("<a href=\"{}\">Stream viewer ↗</a>", url(&stream)));
         }
         for (suffix, label) in [
+            ("paged.html", "Paged viewer"),
+            ("metadata.json", "Paged metadata"),
             ("stream.json", "Stream metadata"),
             ("step", "STEP"),
             ("exchange.json", "Exchange fidelity"),
@@ -629,11 +631,15 @@ mod tests {
         std::fs::write(dir.path().join("large.display.json"), "{}").unwrap();
         std::fs::write(dir.path().join("large.stream.html"), "stream").unwrap();
         std::fs::write(dir.path().join("large.stream.json"), "{}").unwrap();
+        std::fs::write(dir.path().join("large.paged.html"), "paged").unwrap();
+        std::fs::write(dir.path().join("large.metadata.json"), "{}").unwrap();
         let response = request(dir.path(), b"GET / HTTP/1.1\r\n\r\n");
         assert!(response.contains("/large.gpu.html"));
         assert!(response.contains("/large.display.json"));
         assert!(response.contains("/large.stream.html"));
         assert!(response.contains("/large.stream.json"));
+        assert!(response.contains("/large.paged.html"));
+        assert!(response.contains("/large.metadata.json"));
         assert!(!response.contains("large.step"));
         assert!(!response.contains("large.preview.svg"));
         std::fs::write(dir.path().join("large.preview.html"), "cpu").unwrap();

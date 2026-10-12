@@ -1833,6 +1833,7 @@ fn display_only_publication_keeps_shared_meshes_and_removes_stale_exports() {
         "many.stream.json",
         "many.stream.html",
         "many.metadata.json",
+        "many.paged.html",
     ] {
         assert!(available.contains(&serde_json::json!(name)));
     }
@@ -1841,7 +1842,7 @@ fn display_only_publication_keeps_shared_meshes_and_removes_stale_exports() {
         .filter(|name| name.as_str().unwrap().starts_with("metadata-"))
         .count();
     assert!(page_count > 1); // Large assemblies must split into independently loadable pages.
-    assert_eq!(available.len(), 6 + page_count); // Five entrypoints, shared mesh, metadata pages.
+    assert_eq!(available.len(), 7 + page_count); // Six entrypoints, shared mesh, metadata pages.
 
     let actual: std::collections::BTreeSet<_> = fs::read_dir(&out)
         .unwrap()
