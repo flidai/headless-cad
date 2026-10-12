@@ -651,3 +651,46 @@ fn joint_discovery_describes_prescribed_attachments_without_claiming_a_solver() 
         .iter()
         .any(|d| d["id"] == "assembly.prescribed_joints"));
 }
+
+#[test]
+fn mechanism_discovery_covers_source_graph_and_reports_bounded_planar_scope() {
+    let directory = tempfile::tempdir().unwrap();
+    let output = cli(
+        directory.path(),
+        &["capabilities", "--type", "mechanism_definition"],
+    );
+    assert!(output.status.success());
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let ids: Vec<_> = value["object_types"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| o["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "mechanism_branch",
+            "mechanism_definition",
+            "mechanism_drive",
+            "mechanism_link",
+            "mechanism_pin",
+            "planar_mechanism",
+            "rigid_transform"
+        ]
+    );
+    let output = cli(directory.path(), &["capabilities"]);
+    let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let domain = value["domains"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["id"] == "assembly.planar_mechanisms")
+        .unwrap();
+    assert_eq!(domain["operation_ids"], serde_json::json!([]));
+    assert_eq!(value["resource_limits"]["mechanisms_per_recipe"], 64);
+    assert_eq!(
+        value["resource_limits"]["mechanism_bindings_per_recipe"],
+        4096
+    );
+}

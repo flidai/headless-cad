@@ -368,6 +368,30 @@ pub fn capability_catalog() -> CapabilityCatalog {
     ];
     object_types.extend(envelope_objects(&operations));
     object_types.extend(engineering::objects());
+    for spec in &mut object_types {
+        match spec.id {
+            "mechanism_definition" => spec.obligations.extend(["example: examples/solved_four_bar.star", "all declared mechanisms solve globally before solids, including selected and display-only builds; immutable rigid geometry"]),
+            "mechanism_binding" => spec.obligations.extend(["exact local occurrence ID in named assembly definition; leaf or rigid child", "one binding per occurrence; cannot coexist with datum attachment; placement = mechanism frame * solved link frame * existing transform"]),
+            "planar_mechanism" => spec.obligations.extend(["1..30 pins, 1..64 links, at most 16 drives and 32 branch witnesses; generated solver constraints bounded", "fully constrained, converged, well-conditioned solution and branch witnesses required; initial coordinates are guesses, not authoritative placements", "no general 3D, collision, dynamics or global branch uniqueness claim"]),
+            _ => {}
+        }
+        for argument in &mut spec.arguments {
+            match (spec.id, argument.name) {
+                ("mechanism_pin", "initial" | "ground") | ("mechanism_link", "length") => {
+                    argument.units = Some("mm")
+                }
+                ("mechanism_drive", "angle_radians") => {
+                    argument.units = Some("rad");
+                    argument.constraints.push("finite and in (-pi, pi]");
+                }
+                ("mechanism_branch", "side") => argument
+                    .constraints
+                    .push("left or right: signed orientation of the three ordered pins"),
+                _ => {}
+            }
+        }
+    }
+
     let domain = |id, operation_ids, requirements, exclusions| DomainCapability {
         id,
         operation_ids,
@@ -375,6 +399,7 @@ pub fn capability_catalog() -> CapabilityCatalog {
         exclusions,
     };
     let domains=vec![
+        domain("assembly.planar_mechanisms",vec![],vec!["bounded planar pin/bar graphs with fixed lengths, grounded pins, directed angle drives and explicit branch-side witnesses", "global deterministic numerical closure before geometry evaluation; all accepted links become rigid local XY frames", "separate arbitrary rigid mechanism frame; binding composes link frame then existing occurrence offset, for leaf parts or rigid children", "solver reports, rank/conditioning, branch witnesses and source context identity retained; selected builds cannot bypass failures"],vec!["general 3D or flexible-body solving; dynamics and collision certification; global uniqueness or automatic branch continuation"]),
         domain("assembly.prescribed_joints",vec![],vec!["schema-2 datum attachments optionally prescribe revolute or prismatic motion; finite position and inclusive min/max limits", "motion is target datum times existing offset times joint motion about/along local +Z times inverse source datum", "part or rigid-module attachments form an acyclic dependency graph; immutable shared geometry; placement-only motion changes assembly identity", "structural joint limits are global even for selected body builds"],vec!["nonlinear or closed-loop solving, free joints, dynamics, collision/clearance certification"]),
         domain("query.planar_section",vec![],vec!["exact directed line/arc loops with native face provenance, area and centroid", "general planar solids; axis-transverse circular, annular, line/arc prism, blind/stepped/countersunk and revolution solids", "body and assembly occurrence frames; assembly areas sum occurrences, not union; declared views are global obligations"],vec!["oblique curved intersections; tangent/coplanar topology-event planes; implicit perturbation; manufacturing PMI"]),
         domain("profile.circle",vec!["feature.circle"],vec!["disk or concentric annulus, finite radii with resolved positive material thickness"],vec!["arbitrary circular-edge graphs"]),
@@ -395,7 +420,7 @@ pub fn capability_catalog() -> CapabilityCatalog {
         domain("boolean.round_stock",vec!["feature.cut"],vec!["canonical solid circular or annular stock with a solid parallel or opposite-axis cylindrical tool", "contained circular through/blind drilling followed by separated or coaxial stepped cuts", "exact two-semicircle outer boundary adaptation; original outer-wall lineage splits into two faces, caps and untouched central bore retain lineage", "native circular support, analytic mass properties and common rigid placements"],vec!["tangent/crossing stock boundaries or existing bore; noncoaxial overlapping holes; enclosed cutter; skew or unresolved placement; general curved Boolean closure"]),
     ];
     CapabilityCatalog{schema_version:CAPABILITY_SCHEMA_VERSION,interface:"json_recipe_ir",recipe_schema_versions:vec![1,2],latest_recipe_schema_version:crate::RECIPE_SCHEMA_VERSION,units:"mm",default_linear_tolerance_mm:cad_kernel::Tolerance::default().linear,identities:ImplementationIdentities{assembly_build_id:cad_assembly::assembly_build_id(),catalog_build_id:catalog_build_id(),kernel_version:cad_kernel::KERNEL_VERSION,kernel_build_id:cad_kernel::KERNEL_BUILD_ID,executor_build_id:crate::executor_build_id(),sketch_solver_build_id:crate::solver_build_id()},operations,object_types,domains,
-        resource_limits:BTreeMap::from([("prescribed_joints_per_recipe",cad_assembly::MAX_PRESCRIBED_JOINTS),("features_per_recipe",crate::MAX_FEATURES),("section_views_per_recipe",crate::MAX_SECTION_VIEWS),("section_dimensions_per_view",crate::MAX_SECTION_DIMENSIONS_PER_VIEW),("section_dimensions_per_recipe",crate::MAX_SECTION_DIMENSIONS),("section_view_geometry_work",crate::MAX_SECTION_VIEW_WORK),("exchange_requirements_per_recipe",crate::MAX_EXCHANGE_REQUIREMENTS),("demanded_sketches_per_build",128),("polygon_points_total",crate::MAX_POLYGON_POINTS),("stepped_bore_axial_sections",cad_kernel::MAX_STEPPED_BORE_SEGMENTS),("profile_holes_total",crate::MAX_POLYGON_HOLES),("sketch_points_total",cad_sketch::MAX_POINTS),("sketch_constraints_total",cad_sketch::MAX_CONSTRAINTS),("sketch_points_per_island",cad_sketch::MAX_ISLAND_POINTS),("sketch_constraints_per_island",cad_sketch::MAX_ISLAND_CONSTRAINTS),("solver_iterations_per_island",cad_sketch::MAX_ITERATIONS),("parts_per_recipe",crate::MAX_PARTS),("assemblies_per_recipe",crate::MAX_ASSEMBLIES),("instances_per_recipe",crate::MAX_INSTANCES),("outputs_per_recipe",crate::MAX_OUTPUTS)]),
+        resource_limits:BTreeMap::from([("mechanisms_per_recipe",crate::MAX_MECHANISMS),("mechanism_bindings_per_recipe",crate::MAX_MECHANISM_BINDINGS),("prescribed_joints_per_recipe",cad_assembly::MAX_PRESCRIBED_JOINTS),("features_per_recipe",crate::MAX_FEATURES),("section_views_per_recipe",crate::MAX_SECTION_VIEWS),("section_dimensions_per_view",crate::MAX_SECTION_DIMENSIONS_PER_VIEW),("section_dimensions_per_recipe",crate::MAX_SECTION_DIMENSIONS),("section_view_geometry_work",crate::MAX_SECTION_VIEW_WORK),("exchange_requirements_per_recipe",crate::MAX_EXCHANGE_REQUIREMENTS),("demanded_sketches_per_build",128),("polygon_points_total",crate::MAX_POLYGON_POINTS),("stepped_bore_axial_sections",cad_kernel::MAX_STEPPED_BORE_SEGMENTS),("profile_holes_total",crate::MAX_POLYGON_HOLES),("sketch_points_total",cad_sketch::MAX_POINTS),("sketch_constraints_total",cad_sketch::MAX_CONSTRAINTS),("sketch_points_per_island",cad_sketch::MAX_ISLAND_POINTS),("sketch_constraints_per_island",cad_sketch::MAX_ISLAND_CONSTRAINTS),("solver_iterations_per_island",cad_sketch::MAX_ITERATIONS),("parts_per_recipe",crate::MAX_PARTS),("assemblies_per_recipe",crate::MAX_ASSEMBLIES),("instances_per_recipe",crate::MAX_INSTANCES),("outputs_per_recipe",crate::MAX_OUTPUTS)]),
         sketch_policy:SketchPolicy{report_schema_version:3,angular_tolerance_radians:cad_sketch::ANGULAR_TOLERANCE_RADIANS,max_condition_bound:cad_sketch::MAX_CONDITION_BOUND,acceptance:"fully_constrained only; linear residuals in mm and angular residuals in radians checked separately; condition bound is worst local normalized Jacobian condition, not coordinate accuracy"},
         validation_obligations:vec!["recipe units must be mm; schemas 1 and 2 accepted; assembly/assertion/datum fields require schema 2", "strict structural fields, unique identifiers, valid references, acyclic dependencies and aggregate resource budgets", "default tolerance is native Tolerance::default(); requested tolerance must be finite and positive", "numeric bounds, minimum feature clearances, canonical native topology and analytic mass properties validated; a declared family does not guarantee every parameter combination", "semantic face selections and property assertions must resolve; display meshes are derived, never authoritative", "unsupported operations fail explicitly; no implicit repair or dimensional snapping", "example paths are repository fixtures illustrating the domain, not a guarantee that arbitrary parameter edits succeed"],unsupported_operation_ids:vec!["feature.fillet","feature.loft","feature.sweep","feature.shell","feature.import_step","feature.general_boolean","assembly.solve_joints"]}
 }
@@ -443,6 +468,8 @@ fn envelope_objects(operations: &[OperationCapability]) -> Vec<ObjectSpec> {
         ("exchange_requirements", "exchange_requirement"),
         ("section_views", "section_view"),
         ("face_datums", "face_datum"),
+        ("mechanisms", "mechanism_definition"),
+        ("mechanism_bindings", "mechanism_binding"),
     ] {
         let mut a = array_default(name, object(kind));
         a.recipe_schema_versions = vec![2];
@@ -600,6 +627,68 @@ fn envelope_objects(operations: &[OperationCapability]) -> Vec<ObjectSpec> {
         recipe,
         feature,
         joint,
+        object_spec(
+            "mechanism_definition",
+            vec![
+                arg("id", T::String),
+                optional(
+                    arg("frame", object("rigid_transform")),
+                    json!({"translation":[0,0,0],"rotation":[0,0,0,1]}),
+                ),
+                arg("input", object("planar_mechanism")),
+            ],
+        ),
+        object_spec(
+            "planar_mechanism",
+            vec![
+                arg("pins", array(object("mechanism_pin"), None)),
+                arg("links", array(object("mechanism_link"), None)),
+                array_default("drives", object("mechanism_drive")),
+                array_default("branches", object("mechanism_branch")),
+            ],
+        ),
+        object_spec(
+            "mechanism_pin",
+            vec![
+                arg("id", T::String),
+                arg("initial", array(T::Number, Some(2))),
+                optional_null("ground", array(T::Number, Some(2))),
+            ],
+        ),
+        object_spec(
+            "mechanism_link",
+            vec![
+                arg("id", T::String),
+                arg("from", reference("mechanism_pin")),
+                arg("to", reference("mechanism_pin")),
+                arg("length", T::Number),
+            ],
+        ),
+        object_spec(
+            "mechanism_drive",
+            vec![
+                arg("id", T::String),
+                arg("link", reference("mechanism_link")),
+                arg("angle_radians", T::Number),
+            ],
+        ),
+        object_spec(
+            "mechanism_branch",
+            vec![
+                arg("id", T::String),
+                arg("pins", array(reference("mechanism_pin"), Some(3))),
+                arg("side", T::String),
+            ],
+        ),
+        object_spec(
+            "mechanism_binding",
+            vec![
+                arg("assembly", reference("assembly_definition")),
+                arg("instance", reference("local_occurrence")),
+                arg("mechanism", reference("mechanism_definition")),
+                arg("link", reference("mechanism_link")),
+            ],
+        ),
         object_spec(
             "chamfer_face",
             vec![

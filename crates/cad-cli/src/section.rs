@@ -152,7 +152,7 @@ pub(super) fn bind_report(
         (id, check)
     }).collect();
     let source_hash = blake3::hash(source).to_hex().to_string();
-    let query_context = json!({"recipe_source_hash":source_hash,"section_build_id":implementation_id(),"parameter_overrides":parameters,"output_name":output,"content_hash":content_hash,"assembly_build_id":if kind=="assembly"{Some(cad_assembly::assembly_build_id())}else{None},"plane":plane,"tolerance":tolerance,"kernel_build_id":cad_kernel::KERNEL_BUILD_ID,"executor_build_id":cad_build::executor_build_id()});
+    let query_context = json!({"recipe_source_hash":source_hash,"mechanism_context_hash":build.mechanism_context_hash,"section_build_id":implementation_id(),"parameter_overrides":parameters,"output_name":output,"content_hash":content_hash,"assembly_build_id":if kind=="assembly"{Some(cad_assembly::assembly_build_id())}else{None},"plane":plane,"tolerance":tolerance,"kernel_build_id":cad_kernel::KERNEL_BUILD_ID,"executor_build_id":cad_build::executor_build_id()});
     let section = &query.section;
     Ok(json!({
         "schema_version":1,"kind":kind,"output_name":output,
@@ -160,8 +160,8 @@ pub(super) fn bind_report(
         "units":{"length":"mm","area":"mm2","angles":"radians"},
         "area_kind":if kind=="assembly" {"summed_occurrence_material_not_union"}else{"integrated_solid_material"},
         "section":section,"occurrences":occurrences,
-        "snapshot":{"recipe_source_hash":source_hash,"section_build_id":implementation_id(),"query_context_hash":blake3::hash(&serde_json::to_vec(&query_context)?).to_hex().to_string(),"parameter_overrides":parameters,"tolerance":tolerance,"feature_id":feature_id,"content_hash":content_hash,"kernel_build_id":cad_kernel::KERNEL_BUILD_ID,"executor_build_id":cad_build::executor_build_id(),"assembly_build_id":if kind=="assembly"{Some(cad_assembly::assembly_build_id())}else{None}},
-        "stats":build.stats,"scope":build.scope,"section_views":section_checks,"face_assertions":build.face_assertions,"property_assertions":build.property_assertions,"sketch_reports":build.sketch_reports,
+        "snapshot":{"recipe_source_hash":source_hash,"mechanism_context_hash":build.mechanism_context_hash,"section_build_id":implementation_id(),"query_context_hash":blake3::hash(&serde_json::to_vec(&query_context)?).to_hex().to_string(),"parameter_overrides":parameters,"tolerance":tolerance,"feature_id":feature_id,"content_hash":content_hash,"kernel_build_id":cad_kernel::KERNEL_BUILD_ID,"executor_build_id":cad_build::executor_build_id(),"assembly_build_id":if kind=="assembly"{Some(cad_assembly::assembly_build_id())}else{None}},
+        "stats":build.stats,"scope":build.scope,"section_views":section_checks,"face_assertions":build.face_assertions,"property_assertions":build.property_assertions,"sketch_reports":build.sketch_reports,"mechanism_reports":build.mechanism_reports,"mechanism_bindings":build.mechanism_bindings,"mechanism_context_hash":build.mechanism_context_hash,
         "exchange_requirements":exchange::pending(&recipe.exchange_requirements),"exchange_policy_status":if recipe.exchange_requirements.is_empty(){"not_requested"}else{"pending_publication"}
     }))
 }

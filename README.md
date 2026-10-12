@@ -358,6 +358,47 @@ repositions the sensor without rebuilding geometry. Upward references, multiple
 simultaneous mates, nonlinear constraint solving and collision checking remain
 unsupported. Prescribed one-axis joints are available as described below.
 
+### Solved planar mechanisms
+
+`examples/solved_four_bar.star` defines a closed four-bar linkage through named
+pins, rigid link lengths, grounded pins and an input angle. Pin coordinates are
+initial guesses. The original numerical solver finds the remaining coordinates;
+parts and rigid subassemblies take their placements from the solved link frames.
+
+```python
+layout = mechanism(id = "drive", pins = pins, links = links,
+    drives = [{"id":"input", "link":"crank", "angle_radians":angle}],
+    branches = [{"id":"upper", "pins":["b","d","c"], "side":"left"}])
+mechanism_bind(assembly = linkage, instance = "coupler",
+               mechanism = layout, link = "coupler")
+```
+
+Each pin has `id`, `initial: [x,y]`, and optional `ground: [x,y]`; each link has
+`id`, `from`, `to`, and positive `length`. An angle drive measures from local +X
+in radians in `(-pi, pi]`. A branch witness requires its third pin to remain on
+the declared side of the directed first-to-second pin line. Guesses select a
+local solution; a wrong or numerically unresolved requested branch fails.
+
+A binding composes `mechanism frame * solved link frame * instance offset`.
+The link's first pin is its origin and local +X points toward the second. The
+mechanism frame accepts ordinary `offset` and quaternion `rotation`, so the
+solved plane can be oriented in an assembly. Binding and datum attachment cannot
+both own one occurrence. Other occurrences may attach to a bound component.
+
+Every declared mechanism is a global build obligation, including selected-body
+builds. Underconstraint, nonconvergence and rejected branches prevent publication;
+failures retain solver evidence. Successful manifests include `mechanism_reports`,
+`mechanism_bindings` and `mechanism_context_hash`. The hash binds source intent,
+solver identity and results separately from native geometric assembly identity.
+Motion edits reuse unchanged part geometry. STEP preserves resolved placements;
+recipes and reports retain the mechanism intent.
+
+Limits are 64 mechanisms and 4,096 bindings per recipe; each mechanism permits
+30 pins, 64 links, 16 drives, 32 branch witnesses and at most 128 generated
+constraints. Placement requires fully constrained local convergence and acceptable
+conditioning. This is planar pin/bar closure, not general 3D mates, dynamics,
+automatic continuation, collision checking or proof of global uniqueness.
+
 ### Prescribed revolute and prismatic joints
 
 An attached part or rigid subassembly can prescribe one bounded coordinate:

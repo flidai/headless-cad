@@ -47,6 +47,8 @@ struct GraphStore {
     exchange_requirements: RefCell<Vec<serde_json::Value>>,
     section_views: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
+    mechanisms: RefCell<Vec<serde_json::Value>>,
+    mechanism_bindings: RefCell<Vec<serde_json::Value>>,
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
     parameters: RefCell<BTreeMap<String, f64>>,
@@ -541,6 +543,61 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         store(eval)?.output(serde_json::json!({
             "name": name, "feature": feature,
         }))?;
+        Ok(NoneType)
+    }
+
+    /// Declare a bounded planar linkage, solved independently of part geometry.
+    fn mechanism(
+        id: &str,
+        pins: Value,
+        links: Value,
+        drives: Option<Value>,
+        branches: Option<Value>,
+        offset: Option<Value>,
+        rotation: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let array = |v: Option<Value>| -> anyhow::Result<serde_json::Value> {
+            Ok(match v.filter(|v| !v.is_none()) {
+                Some(v) => serde_json::from_str(&v.to_json()?)?,
+                None => serde_json::json!([]),
+            })
+        };
+        let definition: cad_build::MechanismDefinition =
+            serde_json::from_value(serde_json::json!({
+                "id":id,"frame":frame(offset,rotation)?,"input":{
+                    "pins":array(Some(pins))?,"links":array(Some(links))?,
+                    "drives":array(drives)?,"branches":array(branches)?
+                }
+            }))?;
+        let graph = store(eval)?;
+        let mut definitions = graph.mechanisms.borrow_mut();
+        anyhow::ensure!(
+            definitions.len() < cad_build::MAX_MECHANISMS,
+            "too many mechanisms"
+        );
+        anyhow::ensure!(
+            !definitions.iter().any(|d| d["id"] == id),
+            "duplicate mechanism ID '{id}'"
+        );
+        definitions.push(serde_json::to_value(definition)?);
+        Ok(id.into())
+    }
+
+    fn mechanism_bind(
+        assembly: &str,
+        instance: &str,
+        mechanism: &str,
+        link: &str,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let graph = store(eval)?;
+        let mut bindings = graph.mechanism_bindings.borrow_mut();
+        anyhow::ensure!(
+            bindings.len() < cad_build::MAX_MECHANISM_BINDINGS,
+            "too many mechanism bindings"
+        );
+        bindings.push(serde_json::json!({"assembly":assembly,"instance":instance,"mechanism":mechanism,"link":link}));
         Ok(NoneType)
     }
 
@@ -1246,10 +1303,12 @@ pub fn from_starlark_with_modules(
     let exchange_requirements = graph.exchange_requirements.into_inner();
     let section_views = graph.section_views.into_inner();
     let face_datums = graph.face_datums.into_inner();
+    let mechanisms = graph.mechanisms.into_inner();
+    let mechanism_bindings = graph.mechanism_bindings.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
     let mut value = serde_json::json!({
-        "schema_version": if assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() { 2 } else { 1 },
+        "schema_version": if !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -1258,6 +1317,12 @@ pub fn from_starlark_with_modules(
         value["parts"] = serde_json::json!(parts);
         value["assemblies"] = serde_json::json!(assemblies);
         value["assembly_outputs"] = serde_json::json!(assembly_outputs);
+    }
+    if !mechanisms.is_empty() {
+        value["mechanisms"] = serde_json::json!(mechanisms);
+    }
+    if !mechanism_bindings.is_empty() {
+        value["mechanism_bindings"] = serde_json::json!(mechanism_bindings);
     }
     if !section_views.is_empty() {
         value["section_views"] = serde_json::json!(section_views);

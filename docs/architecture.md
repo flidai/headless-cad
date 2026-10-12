@@ -1317,7 +1317,45 @@ STEP configurations, including moving sections. Rejected limit edits preserve
 all previously published artifact bytes. These checks establish this bounded
 domain, not general mechanism solving.
 
-The assembly solver operates on rigid frames, named attachment datums, joint
+### Planar closed-loop mechanism integration
+
+The bounded planar mechanism path is separate from acyclic prescribed datum
+joints. Named pins and fixed link lengths compile into equations in the original
+numerical solver. Ground pins remove rigid gauge freedom; directed angle drives
+prescribe inputs. Explicit signed branch witnesses reject wrong-sided or
+numerically unresolved solutions without silently changing the user's guess.
+An accepted solution must converge, have full local rank and meet the solver's
+conditioning/residual policy. This is local acceptance evidence, not proof of a
+unique global solution or continuous branch tracking through a singularity.
+
+A recipe mechanism definition owns `{id, frame, input}`; the native solver owns
+only planar pins, links, grounds, drives and branch checks. The native solve loads
+zero exact bodies. Separate bindings address a named local occurrence in a named
+assembly definition and compose its existing offset after the solved link frame.
+Both part and rigid-child bindings are supported; datum attachments can depend
+on their resolved placements. Duplicate bindings or competing attachment owners
+fail. Reused parent occurrences share the solved internal definition.
+
+All declared mechanisms are build obligations even when an output selection
+omits their parts. Reports retain source, input hash, solver implementation,
+local pins/frames, link residuals, Jacobian diagnostics and branch witnesses.
+A separate mechanism context hash binds intent and evidence to publication and
+queries; native assembly identity remains recomputable from geometry and resolved
+hierarchy. STEP carries placements, while captured recipes and reports carry
+mechanical intent. Invalid mechanisms cannot replace a valid generation.
+
+The acceptance fixture is `solved_four_bar.star`: a solved crank subassembly,
+coupler, rocker and ground link with four shared pin occurrences, native material
+queries and a moving datum section. Independent circle-circle intersections check
+closure over input-angle and link-length changes and oblique assembly planes.
+The native product corpus passes 27 angle/length/plane configurations; three
+independent STEP cases check closure, placements, material volume/centroid and
+sections. Failed branch/underconstraint edits preserve publication and motion
+reuses part geometry. Inspection of captured source is a separate browser gate.
+General spatial mates, mechanism continuation, conflict minimization, collision,
+loads and dynamics remain separate target work.
+
+The target general assembly solver operates on rigid frames, named attachment datums, joint
 parameters, and sparse constraints. It must not need full solid data to solve
 ordinary placement. Partition independent constraint islands, fix gauge freedoms,
 use deterministic ordering and bounded nonlinear solving, and report residuals
@@ -2314,15 +2352,16 @@ new solids for an unselected-tool edit and one for the selected tool.
 Prescribed revolute/prismatic joints now have native, recipe/build, product and
 independent STEP acceptance for the bounded acyclic contract above. Motion,
 material properties and moving sections are checked across multiple coordinates
-and rigid poses; failed limit edits preserve the published generation. Nonlinear
-closed-loop solving, dynamics and collision certification remain open.
+and rigid poses; failed limit edits preserve the published generation. General spatial
+closed-loop solving, dynamics and collision certification remain open; the planar
+pin/bar solver has its own bounded acceptance contract above.
 
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters and locked local modules with captured replay bundles; strict JSON graph; Rust structs; versioned recipe/assembly capability catalog | Remote package resolution, unit types, source maps, full public agent/SDK contracts |
 | Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through/blind bores, coaxial counterbores and conical countersinks in recognized prisms and circular/annular stock; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
-| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM; bounded prescribed revolute/prismatic motion | Nonlinear/closed-loop joint constraints, flexible occurrences and configurations |
+| Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM; bounded prescribed revolute/prismatic motion; bounded planar pin/bar closure | General 3D/closed-loop joint constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |

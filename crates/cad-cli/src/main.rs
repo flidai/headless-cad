@@ -244,6 +244,9 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "exchange_requirements": exchange::pending(&recipe.exchange_requirements),
         "exchange_policy_status": if recipe.exchange_requirements.is_empty() { "not_requested" } else { "pending_publication" },
         "sketch_reports": build.sketch_reports,
+        "mechanism_reports": build.mechanism_reports,
+        "mechanism_bindings": build.mechanism_bindings,
+        "mechanism_context_hash": build.mechanism_context_hash,
         "face_datums": build.face_datums,
         "outputs": outputs,
     }))
@@ -570,7 +573,13 @@ fn difference(before: &Value, after: &Value) -> Value {
             };
             (id.clone(),json!({"status":status,"before":a,"after":b,"before_hash":old_hash,"after_hash":new_hash}))
         }).collect();
-    json!({"outputs":changes,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
+    let mechanisms = json!({
+        "status": if before["mechanism_context_hash"] == after["mechanism_context_hash"] { "unchanged" } else { "changed" },
+        "before": before["mechanism_reports"], "after": after["mechanism_reports"],
+        "before_bindings": before["mechanism_bindings"], "after_bindings": after["mechanism_bindings"],
+        "before_context_hash": before["mechanism_context_hash"], "after_context_hash": after["mechanism_context_hash"],
+    });
+    json!({"outputs":changes,"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -949,6 +958,9 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             result["build_scope"] = json!(built.scope);
             result["property_assertions"] = json!(built.property_assertions);
             result["sketch_reports"] = json!(built.sketch_reports);
+            result["mechanism_reports"] = json!(built.mechanism_reports);
+            result["mechanism_bindings"] = json!(built.mechanism_bindings);
+            result["mechanism_context_hash"] = json!(built.mechanism_context_hash);
             result["section_views"] = json!(built.section_views);
             result["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
             result["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
@@ -989,6 +1001,9 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             report["stats"] = json!(build.stats);
             report["property_assertions"] = json!(build.property_assertions);
             report["sketch_reports"] = json!(build.sketch_reports);
+            report["mechanism_reports"] = json!(build.mechanism_reports);
+            report["mechanism_bindings"] = json!(build.mechanism_bindings);
+            report["mechanism_context_hash"] = json!(build.mechanism_context_hash);
             report["section_views"] = json!(build.section_views);
             report["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
             report["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
@@ -1141,6 +1156,9 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         snapshot.bind(&mut result);
         result["property_assertions"] = json!(build.property_assertions);
         result["sketch_reports"] = json!(build.sketch_reports);
+        result["mechanism_reports"] = json!(build.mechanism_reports);
+        result["mechanism_bindings"] = json!(build.mechanism_bindings);
+        result["mechanism_context_hash"] = json!(build.mechanism_context_hash);
         result["section_views"] = json!(build.section_views);
         result["exchange_requirements"] = exchange::pending(&recipe.exchange_requirements);
         result["exchange_policy_status"] = json!(if recipe.exchange_requirements.is_empty() {
@@ -1235,6 +1253,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             "section_views": recipe.section_views,
             "section_build_id": section::implementation_id(),
             "sketch_reports": summary["sketch_reports"],
+            "mechanism_context_hash": summary["mechanism_context_hash"],
             "solver_build_id": summary["solver_build_id"],
             "kernel_build_id": summary["kernel_build_id"],
             "executor_build_id": summary["executor_build_id"],
@@ -1615,6 +1634,16 @@ fn main() {
                     cad_build::BuildError::Sketch { feature, .. } => {
                         report["code"] = json!("invalid_sketch");
                         report["feature"] = json!(feature);
+                    }
+                    cad_build::BuildError::MechanismFailed {
+                        id,
+                        message,
+                        report: solver_report,
+                    } => {
+                        report["code"] = json!("mechanism_solve_failed");
+                        report["mechanism"] = json!(id);
+                        report["diagnostic"] = json!(message);
+                        report["solver_report"] = json!(solver_report);
                     }
                     cad_build::BuildError::SketchSolveFailed {
                         feature,

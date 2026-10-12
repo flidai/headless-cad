@@ -6,6 +6,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - case: planar-mechanisms
+            capability: assembly.planar-mechanisms
           - case: prescribed-joints
             capability: assembly.prescribed-joints
           - case: counterbore

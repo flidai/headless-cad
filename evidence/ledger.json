@@ -273,6 +273,30 @@
         "joint-cli",
         "joint-independent"
       ]
+    },
+    {
+      "id": "assembly.planar-mechanisms",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "assembly.planar_mechanisms"
+      ],
+      "supported_domain": "Bounded planar pin/bar closure with grounded pins, fixed lengths, directed angle drives and explicit branch-side witnesses. Source-owned link frames bind rigid part or subassembly occurrences. Solved four-bar fixture spans angle 0.5..1.3 rad, coupler length 65..75 mm and three rigid plane poses, with global failure, geometry reuse, independent closure, STEP and moving-section checks required.",
+      "exclusions": [
+        "General spatial mates or flexible-body mechanisms",
+        "Automatic branch continuation and proof of global solution uniqueness",
+        "Dynamics, loads and collision or clearance certification",
+        "STEP preservation of native mechanism intent"
+      ],
+      "fixture": "examples/solved_four_bar.star",
+      "checks": [
+        "mechanism-native",
+        "mechanism-build",
+        "mechanism-recipe",
+        "mechanism-product",
+        "mechanism-cli",
+        "mechanism-independent"
+      ]
     }
   ],
   "checks": [
@@ -795,6 +819,87 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/jointed_stage"
+      ]
+    },
+    {
+      "id": "mechanism-native",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-assembly",
+        "mechanism_tests"
+      ]
+    },
+    {
+      "id": "mechanism-build",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-build",
+        "--test",
+        "mechanisms"
+      ]
+    },
+    {
+      "id": "mechanism-recipe",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-recipe",
+        "--test",
+        "mechanisms"
+      ]
+    },
+    {
+      "id": "mechanism-product",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "solved_four_bar"
+      ]
+    },
+    {
+      "id": "mechanism-cli",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "mechanisms"
+      ]
+    },
+    {
+      "id": "mechanism-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_four_bar_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/four_bar"
       ]
     }
   ]

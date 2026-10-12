@@ -5,10 +5,13 @@
 //! remains local to its definition and does not expand the kernel's supported
 //! modeling domain. Nested reusable definitions retain local placements and explicit
 //! occurrence paths. Acyclic datum attachments support prescribed local-Z joints;
-//! free-coordinate and closed-loop constraint solving are not implemented.
+//! a separate bounded planar pin/bar solver supports closed-loop mechanisms.
+//! General spatial constraint solving, dynamics and collision checks remain open.
 mod bom;
 mod mass_properties;
 pub use mass_properties::AssemblyMassProperties;
+mod mechanism;
+pub use mechanism::*;
 mod joint;
 pub use joint::{JointReport, PrescribedJoint, JOINT_ANGULAR_TOLERANCE_RAD, MAX_PRESCRIBED_JOINTS};
 mod datum;
@@ -41,6 +44,8 @@ pub fn assembly_build_id() -> &'static str {
         hash.update(include_bytes!("mass_properties.rs"));
         hash.update(include_bytes!("datum.rs"));
         hash.update(include_bytes!("joint.rs"));
+        hash.update(include_bytes!("mechanism.rs"));
+        hash.update(cad_sketch::SOLVER_BUILD_ID.as_bytes());
         hash.update(include_bytes!("../Cargo.toml"));
         hash.update(include_bytes!("../../../Cargo.lock"));
         hash.update(cad_kernel::KERNEL_BUILD_ID.as_bytes());
@@ -590,3 +595,6 @@ mod tests;
 
 #[cfg(test)]
 mod joint_tests;
+
+#[cfg(test)]
+mod mechanism_tests;

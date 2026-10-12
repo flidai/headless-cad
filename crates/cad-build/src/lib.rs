@@ -44,6 +44,11 @@ pub use property_assertions::{
     EngineeringProperty, PropertyAssertion, PropertyAssertionReport, PropertyAssertionStatus,
     MAX_PROPERTY_ASSERTIONS, MAX_PROPERTY_ASSERTION_WORK,
 };
+mod mechanisms;
+pub use mechanisms::{
+    MechanismBinding, MechanismBindingReport, MechanismDefinition, MechanismReport, MAX_MECHANISMS,
+    MAX_MECHANISM_BINDINGS,
+};
 mod face_datums;
 pub use face_datums::{
     FaceDatumDefinition, FaceDatumResolution, ResolvedFaceDatums, MAX_FACE_DATUMS,
@@ -81,6 +86,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("demand.rs").as_slice(),
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
+            include_bytes!("mechanisms.rs").as_slice(),
             include_bytes!("property_assertions.rs").as_slice(),
             include_bytes!("exchange_requirements.rs").as_slice(),
             include_bytes!("section_views.rs").as_slice(),
@@ -133,6 +139,10 @@ pub struct Recipe {
     pub section_views: Vec<SectionView>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mechanisms: Vec<MechanismDefinition>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mechanism_bindings: Vec<MechanismBinding>,
 }
 
 impl<'de> Deserialize<'de> for Recipe {
@@ -170,8 +180,18 @@ impl<'de> Deserialize<'de> for Recipe {
             section_views: Option<Vec<SectionView>>,
             #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
+            #[serde(default, deserialize_with = "present_vec")]
+            mechanisms: Option<Vec<MechanismDefinition>>,
+            #[serde(default, deserialize_with = "present_vec")]
+            mechanism_bindings: Option<Vec<MechanismBinding>>,
         }
         let raw = RawRecipe::deserialize(deserializer)?;
+        if raw.schema_version == 1 && (raw.mechanisms.is_some() || raw.mechanism_bindings.is_some())
+        {
+            return Err(serde::de::Error::custom(
+                "mechanisms require schema version 2",
+            ));
+        }
         if raw.schema_version == 1 && raw.section_views.is_some() {
             return Err(serde::de::Error::custom(
                 "section views require schema version 2",
@@ -218,6 +238,8 @@ impl<'de> Deserialize<'de> for Recipe {
             exchange_requirements: raw.exchange_requirements.unwrap_or_default(),
             section_views: raw.section_views.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
+            mechanisms: raw.mechanisms.unwrap_or_default(),
+            mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
         })
     }
 }
@@ -798,11 +820,20 @@ pub struct BuildResult {
     pub pending_exchange_requirements: Vec<ExchangeRequirement>,
     pub section_views: BTreeMap<String, SectionViewReport>,
     pub face_datums: ResolvedFaceDatums,
+    pub mechanism_reports: BTreeMap<String, MechanismReport>,
+    pub mechanism_bindings: Vec<MechanismBindingReport>,
+    pub mechanism_context_hash: String,
     selection_graph: selection::SelectionGraph,
 }
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("mechanism '{id}' failed: {message}")]
+    MechanismFailed {
+        id: String,
+        message: String,
+        report: Option<Box<SolveReport>>,
+    },
     #[error("section dimension '{id}' in view '{view}' on output '{output}' failed: {message}")]
     SectionDimensionFailed {
         view: String,
@@ -1382,6 +1413,7 @@ impl BuildEngine {
         if !tolerance.linear.is_finite() || tolerance.linear <= 0.0 {
             return Err(BuildError::Tolerance);
         }
+        mechanisms::preflight(recipe)?;
         let mut indices = HashMap::new();
         for (index, feature) in recipe.features.iter().enumerate() {
             identifier("feature", feature.id())?;
@@ -1565,6 +1597,8 @@ impl BuildEngine {
             }
         }
         assembly::validate(recipe, &indices, &mut output_names)?;
+        let mechanism_evaluation = mechanisms::evaluate(recipe, tolerance)?;
+        let recipe = &mechanism_evaluation.recipe;
         let scope = demand::scope(recipe, requested, &indices)?;
         let wanted: BTreeSet<_> = scope
             .evaluated_features
@@ -1830,6 +1864,9 @@ impl BuildEngine {
             pending_exchange_requirements: recipe.exchange_requirements.clone(),
             section_views: BTreeMap::new(),
             face_datums: BTreeMap::new(),
+            mechanism_reports: mechanism_evaluation.reports,
+            mechanism_bindings: mechanism_evaluation.bindings,
+            mechanism_context_hash: mechanism_evaluation.context_hash,
             selection_graph,
         };
         for assertion in &recipe.face_assertions {

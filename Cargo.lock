@@ -270,6 +270,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "cad-kernel",
+ "cad-sketch",
  "serde",
  "serde_json",
  "thiserror",
