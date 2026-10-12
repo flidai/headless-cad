@@ -64,6 +64,8 @@ pub struct DisplayMeshAsset {
 /// Metadata-only streamed scene, viewer HTML, and shared immutable mesh assets.
 #[derive(Debug, Clone)]
 pub struct StreamBundle {
+    pub metadata_index_json: String,
+    pub metadata_assets: Vec<DisplayMeshAsset>,
     pub scene_json: String,
     pub html: String,
     pub assets: Vec<DisplayMeshAsset>,
@@ -453,7 +455,32 @@ pub fn to_assembly_stream_bundle_with_cache(
         );
         scene.mesh_lods.insert(hash, descriptors);
     }
+    let definitions = scene
+        .definitions
+        .iter()
+        .map(|(id, definition)| {
+            let mut value = serde_json::to_value(definition)?;
+            value["mesh_asset"] = serde_json::to_value(&scene.mesh_assets[&definition.mesh])?;
+            value["mesh_lods"] = serde_json::to_value(&scene.mesh_lods[&definition.mesh])?;
+            Ok((id.clone(), value))
+        })
+        .collect::<Result<BTreeMap<_, _>, serde_json::Error>>()?;
+    let bounds = scene
+        .mesh_assets
+        .iter()
+        .map(|(id, asset)| (id.clone(), asset.bounds))
+        .collect();
+    let (metadata_index_json, metadata_assets) = crate::metadata_pages::build(
+        &scene.assembly_id,
+        recipe,
+        &scene.instances,
+        &scene.instance_paths,
+        &definitions,
+        &bounds,
+    )?;
     Ok(StreamBundle {
+        metadata_index_json,
+        metadata_assets,
         scene_json: serde_json::to_string_pretty(&scene)?,
         html: render_html_template(&scene, Some(recipe), include_str!("gpu-viewer.html"))?,
         assets: assets

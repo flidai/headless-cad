@@ -1832,10 +1832,16 @@ fn display_only_publication_keeps_shared_meshes_and_removes_stale_exports() {
         "many.gpu.html",
         "many.stream.json",
         "many.stream.html",
+        "many.metadata.json",
     ] {
         assert!(available.contains(&serde_json::json!(name)));
     }
-    assert_eq!(available.len(), 5); // four entrypoints plus one immutable shared mesh
+    let page_count = available
+        .iter()
+        .filter(|name| name.as_str().unwrap().starts_with("metadata-"))
+        .count();
+    assert!(page_count > 1); // Large assemblies must split into independently loadable pages.
+    assert_eq!(available.len(), 6 + page_count); // Five entrypoints, shared mesh, metadata pages.
 
     let actual: std::collections::BTreeSet<_> = fs::read_dir(&out)
         .unwrap()
@@ -1917,7 +1923,33 @@ fn streamed_outputs_deduplicate_payloads_but_each_lists_shared_dependencies() {
         .filter(|name| name.starts_with("mesh-"))
         .collect();
     assert_eq!(meshes.len(), 1);
+    let pages: Vec<_> = fs::read_dir(&output)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.starts_with("metadata-"))
+        .collect();
+    assert_eq!(pages.len(), 1);
     for name in ["first", "second"] {
+        let index_name = format!("{name}.metadata.json");
+        let index: serde_json::Value =
+            serde_json::from_slice(&fs::read(output.join(&index_name)).unwrap()).unwrap();
+        assert_eq!(index["kind"], "assembly_metadata_index");
+        assert_eq!(index["total_occurrences"], 1);
+        assert_eq!(
+            index["recipe_context_hash"],
+            manifest["recipe_context_hash"]
+        );
+        assert_eq!(index["root"]["url"], pages[0]);
+        assert_eq!(
+            index["root"]["byte_length"],
+            fs::metadata(output.join(&pages[0])).unwrap().len()
+        );
+        for dependency in [&index_name, &pages[0]] {
+            assert!(manifest["outputs"][name]["available_files"]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::json!(dependency)));
+        }
         let metadata: serde_json::Value =
             serde_json::from_slice(&fs::read(output.join(format!("{name}.stream.json"))).unwrap())
                 .unwrap();
@@ -1948,6 +1980,14 @@ fn streamed_outputs_deduplicate_payloads_but_each_lists_shared_dependencies() {
             metadata
         );
     }
+    let verified = cli(&["verify", output.to_str().unwrap()]);
+    assert!(verified.status.success());
+    fs::write(output.join(&pages[0]), "{}").unwrap();
+    let corrupted = cli(&["verify", output.to_str().unwrap()]);
+    assert!(
+        !corrupted.status.success(),
+        "corrupt metadata must invalidate generation"
+    );
 }
 
 fn near(value: &serde_json::Value, expected: f64) {

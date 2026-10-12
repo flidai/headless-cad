@@ -34,6 +34,13 @@ does not establish bounded modeling memory. Resource failures must preserve the
 previous complete generation without reducing engineering fidelity. M7 adapters
 must reconcile idempotent release deliveries and expose partial synchronization.
 
+The metadata-page producer now publishes a small source-bound index and immutable
+spatial branch/leaf pages with original occurrence identity and independent mesh
+references. Atomic publication and integrity checks cover the page set. This is
+the M3b artifact foundation only: browser page scheduling, bounded decoded-record
+residency, eviction, subtree proxies and the 100k-occurrence acceptance remain
+open. Existing viewers continue to load the complete occurrence catalog.
+
 Use the [feature-brief acceptance scenarios](architecture.md#feature-brief-acceptance-scenarios)
 to turn these tracks into release checks. Increase unique geometry complexity,
 feature-history depth, occurrence count, constraint coupling and annotation count

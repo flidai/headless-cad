@@ -1539,6 +1539,19 @@ candidate and refines before claiming a particular semantic face.
 
 ### Target display hierarchy contract
 
+The native publisher now emits a separate schema-1 `assembly_metadata_index`
+artifact alongside the existing schema-2 streamed scene. Its source-context-bound
+root references immutable SHA-256 spatial pages. Binary branch pages carry child
+bounds and counts; leaves carry at most 128 original-ordinal occurrences, exact
+instance paths, definition metadata and display references. Pages are limited to
+1 MiB encoded JSON and participate in atomic generation integrity checks.
+The producer uses existing display bounds rather than loading or tessellating
+geometry again. This establishes an independently traversable artifact boundary,
+not completion of M3b: generation still owns the complete built assembly and the
+existing viewer still expands all occurrence metadata. The consumer must next
+replace dense occurrence arrays, client-built spatial trees and total-count-sized
+proxy buffers with budgeted page traversal, eviction and unresolved subtree proxies.
+
 Implement this contract in independently reviewable stages, retaining the current
 portable and WebGL2 inspection paths until a replacement passes their identity
 and failure tests. Each stage requires an end-to-end fixture, not just an asset

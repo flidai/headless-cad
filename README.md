@@ -1217,6 +1217,14 @@ IDs remain stable. All occurrence metadata is still loaded at startup; metadata
 paging, cluster streaming and occlusion culling remain future work. The streaming
 viewer needs HTTP(S) and Web Crypto; localhost works.
 
+Assembly publication also includes `*.metadata.json`, a small source-bound index
+into SHA-256-addressed spatial metadata pages. Branch pages reference two children;
+leaf pages retain at most 128 occurrence records with paths, part identity and
+display references. Each encoded page is capped at 1 MiB and included in the
+generation's integrity inventory. This is the producer contract for paged
+inspection; the existing viewers still use their complete occurrence arrays.
+It does not yet bound browser metadata residency or headless build memory.
+
 Curved parts now have up to three shared display levels, built with native
 tessellation policies of 0.5, 0.1 and 0.01 mm. The streamed viewer loads a coarse
 surface first and refines toward a one-physical-pixel geometric detail target,

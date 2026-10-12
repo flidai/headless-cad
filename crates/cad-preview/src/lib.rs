@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use thiserror::Error;
 
+pub mod metadata_pages;
 mod motion;
 pub use motion::to_motion_study_html;
 

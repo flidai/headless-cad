@@ -1507,12 +1507,13 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             )?;
             artifacts.push((format!("{name}.stream.html"), bundle.html));
             artifacts.push((format!("{name}.stream.json"), bundle.scene_json));
-            for asset in bundle.assets {
+            artifacts.push((format!("{name}.metadata.json"), bundle.metadata_index_json));
+            for asset in bundle.assets.into_iter().chain(bundle.metadata_assets) {
                 filename(&asset.name)?;
                 dependencies.insert(asset.name.clone());
                 if let Some(&index) = shared_display_assets.get(&asset.name) {
                     if artifacts[index].1 != asset.content {
-                        return Err("shared display mesh digest collision".into());
+                        return Err("shared display asset digest collision".into());
                     }
                 } else {
                     shared_display_assets.insert(asset.name.clone(), artifacts.len());
