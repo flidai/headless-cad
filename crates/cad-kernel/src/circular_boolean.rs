@@ -15,7 +15,7 @@ fn empty() -> ModelSnapshot {
         solids: vec![],
     }
 }
-fn quaternion(x: [f64; 3], z: [f64; 3]) -> [f64; 4] {
+pub(crate) fn quaternion(x: [f64; 3], z: [f64; 3]) -> [f64; 4] {
     let y = cross(z, x);
     let m = [[x[0], y[0], z[0]], [x[1], y[1], z[1]], [x[2], y[2], z[2]]];
     let trace = m[0][0] + m[1][1] + m[2][2];

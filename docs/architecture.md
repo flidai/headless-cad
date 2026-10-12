@@ -681,6 +681,36 @@ the previous generation after tangent, partial-depth and unresolved-cap edits.
 This advances the bearing-housing geometry track without closing general curved
 intersection, contact, fits or manufacturing-release obligations.
 
+### Sequential machining through-bores
+
+A separate difference path cuts a solid aligned cylinder through a recognized
+polygon or line/arc right prism. It preserves existing vertices, edges, walls
+and face IDs, appends circular inner loops to the two caps, and adds one inward
+cylindrical wall with a true periodic seam. All existing faces have identity
+lineage; only the tool wall contributes to the new bore. Tool caps are deleted.
+This lets later drill features retain earlier holes and the stock's seat/cap
+references. Supported arc-prism results of cylinder Booleans can be drilled too;
+this is useful composition without general Boolean closure.
+
+Recognition and analytic profile separation certify that the added bore is
+wholly in material and clear of outer boundaries and existing polygon/circular
+holes. Placement arithmetic reserves a separate conservative clearance margin;
+the actual radius and existing geometry are unchanged. The cylinder must cover
+the full stock interval, with parallel or opposite axis, and resulting world
+supports must meet the arithmetic policy before native validation. Reuse the
+existing maximum of 32 combined holes. Outside cuts, holes entirely inside a
+preexisting void, tangent/crossing/overlapping holes, partial-depth and skew cuts
+are explicit unsupported outcomes. Neither tessellation nor tolerance snapping
+decides native containment.
+
+`machined_bearing_support.star` applies four cuts to a concave jaw before
+assembling two shared jaws, a shaft and eight sleeves. Independent signed-area
+integrals cover 27 configurations, full native/assembly moments and selective
+invalidation. Publication acceptance checks global machining obligations even
+when the requested output is unchanged stock. Extend toward interacting cuts,
+blind pockets and generalized face splitting to advance the manufacturing
+workflow; the current assembly does not certify fits or contact loads.
+
 ## Constraints and assemblies
 
 Stage assembly-solver acceptance separately from today's attachment DAG: first a grounded
@@ -1699,7 +1729,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Area | Implemented now | Target work |
 | --- | --- | --- |
 | Authoring | Starlark functions/loops/parameters; strict JSON graph; Rust structs | Locked modules, unit types, source maps, public agent/SDK contracts |
-| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
+| Kernel | Orthogonal B-rep/Booleans and bounded parallel-cylinder union/intersection/through-cut; sequential contained through-bores in recognized prisms; native simple-profile right prisms with simple polygonal and circular through-holes; translation and scoped exact rigid transforms and bounded convex intersection; single-convex and matched-cap simple-prism validation; analytic circular and simple concave line/arc-profile extrusions and full-turn stepped/tapered revolutions including conical poles with rigid transforms and periodic seams | General curved geometry, generalized intersections/Booleans, cavity/trim handling, richer operations |
 | References | Feature-role face selectors, explicit orthogonal/convex-intersection/parallel-cylinder face lineage, cardinality diagnostics, recipe assertions, associative face datums and snapshot witnesses | Instance-path, edge/vertex and predicate selectors, downstream solid-modeling consumers, general-geometry history |
 | Assemblies | Schema-2 reusable definitions, nested rigid instances, named local datums and part/rigid-module attachments, explicit paths, shared assets, hierarchical STEP and leaf-part BOM | Joints/constraints, flexible occurrences and configurations |
 | Sketches | Original Rust bounded 2D point solver, ten constraint kinds, deterministic independent islands, schema-3 linear/angular residuals and separate tolerances, local rank/DOF/conditioning reports, sketch profiles feeding extrusion and generation-preserving failures | Independent arc variables, circle-to-circle tangency, large connected sparse systems, branch continuation, minimal conflict explanations |

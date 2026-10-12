@@ -43,6 +43,7 @@ mod profile_prism;
 mod revolve;
 mod simple_polygon;
 mod tessellation;
+mod through_bore;
 mod transform;
 mod triangulation;
 mod validation;

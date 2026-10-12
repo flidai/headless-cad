@@ -1614,5 +1614,61 @@
       "volume_tolerance_mm3": 0.01,
       "linear_tolerance_mm": 1e-05
     }
+  },
+  "machined_bearing_support.star": {
+    "stock": {
+      "volume_mm3": 80839.11582213217,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          50,
+          18
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "drilled_jaw": {
+      "volume_mm3": 78803.36378260599,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          50,
+          18
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    },
+    "machined_bearing_support": {
+      "volume_mm3": 198799.29043908135,
+      "solids": 11,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          -12
+        ],
+        [
+          100,
+          102,
+          30
+        ]
+      ],
+      "volume_tolerance_mm3": 0.01,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }

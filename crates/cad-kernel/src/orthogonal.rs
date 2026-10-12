@@ -346,6 +346,12 @@ pub fn boolean(
 ) -> Result<OperationResult, KernelError> {
     validated(a, tolerance)?;
     validated(b, tolerance)?;
+    if operation == BooleanOp::Difference
+        && b.has_curved_geometry()
+        && crate::analytic::recognize(a, Some(tolerance)).is_err()
+    {
+        return crate::through_bore::cut(a, b, tolerance);
+    }
     if a.has_curved_geometry() || b.has_curved_geometry() {
         return crate::circular_boolean::boolean(a, b, operation, tolerance);
     }

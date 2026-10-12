@@ -19,7 +19,8 @@ outlines and simple polygonal through-holes, plus true circular extrusions, simp
 seating blocks. Convex solids also support native rigid transforms. Reusable
 assemblies can place these parts with rigid rotations;
 Union, cut and intersection support orthogonal solids and a bounded analytic
-branch for two parallel solid cylinders. Intersection also supports bounded,
+branch for two parallel solid cylinders. Existing right prisms also accept
+contained circular through-cuts in sequence. Intersection supports bounded,
 well-conditioned convex planar solids, including rotated inputs.
 
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
@@ -623,7 +624,9 @@ Selection has a one-million-unit traversal/copy budget, including copied identif
 Polygon extrusions generate `start_cap`, `end_cap`, `walls`, and `wall_0` through
 `wall_<n-1>`. `wall_i` comes from the input edge from vertex `i` to vertex
 `(i + 1) % n`; reordering the profile changes this role intent. Translation
-preserves those roles through lineage. Polygon Boolean lineage is unsupported.
+preserves those roles through lineage. Supported convex intersections and
+contained through-bores also preserve source-face lineage; general polygon
+Boolean lineage remains unsupported.
 
 This is the initial scoped face-reference contract. It does not yet provide
 edge/vertex selectors, adjacency predicates, topology-associated datums,
@@ -927,7 +930,9 @@ CAD_BROWSER=/path/to/chromium node tools/preview-check/gpu-benchmark.cjs
 - Two parallel solid cylinders support analytic intersection over a common axial
   interval, union with matching intervals, and through-cuts. Contact and uncertain
   separation fail explicitly; arbitrary curved operands and chained lens/crescent
-  results are outside this Boolean branch.
+  results are outside this two-cylinder branch. A separate drilling path supports
+  contained, disjoint circular through-cuts in recognized polygon and line/arc
+  prisms, including earlier drilled parts and supported cylinder-Boolean results.
 - General planar validation supports one strictly convex solid with supporting
   outward face planes, or one matched-cap right prism with a simple outer ring and simple holes.
   Multiple general solids are explicitly
@@ -1430,8 +1435,9 @@ reject the revision and preserve all previously published artifacts.
 This branch accepts two recognized solid cylinders with parallel or opposite
 axes. Union requires matching axial intervals; intersection uses their common
 interval; a cutting cylinder must cover the left operand axially. Annular
-operands, arbitrary curved bodies, disconnected curved unions and further
-Booleans on the resulting lens/crescent are unsupported. Modeling never uses
+operands, arbitrary curved bodies, disconnected curved unions and general
+further Booleans on the resulting lens/crescent are unsupported. The contained
+through-bore path below can drill recognized arc-prism results. Modeling never uses
 the display mesh. This fixture is a prescribed layout, not a fit/contact proof.
 
 Independent STEP acceptance covers three recipe configurations plus six direct
@@ -1439,3 +1445,34 @@ Boolean cases, including operations on obliquely transformed operands.
 `npm run test:circular-boolean --prefix tools/preview-check` checks nine browser
 views and 2,169 visibility samples across Canvas, embedded GPU and streaming GPU
 clients, with exact captured source and no exact-geometry downloads.
+
+### Machined bearing support with sequential drilling
+
+[machined_bearing_support.star](examples/machined_bearing_support.star) starts
+with a solid jaw containing a concave seat, then uses four successive `cut`
+features to drill mounting bores. The assembly reuses that finished jaw twice
+with a stepped shaft and eight shared sleeves: eleven occurrences, three
+definitions. Inspect `stock` beside `drilled_jaw` to see the machining result.
+
+The bore path preserves existing native faces and their source references, adds
+true circular cap boundaries and inward cylindrical walls, and retains each
+cutting tool's wall provenance. `seat_radius` (14..22 mm), `bore_radius`
+(2..4 mm), and `depth` (12..24 mm) control the design. Independent signed
+rectangle/semicircle/disk integrals verify full volume and material inertia over
+27 configurations. Seat edits compute six solids, bore edits ten, depth edits
+twelve; unaffected stock/tools/part definitions remain reusable as applicable.
+
+Drilling requires a recognized right prism and a solid parallel cylinder covering
+its full depth. The bore must be wholly within material and separated from
+existing holes. Crossing, tangent, overlapping, outside and partial-depth bores
+fail explicitly; cuts wholly inside an existing hole are also unsupported.
+General pockets and intersecting drill passages remain future work. Failed
+machining obligations preserve the prior published generation even when only
+the unchanged stock is requested.
+
+Independent STEP checks cover three support configurations and four direct
+rectangle/capsule drilling cases with identity and oblique operand frames.
+Imported drilled jaws retain five inward cylindrical faces and four periodic
+seams. `npm run test:through-bore --prefix tools/preview-check` verifies twelve
+browser views and 1,190 visibility samples, including exposed jaw holes, sleeve
+bores and the exact captured recipe.

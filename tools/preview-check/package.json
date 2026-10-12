@@ -37,7 +37,8 @@
     "test:capsule-sketch": "node capsule-sketch-check.cjs",
     "test:islands-sketch": "node islands-sketch-check.cjs",
     "test:concave-profile": "node concave-profile-check.cjs",
-    "test:circular-boolean": "node circular-boolean-check.cjs"
+    "test:circular-boolean": "node circular-boolean-check.cjs",
+    "test:through-bore": "node through-bore-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"
