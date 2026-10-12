@@ -1,0 +1,27 @@
+name: Engineering release evidence
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  counterbore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup show
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install cadquery-ocp==8.0.1.1.0
+      - name: Collect native and independent engineering evidence
+        run: >-
+          python scripts/evidence.py collect
+          --ledger evidence/ledger.json
+          --capability machining.counterbore-fixture
+          --python python
+          --out-dir "${{ runner.temp }}/counterbore-evidence"
+      - name: Verify evidence and reject altered claims
+        env:
+          CAD_EVIDENCE_BUNDLE: ${{ runner.temp }}/counterbore-evidence
+        run: python -m unittest discover -s scripts/tests -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: counterbore-engineering-evidence
+          path: ${{ runner.temp }}/counterbore-evidence/

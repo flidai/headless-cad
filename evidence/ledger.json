@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "capabilities": [
+    {
+      "id": "machining.counterbore-fixture",
+      "status": "experimental",
+      "domain_ids": [
+        "boolean.stepped_bore"
+      ],
+      "supported_domain": "Coaxial cylindrical through/blind drilling and opposed counterbores in the counterbored_fixture recipe: counterbore radius 6..8 mm, depth 4..8 mm, plate height 18..24 mm; native parameter sweep and independently imported assembly exchange at default/min/max configurations.",
+      "exclusions": [
+        "Noncoaxial intersecting bores",
+        "Conical countersinks and general pockets",
+        "Threads, fit, preload and load capacity certification",
+        "General commercial CAD parity"
+      ],
+      "fixture": "examples/counterbored_fixture.star",
+      "checks": [
+        "native-moments",
+        "exchange-moments"
+      ],
+      "kind": "engineering"
+    },
+    {
+      "id": "manufacturing.drive-module-release",
+      "status": "planned",
+      "domain_ids": [],
+      "supported_domain": "Revised bearing-supported drive module with associated drawings, dimensions, datum references, BOM and explicit exchange-loss reporting.",
+      "exclusions": [
+        "No current validated release-pack workflow"
+      ],
+      "fixture": "examples/mounted_drive_module.star",
+      "checks": [],
+      "kind": "engineering"
+    },
+    {
+      "id": "assembly.hardware-scale-gates",
+      "status": "planned",
+      "domain_ids": [],
+      "supported_domain": "Bounded-memory inspection and one-part revision of declared repeated/unique assembly workloads on pinned hardware.",
+      "exclusions": [
+        "Current display benchmarks do not close all scale gates"
+      ],
+      "fixture": "examples/spindle_line.star",
+      "checks": [],
+      "kind": "performance"
+    }
+  ],
+  "checks": [
+    {
+      "id": "native-moments",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-preview",
+        "--test",
+        "counterbored_fixture"
+      ]
+    },
+    {
+      "id": "exchange-moments",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_counterbored_fixture_ocp.py",
+        "--cad",
+        "{cad}",
+        "--retain-dir",
+        "{artifacts}/counterbored_fixture"
+      ]
+    }
+  ]
+}

@@ -153,8 +153,13 @@ Each capability record must include its ID, status, supported domain, exclusions
 fixture, executable check, independent oracle, source/build revision and result
 artifact digest. Performance records additionally pin hardware and workload.
 CI must reject a transition to validated when required evidence is missing or
-belongs to another revision. This ledger is planned; prose milestones and test
-counts are not a substitute for implementing it.
+belongs to another revision. The first implementation is `evidence/ledger.json`:
+its counterbore case collects native checks, an independent retained STEP/STL
+oracle, source/binary snapshots and artifact digests through `scripts/evidence.py`.
+Validation is scoped to the case and recorded revision; the source ledger is not
+permanently promoted by one run. Manufacturing-release and hardware-scale entries
+remain planned. Performance promotion is rejected pending a hardware/workload
+evidence protocol.
 
 ## System decomposition
 
@@ -1633,9 +1638,16 @@ digest/byte-length inventory of every payload, excluding the manifest itself.
 recipe evaluation. Its returned manifest digest can be pinned by an external
 release record and supplied as `--manifest-hash` on later verification. This
 detects changes relative to that pin; self-consistent manifests alone do not
-authenticate a publisher or prove engineering correctness. The planned evidence
-ledger must additionally bind executed checks, independent oracles, build/source
-identity and their results. Artifact integrity does not close those obligations.
+authenticate a publisher or prove engineering correctness. The evidence collector
+additionally binds executed checks, independent oracles, source snapshots and the
+tested binary for the counterbore case. It requires a clean checkout, retains
+actual arguments and oracle results, and verifies generated artifacts before
+atomic no-replace publication. Offline verification checks inventory, capability
+and check bindings; an optional source-root check compares the clean Git revision
+and bytes. An externally pinned SHA-256 manifest binds the bundle. Trust in
+execution comes from reviewed collector/CI execution, not self-authored success
+JSON or hashes alone. Hermetic replay, signed approvals and general evidence
+producers remain target work.
 
 Hosted project authorization applies to source snapshots, manifests, meshes,
 reports and every referenced dependency. Knowing a content digest grants no

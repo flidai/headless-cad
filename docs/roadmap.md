@@ -94,9 +94,12 @@ contain their transformed native coordinates.
 Published generations now carry a payload digest/size inventory, with a separate
 manifest schema and read-only `cad verify` command. Externally pinned manifest
 digests detect changes to the complete generation. Continue M7 toward a versioned
-capability-evidence ledger that records actual check runs, independent oracles,
-source/build identity and result artifacts; internally consistent bytes alone
-cannot promote a capability to validated or complete a manufacturing release.
+capability-evidence ledger. Its first engineering case now records actual native
+and independent counterbore checks, retained models and full-moment oracle reports,
+source snapshots, tested binaries and result digests. CI collects this case and
+tests altered-evidence rejection. Continue toward hermetic replay, hardware-pinned
+performance records and the full drive-module release pack; internally consistent
+bytes alone do not establish trusted execution or complete a manufacturing release.
 
 The first M3a increment now streams whole-part analytic LOD, preserving current
 surfaces while finer assets load and exposing unmet detail under resource or

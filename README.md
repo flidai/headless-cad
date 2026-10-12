@@ -794,6 +794,42 @@ An empty Boolean result is valid for `inspect` and `check`, with zero volume and
 null bounds. `build` reports an explicit export error because this STEP writer
 requires a solid; no previous artifact generation is replaced.
 
+### Collect engineering release evidence
+
+From a clean Git checkout on Linux, with `cadquery-ocp` installed in a separate
+Python environment:
+
+```sh
+python3 scripts/evidence.py collect --ledger evidence/ledger.json \
+  --capability machining.counterbore-fixture --python /path/to/oracle/bin/python \
+  --out-dir /tmp/counterbore-evidence
+python3 scripts/evidence.py verify /tmp/counterbore-evidence --source-root .
+CAD_EVIDENCE_BUNDLE=/tmp/counterbore-evidence python3 -m unittest discover -s scripts/tests -v
+```
+
+The collector builds the tested CLI, runs native and independent checks, and
+retains source, binary, capability catalog, command logs, oracle versions and
+generated models. The first case checks 27 native parameter combinations and
+three independently imported STEP/STL configurations, retaining expected and
+measured full moments. Each generation also passes `cad verify`. A successful
+bundle validates only the named engineering case for its recorded revision;
+the source ledger remains experimental until evaluated for another release.
+
+The bundle uses SHA-256 separately from CAD generation BLAKE3 inventories.
+Verification returns `manifest_sha256`; use an independently trusted value with
+`--manifest-hash` on later verification. It executes no bundled programs.
+`--source-root` additionally compares the clean Git revision and tracked source
+bytes. Keep bundles immutable during verification. Checksums do not independently
+prove command execution: trust the reviewed collector/CI and preserve its pin.
+
+Collection executes trusted ledger argument arrays without a shell. It refuses
+dirty source, incomplete evidence, planned capability promotion and existing
+destinations. Failed attempts retain staging logs without replacing prior bundles.
+Verification is portable; atomic no-replace collection currently uses Linux.
+The separate engineering-evidence CI job collects this case and tests altered
+evidence rejection. Hardware performance promotion, hermetic replay, signed
+approvals and complete manufacturing-release gates remain future work.
+
 ## Rebuilds and reproducibility
 
 Build a dependency closure for one or more outputs with repeatable `--output`:
