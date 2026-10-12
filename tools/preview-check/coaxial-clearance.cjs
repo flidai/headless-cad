@@ -7,7 +7,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],requests=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push({type:r.resourceType(),url:r.url()}));
   const r=await page.goto(`${dir}/clearance-checks.html`);assert.ok(r.ok());assert.equal(await page.locator('script').count(),0);
-  await page.locator('details summary').click();const inline=JSON.parse(await page.locator('details pre').textContent());assert.equal(inline.schema_version,2);assert.equal(inline.kind,'native_geometric_clearance');
+  await page.locator('details summary').click();const inline=JSON.parse(await page.locator('details pre').textContent());assert.equal(inline.schema_version,3);assert.equal(inline.kind,'native_geometric_clearance');
   const get=async name=>{const response=await page.request.get(`${dir}/${name}`);assert.ok(response.ok());return response.json();};
   assert.deepEqual(inline,await get('clearance-checks.json'));const manifest=await get('manifest.json');
   assert.match(inline.recipe_context_hash,/^[0-9a-f]{64}$/);assert.equal(inline.recipe_context_hash,manifest.recipe_context_hash);assert.deepEqual(inline.checks,manifest.clearance_checks);

@@ -34,7 +34,12 @@ mod bored_prism;
 mod circular_boolean;
 mod convex_clearance;
 mod solid_clearance;
+mod translation_clearance;
 pub use solid_clearance::{ClearanceMethod, SolidClearance};
+pub use translation_clearance::{
+    TranslationClearance, TranslationInterval, TranslationSample, MAX_TRANSLATION_DEPTH,
+    MAX_TRANSLATION_QUERIES,
+};
 mod convex_intersection;
 pub use convex_clearance::{
     ConvexClearance, MAX_CLEARANCE_CANDIDATES, MAX_CLEARANCE_EDGES, MAX_CLEARANCE_FACES,

@@ -468,3 +468,133 @@ fn parallel_annular_eccentric_and_external_pairs_are_global_native_queries() {
         }
     }
 }
+
+#[test]
+fn translation_checks_cover_whole_path_and_preserve_local_frame_and_cache_semantics() {
+    for reversed in [false, true] {
+        let mut v = value();
+        v["assemblies"][1]["assemblies"][1]["transform"]["translation"] =
+            json!([5, 0, if reversed { 2 } else { 0 }]);
+        v["clearance_checks"][0]["right_translation"] =
+            json!([0, 0, if reversed { -2 } else { 2 }]);
+        v["clearance_checks"][0]["min_clearance"] = json!(2.);
+        let mut r = parse(v);
+        let mut engine = BuildEngine::default();
+        let b = engine.build_outputs(&r, &["body".into()]).unwrap();
+        let c = &b.clearance_checks["gap"];
+        let sweep = c.sweep.as_ref().unwrap();
+        assert!(c.lower_bound_mm >= 2. && c.upper_bound_mm >= 3.);
+        assert_eq!(
+            sweep.samples.iter().find(|s| s.time == 0.).unwrap().query,
+            c.query
+        );
+        assert!(sweep.query_count <= cad_kernel::MAX_TRANSLATION_QUERIES);
+        assert!(b.assemblies.is_empty());
+        assert_eq!(
+            engine
+                .build_outputs(&r, &["body".into()])
+                .unwrap()
+                .stats
+                .computed_solids,
+            0
+        );
+        r.clearance_checks[0].min_clearance = 3.00001;
+        assert!(matches!(
+            engine.build_outputs(&r, &["body".into()]),
+            Err(BuildError::ClearanceCheckFailed { .. })
+        ));
+    }
+    let mut v = value();
+    let q = [
+        0.,
+        std::f64::consts::FRAC_1_SQRT_2,
+        0.,
+        std::f64::consts::FRAC_1_SQRT_2,
+    ];
+    v["assemblies"][1]["assemblies"][0]["transform"] =
+        json!({"translation":[10,-20,30],"rotation":q});
+    v["assemblies"][1]["assemblies"][1]["transform"] =
+        json!({"translation":[10,-20,25],"rotation":q});
+    v["clearance_checks"][0]["right_translation"] = json!([0, 0, 2]);
+    v["clearance_checks"][0]["min_clearance"] = json!(2.);
+    let b = cad_build::build(&parse(v)).unwrap();
+    let c = &b.clearance_checks["gap"];
+    let world = c.right_translation_world.unwrap();
+    assert!((world[0] - 2.).abs() < 1e-12 && world[1].abs() < 1e-12 && world[2].abs() < 1e-12);
+    assert!(c.lower_bound_mm >= 2.);
+}
+
+#[test]
+fn translation_interior_collision_and_invalid_authored_vectors_fail_globally() {
+    let mut v = value();
+    v["assemblies"][1]["assemblies"][1]["transform"]["translation"] = json!([-5, 0, 0]);
+    v["clearance_checks"][0]["right_translation"] = json!([10, 0, 0]);
+    v["clearance_checks"][0]["min_clearance"] = json!(1.);
+    assert!(matches!(
+        BuildEngine::default().build_outputs(&parse(v), &["body".into()]),
+        Err(BuildError::ClearanceCheckFailed { .. })
+    ));
+    for vector in [
+        [0., 0., 0.],
+        [1e6 + 1., 0., 0.],
+        [f64::NAN, 0., 0.],
+        [f64::INFINITY, 0., 0.],
+    ] {
+        let mut r = parse(value());
+        r.clearance_checks[0].right_translation = Some(vector);
+        assert!(matches!(
+            cad_build::build(&r),
+            Err(BuildError::InvalidClearanceCheck { .. })
+        ));
+    }
+    let mut r = parse(value());
+    let mut check = r.clearance_checks[0].clone();
+    check.right_translation = Some([0., 0., 1.]);
+    r.clearance_checks = (0..17)
+        .map(|i| {
+            let mut c = check.clone();
+            c.id = format!("sweep{i}");
+            c
+        })
+        .collect();
+    assert!(matches!(
+        cad_build::build(&r),
+        Err(BuildError::ResourceLimit {
+            resource: "clearance translation sweeps",
+            limit: 16
+        })
+    ));
+}
+
+#[test]
+fn translation_query_budgets_bound_individual_and_aggregate_refinement() {
+    let mut v = value();
+    v["features"][1]["height"] = json!(10);
+    v["assemblies"][1]["assemblies"][1]["transform"]["translation"] = json!([5, 0, 0]);
+    v["clearance_checks"][0]["right_translation"] = json!([0, 0, 8]);
+    v["clearance_checks"][0]["min_clearance"] = json!(2.99);
+    let mut r = parse(v);
+    let one = cad_build::build(&r).unwrap();
+    let count = one.clearance_checks["gap"]
+        .sweep
+        .as_ref()
+        .unwrap()
+        .query_count;
+    assert_eq!(count, 1025); // 512 midpoint-certified leaves plus the two endpoints.
+    let check = r.clearance_checks[0].clone();
+    r.clearance_checks = (0..4)
+        .map(|i| {
+            let mut c = check.clone();
+            c.id = format!("budget{i}");
+            c
+        })
+        .collect();
+    assert!(
+        matches!(cad_build::build(&r),Err(BuildError::ClearanceCheckFailed{message,..}) if message.contains("budget") || message.contains("limit"))
+    );
+    r.clearance_checks = vec![check];
+    r.clearance_checks[0].min_clearance = 2.999;
+    assert!(
+        matches!(cad_build::build(&r),Err(BuildError::ClearanceCheckFailed{message,..}) if message.contains("budget") || message.contains("limit"))
+    );
+}

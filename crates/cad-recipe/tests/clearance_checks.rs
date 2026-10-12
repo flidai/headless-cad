@@ -84,3 +84,27 @@ fn source_eccentric_shaft_inside_ring_reports_parallel_annular_method() {
     );
     assert!(q.lower_bound_mm <= 0.75 && q.upper_bound_mm >= 0.75);
 }
+
+#[test]
+fn source_translation_optional_vector_is_strict_and_preserves_static_defaults() {
+    let source = SOURCE.replace("offset=[5,7,0]", "offset=[5,0,0]");
+    let check = CHECK.replace(
+        "min_clearance=4.99",
+        "min_clearance=2,right_translation=[0,0,2]",
+    );
+    let r = cad_recipe::from_starlark("sweep.star", &format!("{source}{check}")).unwrap();
+    assert_eq!(r.clearance_checks[0].right_translation, Some([0., 0., 2.]));
+    assert!(cad_build::build(&r).unwrap().clearance_checks["gap"]
+        .sweep
+        .is_some());
+    for vector in ["[0,0,0]", "[1,2]", "'bad'", "[1000001,0,0]"] {
+        let invalid = check.replace("[0,0,2]", vector);
+        assert!(cad_recipe::from_starlark("invalid.star", &format!("{source}{invalid}")).is_err());
+    }
+    let none = CHECK.replace(
+        "min_clearance=4.99",
+        "min_clearance=2,right_translation=None",
+    );
+    let r = cad_recipe::from_starlark("static.star", &format!("{source}{none}")).unwrap();
+    assert!(r.clearance_checks[0].right_translation.is_none());
+}

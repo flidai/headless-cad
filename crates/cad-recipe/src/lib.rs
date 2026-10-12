@@ -635,13 +635,14 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Require native convex-polyhedral separation of two exact assembly leaves.
+    /// Require native static or whole-translation separation of exact assembly leaves.
     fn clearance_check(
         id: &str,
         output: &str,
         left_instance_path: Value,
         right_instance_path: Value,
         min_clearance: Value,
+        right_translation: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let check = cad_build::ClearanceCheck {
@@ -650,6 +651,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             left_instance_path: occurrence_path(left_instance_path, "left_instance_path")?,
             right_instance_path: occurrence_path(right_instance_path, "right_instance_path")?,
             min_clearance: number(min_clearance)?,
+            right_translation: right_translation
+                .filter(|v| !v.is_none())
+                .map(|v| -> anyhow::Result<[f64; 3]> { Ok(serde_json::from_str(&v.to_json()?)?) })
+                .transpose()?,
         };
         check.validate()?;
         let graph = store(eval)?;

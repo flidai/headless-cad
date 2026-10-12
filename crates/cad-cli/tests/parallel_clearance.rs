@@ -56,7 +56,7 @@ fn analytic_parallel_clearance_replays_reuses_and_preserves_failures() {
     }
     let report: Value =
         serde_json::from_slice(&fs::read(out.join("clearance-checks.json")).unwrap()).unwrap();
-    assert_eq!(report["schema_version"], 2);
+    assert_eq!(report["schema_version"], 3);
     assert_eq!(report["kind"], "native_geometric_clearance");
     let stable = files(&out);
     for parameters in [

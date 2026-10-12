@@ -2,6 +2,9 @@
 use super::*;
 pub const MAX_CLEARANCE_CHECKS: usize = 64;
 pub const MAX_CLEARANCE_RESOLVE_WORK: usize = 10_000_000;
+pub const MAX_CLEARANCE_SWEEPS: usize = 16;
+pub const MAX_CLEARANCE_SWEEP_QUERIES: usize = 4096;
+pub const MAX_CLEARANCE_TRANSLATION_MM: f64 = 1_000_000.;
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ClearanceCheck {
     pub id: String,
@@ -9,6 +12,8 @@ pub struct ClearanceCheck {
     pub left_instance_path: Vec<String>,
     pub right_instance_path: Vec<String>,
     pub min_clearance: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub right_translation: Option<[f64; 3]>,
 }
 impl<'de> Deserialize<'de> for ClearanceCheck {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -20,6 +25,8 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             left_instance_path: Vec<String>,
             right_instance_path: Vec<String>,
             min_clearance: f64,
+            #[serde(default)]
+            right_translation: Option<[f64; 3]>,
         }
         let v = serde_json::Value::deserialize(d)?;
         if !v.is_object() {
@@ -34,6 +41,7 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             left_instance_path: r.left_instance_path,
             right_instance_path: r.right_instance_path,
             min_clearance: r.min_clearance,
+            right_translation: r.right_translation,
         })
     }
 }
@@ -53,10 +61,17 @@ pub struct ClearanceCheckReport {
     pub assembly_content_hash: String,
     pub left: ClearanceOccurrenceWitness,
     pub right: ClearanceOccurrenceWitness,
-    /// Certificate for the rounded, placed native snapshots.
+    /// Static certificate for the initial rounded, placed native snapshots.
     pub query: cad_kernel::SolidClearance,
     /// Additional conservative displacement allowance for both native placements.
     pub placement_uncertainty_mm: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sweep: Option<cad_kernel::TranslationClearance>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub right_translation_world: Option<[f64; 3]>,
+    /// Total initial-placement plus local-vector rotation allowance for the path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path_uncertainty_mm: Option<f64>,
     pub lower_bound_mm: f64,
     pub upper_bound_mm: f64,
 }
@@ -92,6 +107,15 @@ impl ClearanceCheck {
                 "minimum clearance must be finite and strictly positive millimetres",
             ));
         }
+        if let Some(v) = self.right_translation {
+            let length = v[0].hypot(v[1]).hypot(v[2]);
+            if !v.into_iter().all(f64::is_finite)
+                || length == 0.
+                || length > MAX_CLEARANCE_TRANSLATION_MM
+            {
+                return Err(fail("right_translation must be a nonzero finite local vector of length at most 1000000 mm"));
+            }
+        }
         Ok(())
     }
 }
@@ -100,6 +124,18 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
         return Err(BuildError::ResourceLimit {
             resource: "clearance checks",
             limit: MAX_CLEARANCE_CHECKS,
+        });
+    }
+    if recipe
+        .clearance_checks
+        .iter()
+        .filter(|c| c.right_translation.is_some())
+        .count()
+        > MAX_CLEARANCE_SWEEPS
+    {
+        return Err(BuildError::ResourceLimit {
+            resource: "clearance translation sweeps",
+            limit: MAX_CLEARANCE_SWEEPS,
         });
     }
     let mut ids = BTreeSet::new();
@@ -128,6 +164,7 @@ pub(super) fn evaluate(
     tolerance: cad_kernel::Tolerance,
 ) -> Result<BTreeMap<String, ClearanceCheckReport>, BuildError> {
     let mut work = 0usize;
+    let mut sweep_queries = 0usize;
     let mut reports = BTreeMap::new();
     for c in &recipe.clearance_checks {
         let fail = |message: String, lower_bound_mm: Option<f64>, upper_bound_mm: Option<f64>| {
@@ -255,18 +292,77 @@ pub(super) fn evaluate(
                 None,
             ));
         }
-        let query = left_model
-            .clearance(&right_model, tolerance)
-            .map_err(|e| fail(e.to_string(), None, None))?;
-        let lower = (query.lower_bound_mm - uncertainty).next_down();
-        let upper = (query.upper_bound_mm + uncertainty).next_up();
-        if !lower.is_finite()
-            || !upper.is_finite()
-            || lower <= tolerance.linear
-            || upper - lower > tolerance.linear
-        {
+        let mut sweep = None;
+        let mut right_translation_world = None;
+        let mut path_uncertainty_mm = None;
+        let (query, lower, upper) = if let Some(local) = c.right_translation {
+            let world = right.transform.vector(local);
+            let rotation_error =
+                (local.into_iter().map(f64::abs).sum::<f64>() * (1024. * f64::EPSILON)).next_up();
+            let path_error = (uncertainty + rotation_error).next_up();
+            if !world.into_iter().all(f64::is_finite)
+                || !path_error.is_finite()
+                || path_error > tolerance.linear / 8.
+            {
+                return Err(fail(
+                    "translation path rotation exceeds precision budget".into(),
+                    None,
+                    None,
+                ));
+            }
+            let budget = cad_kernel::MAX_TRANSLATION_QUERIES
+                .min(MAX_CLEARANCE_SWEEP_QUERIES - sweep_queries);
+            if budget < 3 {
+                return Err(BuildError::ResourceLimit {
+                    resource: "clearance sweep queries",
+                    limit: MAX_CLEARANCE_SWEEP_QUERIES,
+                });
+            }
+            let required = (c.min_clearance + path_error).next_up();
+            if !required.is_finite() {
+                return Err(fail("translation threshold overflow".into(), None, None));
+            }
+            let result = left_model
+                .translation_clearance(&right_model, world, required, tolerance, budget)
+                .map_err(|e| fail(e.to_string(), None, None))?;
+            sweep_queries += result.query_count;
+            let query = result
+                .samples
+                .iter()
+                .find(|s| s.time == 0.)
+                .ok_or_else(|| {
+                    fail(
+                        "translation certificate missing initial query".into(),
+                        None,
+                        None,
+                    )
+                })?
+                .query
+                .clone();
+            let lower = (result.lower_bound_mm - path_error).next_down();
+            let upper = (result.upper_bound_mm + path_error).next_up();
+            right_translation_world = Some(world);
+            path_uncertainty_mm = Some(path_error);
+            sweep = Some(result);
+            (query, lower, upper)
+        } else {
+            let query = left_model
+                .clearance(&right_model, tolerance)
+                .map_err(|e| fail(e.to_string(), None, None))?;
+            let lower = (query.lower_bound_mm - uncertainty).next_down();
+            let upper = (query.upper_bound_mm + uncertainty).next_up();
+            if upper - lower > tolerance.linear {
+                return Err(fail(
+                    "placed clearance is unresolved at modeling tolerance".into(),
+                    Some(lower),
+                    Some(upper),
+                ));
+            }
+            (query, lower, upper)
+        };
+        if !lower.is_finite() || !upper.is_finite() || lower <= tolerance.linear || upper < lower {
             return Err(fail(
-                "placed clearance is unresolved at modeling tolerance".into(),
+                "placed clearance bounds are unresolved".into(),
                 lower.is_finite().then_some(lower),
                 upper.is_finite().then_some(upper),
             ));
@@ -288,6 +384,9 @@ pub(super) fn evaluate(
                 right: right_witness,
                 query,
                 placement_uncertainty_mm: uncertainty,
+                sweep,
+                right_translation_world,
+                path_uncertainty_mm,
                 lower_bound_mm: lower,
                 upper_bound_mm: upper,
             },

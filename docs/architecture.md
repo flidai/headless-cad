@@ -58,6 +58,38 @@ retained evidence for the actual release revision. Performance evidence must pin
 hardware and workload. Current implementations and remaining work are recorded
 at the end of this document; this table is a target, not a certification.
 
+### Commercial release readiness
+
+This evidence index governs completion of the five release scenarios above.
+**All five gates remain open.** Increment tests elsewhere in this document are
+supporting evidence; no complete commercial release evidence bundle is recorded.
+Each passing row must link a pinned workload/configuration, source and binary
+revision, reproducible acceptance command, independent oracle, retained results,
+and applicable predeclared hardware/resource thresholds. Missing fields keep the
+gate open. Do not infer completion from operation counts or successful previews.
+
+| Gate ID / release scenario | Full-workflow evidence still required | Status / release evidence |
+| --- | --- | --- |
+| R1: Inspect a large machine | Separate repeated/unique-part workloads; zero overview exact-body loads; total decoded CPU/GPU residency, requested-detail latency, refinement failure recovery and stable source picking on pinned hardware | Open / not recorded |
+| R2: Revise one component | Consequential drive-module edits through native geometry and semantic references; unchanged-definition reuse; bounded exact-body and scratch residency during concurrent inspection/export; forced failure retains the previous generation | Open / not recorded |
+| R3: Validate mechanical intent | Required sketches/joints across regular, singular and conflicting configurations; independent residual/DOF/branch results and explicit clearance scope; sampled poses cannot certify a continuous path | Open / not recorded |
+| R4: Release manufacturing data | Original and revised drive-module drawings, fits/GD&T, BOM/materials and open exchange; independent semantic-loss and revision-consistency checks for the complete pack | Open / not recorded |
+| R5: Replay a human or agent change | Reviewable source patch through the versioned, isolated job protocol; structured failure and recovery; concurrent-job integrity and offline replay of the accepted release | Open / not recorded |
+
+All five gates must pass for the same release candidate, covering both the
+bearing-supported drive module and the separate assembly-scale workload. A
+change after acceptance requires an explicit invalidation assessment and reruns
+of affected gates. Remaining general CAD capabilities belong in the published
+supported-workflow matrix. Use the [benchmark protocol](#commercial-workflow-benchmark-protocol)
+and [release thresholds](#proposed-release-thresholds) to judge the evidence.
+
+The virtualized-geometry brief sets a contract for bounded, error-controlled
+progressive inspection with stable semantic identity. Meshlets, GPU traversal
+and analytic rendering are candidate implementations. They must not become
+requirements for exact modeling or substitute display accuracy for manufacturing
+accuracy. The original Rust kernel, Apache-2.0 first-party licensing and
+Git-versioned source remain binding across all five gates.
+
 ## Architectural commitments
 
 ### Delivery priorities and completion authority
@@ -2102,7 +2134,7 @@ precision and global selected/cache obligations remain unchanged.
 `SolidClearance.method` distinguishes `convex_support` from `coaxial_meridian`;
 `axis` denotes witness direction, not a separating plane for nested material.
 The original `ConvexClearance` API retains its separating-direction contract.
-Publication advances clearance JSON to schema 2, kind `native_geometric_clearance`,
+Publication uses clearance JSON schema 3, kind `native_geometric_clearance`,
 and shows the method in the static report. `coaxial_clearance.star` integrates
 stepped shafts, tapered/stepped bores and an axial spacer. Acceptance requires
 independent source-profile material distances, imported STEP boundary witnesses,
@@ -2130,8 +2162,41 @@ eccentric bores, offset sleeves, hollow spindles and reversed nesting. Acceptanc
 requires independent radial/axial formulas, imported STEP boundary witnesses and
 placements, exact-distance cases, noncentral footprint intersections, common and
 opposed poses, replay/cache behavior, and preserved generations on rejected edits.
-Offset stepped/tapered meridians, arbitrary nonparallel annuli and continuous
-motion remain separate geometry obligations.
+Offset stepped/tapered meridians and arbitrary nonparallel annuli remain
+separate geometry obligations. Bounded translation is described below.
+
+Continuous straight-line clearance extends these admitted native geometry paths
+through optional `clearance_check.right_translation`. The vector is expressed in
+the right occurrence's local axes and rotated into assembly coordinates; only
+that occurrence translates over the closed interval [0,1]. Each adaptive dyadic
+leaf uses a native midpoint distance lower bound minus an outward-rounded maximum
+displacement. Successful leaves cover the entire interval, so success is not
+inferred from sampled poses. Endpoints are also checked. Placement, vector rotation
+and translated-support arithmetic allowances widen the result explicitly.
+
+Clearance publication schema 3 distinguishes initial-pose and whole-path scope.
+The initial `query` remains bound to the original occurrence; `sweep` records timed
+native samples and interval certificates. Top-level bounds enclose the minimum
+across the whole path and need not have static-query tolerance width. Work is
+bounded by 1,025 native queries per sweep, depth 32, 16 sweeps per recipe and 4,096
+aggregate queries. A finite nonzero source vector has norm at most 1e6 mm.
+Unsupported poses, threshold uncertainty and resource exhaustion fail explicitly
+without replacing a valid generation, including cached or selected-output builds.
+
+`translation_clearance.star` combines shaft travel through a bearing with a guard
+pass. Acceptance includes independent whole-path minima, exact interval-coverage
+and Lipschitz arithmetic checks, imported STEP poses and witnesses, and a collision
+at quarter travel despite clear endpoints and midpoint. This is a bounded
+prescribed-translation capability; rotating paths, general mechanisms and
+manufacturing tolerance envelopes remain open.
+
+The independent translation acceptance run covers 19 configurations and 38 paths,
+with exact rational audits of 732 covering intervals and 1,502 sample reports.
+It checks 114 imported STEP poses and four rejected edits that preserve the prior
+generation. Reproduce with `tools/check-translation-clearance.py --out-dir <new-dir>`
+in the independent OCP environment and `tools/preview-check/translation-clearance.cjs`
+against the published example. This corpus establishes the declared translation
+contract, not general motion certification or commercial release readiness.
 
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.

@@ -36,7 +36,8 @@ pub use tolerance_stacks::{
 mod clearance_checks;
 pub use clearance_checks::{
     ClearanceCheck, ClearanceCheckReport, ClearanceOccurrenceWitness, MAX_CLEARANCE_CHECKS,
-    MAX_CLEARANCE_RESOLVE_WORK,
+    MAX_CLEARANCE_RESOLVE_WORK, MAX_CLEARANCE_SWEEPS, MAX_CLEARANCE_SWEEP_QUERIES,
+    MAX_CLEARANCE_TRANSLATION_MM,
 };
 mod dimension_tolerance;
 pub use dimension_tolerance::{DimensionTolerance, DimensionToleranceReport};

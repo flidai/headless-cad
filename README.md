@@ -11,6 +11,8 @@ The [competitive release contract](docs/architecture.md#first-competitive-releas
 covers reliable revisions, large assemblies, mechanical constraints,
 manufacturing deliverables and reproducible human/AI workflows. The overall
 product goal remains active as these capabilities are implemented and validated.
+The [commercial release readiness ledger](docs/architecture.md#commercial-release-readiness)
+records the five open product gates and the work that still blocks release.
 
 The [architecture decision](docs/architecture.md#architecture-decision-commercial-engineering-and-virtualized-inspection)
 turns the commercial-CAD and virtualized-geometry briefs into concrete subsystem
@@ -2328,13 +2330,14 @@ parallel circular-extrusion path below additionally supports lateral offsets.
 
 The generic native API is `ModelSnapshot::clearance`; the original
 `convex_clearance` API keeps its convex-only contract. Published clearance JSON
-uses schema 2 and `kind: native_geometric_clearance`. Each query records
+uses schema 3 and `kind: native_geometric_clearance`. Each query records
 `method: convex_support | coaxial_meridian | parallel_annular`; its `axis` is a witness direction,
 not a global separating plane for nested bodies. Coaxial admission allows at most
 128 faces, 256 loops, two loops per face, and the existing vertex/edge/reference
 budgets. The report displays the geometry method beside each checked pair.
-General nonparallel or noncircular hollow/nonconvex queries, continuous motion
-and manufacturing tolerance envelopes remain separate capabilities.
+General nonparallel or noncircular hollow/nonconvex queries and manufacturing
+tolerance envelopes remain separate capabilities. Bounded straight-line motion
+is checked by the declaration below.
 
 `parallel_clearance.star` adds true lateral offsets between finite circular
 extrusions, including a solid or hollow spindle and an offset annular sleeve.
@@ -2355,6 +2358,32 @@ poses preserve the material sets. The report labels this path `Parallel annuli`;
 coaxial and convex inputs retain their existing method labels. Contact/material
 overlap and real axis tilt fail explicitly. This path does not extend offset
 support to stepped or tapered meridians.
+
+### Continuous straight-line clearance
+
+```sh
+cad build examples/translation_clearance.star --out-dir out/translation_clearance
+```
+
+Add `right_translation = [0, 0, 40]` to `clearance_check` to check the right
+occurrence's entire travel in its **local body axes**, from time 0 to 1. The left
+occurrence remains fixed. The example checks a stepped shaft through a bearing
+and a carriage passing a guard. Its report shows `Continuous translation` and
+bounds the minimum over the whole path; bounds need not be as tight as a static
+query's modeling tolerance.
+
+Native midpoint queries and conservative displacement bounds certify complete
+interval coverage. Sampling alone never passes a path. `--param pass_y=0 --param
+traverse=40` intentionally collides at quarter travel even though the endpoints
+and midpoint are clear. Unsupported intermediate geometry, insufficient
+clearance, numerical uncertainty and exhausted work budgets reject publication.
+The previous valid generation remains available.
+
+Vectors must be finite, nonzero and at most 1,000,000 mm long. Limits are 16 swept
+checks per recipe, 1,025 native queries per check, and 4,096 queries across sweeps.
+Reports retain interval certificates, timed witnesses and arithmetic allowances;
+`query` still describes the initial pose. This supports one prescribed translating
+body per pair, not rotation, general trajectories or manufactured tolerances.
 
 ### Native planar edge chamfers
 

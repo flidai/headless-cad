@@ -25,6 +25,8 @@ its predeclared latency budget. Visible proxies and unmet-detail reports establi
 safe overload behavior only; they cannot satisfy the normal-operation gate.
 The complete first release requires both the drive-module engineering workflow
 and the separate assembly-scale workload.
+Track completion in the [commercial release readiness ledger](architecture.md#commercial-release-readiness);
+all five product gates remain open, independently of individual increment acceptance.
 
 M3's large-assembly gate also includes the architecture's
 [exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):
@@ -261,6 +263,13 @@ layout inspector plus source-bound JSON. Its acceptance checks sampled closure,
 round trips, static-geometry reuse and failure-preserving publication. Continuous
 branch certification, singularity crossing, physical interference and dynamics
 remain open. Sample playback never executes modeling calls.
+
+The continuous-translation increment extends geometric clearance to complete
+straight-line right-occurrence travel, with adaptive native distance certificates
+and explicit work/uncertainty limits. `translation_clearance.star` requires
+whole-path expected minima and interior-collision rejection, including collisions
+missed by endpoint/midpoint sampling. This advances mechanical validation without
+closing general rotating-motion clearance or the R3 release gate.
 
 ## Next concrete implementation increments
 
