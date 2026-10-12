@@ -3120,3 +3120,13 @@ adds three real through holes, native bore/radius dimensions and full-turn
 external-roller evidence. Independent OCCT subtraction builds the reference
 material, and every reported sample checks actual STEP boundary membership and
 analytic distance. Failed interior-motion edits preserve the accepted generation.
+
+The rotating-drive integration applies four sequential semantic fillets to the
+original four-hole base stock. The final `base_body` feeds the existing part,
+assembly and mounting section; each generated cylindrical face has a distinct
+lineage assertion and single-arc radius witness on the exact base occurrence.
+The corner-radius parameter changes geometry, material accounting and drawing
+annotations together. Independent references use OCCT edge fillets followed by
+actual bore subtraction, retaining the original retained-drive oracle unchanged.
+Existing eleven named motion pairs retain their scope; the new plate geometry
+does not imply a general collision certificate for the assembly.

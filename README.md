@@ -2904,3 +2904,11 @@ witnesses inside or too near a hole, and unresolved numerical cases reject.
 It does not establish clearance for a shaft nested inside the bore. Run
 `tools/check-rounded-rotor.py --drilled` with the optional test oracle to compare
 the actual drilled STEP solids, motion samples and native material witnesses.
+
+The rotating drive (`examples/drive_module_rotation.star`) uses a rounded,
+four-hole mounting plate. `base_corner_radius` (2–10 mm, default 6) controls
+four native longitudinal fillets and their semantic radius dimensions on the
+mounting drawing. Its material assertions include the removed corner volume;
+the retained 24-part assembly keeps its eleven named clearance checks and
+nine-member rotation group. The viewer remains an inspector of the captured
+recipe and evidence. These nominal dimensions do not certify manufactured fit.

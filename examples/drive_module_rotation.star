@@ -9,6 +9,7 @@ design_revision = "A"
 turn_radians = param(name = "turn_radians", default = 6.283185307179586)
 shaft_diameter = param(name = "shaft_diameter", default = 12)
 mounting_pitch = param(name = "mounting_pitch", default = 60)
+base_corner_radius = param(name = "base_corner_radius", default = 6)
 required_clearance = param(name = "required_clearance", default = 0.09)
 minimum_endplay = param(name = "minimum_endplay", default = 0.1)
 
@@ -17,6 +18,8 @@ def validate_parameters():
         fail("shaft_diameter must be 10..16 mm")
     if mounting_pitch < 60 or mounting_pitch > 90:
         fail("mounting_pitch must be 60..90 mm")
+    if base_corner_radius < 2 or base_corner_radius > 10:
+        fail("base_corner_radius must be 2..10 mm")
     if minimum_endplay <= 0:
         fail("minimum_endplay must be positive")
     if required_clearance <= 0:
@@ -29,9 +32,14 @@ pi = 3.141592653589793
 # Cyclic frame: local X -> world Y, local Y -> world Z, local Z -> world X.
 shaft_frame = [0.5,0.5,0.5,0.5]
 bolt_centers = [[x,y] for x in [33,p+33] for y in [-28,28]]
-base_body = extrude(id = "base_body", profile = polygon(id = "base_profile",
+base_stock = extrude(id = "base_stock", profile = polygon(id = "base_profile",
     points = [[0,-40],[p+90,-40],[p+90,40],[0,40]],
     circular_holes = [{"center":xy,"radius":3} for xy in bolt_centers]), height = 6)
+# Exact tangent edge fillets preserve the four real anchor holes.
+base_front_left = fillet(id = "base_front_left", body = base_stock, faces = [{"from_feature":base_stock,"role":"wall_3"},{"from_feature":base_stock,"role":"wall_0"}], radius = base_corner_radius)
+base_front_right = fillet(id = "base_front_right", body = base_front_left, faces = [{"from_feature":base_stock,"role":"wall_0"},{"from_feature":base_stock,"role":"wall_1"}], radius = base_corner_radius)
+base_back_right = fillet(id = "base_back_right", body = base_front_right, faces = [{"from_feature":base_stock,"role":"wall_1"},{"from_feature":base_stock,"role":"wall_2"}], radius = base_corner_radius)
+base_body = fillet(id = "base_body", body = base_back_right, faces = [{"from_feature":base_stock,"role":"wall_2"},{"from_feature":base_stock,"role":"wall_3"}], radius = base_corner_radius)
 housing_body = extrude(id = "housing_body", profile = polygon(id = "housing_profile",
     points = [[-22,-26],[22,-26],[22,14],[14,22],[-14,22],[-22,14]],
     circular_holes = [{"center":[0,0],"radius":r+4.025}]), height = 16)
@@ -73,7 +81,7 @@ clamp_body = extrude(id = "clamp_body", profile = polygon(id = "clamp_profile", 
 nut_body = extrude(id = "nut_body", profile = circle(id = "nut_profile", radius = 5, inner_radius = 2.6), height = 5)
 clamp = part(id = "clamp_bar", body = clamp_body, part_number = "DM-CLAMP", revision = design_revision, description = "Bridge clamp seated on bearing housing", material = "Aluminum", density_kg_per_m3 = 2700)
 nut = part(id = "nut_envelope", body = nut_body, part_number = "DM-NUT-ENVELOPE", revision = design_revision, description = "Underside clamp nut envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800)
-base = part(id = "base", body = base_body, part_number = "DM-BASE", revision = design_revision, description = "Four-hole mounting plate", material = "Aluminum", density_kg_per_m3 = 2700)
+base = part(id = "base", body = base_body, part_number = "DM-BASE", revision = design_revision, description = "Four-hole mounting plate with native tangent corner fillets", material = "Aluminum", density_kg_per_m3 = 2700)
 housing = part(id = "housing", body = housing_body, part_number = "DM-HOUSING", revision = design_revision, description = "Bearing housing seated under bridge clamp", material = "Aluminum", density_kg_per_m3 = 2700,
     datums = {"axis":datum(), "seat":datum(offset = [0,-26,0])})
 sleeve = part(id = "sleeve", body = sleeve_body, part_number = "DM-SLEEVE", revision = design_revision, description = "Flanged bronze bush seated against the outer housing face", material = "Bronze", density_kg_per_m3 = 8800, datums = {
@@ -136,7 +144,7 @@ output(name = "washer", feature = washer_body)
 output(name = "retaining_ring", feature = ring_body)
 
 # Independent material-volume formulas include actual holes, not bounding boxes.
-base_volume = (80*(p+90)-4*pi*3*3)*6
+base_volume = (80*(p+90)-4*pi*3*3-(4-pi)*base_corner_radius*base_corner_radius)*6
 housing_volume = (44*48-64-pi*(r+4.025)*(r+4.025))*16
 sleeve_volume = pi*((r+6)*(r+6)-(r+0.15)*(r+0.15))*2+pi*((r+4)*(r+4)-(r+0.15)*(r+0.15))*16
 half_width = 2.02
@@ -177,6 +185,11 @@ clearance_check(id = "shaft_washer_bush_gap", output = "drive_module_release", l
 
 # Plan section through mounting plate and transverse section through left bearing.
 section_view(id = "mounting_plan", output = "drive_module_release", origin = [0,0,3])
+def base_radius_dimensions():
+    for feature, offset in [(base_front_left,[-10,-10]),(base_front_right,[10,-10]),(base_back_right,[10,10]),(base_body,[-10,10])]:
+        assert_faces(id = feature+"_survives", from_feature = feature, role = "fillet_wall", in_feature = base_body, count = 1)
+        section_circle_dimension(view = "mounting_plan", id = feature+"_radius", from_feature = feature, role = "fillet_wall", instance_path = ["base"], kind = "radius", coverage = "single_arc", label_offset = offset, min = base_corner_radius-0.000001, max = base_corner_radius+0.000001)
+base_radius_dimensions()
 section_dimension(view = "mounting_plan", id = "support_pitch", from_instance_path = ["left_support","housing"], from_datum = "axis", to_instance_path = ["right_support","right_housing"], to_datum = "axis", axis = "x", offset = -50,
     tolerance = {"nominal":p,"lower":-0.05,"upper":0.05})
 section_view(id = "bearing_section", output = "bearing_fit_inspection", instance_path = ["inspect_support","housing"], datum = "axis", origin = [0,0,8])
@@ -187,7 +200,7 @@ section_circle_dimension(view = "bearing_section", id = "housing_bore", from_fea
 tolerance_stack(id = "running_diametral_limits", terms = [{"view":"bearing_section","dimension":"sleeve_bore","coefficient":1},{"view":"bearing_section","dimension":"shaft_diameter","coefficient":-1}], min = 0.29, max = 0.35)
 tolerance_stack(id = "housing_sleeve_diametral_limits", terms = [{"view":"bearing_section","dimension":"housing_bore","coefficient":1},{"view":"bearing_section","dimension":"sleeve_outer","coefficient":-1}], min = 0.04, max = 0.09)
 drawing_sheet(id = "drive_module_sections", title = "Bearing drive layout — mounting and nominal size limits", revision = design_revision, width = 420, height = 297,
-    views = [{"view":"mounting_plan","x":10,"y":10,"width":240,"height":240,"scale":1},{"view":"bearing_section","x":260,"y":10,"width":150,"height":240,"scale":1}])
+    views = [{"view":"mounting_plan","x":10,"y":10,"width":240,"height":240,"scale":0.5},{"view":"bearing_section","x":260,"y":10,"width":150,"height":240,"scale":1}])
 
 # Native parallel stop planes, measured from resolved B-rep face datums. These
 # authored manufacturing limits are illustrative design requirements, not a

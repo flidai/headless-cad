@@ -776,7 +776,7 @@ line/arc support queries. The rounded-rotor fixture requires a native full-turn
 clearance proof and catches an interior-only failure under a corner-radius edit.
 Exact sample formulas, independent STEP witness checks and complete native
 interval coverage accompany the source-owned read-only motion inspector.
-Holed/nonconvex curved clearance and general contact remain open; this increment
+General holed/nonconvex curved clearance and contact remain open; this increment
 does not close the R3 mechanical-intent gate.
 
 
@@ -785,3 +785,10 @@ continuous external clearance. An explicit surviving-witness proof distinguishes
 removed material from a filled outer envelope; native and independent tests cover
 hole exclusion, whole-turn edits and atomic failure. General cavity/shaft nesting,
 nonconvex curved distance and contact remain separate open obligations.
+
+The rotating drive now exercises four native baseplate corner fillets and four
+source-bound partial-arc radius annotations alongside its retained shaft, key,
+rings and eleven named motion checks. Radius edits update material accounting
+and drawings; independent STEP comparisons cover every occurrence. This combines
+existing bounded capabilities in the main assembly without expanding the
+named-pair collision scope or claiming manufacturing release.

@@ -14,6 +14,7 @@ import subprocess
 SPEC=importlib.util.spec_from_file_location('retained_drive',Path(__file__).with_name('check-retained-drive-module.py'))
 d=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(d)
 k=d.k;c=d.coupling.convex
+f=d.oracle('rounded_drive_fillet_oracle','check-longitudinal-fillet.py')
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Common,BRepAlgoAPI_Cut
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 from OCP.gp import gp_Trsf,gp_Ax1,gp_Pnt,gp_Dir
@@ -32,10 +33,10 @@ def boundary_distance(point,shape):
     while iterator.More():faces.append(iterator.Current());iterator.Next()
     return min(c.witness_distance(point,face) for face in faces)
 
-def run_case(cad,directory,diameter,pitch,sign):
-    tag=f'd{diameter}-p{pitch}-turn{sign}';out=directory/tag
+def run_case(cad,directory,diameter,pitch,sign,radius):
+    tag=f'd{diameter}-p{pitch}-turn{sign}-r{radius}';out=directory/tag
     result=c.run(cad,d.ROOT/'examples/drive_module_rotation.star',out,
-                 dict(shaft_diameter=diameter,mounting_pitch=pitch,turn_radians=sign*math.tau))
+                 dict(shaft_diameter=diameter,mounting_pitch=pitch,turn_radians=sign*math.tau,base_corner_radius=radius))
     d.require(result.returncode==0,result.stderr);manifest=json.loads(result.stdout)
     report=json.loads((out/'rigid-rotation-groups.json').read_text());group=report['groups']['rotor']
     d.require(group['status']=='named_pairs_passed' and group['coverage']=='named_pairs_only','explicit named-pair scope')
@@ -46,6 +47,14 @@ def run_case(cad,directory,diameter,pitch,sign):
     d.close(group['rotation_world']['angle_radians'],sign*math.tau,'signed full turn')
     leaves=c.imported_leaves(out/'drive_module_release.step')
     _,references,_=d.geometries(diameter,pitch)
+    points=[(0,-40),(pitch+90,-40),(pitch+90,40),(0,40)]
+    base=f.filleted(points,6,radius,[0,1,2,3])
+    for x in [33,pitch+33]:
+        for y in [-28,28]:
+            cutter=f.BRepPrimAPI_MakeCylinder(f.gp_Ax2(f.gp_Pnt(x,y,0),f.gp_Dir(0,0,1)),3,6).Shape()
+            base=k.boolean(BRepAlgoAPI_Cut,base,cutter)
+    references[('base',)]=base
+    d.close(k.properties(base)[0],6*(80*(pitch+90)-36*math.pi-(4-math.pi)*radius**2),'rounded base closed-form volume')
     d.require(set(leaves)==set(references),'all twenty-four STEP occurrences')
     shapes={path:leaf['shape'] for path,leaf in leaves.items()}
     for path,shape in shapes.items():
@@ -125,7 +134,7 @@ def rejected_edits(cad,directory):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--cad',type=Path,default=d.ROOT/'target/release/cad');parser.add_argument('--out-dir',type=Path,required=True)
     args=parser.parse_args();args.out_dir.mkdir(parents=True,exist_ok=False)
-    cases=[run_case(args.cad.resolve(),args.out_dir,*configuration) for configuration in [(12,60,1),(14,72,-1)]]
+    cases=[run_case(args.cad.resolve(),args.out_dir,*configuration) for configuration in [(12,60,1,6),(14,72,-1,2),(10,90,1,10)]]
     failures=rejected_edits(args.cad.resolve(),args.out_dir)
     report=dict(valid=True,cases=cases,rejected_edits=failures,scope='Native continuous named-pair proofs with independent sampled STEP checks; no general assembly collision, installation or load certification')
     (args.out_dir/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
