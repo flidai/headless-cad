@@ -1634,15 +1634,23 @@ unconditional performance/correctness guarantee for engineering assemblies.
 
 ## Queries, drawings, and engineering deliverables
 
-The next manufacturing foundation is an authoritative planar-section query.
-Its target result is oriented native curves with face provenance, plane frame,
-units, area and centroid, bound to captured source and implementation identities.
-SVG is a derived inspection/export representation of those curves. Unsupported
-surface intersections and tangent or coplanar topology events must be explicit;
-display-mesh slicing cannot silently replace the native query. Assembly sections
-must preserve occurrence identity and distinguish separate overlapping parts
-from a material union. This work is in progress, not a released drawing system.
-Associative annotation intent, projected/hidden-line views, dimensions, fits and
+`cad section` implements the first authoritative planar-section query. It
+returns oriented native lines/circular arcs with face provenance, plane frame,
+units, area and centroid, bound to captured source, overrides, output content and
+implementation identities. General planar solids and axis-transverse sections of
+supported analytic bodies are covered. Empty sections succeed; unsupported curved
+oblique intersections, tangent/coplanar topology events and unresolved drawing
+coordinates reject explicitly. No display mesh participates in the query.
+
+JSON preserves each assembly occurrence's path, part identity and face-local
+curves. Assembly area and centroid describe summed occurrence material, not a
+Boolean union. SVG uses separate occurrence paths so overlapping parts do not
+cancel through an even-odd fill rule; its metadata embeds the source-bound query
+report. The query evaluates selected dependencies with global assertions intact,
+leaves exchange requirements pending publication, and does not replace published
+generations. CLI/kernel/SVG tests and the `query.native-planar-section` evidence
+entry cover this bounded foundation. This is not a released drawing system:
+associative annotation intent, projected/hidden-line views, dimensions, fits and
 GD&T remain separate manufacturing obligations.
 
 Expose accuracy explicitly: visual approximation, conservative bound, or
@@ -2057,7 +2065,7 @@ new solids for an unselected-tool edit and one for the selected tool.
 | Builds | Local DAG/cache, selected-output dependency evaluation with global validation, captured source, scope evidence, atomic generations and watch | Bounded exact-body residency, parallel jobs, isolated workers, distributed content store |
 | Viewer | HTTP gallery, Canvas with live refresh; opt-in WebGL2 shared-mesh instancing and depth-tested face/occurrence picking; recipe and datum inspection; display-only publication; SHA-256-verified selective mesh streaming, occurrence-BVH frustum culling, bounded geometry cache, native analytic part LOD and proxy fallback | Paged assembly/part spatial indexes, occlusion, cluster LOD/meshlets, GPU generation refresh, sections/overlays |
 | Exchange | Planar AP214 and analytic cylinder STEP/STL, shared STEP definitions and named occurrences; independent OCCT/XCAF checks | Analytic import/export, AP242 PMI support, broader exchange fidelity and loss reporting |
-| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; recipe property assertions with pinned evidence and global validation | Broader sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
+| Engineering | Volume/bounds, explicit part metadata/density, nested quantity BOM, summed mass and CSV/JSON reports; native geometric centroid/inertia and density-weighted assembly properties; source-bound native planar sections with occurrence-aware SVG; recipe property assertions with pinned evidence and global validation | Broader sketch/assembly solving, drawings, GD&T, material property libraries, configurations, principal axes and dynamics |
 
 The milestone dependency order and example progression are in [roadmap.md](roadmap.md).
 The current working commands are in [README.md](../README.md).

@@ -1819,3 +1819,21 @@ checks cone picking, through passages and blind floors in all three viewers.
 Noncoaxial intersections, boundary contact, enclosed cutters, conical apex cuts
 and general pockets remain unsupported. These fasteners are geometric envelopes,
 not certified thread, fit or preload models.
+
+Query native planar sections without publishing a generation:
+
+```sh
+cad section examples/countersink.star --output countersunk --origin 0,0,10
+cad section examples/countersink.star --output countersunk --origin 0,0,10 --format svg > section.svg
+```
+
+`--normal` defaults to `0,0,1` and `--x-direction` to `1,0,0`; both must be
+unit vectors and perpendicular. JSON reports directed analytic line/arc loops,
+face IDs, area in mm², centroid in plane coordinates, source and geometry hashes,
+query frame, build identity, global assertion results, and pending exchange
+requirements. SVG retains the source-bound report in its metadata. Assembly
+queries retain each occurrence path and sum areas, including overlaps; they do
+not compute a union. Sections use native boundaries, never a display mesh.
+General planar sections and transverse cylinder/cone sections are supported;
+planes at topology events and oblique curved intersections return an explicit
+error. These inspection sections do not specify manufacturing tolerances or GD&T.

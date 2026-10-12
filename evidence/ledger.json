@@ -68,6 +68,29 @@
       ]
     },
     {
+      "id": "query.native-planar-section",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "solid.extrusion",
+        "boolean.countersink"
+      ],
+      "supported_domain": "Native directed line/circular-arc plane sections of supported planar solids and axis-transverse analytic bodies, with area/centroid and face provenance. Source-bound CLI body and rigid-assembly queries, separate occurrence paths, and true-mm SVG. Independent imported STEP intersections cover countersunk cover depths, common rigid frames, a planar oblique cut, empty space and a small countersink.",
+      "exclusions": [
+        "Oblique intersections of curved surfaces; ellipses and hyperbolas",
+        "Tangent, coplanar or unresolved topology-event planes",
+        "Material union of overlapping assembly occurrences",
+        "Associative dimensions, hidden-line drawings, fits and GD&T certification"
+      ],
+      "fixture": "examples/countersunk_bearing_cover.star",
+      "checks": [
+        "section-native-kernel",
+        "section-native-cli",
+        "section-svg",
+        "section-independent"
+      ]
+    },
+    {
       "id": "manufacturing.drive-module-release",
       "status": "planned",
       "domain_ids": [],
@@ -194,6 +217,58 @@
         "{python}",
         "crates/cad-export/tools/check_countersinks_ocp.py",
         "{artifacts}/countersink_direct"
+      ]
+    },
+    {
+      "id": "section-native-kernel",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-kernel"
+      ]
+    },
+    {
+      "id": "section-native-cli",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "section"
+      ]
+    },
+    {
+      "id": "section-svg",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-export",
+        "--test",
+        "section_svg"
+      ]
+    },
+    {
+      "id": "section-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_sections_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/sections"
       ]
     }
   ]

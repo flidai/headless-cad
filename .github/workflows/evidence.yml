@@ -12,6 +12,8 @@ jobs:
             capability: machining.round-bearing-cartridge
           - case: countersink
             capability: machining.countersunk-bearing-cover
+          - case: sections
+            capability: query.native-planar-section
     steps:
       - uses: actions/checkout@v4
       - run: rustup show

@@ -14,12 +14,14 @@ mod analytic;
 mod assembly;
 mod bom;
 mod fidelity;
+mod section;
 pub use assembly::{assembly_to_step, assembly_to_stl, assembly_to_stl_with_cache};
 pub use bom::bom_to_csv;
 pub use fidelity::{
     exchange_fidelity, ExchangeFidelityReport, ExchangeFormat, ExchangeSource, FidelityEntry,
     FidelityStatus,
 };
+pub use section::{section_to_svg, sections_to_svg};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

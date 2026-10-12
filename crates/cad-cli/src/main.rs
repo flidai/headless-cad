@@ -11,6 +11,7 @@ use serde_json::{json, Value};
 mod capabilities;
 mod exchange;
 mod integrity;
+mod section;
 mod server;
 mod watch;
 
@@ -87,6 +88,20 @@ enum Command {
         /// Optional uniform body density; assemblies use each part's material.
         #[arg(long)]
         density_kg_per_m3: Option<f64>,
+    },
+    /// Query an authoritative analytic planar section without publishing artifacts.
+    Section {
+        recipe: PathBuf,
+        #[arg(long)]
+        output: String,
+        #[arg(long, allow_hyphen_values = true)]
+        origin: String,
+        #[arg(long, default_value = "0,0,1", allow_hyphen_values = true)]
+        normal: String,
+        #[arg(long, default_value = "1,0,0", allow_hyphen_values = true)]
+        x_direction: String,
+        #[arg(long, default_value = "json", value_parser = ["json", "svg"])]
+        format: String,
     },
     /// Report component quantities, materials, and mass for an assembly output.
     Bom {
@@ -868,6 +883,7 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     {"name":"check", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Evaluate all outputs and native geometry/engineering validation; exchange obligations remain pending until full publication."},
                     {"name":"inspect", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Report output geometry, provenance, scope and checks; optional --output selects the demanded closure."},
                     {"name":"select", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Resolve a source face role through feature history; deletion and ambiguity are explicit."},
+                    {"name":"section", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Query analytic line/arc plane sections as source-bound JSON or SVG; assembly areas sum occurrences, not union. Topology-event and oblique curved intersections reject."},
                     {"name":"properties", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Measure a named output independently of display LOD; assemblies sum occurrences."},
                     {"name":"bom", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Report assembly component quantities and material properties."},
                     {"name":"diff", "publishes_artifacts":false, "evaluates_geometry":true, "purpose":"Compare two recipe revisions and their resolved results."},
@@ -880,6 +896,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
                     "failure_channel": "runtime_errors_stderr_json",
                     "usage_errors": "CLI argument parsing errors use human-readable stderr",
                     "success_channel": "stdout_json",
+                    "success_format_overrides": {"section --format svg":"stdout_svg_with_query_metadata"},
+                    "section_build_id": section::implementation_id(),
                     "failure_exit_status": "nonzero",
                     "global_obligations_apply_to_selected_outputs": true
                 }
@@ -1034,7 +1052,8 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         | Command::Inspect { recipe, .. }
         | Command::Check { recipe }
         | Command::Build { recipe, .. }
-        | Command::Properties { recipe, .. } => recipe,
+        | Command::Properties { recipe, .. }
+        | Command::Section { recipe, .. } => recipe,
         _ => unreachable!(),
     };
     // One immutable byte snapshot feeds graph evaluation, provenance, and the
@@ -1063,7 +1082,9 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         {
             Some(outputs.as_slice())
         }
-        Command::Properties { output, .. } => Some(std::slice::from_ref(output)),
+        Command::Properties { output, .. } | Command::Section { output, .. } => {
+            Some(std::slice::from_ref(output))
+        }
         _ => None,
     };
     let build = match selected {
@@ -1092,6 +1113,57 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
         } else {
             "pending_publication"
         });
+        return Ok(result);
+    }
+    if let Command::Section {
+        output,
+        origin,
+        normal,
+        x_direction,
+        format,
+        ..
+    } = &cli.command
+    {
+        let plane = cad_kernel::SectionPlane {
+            origin: section::vector(origin)?,
+            normal: section::vector(normal)?,
+            x_direction: section::vector(x_direction)?,
+        };
+        let mut result =
+            section::report(&recipe, &build, output, plane, &source_bytes, &parameters)?;
+        if format == "svg" {
+            let label = if result["kind"] == "assembly" {
+                format!("{output} — summed part areas (overlaps counted)")
+            } else {
+                output.clone()
+            };
+            let mut sections: Vec<cad_kernel::PlanarSection> = if result["kind"] == "assembly" {
+                result["occurrences"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|o| serde_json::from_value(o["section"].clone()))
+                    .collect::<Result<_, _>>()?
+            } else {
+                vec![serde_json::from_value(result["section"].clone())?]
+            };
+            if sections.is_empty() {
+                sections.push(cad_kernel::PlanarSection {
+                    plane,
+                    loops: vec![],
+                    area: 0.,
+                    centroid: None,
+                });
+            }
+            let mut svg = cad_export::sections_to_svg(&sections, &label)?;
+            let metadata = serde_json::to_string(&result)?
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;");
+            let at = svg.find('>').expect("SVG root") + 1;
+            svg.insert_str(at, &format!("\n<metadata>{metadata}</metadata>"));
+            result["svg"] = json!(svg);
+        }
         return Ok(result);
     }
     let mut summary = report(&recipe, &build)?;
@@ -1435,7 +1507,26 @@ fn run_with_source(cli: Cli, source: Option<&[u8]>) -> Result<Value, Box<dyn Err
 }
 
 fn main() {
-    match run(Cli::parse()) {
+    let cli = Cli::parse();
+    let svg = matches!(&cli.command,Command::Section {format,..} if format=="svg");
+    let section_input = if let Command::Section {
+        output,
+        origin,
+        normal,
+        x_direction,
+        ..
+    } = &cli.command
+    {
+        let vector = |s: &str| section::vector(s).map_or_else(|_| json!(s), |v| json!(v));
+        Some((
+            output.clone(),
+            json!({"origin":vector(origin),"normal":vector(normal),"x_direction":vector(x_direction)}),
+        ))
+    } else {
+        None
+    };
+    match run(cli) {
+        Ok(value) if svg => print!("{}", value["svg"].as_str().expect("successful SVG section")),
         Ok(value) => println!(
             "{}",
             serde_json::to_string_pretty(&value).expect("JSON value serializes")
@@ -1581,6 +1672,14 @@ fn main() {
                 report["code"] = json!("io_failed");
             } else if error.is::<serde_json::Error>() {
                 report["code"] = json!("invalid_json");
+            }
+            if let Some((output, plane)) = section_input {
+                report["output_name"] = json!(output);
+                report["plane"] = plane;
+                if report["code"] == "invalid_request" {
+                    report["code"] = json!("section_failed");
+                }
+                report["diagnostic"] = json!(error.to_string());
             }
             eprintln!("{report}");
             std::process::exit(1);
