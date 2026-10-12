@@ -44,6 +44,12 @@ housing example dimensions station pitch through assembly rotations. Continue
 toward geometric edge/curve dimensions, projected views, annotation layout and
 manufacturing semantics; this increment does not close the drawing release gate.
 
+Semantic radius/diameter annotations now resolve generated faces through lineage
+and measure their complete native section circles. The conical-seat examples
+exercise section-depth changes and repeated rotated occurrences with independent
+STEP circle checks. Partial or ambiguous intersections reject rather than becoming
+mesh measurements; broader drawing semantics remain a release obligation.
+
 Use the architecture's [delivery priorities](architecture.md#delivery-priorities-and-completion-authority)
 to select and review increments across modeling, assembly scale, inspection,
 constraints, manufacturing and automation. Report the supported domain and

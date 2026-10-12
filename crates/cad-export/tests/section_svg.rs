@@ -290,3 +290,216 @@ fn dimension_validation_rejects_invalid_geometry_and_labels() {
         cad_export::annotated_section_to_svg(&section, "plate", &[base.clone(), base]).is_err()
     );
 }
+
+#[test]
+fn circular_dimensions_preserve_native_paths_and_bound_leaders_and_labels() {
+    use cad_export::{
+        SectionCircleDimensionAnnotation as Circle, SectionCircleDimensionKind as Kind,
+    };
+    let section = extrude_annulus(20., 8., 10., Tolerance::default())
+        .unwrap()
+        .model
+        .section(plane(), Tolerance::default())
+        .unwrap();
+    let circles = [
+        Circle {
+            id: "bore<&\"".into(),
+            center: [0., 0.],
+            radius: 8.,
+            kind: Kind::Diameter,
+            label_offset: [-100., -60.],
+            value_mm: 16.,
+        },
+        Circle {
+            id: "outer".into(),
+            center: [0., 0.],
+            radius: 20.,
+            kind: Kind::Radius,
+            label_offset: [80., 110.],
+            value_mm: 20.,
+        },
+    ];
+    let svg = cad_export::dimensioned_sections_to_svg(
+        &[section.clone(), section.clone()],
+        "rings",
+        &[],
+        &circles,
+    )
+    .unwrap();
+    assert_eq!(
+        svg,
+        cad_export::dimensioned_sections_to_svg(
+            &[section.clone(), section],
+            "rings",
+            &[],
+            &circles
+        )
+        .unwrap()
+    );
+    assert_eq!(svg.matches("data-occurrence-index=").count(), 2);
+    assert_eq!(svg.matches("class=\"section-circle-dimension\"").count(), 2);
+    assert_eq!(svg.matches("<polygon ").count(), 3);
+    assert!(svg.contains("bore&lt;&amp;&quot;: 16 mm diameter"));
+    assert!(svg.contains("outer: 20 mm radius"));
+    assert!(svg.contains("data-kind=\"diameter\"") && svg.contains("data-kind=\"radius\""));
+    let view: Vec<f64> = attribute(&svg, "viewBox")
+        .split_whitespace()
+        .map(|s| s.parse().unwrap())
+        .collect();
+    let inside = |x: f64, y: f64| {
+        assert!(x > view[0] && x < view[0] + view[2]);
+        assert!(y > view[1] && y < view[1] + view[3]);
+    };
+    let mut lowest = f64::NEG_INFINITY;
+    for line in svg.lines().map(str::trim) {
+        if line.starts_with("<line ") {
+            for (x, y) in [("x1", "y1"), ("x2", "y2")] {
+                let x = attribute(line, x).parse().unwrap();
+                let y = attribute(line, y).parse().unwrap();
+                inside(x, y);
+                lowest = lowest.max(y);
+            }
+        } else if line.starts_with("<polygon ") {
+            let points: Vec<f64> = attribute(line, "points")
+                .split_whitespace()
+                .map(|s| s.parse().unwrap())
+                .collect();
+            for p in points.as_chunks::<2>().0 {
+                inside(p[0], p[1]);
+                lowest = lowest.max(p[1]);
+            }
+        } else if line.starts_with("<text ") && line.contains("textLength=") {
+            let x: f64 = attribute(line, "x").parse().unwrap();
+            let y: f64 = attribute(line, "y").parse().unwrap();
+            let width: f64 = attribute(line, "textLength").parse().unwrap();
+            let font: f64 = attribute(line, "font-size").parse().unwrap();
+            inside(x, y - font * 1.2);
+            inside(x + width, y + font * 0.4);
+            lowest = lowest.max(y + font * 0.4);
+        } else if line.starts_with("<text ") {
+            let y: f64 = attribute(line, "y").parse().unwrap();
+            let font: f64 = attribute(line, "font-size").parse().unwrap();
+            assert!(y - font > lowest);
+        }
+    }
+}
+
+#[test]
+fn circular_dimension_validation_covers_precision_and_shared_ids() {
+    use cad_export::{
+        SectionCircleDimensionAnnotation as Circle, SectionCircleDimensionKind as Kind,
+        SectionDimensionAnnotation as Linear,
+    };
+    let section = extrude_annulus(20., 8., 10., Tolerance::default())
+        .unwrap()
+        .model
+        .section(plane(), Tolerance::default())
+        .unwrap();
+    let base = Circle {
+        id: "bore".into(),
+        center: [0., 0.],
+        radius: 8.,
+        kind: Kind::Radius,
+        label_offset: [20., 0.],
+        value_mm: 8.,
+    };
+    for invalid in [
+        Circle {
+            radius: 0.,
+            ..base.clone()
+        },
+        Circle {
+            radius: f64::NAN,
+            ..base.clone()
+        },
+        Circle {
+            center: [f64::INFINITY, 0.],
+            ..base.clone()
+        },
+        Circle {
+            value_mm: 9.,
+            ..base.clone()
+        },
+        Circle {
+            kind: Kind::Diameter,
+            ..base.clone()
+        },
+        Circle {
+            label_offset: [0., 0.],
+            ..base.clone()
+        },
+        Circle {
+            label_offset: [8., 0.],
+            ..base.clone()
+        },
+        Circle {
+            label_offset: [1., 1.],
+            ..base.clone()
+        },
+        Circle {
+            label_offset: [f64::NAN, 0.],
+            ..base.clone()
+        },
+        Circle {
+            id: "bad\0".into(),
+            ..base.clone()
+        },
+        Circle {
+            id: "bad\u{ffff}".into(),
+            ..base.clone()
+        },
+        Circle {
+            center: [1e16, 0.],
+            ..base.clone()
+        },
+    ] {
+        assert!(cad_export::dimensioned_section_to_svg(&section, "test", &[], &[invalid]).is_err());
+    }
+    let tiny = Circle {
+        radius: 5e-10,
+        value_mm: 5e-10,
+        label_offset: [1e-9, 0.],
+        ..base.clone()
+    };
+    let svg =
+        cad_export::dimensioned_section_to_svg(&section, "test", &[], std::slice::from_ref(&tiny))
+            .unwrap();
+    assert!(svg.contains("5.000000e-10 mm radius"));
+    assert!(cad_export::dimensioned_section_to_svg(
+        &section,
+        "test",
+        &[],
+        &[Circle {
+            value_mm: 1e-10,
+            ..tiny
+        }]
+    )
+    .is_err());
+    let translated = Circle {
+        center: [1e4, 1e4],
+        radius: 0.1,
+        value_mm: 0.1,
+        label_offset: [0.2, 0.3],
+        ..base.clone()
+    };
+    assert!(cad_export::dimensioned_section_to_svg(&section, "test", &[], &[translated]).is_ok());
+    let linear = Linear {
+        id: "bore".into(),
+        from: [0., 0.],
+        to: [8., 0.],
+        axis: 0,
+        offset: 20.,
+        value_mm: 8.,
+    };
+    assert!(cad_export::dimensioned_section_to_svg(
+        &section,
+        "test",
+        &[linear],
+        std::slice::from_ref(&base)
+    )
+    .is_err());
+    assert!(
+        cad_export::dimensioned_section_to_svg(&section, "test", &[], &[base.clone(), base])
+            .is_err()
+    );
+}

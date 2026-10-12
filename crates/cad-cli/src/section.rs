@@ -99,6 +99,18 @@ pub(super) fn bind_view_report(
                 .to_hex()
                 .to_string());
     }
+    if !view.circle_dimensions.is_empty() {
+        report["section_view"]["circle_dimensions"] =
+            serde_json::to_value(&view.circle_dimensions)?;
+        let context = json!({
+            "base_query_context_hash": report["snapshot"]["query_context_hash"],
+            "native_circle_dimensions": view.circle_dimensions,
+        });
+        report["snapshot"]["query_context_hash"] =
+            json!(blake3::hash(&serde_json::to_vec(&context)?)
+                .to_hex()
+                .to_string());
+    }
     Ok(report)
 }
 
@@ -128,6 +140,12 @@ pub(super) fn bind_report(
             check["dimensions"] = json!(view.dimensions.iter().map(|d| json!({
                 "id":d.declaration.id,"status":d.status,"value_mm":d.value_mm,
                 "signed_delta_mm":d.signed_delta_mm
+            })).collect::<Vec<_>>());
+        }
+        if !view.circle_dimensions.is_empty() {
+            check["circle_dimensions"] = json!(view.circle_dimensions.iter().map(|d| json!({
+                "id":d.declaration.id,"status":d.status,"value_mm":d.value_mm,
+                "radius":d.radius,"center":d.center,"target_content_hash":d.target_content_hash
             })).collect::<Vec<_>>());
         }
         (id, check)
@@ -201,7 +219,33 @@ pub(super) fn svg(report: &Value) -> Result<String, Box<dyn Error>> {
             })
         })
         .collect::<Result<_, Box<dyn Error>>>()?;
-    let mut svg = cad_export::annotated_sections_to_svg(&sections, &label, &dimensions)?;
+    let circles: Vec<cad_export::SectionCircleDimensionAnnotation> = report["section_view"]
+        ["circle_dimensions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|d| {
+            Ok(cad_export::SectionCircleDimensionAnnotation {
+                id: d["declaration"]["id"]
+                    .as_str()
+                    .ok_or("missing circle dimension id")?
+                    .into(),
+                center: serde_json::from_value(d["center"].clone())?,
+                radius: d["radius"].as_f64().ok_or("missing circle radius")?,
+                kind: match d["declaration"]["kind"].as_str() {
+                    Some("radius") => cad_export::SectionCircleDimensionKind::Radius,
+                    Some("diameter") => cad_export::SectionCircleDimensionKind::Diameter,
+                    _ => return Err("invalid circle dimension kind".into()),
+                },
+                label_offset: serde_json::from_value(d["declaration"]["label_offset"].clone())?,
+                value_mm: d["value_mm"]
+                    .as_f64()
+                    .ok_or("missing circle dimension value")?,
+            })
+        })
+        .collect::<Result<_, Box<dyn Error>>>()?;
+    let mut svg =
+        cad_export::dimensioned_sections_to_svg(&sections, &label, &dimensions, &circles)?;
     let metadata = serde_json::to_string(report)?
         .replace('&', "&amp;")
         .replace('<', "&lt;")

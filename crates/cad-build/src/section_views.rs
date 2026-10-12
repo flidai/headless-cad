@@ -41,6 +41,73 @@ pub struct SectionDimensionReport {
     pub from_witness: SectionAnchorWitness,
     pub to_witness: SectionAnchorWitness,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SectionCircleDimensionKind {
+    Radius,
+    Diameter,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SectionCircleDimension {
+    pub id: String,
+    pub anchor_feature: String,
+    pub role: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance_path: Option<Vec<String>>,
+    pub kind: SectionCircleDimensionKind,
+    pub label_offset: [f64; 2],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct SectionCircleDimensionReport {
+    pub declaration: SectionCircleDimension,
+    pub status: String,
+    pub value_mm: f64,
+    pub center: [f64; 2],
+    pub radius: f64,
+    pub selection: FaceResolution,
+    pub anchor_content_hash: Option<String>,
+    pub target_content_hash: String,
+    pub instance_id: Option<String>,
+    pub instance_path: Option<Vec<String>>,
+    pub part_id: Option<String>,
+    pub occurrence_frame: Option<cad_assembly::RigidTransform>,
+}
+impl SectionCircleDimension {
+    pub fn validate(&self) -> Result<(), String> {
+        if !safe_id(&self.id)
+            || self.anchor_feature.is_empty()
+            || self.anchor_feature.trim() != self.anchor_feature
+            || self.role.is_empty()
+            || self.role.trim() != self.role
+        {
+            return Err("invalid circle dimension ID, anchor feature or role".into());
+        }
+        if self.instance_path.as_ref().is_some_and(|p| {
+            !valid_anchor(&SectionAnchor {
+                instance_path: p.clone(),
+                datum: "unused".into(),
+            })
+        }) {
+            return Err("invalid literal circle dimension occurrence path".into());
+        }
+        if self.label_offset.iter().any(|v| !v.is_finite())
+            || self.label_offset == [0., 0.]
+            || [self.min, self.max]
+                .into_iter()
+                .flatten()
+                .any(|v| !v.is_finite() || v < 0.)
+            || matches!((self.min,self.max),(Some(a),Some(b)) if a>b)
+        {
+            return Err("circle dimension label offset must be finite nonzero; bounds finite nonnegative and ordered".into());
+        }
+        Ok(())
+    }
+}
 fn safe_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128
@@ -103,6 +170,8 @@ pub struct SectionView {
     pub output: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dimensions: Vec<SectionDimension>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub circle_dimensions: Vec<SectionCircleDimension>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anchor: Option<SectionAnchor>,
     pub origin: [f64; 3],
@@ -158,13 +227,20 @@ impl SectionView {
                 return Err(fail("anchor needs a literal leaf path of 1..64 IDs and datum; IDs must be nonempty, at most 1024 bytes, without surrounding whitespace"));
             }
         }
-        if self.dimensions.len() > MAX_SECTION_DIMENSIONS_PER_VIEW {
+        if self.dimensions.len() + self.circle_dimensions.len() > MAX_SECTION_DIMENSIONS_PER_VIEW {
             return Err(fail("at most 32 dimensions per section view"));
         }
         let mut ids = BTreeSet::new();
         for d in &self.dimensions {
             d.validate()
                 .map_err(|e| fail(&format!("dimension '{}': {e}", d.id)))?;
+            if !ids.insert(d.id.to_ascii_lowercase()) {
+                return Err(fail("duplicate dimension ID within view"));
+            }
+        }
+        for d in &self.circle_dimensions {
+            d.validate()
+                .map_err(|e| fail(&format!("circle dimension '{}': {e}", d.id)))?;
             if !ids.insert(d.id.to_ascii_lowercase()) {
                 return Err(fail("duplicate dimension ID within view"));
             }
@@ -216,6 +292,7 @@ pub struct SectionViewReport {
     pub status: String,
     pub query: SectionQuery,
     pub dimensions: Vec<SectionDimensionReport>,
+    pub circle_dimensions: Vec<SectionCircleDimensionReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_witness: Option<SectionAnchorWitness>,
 }
@@ -331,7 +408,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     if recipe
         .section_views
         .iter()
-        .map(|v| v.dimensions.len())
+        .map(|v| v.dimensions.len() + v.circle_dimensions.len())
         .sum::<usize>()
         > MAX_SECTION_DIMENSIONS
     {
@@ -356,6 +433,13 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
                 id: v.id.clone(),
                 message: "anchored or dimensioned section target must be an assembly output".into(),
             });
+        }
+        let assembly = recipe.assembly_outputs.iter().any(|o| o.name == v.output);
+        if v.circle_dimensions
+            .iter()
+            .any(|d| d.instance_path.is_some() != assembly)
+        {
+            return Err(BuildError::InvalidSectionView{id:v.id.clone(),message:"circle dimensions require an exact leaf path for assembly outputs and no path for bodies".into()});
         }
         if !ids.insert(v.id.to_ascii_lowercase()) || !outputs.contains(&v.output) {
             return Err(BuildError::InvalidSectionView {
@@ -545,14 +629,234 @@ fn dimensions(
     Ok(reports)
 }
 
+fn complete_circle(
+    curves: &[&cad_kernel::SectionCurve],
+    tolerance: Tolerance,
+) -> Result<([f64; 2], f64), String> {
+    use cad_kernel::SectionCurve;
+    let Some(SectionCurve::Arc {
+        center,
+        radius,
+        sweep_angle,
+        ..
+    }) = curves.first().copied()
+    else {
+        return Err("selected face does not section as a circle".into());
+    };
+    let (center, radius, sign) = (*center, *radius, sweep_angle.signum());
+    let scale = center
+        .into_iter()
+        .map(f64::abs)
+        .fold(radius, f64::max)
+        .max(1.);
+    let error = scale * 128. * f64::EPSILON;
+    if error > tolerance.linear / 16. || !radius.is_normal() || radius <= tolerance.linear {
+        return Err("circle support exceeds modeling precision".into());
+    }
+    let mut sweep = 0.;
+    let mut first = None;
+    let mut last = None;
+    for curve in curves {
+        let SectionCurve::Arc {
+            center: c,
+            radius: r,
+            start_angle: a,
+            sweep_angle: d,
+        } = **curve
+        else {
+            return Err("selected section contains a noncircular segment".into());
+        };
+        if c.into_iter().chain([r, a, d]).any(|v| !v.is_finite())
+            || (c[0] - center[0]).hypot(c[1] - center[1]) > error
+            || (r - radius).abs() > error
+            || d.signum() != sign
+            || d == 0.
+            || d.abs() > std::f64::consts::TAU + 128. * f64::EPSILON
+        {
+            return Err("selected arcs do not share one oriented circle support".into());
+        }
+        let point = |angle: f64| [radius * angle.cos(), radius * angle.sin()];
+        let start = point(a);
+        let end = point(a + d);
+        if let Some(p) = last {
+            let p: [f64; 2] = p;
+            if (p[0] - start[0]).hypot(p[1] - start[1]) > error {
+                return Err("selected arcs are not a continuous circle".into());
+            }
+        }
+        first.get_or_insert(start);
+        last = Some(end);
+        sweep += d;
+    }
+    let a = first.unwrap();
+    let b = last.unwrap();
+    if (sweep.abs() - std::f64::consts::TAU).abs() > 128. * f64::EPSILON * curves.len() as f64
+        || (a[0] - b[0]).hypot(a[1] - b[1]) > error
+    {
+        return Err("selected section is partial or has duplicate winding".into());
+    }
+    Ok((center, radius))
+}
+fn circle_dimensions(
+    view: &SectionView,
+    query: &SectionQuery,
+    build: &BuildResult,
+    assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
+    tolerance: Tolerance,
+    selection_work: &mut usize,
+    work: &mut usize,
+) -> Result<Vec<SectionCircleDimensionReport>, BuildError> {
+    let mut reports = vec![];
+    for d in &view.circle_dimensions {
+        let fail = |message: String, actual_value| BuildError::SectionDimensionFailed {
+            view: view.id.clone(),
+            id: d.id.clone(),
+            output: view.output.clone(),
+            message,
+            actual_value,
+        };
+        let (target, hash, loops, instance_id, instance_path, part_id, occurrence_frame) =
+            if let Some(path) = &d.instance_path {
+                let a = &assemblies[&view.output];
+                *work =
+                    work.saturating_add(a.instances.len().saturating_add(query.occurrences.len()));
+                if *work > MAX_SECTION_VIEW_WORK {
+                    return Err(BuildError::ResourceLimit {
+                        resource: "section view geometry work",
+                        limit: MAX_SECTION_VIEW_WORK,
+                    });
+                }
+                let mut matches = a
+                    .instances
+                    .iter()
+                    .filter(|i| a.instance_paths.get(&i.id) == Some(path));
+                let instance = matches.next().ok_or_else(|| {
+                    fail(
+                        "circle dimension occurrence path does not exist".into(),
+                        None,
+                    )
+                })?;
+                if matches.next().is_some() {
+                    return Err(fail("ambiguous circle dimension path".into(), None));
+                }
+                let part = &a.parts[&instance.part];
+                let section = query
+                    .occurrences
+                    .iter()
+                    .find(|s| s.instance_id == instance.id)
+                    .ok_or_else(|| fail("missing occurrence section".into(), None))?;
+                (
+                    &part.feature_id,
+                    &part.content_hash,
+                    section.section.loops.as_slice(),
+                    Some(instance.id.clone()),
+                    Some(path.clone()),
+                    Some(instance.part.clone()),
+                    Some(instance.transform),
+                )
+            } else {
+                (
+                    &query.feature_id,
+                    &query.content_hash,
+                    query
+                        .section
+                        .loops
+                        .as_deref()
+                        .ok_or_else(|| fail("body section missing native loops".into(), None))?,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+            };
+        *work = work.saturating_add(loops.iter().map(|l| l.segments.len()).sum::<usize>());
+        if *work > MAX_SECTION_VIEW_WORK {
+            return Err(BuildError::ResourceLimit {
+                resource: "section view geometry work",
+                limit: MAX_SECTION_VIEW_WORK,
+            });
+        }
+        let selection = build.resolve_faces_with_remaining(
+            &FaceSelector {
+                anchor_feature: d.anchor_feature.clone(),
+                role: d.role.clone(),
+                target_feature: target.clone(),
+                cardinality: FaceCardinality::Exactly { count: 1 },
+            },
+            selection_work,
+        );
+        if selection.status != FaceResolutionStatus::Resolved || selection.witnesses.len() != 1 {
+            return Err(fail(
+                format!(
+                    "circle face selection {:?}: {}",
+                    selection.status, selection.diagnostic
+                ),
+                None,
+            ));
+        }
+        let face = selection.witnesses[0].target_face;
+        let curves: Vec<_> = loops
+            .iter()
+            .flat_map(|l| &l.segments)
+            .filter(|s| s.face == face)
+            .map(|s| &s.curve)
+            .collect();
+        let (center, radius) = complete_circle(&curves, tolerance).map_err(|e| fail(e, None))?;
+        let label_distance = d.label_offset[0].hypot(d.label_offset[1]);
+        if !label_distance.is_finite()
+            || label_distance <= radius + tolerance.linear
+            || (0..2).any(|i| !(center[i] + d.label_offset[i]).is_finite())
+        {
+            return Err(fail(
+                "circle label offset must place a finite label outside the circle".into(),
+                None,
+            ));
+        }
+        let value_mm = radius
+            * match d.kind {
+                SectionCircleDimensionKind::Radius => 1.,
+                SectionCircleDimensionKind::Diameter => 2.,
+            };
+        if !value_mm.is_finite() {
+            return Err(fail(
+                "circle measurement exceeds numeric range".into(),
+                None,
+            ));
+        }
+        if d.min.is_some_and(|v| value_mm < v) || d.max.is_some_and(|v| value_mm > v) {
+            return Err(fail(
+                "circle dimension lies outside declared bounds".into(),
+                Some(value_mm),
+            ));
+        }
+        reports.push(SectionCircleDimensionReport {
+            declaration: d.clone(),
+            status: "passed".into(),
+            value_mm,
+            center,
+            radius,
+            selection,
+            anchor_content_hash: build.feature_hashes.get(&d.anchor_feature).cloned(),
+            target_content_hash: hash.clone(),
+            instance_id,
+            instance_path,
+            part_id,
+            occurrence_frame,
+        });
+    }
+    Ok(reports)
+}
+
 pub(super) fn evaluate(
     recipe: &Recipe,
-    face_datums: &ResolvedFaceDatums,
-    hashes: &BTreeMap<String, String>,
+    build: &BuildResult,
     models: &HashMap<String, Arc<OperationResult>>,
     assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
     tolerance: Tolerance,
+    selection_work: &mut usize,
 ) -> Result<BTreeMap<String, SectionViewReport>, BuildError> {
+    let face_datums = &build.face_datums;
+    let hashes = &build.feature_hashes;
     let mut reports = BTreeMap::new();
     let mut work = 0usize;
     for v in &recipe.section_views {
@@ -624,6 +928,15 @@ pub(super) fn evaluate(
             });
         }
         let dimensions = dimensions(v, plane, face_datums, assemblies, tolerance)?;
+        let circle_dimensions = circle_dimensions(
+            v,
+            &query,
+            build,
+            assemblies,
+            tolerance,
+            selection_work,
+            &mut work,
+        )?;
         reports.insert(
             v.id.clone(),
             SectionViewReport {
@@ -632,6 +945,7 @@ pub(super) fn evaluate(
                 query,
                 anchor_witness,
                 dimensions,
+                circle_dimensions,
             },
         );
     }
@@ -914,6 +1228,116 @@ mod tests {
         let mut v = serde_json::to_value(r).unwrap();
         v["section_views"][0]["dimensions"][0]["axis"] = "z".into();
         assert!(serde_json::from_value::<Recipe>(v).is_err());
+    }
+    fn circle_dimension() -> SectionCircleDimension {
+        SectionCircleDimension {
+            id: "diameter".into(),
+            anchor_feature: "b".into(),
+            role: "wall".into(),
+            instance_path: None,
+            kind: SectionCircleDimensionKind::Diameter,
+            label_offset: [10., 10.],
+            min: None,
+            max: None,
+        }
+    }
+    fn circle_recipe() -> Recipe {
+        let mut v = serde_json::to_value(recipe()).unwrap();
+        v["features"][0] = serde_json::json!({"op":"circle","id":"p","radius":3});
+        v["section_views"] = serde_json::json!([{"id":"circle","output":"body","origin":[0,0,4],"circle_dimensions":[circle_dimension()]}]);
+        serde_json::from_value(v).unwrap()
+    }
+    #[test]
+    fn semantic_circle_dimensions_track_native_radius_and_global_cache_obligations() {
+        let mut r = circle_recipe();
+        let mut engine = BuildEngine::default();
+        let a = engine.build_outputs(&r, &["other".into()]).unwrap();
+        let d = &a.section_views["circle"].circle_dimensions[0];
+        assert_eq!(d.value_mm, 6.);
+        assert_eq!(d.radius, 3.);
+        assert_eq!(d.center, [0., 0.]);
+        assert_eq!(d.selection.status, FaceResolutionStatus::Resolved);
+        assert!(d.instance_id.is_none());
+        assert_eq!(d.target_content_hash, a.feature_hashes["b"]);
+        r.section_views[0].circle_dimensions[0].max = Some(5.);
+        assert!(matches!(
+            engine.build_outputs(&r, &["other".into()]),
+            Err(BuildError::SectionDimensionFailed {
+                actual_value: Some(6.),
+                ..
+            })
+        ));
+        r.section_views[0].circle_dimensions[0].max = None;
+        if let Feature::Circle { radius, .. } = &mut r.features[0] {
+            *radius = 4.;
+        } else {
+            panic!()
+        };
+        let b = engine.build(&r).unwrap();
+        assert_eq!(b.section_views["circle"].circle_dimensions[0].value_mm, 8.);
+        assert_ne!(a.feature_hashes, b.feature_hashes);
+        for role in ["missing", "boundary", "end_cap"] {
+            r.section_views[0].circle_dimensions[0].role = role.into();
+            assert!(matches!(
+                engine.build(&r),
+                Err(BuildError::SectionDimensionFailed { .. })
+            ));
+        }
+    }
+    #[test]
+    fn circle_dimensions_resolve_exact_repeated_rotated_occurrence() {
+        let mut value = serde_json::to_value(anchored_recipe()).unwrap();
+        value["features"][0] = serde_json::json!({"op":"circle","id":"p","radius":3});
+        let mut r: Recipe = serde_json::from_value(value).unwrap();
+        r.section_views[0].min_area = None;
+        r.section_views[0].max_area = None;
+        let mut d = circle_dimension();
+        d.instance_path = Some(vec!["right".into(), "leaf".into()]);
+        d.kind = SectionCircleDimensionKind::Radius;
+        r.section_views[0].circle_dimensions = vec![d];
+        let b = build(&r).unwrap();
+        let report = &b.section_views["local"].circle_dimensions[0];
+        assert_eq!(report.value_mm, 3.);
+        assert_eq!(
+            report.instance_path,
+            Some(vec!["right".into(), "leaf".into()])
+        );
+        assert_eq!(report.part_id.as_deref(), Some("part"));
+        assert!(report.occurrence_frame.is_some());
+        r.section_views[0].circle_dimensions[0].instance_path = Some(vec!["leaf".into()]);
+        assert!(build(&r).is_err());
+    }
+    #[test]
+    fn complete_circle_certificate_rejects_partial_disconnected_lines_and_duplicate_winding() {
+        use cad_kernel::SectionCurve as C;
+        let arc = |a, d| C::Arc {
+            center: [0., 0.],
+            radius: 3.,
+            start_angle: a,
+            sweep_angle: d,
+        };
+        let t = Tolerance::default();
+        let pi = std::f64::consts::PI;
+        assert!(complete_circle(&[&arc(0., pi), &arc(pi, pi)], t).is_ok());
+        for curves in [
+            vec![arc(0., pi)],
+            vec![arc(0., pi), arc(0., pi)],
+            vec![arc(0., 2. * pi), arc(0., 2. * pi)],
+            vec![arc(0., pi), arc(pi, -pi)],
+            vec![C::Line {
+                start: [0., 0.],
+                end: [1., 0.],
+            }],
+        ] {
+            assert!(complete_circle(&curves.iter().collect::<Vec<_>>(), t).is_err());
+        }
+        let mut r = circle_recipe();
+        r.section_views[0].circle_dimensions[0].label_offset = [1., 0.];
+        assert!(build(&r).is_err());
+        r.section_views[0].circle_dimensions[0].label_offset = [10., 0.];
+        r.section_views[0].dimensions = vec![dimension()];
+        r.section_views[0].dimensions[0].id = "DIAMETER".into();
+        assert!(preflight(&r).is_err());
     }
     #[test]
     fn declarations_are_strict_bounded_and_safe() {

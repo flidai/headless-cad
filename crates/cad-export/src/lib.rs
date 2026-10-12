@@ -22,8 +22,9 @@ pub use fidelity::{
     FidelityStatus,
 };
 pub use section::{
-    annotated_section_to_svg, annotated_sections_to_svg, section_to_svg, sections_to_svg,
-    SectionDimensionAnnotation,
+    annotated_section_to_svg, annotated_sections_to_svg, dimensioned_section_to_svg,
+    dimensioned_sections_to_svg, section_to_svg, sections_to_svg, SectionCircleDimensionAnnotation,
+    SectionCircleDimensionKind, SectionDimensionAnnotation,
 };
 use thiserror::Error;
 

@@ -192,12 +192,62 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     dimension.obligations.extend(["projected datum-origin distance along resolved section X or Y, not 3D distance; endpoints need not lie in the plane", "value_mm is absolute axis delta; signed_delta_mm and projected endpoints retained; value <= modeling tolerance fails as degenerate", "offset is an absolute dimension-line coordinate on the perpendicular drawing axis in mm, not a measurement adjustment", "IDs case-insensitive unique within view; same safe identifier rules as section_view; finite offset and finite nonnegative ordered bounds", "Starlark section_dimension(view,id,from_instance_path,from_datum,to_instance_path,to_datum,offset,axis='x',min=None,max=None) attaches to an already declared assembly section", "at most 32 per view and 1024 per recipe; all measurements are global native obligations including cache hits and selected builds; datum/face/placement witnesses retained"]);
+    let mut circle_dimension = object_spec(
+        "section_circle_dimension",
+        vec![
+            arg("id", T::String),
+            arg("anchor_feature", reference("solid_feature")),
+            arg("role", T::String),
+            optional(
+                arg(
+                    "instance_path",
+                    T::Nullable {
+                        value: Box::new(array(reference("occurrence_path_component"), None)),
+                    },
+                ),
+                json!(null),
+            ),
+            arg(
+                "kind",
+                T::Enum {
+                    values: vec!["radius", "diameter"],
+                },
+            ),
+            arg("label_offset", numbers(2)),
+            optional(
+                arg(
+                    "min",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+            optional(
+                arg(
+                    "max",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+        ],
+    );
+    circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "Exactly1 semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "only one complete native circular section on the selected face; consistent center/radius/orientation, continuous full turn; no lines, partial arcs, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
     let mut section = object_spec(
         "section_view",
         vec![
             arg("id", T::String),
             arg("output", reference("output")),
             arg("origin", numbers(3)),
+            optional(
+                arg(
+                    "circle_dimensions",
+                    array(object("section_circle_dimension"), None),
+                ),
+                json!([]),
+            ),
             optional(
                 arg("dimensions", array(object("section_dimension"), None)),
                 json!([]),
@@ -244,6 +294,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         section,
         anchor,
         dimension,
+        circle_dimension,
     ]
 }
 

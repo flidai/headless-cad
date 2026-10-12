@@ -524,6 +524,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         };
         let view = cad_build::SectionView {
             dimensions: vec![],
+            circle_dimensions: vec![],
             id: id.into(),
             output: output.into(),
             anchor,
@@ -596,7 +597,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         let mut views = graph.section_views.borrow_mut();
         let total: usize = views
             .iter()
-            .map(|v| v["dimensions"].as_array().map_or(0, Vec::len))
+            .map(|v| {
+                v["dimensions"].as_array().map_or(0, Vec::len)
+                    + v["circle_dimensions"].as_array().map_or(0, Vec::len)
+            })
             .sum();
         anyhow::ensure!(
             total < cad_build::MAX_SECTION_DIMENSIONS,
@@ -621,6 +625,68 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "duplicate section dimension id"
         );
         dimensions.push(serde_json::to_value(dimension)?);
+        serde_json::from_value::<cad_build::SectionView>(target.clone())?.validate()?;
+        Ok(NoneType)
+    }
+
+    /// Measure a complete native circle selected by feature-role lineage.
+    fn section_circle_dimension(
+        view: &str,
+        id: &str,
+        from_feature: &str,
+        role: &str,
+        label_offset: Value,
+        kind: Option<&str>,
+        instance_path: Option<Value>,
+        min: Option<Value>,
+        max: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let dimension = cad_build::SectionCircleDimension {
+            id: id.into(),
+            anchor_feature: from_feature.into(),
+            role: role.into(),
+            label_offset: serde_json::from_str(&label_offset.to_json()?)?,
+            kind: match kind.unwrap_or("diameter") {
+                "radius" => cad_build::SectionCircleDimensionKind::Radius,
+                "diameter" => cad_build::SectionCircleDimensionKind::Diameter,
+                _ => anyhow::bail!("circle dimension kind must be radius or diameter"),
+            },
+            instance_path: instance_path
+                .filter(|v| !v.is_none())
+                .map(|v| occurrence_path(v, "instance_path"))
+                .transpose()?,
+            min: min.filter(|v| !v.is_none()).map(number).transpose()?,
+            max: max.filter(|v| !v.is_none()).map(number).transpose()?,
+        };
+        dimension.validate().map_err(anyhow::Error::msg)?;
+        let graph = store(eval)?;
+        let mut views = graph.section_views.borrow_mut();
+        let total: usize = views
+            .iter()
+            .map(|v| {
+                v["dimensions"].as_array().map_or(0, Vec::len)
+                    + v["circle_dimensions"].as_array().map_or(0, Vec::len)
+            })
+            .sum();
+        anyhow::ensure!(
+            total < cad_build::MAX_SECTION_DIMENSIONS,
+            "too many section dimensions"
+        );
+        let target = views
+            .iter_mut()
+            .find(|v| v["id"].as_str() == Some(view))
+            .ok_or_else(|| {
+                anyhow::anyhow!("section_circle_dimension view must already be declared")
+            })?;
+        if target.get("circle_dimensions").is_none() {
+            target["circle_dimensions"] = serde_json::json!([]);
+        }
+        target["circle_dimensions"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::to_value(dimension)?);
+        serde_json::from_value::<cad_build::SectionView>(target.clone())?.validate()?;
         Ok(NoneType)
     }
 
@@ -2451,6 +2517,56 @@ mod exchange_requirement_tests {
 mod section_view_tests {
     use super::*;
     const SOURCE:&str="b=extrude(id='b',profile=rectangle(id='p',width=10,depth=12),height=8)\noutput(name='body',feature=b)\n";
+    #[test]
+    fn native_conical_section_circle_dimensions_follow_semantic_faces() {
+        let source="stock=extrude(id='stock',profile=rectangle(id='outline',width=30,depth=20),height=12)\npilot=translate(id='pilot',body=extrude(id='pilot_body',profile=circle(id='pilot_profile',radius=3),height=16),offset=[15,10,-2])\ndrilled=cut(id='drilled',left=stock,right=pilot)\ncone=revolve(id='cone',profile=polygon(id='cone_profile',points=[[0,8],[3,8],[9,14],[0,14]]))\ncutter=translate(id='cutter',body=cone,offset=[15,10,0])\nfinished=cut(id='finished',left=drilled,right=cutter)\noutput(name='body',feature=finished)\nsection_view(id='seat',output='body',origin=[0,0,10])\n";
+        let args="view='seat',id='diameter',from_feature='cone',role='conical_faces',label_offset=[12,8],min=9.999999,max=10.000001";
+        let recipe = from_starlark(
+            "seat.star",
+            &format!("{source}section_circle_dimension({args})"),
+        )
+        .unwrap();
+        let build = cad_build::build(&recipe).unwrap();
+        let report = &build.section_views["seat"].circle_dimensions[0];
+        assert_eq!(report.value_mm, 10.);
+        assert_eq!(report.center, [15., 10.]);
+        assert_eq!(
+            report.selection.status,
+            cad_build::FaceResolutionStatus::Resolved
+        );
+        let deleted = args
+            .replace("from_feature='cone'", "from_feature='pilot_body'")
+            .replace("role='conical_faces'", "role='end_cap'");
+        let recipe = from_starlark(
+            "deleted.star",
+            &format!("{source}section_circle_dimension({deleted})"),
+        )
+        .unwrap();
+        assert!(matches!(
+            cad_build::build(&recipe),
+            Err(cad_build::BuildError::SectionDimensionFailed { .. })
+        ));
+        for bad in [
+            args.replace("view='seat'", "view='missing'"),
+            format!("{args},kind='ellipse'"),
+            args.replace("label_offset=[12,8]", "label_offset=[0,0]"),
+            args.replace("min=9.999999", "min=-1"),
+        ] {
+            assert!(from_starlark(
+                "bad.star",
+                &format!("{source}section_circle_dimension({bad})")
+            )
+            .is_err());
+        }
+        assert!(from_starlark(
+            "dup.star",
+            &format!(
+                "{source}section_circle_dimension({args})\nsection_circle_dimension({})",
+                args.replace("id='diameter'", "id='DIAMETER'")
+            )
+        )
+        .is_err());
+    }
     #[test]
     fn projected_dimension_directive_attaches_to_existing_view_with_strict_defaults() {
         let source=format!("{SOURCE}p=part(id='part',body=b,datums={{'mid':datum(offset=[0,0,4])}})\nassembly_output(name='machine',assembly=assembly(id='root',instances=[instance(id='left',part=p),instance(id='right',part=p,offset=[20,0,0])]))\nsection_view(id='drawing',output='machine',origin=[0,0,4])\n");

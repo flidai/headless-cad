@@ -60,6 +60,28 @@ fn twenty_seven_configurations_preserve_associative_section_geometry_and_world_f
                     let report = &build.section_views[id];
                     assert_eq!(report.status, "passed");
                     close(report.query.section.area, expected_area);
+                    assert_eq!(report.circle_dimensions.len(), 1);
+                    let circle = &report.circle_dimensions[0];
+                    close(circle.radius, 3. + depth / 2.);
+                    close(
+                        circle.value_mm,
+                        (3. + depth / 2.) * if station == "left" { 2. } else { 1. },
+                    );
+                    close(circle.center[0], 0.);
+                    close(circle.center[1], 0.);
+                    assert_eq!(
+                        circle.selection.status,
+                        cad_build::FaceResolutionStatus::Resolved
+                    );
+                    assert_eq!(circle.selection.selector.anchor_feature, "sink_body");
+                    assert_eq!(
+                        circle.instance_path.as_ref().unwrap(),
+                        &vec!["carrier", station, "housing"]
+                    );
+                    assert_eq!(
+                        circle.target_content_hash,
+                        build.outputs["housing"].content_hash
+                    );
                     assert_eq!(report.dimensions.len(), 1);
                     let dimension = &report.dimensions[0];
                     close(dimension.value_mm, spacing);

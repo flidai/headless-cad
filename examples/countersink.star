@@ -25,3 +25,6 @@ pilot_area = 60*40-pi*9
 seat_area = 60*40-pi*(3+depth/2)*(3+depth/2)
 section_view(id = "pilot", output = "countersunk", origin = [0,0,2], min_area = pilot_area-0.000001, max_area = pilot_area+0.000001)
 section_view(id = "seat", output = "countersunk", origin = [0,0,12-depth/2], min_area = seat_area-0.000001, max_area = seat_area+0.000001)
+
+section_circle_dimension(view = "pilot", id = "pilot_diameter", from_feature = "pilot", role = "wall", kind = "diameter", label_offset = [0,30], min = 5.999999, max = 6.000001)
+section_circle_dimension(view = "seat", id = "seat_diameter", from_feature = sink_body, role = "conical_faces", kind = "diameter", label_offset = [0,30], min = 6+depth-0.000001, max = 6+depth+0.000001)

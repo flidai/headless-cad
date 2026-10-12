@@ -48,3 +48,8 @@ section_view(id = "right_seat", output = "datum_section_fixture", instance_path 
 # Bounds validate design intent; these are not fit or manufacturing tolerances.
 section_dimension(view = "left_seat", id = "station_pitch", from_instance_path = ["carrier","left","housing"], from_datum = "top", to_instance_path = ["carrier","right","housing"], to_datum = "top", axis = "x", offset = -30, min = spacing-0.000001, max = spacing+0.000001)
 section_dimension(view = "right_seat", id = "station_pitch", from_instance_path = ["carrier","right","housing"], from_datum = "top", to_instance_path = ["carrier","left","housing"], to_datum = "top", axis = "x", offset = -30, min = spacing-0.000001, max = spacing+0.000001)
+
+# Measure the cone/plane intersection itself through semantic face lineage.
+seat_diameter = 2*(3+depth/2)
+section_circle_dimension(view = "left_seat", id = "seat_diameter", from_feature = sink_body, role = "conical_faces", instance_path = ["carrier","left","housing"], kind = "diameter", label_offset = [0,35], min = seat_diameter-0.000001, max = seat_diameter+0.000001)
+section_circle_dimension(view = "right_seat", id = "seat_radius", from_feature = sink_body, role = "conical_faces", instance_path = ["carrier","right","housing"], kind = "radius", label_offset = [0,35], min = seat_diameter/2-0.000001, max = seat_diameter/2+0.000001)

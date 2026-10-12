@@ -1743,6 +1743,33 @@ native fixture, publication failures, exporter checks and independent placed STE
 pin-centre distances in three poses. General geometry dimensions, angular/radial
 annotations, collision-free label layout, drawing standards and GD&T remain open.
 
+Semantic `section_circle_dimension` annotations now measure a selected native
+face's complete circular intersection with the section plane. A generated role
+resolves through feature lineage with exactly-one cardinality; assembly scopes
+require a literal leaf occurrence path. The evaluator certifies common circle
+support, continuous same-direction arcs and one full winding, rejecting partial,
+empty, mixed, duplicate or ambiguous intersections. Cone dimensions consequently
+follow section depth rather than reporting an unrelated surface parameter.
+
+Radius/diameter reports retain declaration, native centre/radius/value, semantic
+selection and lineage, source/target content hashes and optional occurrence
+identity/frame. Circle selectors participate in global dependency demand and
+share the face-resolution work budget with assertions and semantic datums.
+Both annotation types share the 32-per-view and 1024-per-recipe limits and ID
+namespace. Endpoint lookup/curve scanning also contributes to section work.
+Bounds and label-outside-circle checks fail atomically in every publication mode.
+SVG renders radial/diametral leaders and labels within its canvas; JSON and SVG
+metadata bind the same circle evidence to the generation. The evidence case
+`manufacturing.semantic-circle-dimensions` compares body bores/conical seats and
+rotated repeated assemblies against independently imported STEP intersections.
+The patterned bearing cover selects one cut-generated wall through subsequent
+operations and independently checks its seat and central bore dimensions. Two
+27-configuration native corpora and nine retained independent configurations
+exercise these references; a shared cutter role is not treated as an occurrence
+selector.
+This extends associative inspection annotations; angular dimensions, general
+curve references, drawing layouts, fits, GD&T and PMI exchange remain open.
+
 Every declared view is a global obligation: selected-output demand includes its
 target dependencies, and cache hits still evaluate the query and area checks.
 Successful full or display-only publication includes each view's JSON and SVG in

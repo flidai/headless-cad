@@ -102,3 +102,7 @@ section_view(id = "pilot", output = "flange", origin = [0,0,d-6], min_area = pil
 section_view(id = "socket", output = "flange", origin = [0,0,d-(5+h)/2], min_area = socket_area-0.000001, max_area = socket_area+0.000001)
 section_view(id = "seat", output = "flange", origin = [0,0,d-h/2], min_area = seat_area-0.000001, max_area = seat_area+0.000001)
 section_view(id = "assembly", output = "countersunk_bearing_cover", origin = [0,0,d-1.5], min_area = assembly_area-0.000001, max_area = assembly_area+0.000001)
+
+# Select the individual machining operation in the six-seat pattern.
+section_circle_dimension(view = "seat", id = "seat_0_diameter", from_feature = "seat_cut_0", role = "bore_wall", kind = "diameter", label_offset = [25,35], min = 6.4+h-0.000001, max = 6.4+h+0.000001)
+section_circle_dimension(view = "seat", id = "bearing_bore", from_feature = stock, role = "inner_wall", kind = "diameter", label_offset = [-30,65], min = 39.999999, max = 40.000001)

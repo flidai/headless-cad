@@ -190,6 +190,24 @@ fn annular_machining_and_cartridge_match_twenty_seven_independent_integrals() {
                         near(coordinate, 0.);
                     }
                 }
+                let dimensions = &build.section_views["seat"].circle_dimensions;
+                assert_eq!(dimensions.len(), 2);
+                near(dimensions[0].value_mm, 6.4 + h);
+                near(dimensions[0].center[0], p);
+                near(dimensions[0].center[1], 0.);
+                assert_eq!(
+                    dimensions[0].selection.selector.anchor_feature,
+                    "seat_cut_0"
+                );
+                assert_eq!(
+                    dimensions[0].selection.status,
+                    cad_build::FaceResolutionStatus::Resolved
+                );
+                near(dimensions[1].value_mm, 40.);
+                for coordinate in dimensions[1].center {
+                    near(coordinate, 0.);
+                }
+                assert_eq!(dimensions[1].selection.selector.anchor_feature, "stock");
                 let assembly_section = &build.section_views["assembly"].query;
                 assert_eq!(assembly_section.occurrences.len(), 20);
                 assert!(assembly_section.section.loops.is_none());

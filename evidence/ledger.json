@@ -178,6 +178,30 @@
         "dimension-svg",
         "dimension-independent"
       ]
+    },
+    {
+      "id": "manufacturing.semantic-circle-dimensions",
+      "kind": "engineering",
+      "status": "experimental",
+      "domain_ids": [
+        "query.planar_section",
+        "boolean.countersink"
+      ],
+      "supported_domain": "Semantic exactly-one native face radius/diameter section annotations for bodies and exact assembly occurrences. Complete-circle certification, shared resource budgets and global atomic publication; two 27-case native fixture corpora and 18 independent STEP dimensions across nine body, rotated assembly and patterned bearing-cover configurations.",
+      "exclusions": [
+        "Partial circular arcs and ambiguous semantic references",
+        "General curve and angular dimensions",
+        "Manufacturing drawing standards, fits, GD&T and PMI exchange",
+        "Unsupported numeric ranges and topology-event sections"
+      ],
+      "fixture": "examples/datum_section_fixture.star",
+      "checks": [
+        "datum-section-native",
+        "recipe-section-native",
+        "circle-dimension-publication",
+        "dimension-svg",
+        "circle-dimension-independent"
+      ]
     }
   ],
   "checks": [
@@ -454,6 +478,32 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/section_dimensions"
+      ]
+    },
+    {
+      "id": "circle-dimension-publication",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-cli",
+        "--test",
+        "section_circle_dimensions"
+      ]
+    },
+    {
+      "id": "circle-dimension-independent",
+      "kind": "independent",
+      "argv": [
+        "{python}",
+        "crates/cad-export/tools/check_section_circle_dimensions_ocp.py",
+        "--cad",
+        "{cad}",
+        "--out-dir",
+        "{artifacts}/circle_dimensions"
       ]
     }
   ]

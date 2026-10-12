@@ -1912,6 +1912,37 @@ computed value. The `datum_section_fixture`
 example checks station pitch in a rotated, repeated assembly. These are
 associative inspection dimensions; full drawing sheets, fits and GD&T remain open.
 
+For a radius or diameter, select a generated face through feature lineage:
+
+```python
+section_circle_dimension(
+    view = "seat", id = "seat_diameter",
+    from_feature = sink_body, role = "conical_faces",
+    kind = "diameter", label_offset = [0, 30],
+    min = 9.999999, max = 10.000001,
+)
+```
+
+This measures the native intersection of that face with the section plane. A
+conical seat therefore reports its diameter at the declared section depth, not
+its maximum diameter. `kind` accepts `"radius"` or `"diameter"` (default).
+Body views omit `instance_path`; assembly views require an exact leaf path.
+The semantic selector must resolve to one face, and its section must form one
+complete circle. Empty, partial, mixed-curve or ambiguous results fail explicitly.
+`label_offset` is a vector from the measured circle centre in drawing millimetres;
+its endpoint must lie outside the circle. Bounds remain inclusive design checks.
+
+Circle reports retain the face selector, lineage, content hashes, occurrence
+frame where applicable, centre and measured radius/value. Their declarations
+are stored in the view's `circle_dimensions` JSON array. Linear and circular
+dimensions share IDs and the 32-per-view/1024-per-recipe limits. Both kinds are
+global publication obligations and appear in SVG with their source-bound evidence.
+See `countersink.star` for body dimensions and `datum_section_fixture.star` for
+radius/diameter measurements of repeated, rotated housings. The bearing-cover
+example selects `seat_cut_0/bore_wall` to dimension one patterned seat and
+`stock/inner_wall` for the bearing bore; a shared cutter role alone can resolve
+to several faces and must not silently select one.
+
 `cad build` publishes `section-seat.json` and `section-seat.svg` in the same
 managed generation as the captured recipe and model artifacts. Their metadata
 binds source, effective parameters, target geometry, query and generation.

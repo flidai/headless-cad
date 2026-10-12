@@ -73,6 +73,11 @@ pub(super) fn scope(
         validation_roots.insert(assertion.selector.anchor_feature.clone());
         validation_roots.insert(assertion.selector.target_feature.clone());
     }
+    for view in &recipe.section_views {
+        for d in &view.circle_dimensions {
+            validation_roots.insert(d.anchor_feature.clone());
+        }
+    }
     for datum in &recipe.face_datums {
         validation_roots.insert(datum.anchor_feature.clone());
         validation_roots.insert(parts[datum.part.as_str()].feature.clone());
