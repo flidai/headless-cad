@@ -35,6 +35,28 @@ regeneration, assemblies, manufacturing and team workflows. The project goal
 remains active until a declared commercial workflow passes its release gates;
 finishing the current prototype or display milestone does not complete it.
 
+### First competitive release contract
+
+The first declared commercial workflow is the bearing-supported drive module
+described below. Its release must cover authoring, a consequential design revision,
+engineering validation, inspection and manufacturing handoff together. The
+separate workcell workload establishes assembly scale. Both are required; neither
+an elaborate single part nor many copies of a simple part establishes the whole
+product's readiness.
+
+| Release scenario | Required result | Failure that blocks the gate |
+| --- | --- | --- |
+| Inspect a large machine | Stream display data and captured source with bounded metadata, CPU and GPU residency; load zero exact bodies for overview | Fine detail missing without a visible fallback, incorrect picks after refinement, or unbounded metadata loading |
+| Revise one component | Rebuild affected feature descendants and validate global obligations; reuse unchanged definitions and placements | Silent reference retargeting, stale evidence, or a failed revision replacing the last valid generation |
+| Validate mechanical intent | Report sketch and joint residuals, remaining degrees of freedom, branch changes and separately checked clearances | A plausible rendered pose being accepted as a solved or collision-free mechanism |
+| Release manufacturing data | Bind drawings, dimensions/datums, BOM, materials and open exchange to one reviewed source/configuration revision | Unsupported required semantics, mismatched revisions, or mesh-derived dimensions presented as native results |
+| Replay a human or agent change | Apply a reviewable source patch through the same versioned capability, validation and publication contracts | Hidden viewer state, an AI provider dependency for replay, or unverifiable generated artifacts |
+
+Each scenario needs a supported-input matrix, independent expected results and
+retained evidence for the actual release revision. Performance evidence must pin
+hardware and workload. Current implementations and remaining work are recorded
+at the end of this document; this table is a target, not a certification.
+
 ## Architectural commitments
 
 ### Delivery priorities and completion authority
@@ -1611,6 +1633,17 @@ solutions. Neither one-triangle-per-pixel nor infinitely smooth zoom is an
 unconditional performance/correctness guarantee for engineering assemblies.
 
 ## Queries, drawings, and engineering deliverables
+
+The next manufacturing foundation is an authoritative planar-section query.
+Its target result is oriented native curves with face provenance, plane frame,
+units, area and centroid, bound to captured source and implementation identities.
+SVG is a derived inspection/export representation of those curves. Unsupported
+surface intersections and tangent or coplanar topology events must be explicit;
+display-mesh slicing cannot silently replace the native query. Assembly sections
+must preserve occurrence identity and distinguish separate overlapping parts
+from a material union. This work is in progress, not a released drawing system.
+Associative annotation intent, projected/hidden-line views, dimensions, fits and
+GD&T remain separate manufacturing obligations.
 
 Expose accuracy explicitly: visual approximation, conservative bound, or
 validated geometry result with tolerance/error. Bounding boxes can reject

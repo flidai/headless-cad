@@ -13,6 +13,13 @@ team automation (M7). None is closed by completing a renderer or accumulating
 passing examples. First-party delivery remains Apache-2.0, with an original Rust
 kernel and source-authoritative modeling throughout.
 
+The [first competitive release contract](architecture.md#first-competitive-release-contract)
+requires five distinct scenarios: large-machine inspection, component revision,
+mechanical-intent validation, manufacturing release, and reproducible human/agent
+changes. Retain evidence for each against the same declared release scope.
+The native section-query increment is in progress toward M6; source-bound curves
+and SVG alone will not close associative drawings, dimensions, fits or GD&T.
+
 Use the architecture's [delivery priorities](architecture.md#delivery-priorities-and-completion-authority)
 to select and review increments across modeling, assembly scale, inspection,
 constraints, manufacturing and automation. Report the supported domain and

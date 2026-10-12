@@ -7,6 +7,11 @@ original Rust kernel**, targeting commercial engineering workflows served by
 Autodesk-class platforms. This repository is the initial working foundation;
 its current bounded geometry support is not the product's target scope.
 
+The [competitive release contract](docs/architecture.md#first-competitive-release-contract)
+covers reliable revisions, large assemblies, mechanical constraints,
+manufacturing deliverables and reproducible human/AI workflows. The overall
+product goal remains active as these capabilities are implemented and validated.
+
 Read the [target architecture](docs/architecture.md) and
 [milestone roadmap](docs/roadmap.md). First-party code is licensed under
 [Apache-2.0](LICENSE); dependencies retain their own licenses and notices.
