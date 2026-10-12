@@ -183,11 +183,11 @@ def verify(directory, manifest_hash=None, source_root=None):
             'invalid ledger or capabilities path')
     substitutions = data['substitutions']
     require(set(substitutions) == {'python', 'cad', 'artifacts'} and
-            all(isinstance(value, str) and Path(value).is_absolute() for value in substitutions.values()),
+            all(isinstance(value, str) and PurePosixPath(value).is_absolute() for value in substitutions.values()),
             'invalid execution paths')
-    require(Path(substitutions['cad']).name == 'cad' and
-            Path(substitutions['cad']).parent.name == 'tools' and
-            Path(substitutions['cad']).parent.parent / 'artifacts' == Path(substitutions['artifacts']),
+    require(PurePosixPath(substitutions['cad']).name == 'cad' and
+            PurePosixPath(substitutions['cad']).parent.name == 'tools' and
+            PurePosixPath(substitutions['cad']).parent.parent / 'artifacts' == PurePosixPath(substitutions['artifacts']),
             'execution paths do not bind the captured binary and artifacts')
     source = data['source']
     require(re.fullmatch(r'[0-9a-f]{40,64}', source['revision']) is not None, 'invalid source revision')
