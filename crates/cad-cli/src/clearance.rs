@@ -41,6 +41,7 @@ pub(super) fn publish(
             cad_kernel::ClearanceMethod::ConvexSupport => "Convex",
             cad_kernel::ClearanceMethod::CoaxialMeridian => "Coaxial",
             cad_kernel::ClearanceMethod::ParallelAnnular => "Parallel annuli",
+            cad_kernel::ClearanceMethod::NativeTrimWitness => "Native trimmed surfaces",
         };
         html.push_str(&format!(
             "<tr><td>{}</td><td>{}<br>{}</td><td>{}</td><td>[{}, {}]</td><td>{}</td><td>{}</td><td>{}</td></tr>",

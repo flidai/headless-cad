@@ -773,6 +773,10 @@ volume is 8900 mm³. General nonconvex planar Booleans remain future work.
 All lengths are millimetres. `mm(value)` is a numeric annotation, not
 dimension-aware arithmetic. Feature references are strings; the graph builder
 checks their types. Namespace IDs inside reusable functions to avoid collisions.
+Pure scalar `sqrt(value)` and `asin(value)` support authored formulas; inverse
+sine returns radians. Inputs must be finite and within their mathematical domains.
+These use the recorded executor's floating-point arithmetic, not symbolic algebra
+or a claim of bit-identical transcendental results across arbitrary platforms.
 
 ```sh
 cad build examples/bracket.star --param width=100 --out-dir out/wide-bracket
@@ -2308,6 +2312,33 @@ hashes, frames and both distance bounds. Checks run globally during selected
 builds and cache hits. Placement-only edits reuse part geometry; failed checks
 preserve the previous generation and captured bundles replay the obligations.
 
+`examples/keyed_clearance.star` adds bounded coaxial keyed-shaft and keyed-hub
+pairs. The original round-stock separation supplies only a lower bound. The
+`native_trim_witness` method finds points on material that survives both native
+cuts and uses their actual distance for the upper bound. It accepts positive
+radial, axial or combined gaps only when the padded interval meets the requested
+accuracy. Different keyway orientations and opposed axes are supported;
+noncoaxial keyed bodies, contact and uncertain witness membership are rejected.
+The independent `tools/check-keyed-clearance.py` suite covers 15 configurations,
+75 distance queries and six publication-preserving failures, comparing complete
+STEP solids, boundary-face distances and actual native witness membership.
+
+`examples/drive_module_keyed.star` incorporates a cut shaft, keyed disc and separate
+key into the bearing-supported module while retaining its seven clearance checks,
+material-volume/mass assertions, size dimensions and tolerance stacks. A shaft
+diameter can span several descendant faces only when their section forms one
+complete, unambiguous native circle; the report retains all face provenance.
+Axial retention, standardized fits, rated loads and manufactured-part conformance
+remain open.
+
+`tools/check-keyed-drive-module.py` independently validates both the 12 mm/60 mm
+and 14 mm/72 mm revisions, including all part volumes and mass, STEP hierarchy,
+seven clearances, native dimensions and actual key contact/gaps.
+
+```sh
+python3 scripts/drive_module_demo.py --recipe examples/drive_module_keyed.star --out-dir out/keyed_drive_demo
+```
+
 `cylinder_clearance.star` extends the query to analytic roller pairs and a tilted
 planar guard. Cylinder supports use recovered native axis, radius, height and
 caps; neither seam vertices nor tessellation approximate the curved surface.
@@ -2462,7 +2493,8 @@ journal caps through placement. This domain has flat pocket ends and sharp
 corners; rounded milling ends, repeated seats and stepped/annular stock require
 additional operations. Matching internal hub keyways have the separate bounded
 domain below. Native properties and transverse
-sections are supported; current clearance queries do not yet admit keyed bodies.
+sections are supported. Bounded coaxial keyed-body clearance uses certified surviving
+native witnesses; general keyed-body distance queries remain unsupported.
 A shaft keyseat alone does not establish a complete torque-transfer or retention design.
 
 The independent `tools/check-keyseat.py` acceptance suite covers 12 scale/pose,
@@ -2489,8 +2521,8 @@ The example exposes bore and outer radii, hub length, keyway width and roof,
 cutter coverage, scale and common operand pose. Its default 4.04 mm width and
 8.05 mm roof coordinate suit the planned 4 × 4 mm key seated at radius 4 mm in
 a 6 mm shaft. These nominal dimensions do not establish load capacity or retention.
-Blind keyways, repeated slots, rounded corners and native clearance queries on
-keyed bodies remain outside this domain.
+Blind keyways, repeated slots and rounded corners remain outside this domain.
+Native clearance queries admit the separate bounded coaxial trim-witness domain.
 
 `tools/check-hub-keyway.py` validates 14 scale/pose, shallow, thin-wall and
 authored-example cases against independent closed-form moments and OCCT solids,

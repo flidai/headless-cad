@@ -24,6 +24,18 @@ fn mul(a: [f64; 3], v: f64) -> [f64; 3] {
     a.map(|x| x * v)
 }
 impl Geometry {
+    pub(crate) fn clearance_envelope(&self) -> crate::trim_clearance::Envelope {
+        crate::trim_clearance::Envelope {
+            origin: self.origin,
+            axis: self.axis,
+            radial: self.x,
+            outer: self.r,
+            inner: 0.,
+            height: self.h,
+            untouched_limit: Some(self.a),
+        }
+    }
+
     fn y(&self) -> [f64; 3] {
         cross(self.axis, self.x)
     }

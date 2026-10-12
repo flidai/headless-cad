@@ -1138,7 +1138,8 @@ volume/centroid/inertia, watertight derived STL, rigid-frame and scale variants,
 malformed native-boundary rejection, selected-output/global assertions, failed
 publication preservation and source replay. `keyed_shaft.star` is the isolating
 fixture. Native transverse sections and planar face datums are supported; oblique
-sections and clearance queries on keyed bodies remain unsupported. A matching
+sections remain unsupported. Coaxial keyed-body clearance has a separate
+trim-witness certificate; general noncoaxial queries remain unsupported. A matching
 internal hub keyway and a real axial-retention arrangement
 remain required before incorporating a complete keyed drive into the reference
 engineering workflow. This domain does not claim general curved Boolean closure.
@@ -1164,6 +1165,22 @@ closed-form removed-strip moments provide a second oracle. Compare both directed
 STEP differences, full moments, native surface types, scale/pose variants and
 failed-publication preservation. Keep geometric key engagement, axial retention,
 clearance-query support and load-capacity evidence as separate obligations.
+
+The bounded coaxial trim-witness query now joins these native families to circular
+extrusions. A recognized round-stock envelope contains each cut body, so its
+separation supplies a lower bound. A common radial direction certified to lie
+outside both removed regions supplies actual surviving boundary points and an
+upper bound. Arithmetic uncertainty pads both bounds; accept only positive
+separation with a sufficiently narrow interval. Reject noncoaxial alignment,
+contact and unproved witness membership. No sampled display geometry supplies
+the certificate.
+
+The keyed drive-module fixture retains the original seven clearance obligations.
+Its journal diameter measurement follows all original wall descendants but requires
+exactly one complete circular native section loop. Partial keyseat sections,
+multiple candidate loops, inconsistent circle supports and duplicate winding
+fail instead of selecting a convenient descendant. Reports preserve the complete
+semantic selection alongside the measured circle.
 
 ## Constraints and assemblies
 

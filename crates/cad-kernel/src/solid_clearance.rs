@@ -10,6 +10,7 @@ pub enum ClearanceMethod {
     ConvexSupport,
     CoaxialMeridian,
     ParallelAnnular,
+    NativeTrimWitness,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -231,13 +232,18 @@ fn coaxial(
     })
 }
 impl ModelSnapshot {
-    /// Admit a bounded convex solid or canonical full-turn meridian. Pair alignment,
+    /// Admit a bounded convex solid, canonical full-turn meridian, or recognized
+    /// keyed circular extrusion. Pair alignment,
     /// native support consistency and separation still require `clearance`.
     pub fn validate_clearance_operand(&self, t: Tolerance) -> Result<(), KernelError> {
         if self.validate_convex_clearance_operand(t).is_ok() {
             Ok(())
         } else {
-            meridian(self, t).map(|_| ())
+            if crate::trim_clearance::is_keyed(self, t) {
+                crate::trim_clearance::admit(self, t).map(|_| ())
+            } else {
+                meridian(self, t).map(|_| ())
+            }
         }
     }
     /// Certified positive material clearance. Unsupported/contact cases fail closed.
@@ -254,6 +260,9 @@ impl ModelSnapshot {
                 right_point: q.right_point,
                 axis: q.axis,
             });
+        }
+        if crate::trim_clearance::is_keyed(self, t) || crate::trim_clearance::is_keyed(other, t) {
+            return crate::trim_clearance::query(self, other, t);
         }
         match coaxial(self, other, t) {
             Ok(q) => Ok(q),

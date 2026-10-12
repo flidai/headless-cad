@@ -28,6 +28,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cad', type=Path, default=ROOT / 'target/release/cad')
     parser.add_argument('--out-dir', type=Path, required=True)
+    parser.add_argument('--recipe', type=Path, default=ROOT / 'examples/drive_module_release.star')
     args = parser.parse_args()
     cad = args.cad.resolve()
     destination = args.out_dir.resolve()
@@ -48,7 +49,7 @@ def main():
         (stage / name).write_text(json.dumps(value, indent=2, allow_nan=False) + '\n')
 
     try:
-        source = (ROOT / 'examples/drive_module_release.star').read_text()
+        source = args.recipe.read_text()
         if source.count('design_revision = "A"') != 1:
             raise ValueError("expected unique design revision")
         revised = source.replace('design_revision = "A"', 'design_revision = "B"')
@@ -92,20 +93,20 @@ def main():
         shutil.rmtree(stage / 'cache')
         save('walkthrough.json', {
             'schema_version': 1, 'kind': 'scripted_source_revision',
-            'experimental': True, 'binary_sha256': hashlib.sha256(cad.read_bytes()).hexdigest(),
+            'experimental': True, 'source_recipe': args.recipe.name, 'binary_sha256': hashlib.sha256(cad.read_bytes()).hexdigest(),
             'before_recipe_context_hash': before['recipe_context_hash'],
             'after_recipe_context_hash': after['recipe_context_hash'],
             'changes': {'design_revision': ['A', 'B'], 'shaft_diameter_mm': [12, 14], 'mounting_pitch_mm': [60, 72]},
             'rejected_edit_preserved_generation': True, 'captured_source_replayed': True,
             'commands': commands,
-            'scope': 'Supported geometry demonstration; hardware envelopes and drive-disc blank are not a complete torque-transmitting design or manufacturing certification.'})
+            'scope': 'Supported geometry demonstration; nominal fits and hardware envelopes do not establish rated torque, axial retention or manufacturing certification.'})
         links = []
         for name, label in [('before', 'Original design'), ('after', 'Revised design')]:
             files = sorted((stage / name).glob('*'))
             artifact_links = ' · '.join(f'<a href="{name}/{html.escape(p.name, quote=True)}">{html.escape(p.name)}</a>'
                                       for p in files if p.suffix in ['.step', '.svg', '.csv'] or p.name in ['clearance-checks.html', 'manifest.json'])
             links.append(f'<section><h2>{label}</h2><p><a href="{name}/drive_module_release.preview.html">Inspect assembly and captured recipe</a></p><p>{artifact_links}</p></section>')
-        (stage / 'index.html').write_text('''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Drive module · Review a design revision</title><style>body{font:17px system-ui;background:#101a28;color:#e6edf5;max-width:1000px;margin:48px auto;padding:0 24px;line-height:1.6}a{color:#91d1ff}section{border-top:1px solid #40546a;margin-top:24px}p{overflow-wrap:anywhere}</style><h1>Review a drive-module revision</h1><p>Experimental, scripted source workflow. Shaft diameter changes from 12 to 14 mm; mounting pitch changes from 60 to 72 mm.</p><p><a href="revision.patch">Review source patch</a> · <a href="semantic-diff.json">Geometry and engineering diff</a> · <a href="walkthrough.json">Execution record</a></p>''' + ''.join(links) + '''<section><h2>Rejected edit and replay</h2><p>A 0.3 mm clearance requirement fails. Every byte of the last valid revised generation is preserved. The captured recipe also rebuilds without the working source or geometry cache.</p><p><a href="rejected-edit.json">Failure diagnostic</a> · <a href="replay-verification.json">Replay integrity</a></p></section><p>Hardware envelopes and a drive-disc blank are simplified geometry. This demonstration does not certify a complete torque-transmitting design, manufacturing readiness, or general CAD support.</p></html>''')
+        (stage / 'index.html').write_text('''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Drive module · Review a design revision</title><style>body{font:17px system-ui;background:#101a28;color:#e6edf5;max-width:1000px;margin:48px auto;padding:0 24px;line-height:1.6}a{color:#91d1ff}section{border-top:1px solid #40546a;margin-top:24px}p{overflow-wrap:anywhere}</style><h1>Review a drive-module revision</h1><p>Experimental, scripted source workflow. Shaft diameter changes from 12 to 14 mm; mounting pitch changes from 60 to 72 mm.</p><p><a href="revision.patch">Review source patch</a> · <a href="semantic-diff.json">Geometry and engineering diff</a> · <a href="walkthrough.json">Execution record</a></p>''' + ''.join(links) + '''<section><h2>Rejected edit and replay</h2><p>A 0.3 mm clearance requirement fails. Every byte of the last valid revised generation is preserved. The captured recipe also rebuilds without the working source or geometry cache.</p><p><a href="rejected-edit.json">Failure diagnostic</a> · <a href="replay-verification.json">Replay integrity</a></p></section><p>Component geometry and hardware envelopes remain experimental. Nominal fits do not certify rated torque, axial retention, manufacturing readiness, or general CAD support.</p></html>''')
         # Publish only after the complete walkthrough succeeds. Refuse to replace
         # another evidence run, including one created while this run was building.
         if destination.exists():

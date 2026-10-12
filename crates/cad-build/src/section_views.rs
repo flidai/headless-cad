@@ -717,6 +717,40 @@ fn complete_circle(
     }
     Ok((center, radius))
 }
+// A semantic cylindrical wall may split into several descendants. Measure a
+// complete native section loop, never concatenate unrelated loops or silently
+// drop noncircular portions of the selected boundary.
+fn selected_complete_circle(
+    loops: &[SectionLoop],
+    faces: &std::collections::BTreeSet<cad_kernel::FaceId>,
+    tolerance: Tolerance,
+) -> Result<([f64; 2], f64), String> {
+    let mut selected = loops.iter().filter(|l| {
+        l.segments
+            .iter()
+            .any(|segment| faces.contains(&segment.face))
+    });
+    let boundary = selected
+        .next()
+        .ok_or_else(|| "selected faces have no native section loop".to_string())?;
+    if selected.next().is_some() {
+        return Err("selected faces intersect more than one native section loop".into());
+    }
+    if boundary
+        .segments
+        .iter()
+        .any(|segment| !faces.contains(&segment.face))
+    {
+        return Err("selected faces do not cover one complete native section loop".into());
+    }
+    let curves: Vec<_> = boundary
+        .segments
+        .iter()
+        .map(|segment| &segment.curve)
+        .collect();
+    complete_circle(&curves, tolerance)
+}
+
 fn circle_dimensions(
     view: &SectionView,
     query: &SectionQuery,
@@ -801,11 +835,11 @@ fn circle_dimensions(
                 anchor_feature: d.anchor_feature.clone(),
                 role: d.role.clone(),
                 target_feature: target.clone(),
-                cardinality: FaceCardinality::Exactly { count: 1 },
+                cardinality: FaceCardinality::All,
             },
             selection_work,
         );
-        if selection.status != FaceResolutionStatus::Resolved || selection.witnesses.len() != 1 {
+        if selection.status != FaceResolutionStatus::Resolved || selection.witnesses.is_empty() {
             return Err(fail(
                 format!(
                     "circle face selection {:?}: {}",
@@ -814,14 +848,9 @@ fn circle_dimensions(
                 None,
             ));
         }
-        let face = selection.witnesses[0].target_face;
-        let curves: Vec<_> = loops
-            .iter()
-            .flat_map(|l| &l.segments)
-            .filter(|s| s.face == face)
-            .map(|s| &s.curve)
-            .collect();
-        let (center, radius) = complete_circle(&curves, tolerance).map_err(|e| fail(e, None))?;
+        let faces = selection.witnesses.iter().map(|w| w.target_face).collect();
+        let (center, radius) =
+            selected_complete_circle(loops, &faces, tolerance).map_err(|e| fail(e, None))?;
         let label_distance = d.label_offset[0].hypot(d.label_offset[1]);
         if !label_distance.is_finite()
             || label_distance <= radius + tolerance.linear
@@ -1510,5 +1539,68 @@ mod tests {
                 .nominal_mm,
             3.
         );
+    }
+}
+
+#[cfg(test)]
+mod split_circle_selection_tests {
+    use super::*;
+    use cad_kernel::{FaceId, SectionCurve, SectionSegment};
+    use std::collections::BTreeSet;
+    fn ring(face: usize, center: [f64; 2]) -> SectionLoop {
+        SectionLoop {
+            segments: vec![SectionSegment {
+                face: FaceId(face),
+                curve: SectionCurve::Arc {
+                    center,
+                    radius: 3.,
+                    start_angle: 0.,
+                    sweep_angle: std::f64::consts::TAU,
+                },
+            }],
+        }
+    }
+    #[test]
+    fn multiple_native_loops_remain_ambiguous_even_on_identical_supports() {
+        let faces = BTreeSet::from([FaceId(0), FaceId(1)]);
+        for center in [[0., 0.], [10., 0.]] {
+            assert!(selected_complete_circle(
+                &[ring(0, [0., 0.]), ring(1, center)],
+                &faces,
+                Tolerance::default()
+            )
+            .is_err());
+        }
+    }
+    #[test]
+    fn split_loop_requires_every_segment_and_exactly_one_winding() {
+        let mut boundary = ring(0, [0., 0.]);
+        boundary.segments[0].curve = SectionCurve::Arc {
+            center: [0., 0.],
+            radius: 3.,
+            start_angle: 0.,
+            sweep_angle: std::f64::consts::PI,
+        };
+        boundary.segments.push(SectionSegment {
+            face: FaceId(1),
+            curve: SectionCurve::Arc {
+                center: [0., 0.],
+                radius: 3.,
+                start_angle: std::f64::consts::PI,
+                sweep_angle: std::f64::consts::PI,
+            },
+        });
+        let faces = BTreeSet::from([FaceId(0), FaceId(1)]);
+        assert!(
+            selected_complete_circle(&[boundary.clone()], &faces, Tolerance::default()).is_ok()
+        );
+        assert!(selected_complete_circle(
+            &[boundary.clone()],
+            &BTreeSet::from([FaceId(0)]),
+            Tolerance::default()
+        )
+        .is_err());
+        boundary.segments.extend(boundary.segments.clone());
+        assert!(selected_complete_circle(&[boundary], &faces, Tolerance::default()).is_err());
     }
 }

@@ -37,6 +37,7 @@ mod hub_keyway;
 mod keyseat;
 mod rotation_clearance;
 mod solid_clearance;
+mod trim_clearance;
 pub use rotation_clearance::{
     RotationClearance, RotationInterval, RotationSample, MAX_ROTATION_DEPTH, MAX_ROTATION_QUERIES,
 };

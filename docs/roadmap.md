@@ -308,13 +308,16 @@ mechanical layout also needs flanged bushings, a thrust washer/retainer and a
 reviewed endplay stack. Do not replace these with a visual key overlapping uncut
 material, an unattached collar, or an unvalidated friction claim.
 
-Before replacing the integrated drive module's round bodies, extend native
-clearance queries without dropping its existing obligations. For bounded coaxial
-keyed bodies, a containing round-stock distance can supply a conservative lower
-bound; an equally close pair of points certified to survive both native trims
-must supply the upper bound. Reject cases without such a witness or a sufficiently
-tight interval. This preserves a path toward measured sleeve, spacer and hub gaps
-while keeping intentional key contact and torque capacity separate.
+The native coaxial trim-witness query now preserves the integrated module's
+clearance obligations: a containing round-stock distance supplies a lower bound,
+while points certified to survive the actual cuts supply the upper bound. Reject
+cases without a surviving witness or a sufficiently tight interval.
+`drive_module_keyed.star` combines the real shaft seat, hub keyway and separate
+key with all seven earlier clearance checks. A complete-circle section certificate
+retains shaft diameter dimensions across split native wall descendants, without
+accepting partial or ambiguous sections. The next mechanical increment is true
+axial retention with an independently checked endplay stack; key load capacity,
+standardized fits and manufacturing readiness remain separate release obligations.
 
 ## Next concrete implementation increments
 

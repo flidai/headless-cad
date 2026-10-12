@@ -178,6 +178,23 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         number(value)
     }
 
+    /// Pure finite scalar square root for authored dimensional formulas.
+    fn sqrt(value: Value) -> anyhow::Result<f64> {
+        let value = number(value)?;
+        anyhow::ensure!(value >= 0., "sqrt requires a nonnegative finite value");
+        Ok(value.sqrt())
+    }
+
+    /// Pure finite scalar inverse sine; the result is in radians.
+    fn asin(value: Value) -> anyhow::Result<f64> {
+        let value = number(value)?;
+        anyhow::ensure!(
+            (-1. ..=1.).contains(&value),
+            "asin requires a finite value in [-1, 1]"
+        );
+        Ok(value.asin())
+    }
+
     /// Dimension-driven polygon or curved profile. Positions are initial guesses; solving
     /// belongs to the headless builder, never to Starlark evaluation or picking.
     #[allow(clippy::too_many_arguments)]

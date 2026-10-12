@@ -24,6 +24,18 @@ fn mul(a: [f64; 3], v: f64) -> [f64; 3] {
     a.map(|x| x * v)
 }
 impl Geometry {
+    pub(crate) fn clearance_envelope(&self) -> crate::trim_clearance::Envelope {
+        crate::trim_clearance::Envelope {
+            origin: self.origin,
+            axis: self.axis,
+            radial: self.x,
+            outer: self.outer,
+            inner: self.inner,
+            height: self.height,
+            untouched_limit: Some(self.q()),
+        }
+    }
+
     fn y(&self) -> [f64; 3] {
         cross(self.axis, self.x)
     }
@@ -908,7 +920,7 @@ mod tests {
             )
             .unwrap();
         assert!((section.area - area).abs() < 1e-10);
-        assert!(m.validate_clearance_operand(t).is_err());
+        assert!(m.validate_clearance_operand(t).is_ok());
     }
     #[test]
     fn hub_keyway_shallow_oblique_operands_and_result_recover() {
