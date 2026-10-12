@@ -1,5 +1,10 @@
 mod agent_jobs;
 mod agent_mcp;
+#[cfg(target_os = "linux")]
+mod agent_store;
+#[cfg(not(target_os = "linux"))]
+#[path = "agent_store_portable.rs"]
+mod agent_store;
 mod source;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
@@ -79,6 +84,9 @@ enum Command {
         /// The only directory from which source snapshots may be captured.
         #[arg(long)]
         workspace: PathBuf,
+        /// Retain immutable candidates across restarts in an exclusively locked local store.
+        #[arg(long)]
+        state_dir: Option<PathBuf>,
     },
     /// Verify published artifact bytes without evaluating a recipe.
     Verify {
@@ -1662,7 +1670,8 @@ fn main() {
             "compile" | "inspect" | "build" | "capabilities" | "verify"
         );
         let admission = if allowed {
-            worker_limits::apply_and_record()
+            worker_limits::enforce_parent_lifetime()
+                .and_then(|()| worker_limits::apply_and_record())
         } else {
             Err("invalid internal worker operation".into())
         };
@@ -1676,12 +1685,16 @@ fn main() {
         arguments.remove(1);
     }
     let cli = Cli::parse_from(arguments);
-    if let Command::Mcp { workspace } = &cli.command {
+    if let Command::Mcp {
+        workspace,
+        state_dir,
+    } = &cli.command
+    {
         if !cli.params.is_empty() || cli.cache_dir.is_some() {
             eprintln!("MCP accepts parameters per job and owns its private cache");
             std::process::exit(2);
         }
-        if let Err(error) = agent_mcp::serve(workspace) {
+        if let Err(error) = agent_mcp::serve(workspace, state_dir.as_deref()) {
             eprintln!("MCP: {error}");
             std::process::exit(1);
         }

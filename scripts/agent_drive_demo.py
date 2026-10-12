@@ -17,8 +17,11 @@ import threading
 
 
 class Client:
-    def __init__(self, cad, workspace):
-        self.process = subprocess.Popen([str(cad), 'mcp', '--workspace', str(workspace)],
+    def __init__(self, cad, workspace, state_dir=None):
+        command = [str(cad), 'mcp', '--workspace', str(workspace)]
+        if state_dir is not None:
+            command += ['--state-dir', str(state_dir)]
+        self.process = subprocess.Popen(command,
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
         self.replies = queue.Queue()
         self.sequence = 0

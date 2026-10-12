@@ -29,6 +29,8 @@ const MAX_SNAPSHOT_BYTES: usize = 64 * 1024 * 1024;
 struct State {
     workspace: Dir,
     snapshots: BTreeMap<String, Snapshot>,
+    parents: BTreeMap<String, Option<String>>,
+    durable: bool,
     jobs: AgentJobs,
 }
 #[derive(Clone)]
@@ -60,6 +62,7 @@ struct ReadSource {
 struct Evaluate {
     snapshot_id: String,
     mode: String,
+    request_id: Option<String>,
     #[serde(default)]
     outputs: Vec<String>,
     #[serde(default)]
@@ -104,12 +107,13 @@ fn tools() -> Vec<Tool> {
     let s = json!({"type":"string"});
     vec![
         Tool::new("cad_capabilities", "Discover native operations, schemas, limits, and executor identity.", schema(json!({"operation":s,"object_type":s}), &[])),
-        Tool::new("cad_snapshot", "Capture a confined workspace-relative recipe and its locked modules into an immutable session snapshot.", schema(json!({"recipe":s}), &["recipe"])),
+        Tool::new("cad_snapshot", "Capture a confined workspace-relative recipe and its locked modules into an immutable snapshot; retained across restarts only with --state-dir.", schema(json!({"recipe":s}), &["recipe"])),
+        Tool::new("cad_snapshots", "List retained immutable snapshot IDs and first-observed parentage, including snapshots recovered after restart.", schema(json!({}), &[])),
         Tool::new("cad_read_source", "Read the authoritative captured root source in bounded UTF-8 chunks.", schema(json!({"snapshot_id":s,"offset":{"type":"integer","minimum":0},"max_bytes":{"type":"integer","minimum":1,"maximum":65536}}), &["snapshot_id","max_bytes"])),
         Tool::new("cad_revise", "Create a candidate root-source revision from an existing snapshot. Preserve locked modules. Does not modify workspace files.", schema(json!({"snapshot_id":s,"source":{"type":"string","maxLength":1048576}}), &["snapshot_id","source"])),
-        Tool::new("cad_evaluate", "Compile, inspect, or build a snapshot in a bounded private worker. Geometry errors are structured results. Build returns an immutable candidate, never replaces accepted output.", schema(json!({"snapshot_id":s,"mode":{"type":"string","enum":["compile","inspect","build"]},"outputs":{"type":"array","items":s,"maxItems":64},"params":{"type":"object","additionalProperties":{"type":"number"},"maxProperties":128}}), &["snapshot_id","mode"])),
-        Tool::new("cad_jobs", "List retained session jobs, including completed results whose client response was lost or cancelled.", schema(json!({}), &[])),
-        Tool::new("cad_job", "Read a completed session job report.", schema(json!({"job_id":s}), &["job_id"])),
+        Tool::new("cad_evaluate", "Compile, inspect, or build a snapshot in a bounded private worker. Geometry errors are structured results. Build returns an immutable candidate, never replaces accepted output. Durable mode requires request_id; identical retries reuse the recorded outcome, interrupted intents never rerun automatically. Ephemeral mode rejects request_id.", schema(json!({"snapshot_id":s,"mode":{"type":"string","enum":["compile","inspect","build"]},"request_id":{"type":"string","minLength":1,"maxLength":128,"description":"Durable mode only: 1..128 UTF-8 bytes, no control characters. Bind retries to identical canonical inputs and executor identity."},"outputs":{"type":"array","items":s,"maxItems":64},"params":{"type":"object","additionalProperties":{"type":"number"},"maxProperties":128}}), &["snapshot_id","mode"])),
+        Tool::new("cad_jobs", "List retained jobs, including completed results whose client response was lost or cancelled.", schema(json!({}), &[])),
+        Tool::new("cad_job", "Read a completed retained job report.", schema(json!({"job_id":s}), &["job_id"])),
         Tool::new("cad_read_artifact", "Read a bounded UTF-8 artifact chunk from a job's verified inventory. Offset and length are bytes.", schema(json!({"job_id":s,"name":s,"offset":{"type":"integer","minimum":0},"max_bytes":{"type":"integer","minimum":1,"maximum":65536}}), &["job_id","name","max_bytes"])),
         Tool::new("cad_verify", "Verify a candidate against the expected manifest digest.", schema(json!({"job_id":s,"manifest_digest":s}), &["job_id","manifest_digest"])),
     ].into_iter().map(|mut t| { let mut a=ToolAnnotations::default(); a.destructive_hint=Some(false); a.open_world_hint=Some(false); t.annotations=Some(a); t }).collect()
@@ -120,7 +124,7 @@ impl State {
         let id = blake3::hash(&bytes).to_hex().to_string();
         if !self.snapshots.contains_key(&id) {
             if self.snapshots.len() >= MAX_SNAPSHOTS {
-                return Err("session snapshot limit reached".into());
+                return Err("retained snapshot limit reached".into());
             }
             let size: usize = self
                 .snapshots
@@ -132,12 +136,18 @@ impl State {
                 })
                 .sum();
             if size.saturating_add(bytes.len()) > MAX_SNAPSHOT_BYTES {
-                return Err("session source byte limit reached".into());
+                return Err("retained source byte limit reached".into());
             }
+            let recorded_parent = if self.durable {
+                self.jobs.persist_snapshot(&id, &snapshot, parent)?
+            } else {
+                parent.map(str::to_owned)
+            };
+            self.parents.insert(id.clone(), recorded_parent);
             self.snapshots.insert(id.clone(), snapshot.clone());
         }
         Ok(
-            json!({"snapshot_id":id,"parent_snapshot_id":parent,"language":snapshot.language,"source_name":snapshot.source_name,"source_bytes":snapshot.source.len(),"modules":snapshot.modules.keys().collect::<Vec<_>>(),"source":if snapshot.source.len()<=65536 {Some(&snapshot.source)} else {None},"source_read_tool":"cad_read_source","authority":"immutable_session_snapshot","workspace_modified":false}),
+            json!({"snapshot_id":id,"parent_snapshot_id":self.parents.get(&id).and_then(Option::as_deref),"parentage":"first_observed_parent","language":snapshot.language,"source_name":snapshot.source_name,"source_bytes":snapshot.source.len(),"modules":snapshot.modules.keys().collect::<Vec<_>>(),"source":if snapshot.source.len()<=65536 {Some(&snapshot.source)} else {None},"source_read_tool":"cad_read_source","authority":if self.durable {"immutable_durable_snapshot"} else {"immutable_session_snapshot"},"workspace_modified":false}),
         )
     }
     fn call(&mut self, name: &str, args: Value, cancel: Arc<AtomicBool>) -> Result<Value, String> {
@@ -152,7 +162,7 @@ impl State {
                     a.object_type.as_deref(),
                     cancel,
                 )?;
-                report["agent_session"] = json!({"transport":"stdio","source_capture_platform":"linux","publication":"immutable_candidate_only","viewer":"read_only","maximum_snapshots":MAX_SNAPSHOTS,"maximum_snapshot_bytes":MAX_SNAPSHOT_BYTES,"maximum_jobs":crate::agent_jobs::MAX_JOBS,"maximum_job_bytes":crate::agent_jobs::MAX_JOB_BYTES,"maximum_retained_job_bytes":crate::agent_jobs::MAX_RETAINED_BYTES,"maximum_frame_bytes":MAX_FRAME,"maximum_response_bytes":MAX_RESPONSE,"maximum_session_frames":4096,"worker_timeout_seconds":60,"maximum_active_tools":1,"hard_os_memory_sandbox":false,"worker_process_admission":crate::worker_limits::policy(),"retention":"until_process_exit"});
+                report["agent_session"] = json!({"transport":"stdio","source_capture_platform":"linux","publication":"immutable_candidate_only","viewer":"read_only","maximum_snapshots":MAX_SNAPSHOTS,"maximum_snapshot_bytes":MAX_SNAPSHOT_BYTES,"maximum_jobs":crate::agent_jobs::MAX_JOBS,"maximum_job_bytes":crate::agent_jobs::MAX_JOB_BYTES,"maximum_retained_job_bytes":crate::agent_jobs::MAX_RETAINED_BYTES,"maximum_frame_bytes":MAX_FRAME,"maximum_response_bytes":MAX_RESPONSE,"maximum_session_frames":4096,"worker_timeout_seconds":60,"maximum_active_tools":1,"hard_os_memory_sandbox":false,"worker_process_admission":crate::worker_limits::policy(),"retention":if self.durable {"durable_state_directory"} else {"until_process_exit"},"durable_state_enabled":self.durable,"request_id_required":self.durable,"request_id_max_bytes":128,"request_id_controls_allowed":false,"evaluate_request_id":if self.durable {"required; same payload reuses recorded outcome; interrupted intents require a new key"} else {"unsupported"},"snapshot_parentage":"first_observed_parent", "release_publication":"unavailable"});
                 Ok(report)
             }
             "cad_snapshot" => {
@@ -160,6 +170,16 @@ impl State {
                 let s = source::agent_source::capture(&self.workspace, &a.recipe)
                     .map_err(|e| e.to_string())?;
                 self.remember(s, None)
+            }
+            "cad_snapshots" => {
+                let _: Empty = decode(args)?;
+                let snapshots:Vec<_> = self.snapshots.iter().map(|(id,snapshot)| json!({
+                    "snapshot_id":id,"parent_snapshot_id":self.parents.get(id).and_then(Option::as_deref),
+                    "source_name":snapshot.source_name,"language":snapshot.language,"source_bytes":snapshot.source.len(),
+                })).collect();
+                Ok(
+                    json!({"snapshots":snapshots,"parentage":"first_observed_parent","retention":if self.durable {"durable_state_directory"} else {"until_process_exit"}}),
+                )
             }
             "cad_read_source" => {
                 let a: ReadSource = decode(args)?;
@@ -183,7 +203,7 @@ impl State {
                     return Err("read budget cannot fit next character".into());
                 }
                 Ok(
-                    json!({"snapshot_id":a.snapshot_id,"offset":a.offset,"next_offset":end,"total_bytes":s.len(),"text":&s[a.offset..end],"eof":end==s.len()}),
+                    json!({"snapshot_id":a.snapshot_id,"offset":a.offset,"next_offset":end,"total_bytes":s.len(),"text":&s[a.offset..end],"parent_snapshot_id":self.parents.get(&a.snapshot_id).and_then(Option::as_deref),"eof":end==s.len()}),
                 )
             }
             "cad_revise" => {
@@ -203,14 +223,33 @@ impl State {
                     .get(&a.snapshot_id)
                     .ok_or("unknown snapshot")?;
                 let bytes = serde_json::to_string(s).map_err(|e| e.to_string())?;
-                self.jobs.evaluate(
-                    &a.snapshot_id,
-                    &bytes,
-                    &a.mode,
-                    &a.outputs,
-                    &a.params,
-                    cancel,
-                )
+                if self.durable {
+                    let request_id = a
+                        .request_id
+                        .as_deref()
+                        .ok_or("durable evaluation requires request_id")?;
+                    self.jobs.evaluate_with_request_id(
+                        &a.snapshot_id,
+                        &bytes,
+                        &a.mode,
+                        &a.outputs,
+                        &a.params,
+                        request_id,
+                        cancel,
+                    )
+                } else {
+                    if a.request_id.is_some() {
+                        return Err("request_id requires --state-dir; ephemeral jobs have no retry identity".into());
+                    }
+                    self.jobs.evaluate(
+                        &a.snapshot_id,
+                        &bytes,
+                        &a.mode,
+                        &a.outputs,
+                        &a.params,
+                        cancel,
+                    )
+                }
             }
             "cad_jobs" => {
                 let _: Empty = decode(args)?;
@@ -258,7 +297,7 @@ fn result(value: Result<Value, String>) -> CallToolResponse {
 }
 impl ServerHandler for CadServer {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions("Experimental original Rust headless CAD. Capture source, create candidate revisions, evaluate and inspect native evidence. Source recipes are authoritative. Jobs are session-local immutable candidates; no automatic source writes or release publication. Viewer is read-only. One active tool call; limits enforced, not an OS memory sandbox.")
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions("Experimental original Rust headless CAD. Capture source, create candidate revisions, evaluate and inspect native evidence. Source recipes are authoritative. Jobs are immutable candidates: ephemeral by default, durable only when launched with --state-dir. Durable evaluation requires an explicit request_id; interrupted requests never rerun automatically. No automatic source writes or release publication. Viewer is read-only. One active tool call; limits enforced, not an OS memory sandbox.")
     }
     async fn list_tools(
         &self,
@@ -309,12 +348,31 @@ impl ServerHandler for CadServer {
         }
     }
 }
-pub fn serve(workspace: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub fn serve(workspace: &Path, state_dir: Option<&Path>) -> Result<(), Box<dyn std::error::Error>> {
+    let workspace_dir = Dir::open_ambient_dir(workspace, ambient_authority())?;
+    let jobs = match state_dir {
+        Some(directory) => AgentJobs::new_durable(directory, workspace, &workspace_dir),
+        None => AgentJobs::new(),
+    }
+    .map_err(std::io::Error::other)?;
+    let recovered = if state_dir.is_some() {
+        jobs.recovered_snapshots().map_err(std::io::Error::other)?
+    } else {
+        BTreeMap::new()
+    };
+    let mut snapshots = BTreeMap::new();
+    let mut parents = BTreeMap::new();
+    for (id, (snapshot, parent)) in recovered {
+        snapshots.insert(id.clone(), snapshot);
+        parents.insert(id, parent);
+    }
     let server = CadServer {
         state: Arc::new(Mutex::new(State {
-            workspace: Dir::open_ambient_dir(workspace, ambient_authority())?,
-            snapshots: BTreeMap::new(),
-            jobs: AgentJobs::new().map_err(std::io::Error::other)?,
+            workspace: workspace_dir,
+            snapshots,
+            parents,
+            durable: state_dir.is_some(),
+            jobs,
         })),
         gate: Arc::new(tokio::sync::Semaphore::new(1)),
     };

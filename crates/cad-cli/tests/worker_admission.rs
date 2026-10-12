@@ -159,6 +159,10 @@ fn retained_drive_full_publication_runs_under_installed_hard_worker_limits() {
     let recipe =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/drive_module_retained.star");
     let result = Command::new(env!("CARGO_BIN_EXE_cad"))
+        .env(
+            "CAD_AGENT_EXPECTED_PARENT_PID",
+            std::process::id().to_string(),
+        )
         .current_dir(directory.path())
         .args([
             "_agent-worker",

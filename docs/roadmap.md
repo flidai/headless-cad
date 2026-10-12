@@ -227,7 +227,7 @@ release and is checked independently from exported solid validity.
 | M4: design constraints | 2D sketches, 3D rigid-joint graphs, residual/DOF/conflict reporting and branch stability. Dimensioned slope fixture → four-bar mechanism → constrained gearbox layout | Over/underconstrained cases, singular positions, edit continuation, joint residual bounds, collision distinct from constraint solving | In progress: bounded original Rust point sketch solver, ten constraint kinds including directed angles and circle-to-line tangency; separate linear/angular tolerances, polygon extrusion, local rank/residual/conditioning reports, independent constraint islands and atomic failure handling; curves, large connected systems, branch continuation, conflict minimization and nonlinear assembly solving remain; bounded prescribed revolute/prismatic forward kinematics has product/exchange acceptance; planar pin/bar closed-loop integration adds numerical solution and explicit branch admission |
 | M5: demanding solid modeling | Sweeps/lofts, general curved intersections, chamfers/fillets, offsets/shelling, controlled repair. Filleted bearing housing → ribbed enclosure → swept manifold | Trimmed-surface validity, repair-deviation reports, failure minimization, broad edit corpus, independent exchange/query results | In progress: local equal-distance straight-edge chamfers on strictly convex planar solids, with complete face lineage and generated-face datums; longitudinal line–line corner fillets on convex right prisms with circular holes; curved/unequal chamfers, general rolling-ball fillets, sweeps/lofts, offsets/shelling and general repair remain |
 | M6: manufacturing deliverables | Associated drawings/sections, dimensions/datums/GD&T intent, materials, mass/inertia, BOM, analytic/assembly STEP and PMI support matrix. Releasable multi-part fixture with drawing pack | Stable annotation edits, material/quantity rollups, no LOD-dependent measurements, export fidelity/loss reports | In progress: part metadata, nested quantity BOM, native centroid/central inertia and density-weighted assembly queries and global recipe property assertions and revision-bound STEP/STL fidelity declarations and source-bound native planar-section JSON/SVG implemented; drawings, PMI, broader independent semantic round-trip evidence, principal axes and configuration policies remain |
-| M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | In progress: pinned local modules and offline replay, confined Linux stdio MCP candidate sessions, verified worker process limits and immutable manifest-bound results; durable jobs, expected-base publication, idempotent delivery, hosted isolation and adapters remain |
+| M7: team-scale engineering | Pinned releases, semantic review, isolated job service, artifact distribution, cancellation/recovery, revision/BOM adapters. Multi-contributor machine module | Reproducible revisions, isolation/quotas, concurrent publication, slow-network/offline recovery, audited artifact identity | In progress: pinned local modules and offline replay, confined Linux stdio MCP candidate sessions, verified worker process limits and immutable manifest-bound results; local durable job recovery and evaluation retry identity implemented; expected-base publication, idempotent external delivery, hosted isolation and adapters remain |
 
 Completing M1 and extending the display-asset interface are the immediate
 architectural priorities. Nested assemblies now share definitions and display
@@ -726,8 +726,9 @@ remains read-only. Native failures can be returned to a client for repair withou
 mutating source or accepted results. The protocol acceptance fixture exercises
 propose → native rejection → repair → build → verify → offline replay.
 
-This is session-local candidate execution, not completion of M7/R5. Durable job
-storage, exact-body memory scheduling and aggregate disk quotas, module proposals, expected-base publication,
+Default execution is session-local; opt-in durable recovery is described below.
+Neither completes M7/R5. Exact-body memory scheduling and aggregate disk quotas,
+module proposals, expected-base publication,
 remote authentication, idempotent delivery, and measured autonomous engineering
 success remain open. All five commercial product gates remain open.
 
@@ -736,7 +737,8 @@ Linux local workers now apply verified virtual-address, CPU, individual-file,
 open-descriptor and core-file limits before recipe evaluation. Isolated process
 probes exercise actual enforcement; the drive remains a normal-capacity acceptance
 case. These per-process limits do not close M3 exact-body scheduling or R5 hosted
-isolation, durable jobs, aggregate quotas, and delivery reconciliation.
+isolation, aggregate quotas, and delivery reconciliation. Local durable job
+recovery is now available through the opt-in state store described below.
 
 
 ### Separated orthogonal stock scaling
@@ -805,3 +807,13 @@ actual queries while retaining full-angle bounds, explicit native evidence and
 independent STEP phase checks. The asymmetric housing is not classified as a
 rotationally symmetric body. General contact, dynamics and spatial assembly
 constraints remain open; this does not close the mechanical release gate.
+
+
+Opt-in local durable agent state advances recovery: immutable source snapshots,
+first-observed revision parentage, job intents and verified result receipts
+survive process exit. Stable evaluation request IDs recover recorded outcomes;
+interrupted attempts remain interrupted. Real restart, orphan-worker termination,
+conflicting retries and tampered-artifact tests exercise the boundary. Default
+MCP sessions remain ephemeral. This is one local writer with fixed quotas;
+expected-base release acceptance, retention management, external delivery and
+hosted isolation remain open, so the agent lifecycle release gate stays open.

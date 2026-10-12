@@ -2926,8 +2926,9 @@ caller cache directory. It consumes a replay bundle in a private temporary job
 root. Builds reuse existing atomic publication and integrity verification before
 exposing their inventory. The manifest hash binds subsequent verification, and
 artifact reads check the captured inventory digest. Failure or cancellation cannot
-replace a previous candidate or an accepted user release. Job IDs are session
-handles, not cross-session authentication tokens. `cad_jobs` lists retained job
+replace a previous candidate or an accepted user release. Default job IDs are
+session handles; durable mode retains them locally across restarts. Neither is
+an authentication token. `cad_jobs` lists retained job
 identities after a lost response or a completion/cancellation race. Cancellation
 is best effort once completion has committed a candidate.
 
@@ -2941,12 +2942,13 @@ return a retryable diagnostic instead of queuing another worker. Cancellation
 signals the worker, which is killed and reaped by the polling supervisor. These
 are bounded buffers and polling guards. In addition, Linux child processes now
 apply and verify hard resource limits before recipe evaluation, as described below.
-Neither layer is a malicious native-code sandbox. Session exit removes the temporary jobs; there is no durable
-storage service or resumable job handle yet.
+Neither layer is a malicious native-code sandbox. Default session exit removes
+temporary jobs. Opt-in local durable recovery is described below; hosted storage
+and automatic resumption of interrupted work remain outside this adapter.
 
 This adapter advances R5 but does not close it. It does not write workspace source,
 publish active releases, solve constraints from natural language, or certify all
-assembly collisions. Still required: durable isolated jobs, exact-body scheduling with resource admission,
+assembly collisions. Still required: hosted isolated jobs, exact-body scheduling with resource admission,
 expected-base serialized compare-and-swap publication, client delivery reconciliation,
 and measured end-to-end autonomous task success. A scripted protocol fixture proves
 the propose/fail/repair/replay interface, not autonomous reasoning by an AI model.
@@ -3183,3 +3185,53 @@ and reference sample. Successful reports have three actual queries, a distinct
 proof kind and no subdivision intervals. Absence of intervals alone never
 establishes coverage. Unsupported pairs retain ordinary subdivision or refusal;
 no general contact or rotating-housing claim is introduced.
+
+
+### Durable local candidate recovery
+
+`cad mcp --workspace <root> --state-dir <separate-root>` enables opt-in local
+persistence. The state root must neither contain nor lie inside the workspace.
+Both roots are pinned by directory handle; admission compares the capture handle
+with the canonical workspace identity and persists its device/inode binding.
+Replacing a workspace at the same pathname cannot silently rebind existing state.
+Linux locks the state directory inode itself, avoiding a replaceable lock file.
+Only one process may own the state directory; this is not distributed scheduling.
+
+Versioned metadata, content-addressed source snapshots, first-observed parent
+links, evaluation intents and completed receipts are immutable records. Snapshot
+IDs retain their exact bundle serialization contract; request payload binding
+compares parsed source structure and hashes canonical request data separately.
+Record writes flush file data, atomically publish with no replacement, and flush
+the containing directory. Bounded record parsing, no-follow file opens and tree
+inventories reject unsupported schemas, partial corruption, symlinks and
+unaccounted artifact changes. These are local integrity checks, not cryptographic
+authentication against someone who can rewrite the entire store.
+
+Durable `cad_evaluate` requires a bounded `request_id`. The intent commits before
+worker execution and binds source ID, captured bundle, mode, output list, numeric
+parameters, recipe executor/kernel identities and the executable bytes. Linux
+hashes and launches the running `/proc/self/exe` image, so replacing an executable
+pathname cannot change which worker implements an already-recorded request.
+A retry with the same identity returns the original completed or interrupted
+job; conflicting data refuses. After an executable upgrade, old results remain
+readable, but evaluation requires new request IDs. Transport JSON-RPC IDs remain
+unique per connection; they are separate from durable evaluation identities.
+
+Workers execute in private temporary directories, then completed candidates are
+copied through bounded, no-follow reads, sealed and committed with their receipts.
+Recovered artifact reads recheck the captured digest; verification operates on a
+fresh private copy rather than following mutable stored paths. Three invariants
+hold after restart: a committed receipt is fully checked before exposure, an
+intent without a receipt is interrupted and never automatically rerun, and
+retention quotas still apply. There is no automatic eviction. `cad_snapshots`
+recovers source IDs and first-parent information even when no evaluation followed;
+`cad_jobs` recovers job identities after a lost response.
+
+The fixed worker registers Linux parent-death SIGKILL before resource admission
+and checks the expected parent after registration. This closes the parent-exit
+race before any recipe evaluation. Tests stop a real admitted child, kill its
+server, and require child termination plus interrupted-request recovery. Other
+acceptance cases cover lost full-drive delivery, source-independent replay,
+changed executable images, workspace replacement, live/offline artifact tampering,
+second-writer refusal and retention across restart. Expected-base release
+acceptance, garbage collection and external delivery reconciliation remain open.

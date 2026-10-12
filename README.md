@@ -97,23 +97,39 @@ The client launches `cad` with arguments `["mcp", "--workspace", "/absolute/path
 Use `cad_snapshot` to capture a relative recipe and its locked modules, `cad_revise`
 to propose new root source, and `cad_evaluate` to compile, inspect, or build that
 immutable candidate. Native failures remain structured tool results so the client
-can repair a proposal and try again. `cad_read_source`, `cad_jobs`, `cad_job`,
+can repair a proposal and try again. `cad_snapshots`, `cad_read_source`, `cad_jobs`, `cad_job`,
 `cad_read_artifact`, and `cad_verify` provide captured source and integrity evidence;
 `cad_capabilities` describes native operations and session limits.
 
 Each worker runs the existing CAD executable in a private directory. Candidate
-jobs never modify your source or replace accepted outputs. Files and jobs are
-session-local and disappear when the MCP process exits; retrieve any artifacts
-you want to retain before closing the session. The viewer remains read-only.
-This first adapter is Linux-only for confined source capture, accepts numeric
+jobs never modify your source or replace accepted outputs. By default, files and
+jobs are session-local and disappear when the MCP process exits. To retain local
+snapshots and results across restarts, opt into a separate state directory:
+
+```sh
+cad mcp --workspace /absolute/path/to/your/cad-project --state-dir /absolute/path/to/cad-state
+```
+
+Durable evaluations require a `request_id` (1–128 bytes, without control
+characters). Retrying the same ID with the same captured source, mode, output
+selection, parameters and executable returns the recorded job. Reusing it for a
+changed request refuses; use a new ID for new work or a new executable. Discover
+captured sources with `cad_snapshots` and jobs with `cad_jobs` after reconnecting.
+Interrupted work is reported as interrupted and is never silently rerun. The
+state directory is exclusively locked and must be separate from the workspace.
+The same snapshot, job and byte limits persist across restarts; restarting does
+not clear durable retention. Release acceptance and garbage collection remain
+separate work. The viewer remains read-only.
+This local adapter is Linux-only for confined source capture, accepts numeric
 parameter overrides, and limits sessions to one active tool, 32 snapshots and 16
 jobs. Before evaluating a recipe, Linux workers enforce a 2 GiB virtual-address limit,
 45/46-second CPU soft/hard limits, a 128 MiB individual-file ceiling, 128 open
 files, and no core dumps. Stricter inherited limits are preserved. The separate
 wall-time and aggregate-disk guards remain polling checks. This is not a filesystem
-sandbox or a cgroup RSS quota. Hosted workers, durable job storage, module editing,
-and expected-base release publication
-remain open. See [the agent contract](docs/architecture.md#local-agent-candidate-jobs)
+sandbox or a cgroup RSS quota. Workers also register parent-death termination
+before admission, so an exited agent process cannot leave a model worker running.
+Hosted workers, module editing, expected-base release publication and automated
+retention management remain open. See [the agent contract](docs/architecture.md#local-agent-candidate-jobs)
 for the precise boundary.
 
 From a source checkout, run the full rotating-drive client fixture after building
@@ -128,6 +144,20 @@ proposal's native diagnostic, and replays captured source after the MCP process
 exits. Open `http://localhost:8080/agent_drive_demo/index.html` with the viewer
 server running. This scripted fixture tests the interface; it does not claim
 autonomous AI reasoning. Choose a new delivery directory for each run.
+
+The durable recovery walkthrough is available from a source checkout:
+
+```sh
+python scripts/agent_recovery_demo.py --cad target/release/cad \
+  --workspace "$PWD" --state-dir /tmp/cad-drive-recovery-state \
+  --out-dir out/agent_recovery_demo
+```
+
+Use a new empty state directory and delivery directory. The client builds two
+source revisions, records a rejected engineering edit, kills the server,
+reconnects, and recovers the same three outcomes before downloading verified
+inspection artifacts. It demonstrates local protocol recovery, not autonomous
+design or acceptance of a production release.
 
 ## Review a complete source revision
 

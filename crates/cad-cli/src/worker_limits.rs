@@ -2,18 +2,41 @@
 use serde_json::{json, Value};
 use std::io::Write;
 pub const ADMISSION_FILE: &str = "worker-admission.json";
+pub const PARENT_PID_ENV: &str = "CAD_AGENT_EXPECTED_PARENT_PID";
 pub const ADDRESS_SPACE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 pub const FILE_BYTES: u64 = 128 * 1024 * 1024;
 pub const CPU_SOFT_SECONDS: u64 = 45;
 pub const CPU_HARD_SECONDS: u64 = 46;
 pub const OPEN_FILES: u64 = 128;
 pub fn policy() -> Value {
-    json!({"platform":"linux","enforcement":"process_rlimits_before_recipe_evaluation","address_space_bytes":ADDRESS_SPACE_BYTES,"cpu_soft_seconds":CPU_SOFT_SECONDS,"cpu_hard_seconds":CPU_HARD_SECONDS,"file_bytes":FILE_BYTES,"core_bytes":0,"open_files":OPEN_FILES,"respects_stricter_inherited_limits":true,"hard_rss_limit":false,"aggregate_disk_quota":false,"filesystem_sandbox":false})
+    json!({"platform":"linux","enforcement":"process_rlimits_before_recipe_evaluation","parent_lifetime":"parent_death_sigkill_registered_before_admission","address_space_bytes":ADDRESS_SPACE_BYTES,"cpu_soft_seconds":CPU_SOFT_SECONDS,"cpu_hard_seconds":CPU_HARD_SECONDS,"file_bytes":FILE_BYTES,"core_bytes":0,"open_files":OPEN_FILES,"respects_stricter_inherited_limits":true,"hard_rss_limit":false,"aggregate_disk_quota":false,"filesystem_sandbox":false})
+}
+#[cfg(target_os = "linux")]
+pub fn enforce_parent_lifetime() -> Result<(), String> {
+    use rustix::process::{getppid, set_parent_process_death_signal, Signal};
+    let expected: u32 = std::env::var(PARENT_PID_ENV)
+        .map_err(|_| "missing worker parent identity")?
+        .parse()
+        .map_err(|_| "invalid worker parent identity")?;
+    if expected == 0 {
+        return Err("invalid worker parent identity".into());
+    }
+    set_parent_process_death_signal(Some(Signal::KILL))
+        .map_err(|e| format!("worker parent lifetime registration failed: {e}"))?;
+    if getppid().map(|pid| pid.as_raw_nonzero().get() as u32) != Some(expected) {
+        return Err("worker parent changed before lifetime registration".into());
+    }
+    Ok(())
+}
+#[cfg(not(target_os = "linux"))]
+pub fn enforce_parent_lifetime() -> Result<(), String> {
+    Err("worker parent lifetime enforcement requires Linux".into())
 }
 pub fn validate_record(record: &Value) -> Result<(), String> {
     if record["schema_version"] != 1
         || record["platform"] != "linux"
         || record["enforcement"] != "process_rlimits_before_recipe_evaluation"
+        || record["parent_lifetime"] != "parent_death_sigkill_registered_before_admission"
     {
         return Err("invalid worker admission identity".into());
     }
@@ -80,7 +103,7 @@ pub fn apply() -> Result<Value, String> {
         effective.insert(name.into(), json!({"soft":current,"hard":maximum}));
     }
     Ok(
-        json!({"schema_version":1,"platform":"linux","enforcement":"process_rlimits_before_recipe_evaluation","effective_limits":effective,"hard_rss_limit":false,"aggregate_disk_quota":false,"filesystem_sandbox":false}),
+        json!({"schema_version":1,"platform":"linux","enforcement":"process_rlimits_before_recipe_evaluation","parent_lifetime":"parent_death_sigkill_registered_before_admission","effective_limits":effective,"hard_rss_limit":false,"aggregate_disk_quota":false,"filesystem_sandbox":false}),
     )
 }
 #[cfg(not(target_os = "linux"))]

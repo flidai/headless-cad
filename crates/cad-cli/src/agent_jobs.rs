@@ -1,4 +1,8 @@
 //! Local immutable candidate jobs. This is a bounded worker adapter, not an OS sandbox.
+use crate::{
+    agent_store::{AgentStore, Intent},
+    source::Snapshot,
+};
 use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
@@ -23,23 +27,122 @@ pub const MAX_READ_BYTES: usize = 64 * 1024;
 pub const MAX_JOB_REPORT_BYTES: usize = 900 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(60);
 type Result<T> = std::result::Result<T, String>;
+fn running_executable() -> Result<PathBuf> {
+    #[cfg(target_os = "linux")]
+    {
+        Ok(PathBuf::from("/proc/self/exe"))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        std::env::current_exe().map_err(|e| e.to_string())
+    }
+}
+fn interrupted_report(intent: &Intent) -> Value {
+    json!({"job_id":intent.job_id,"snapshot_id":intent.snapshot_id,"mode":intent.mode,"worker":{"success":false,"diagnostic":{"code":"interrupted","error":"durable worker did not commit a completed receipt before restart"}},"artifacts":[],"publication":"immutable_candidate_only","manifest_hash":null,"status":"interrupted"})
+}
 struct Job {
-    directory: tempfile::TempDir,
+    directory: Option<JobDirectory>,
     report: Value,
     artifacts: BTreeMap<String, (u64, String)>,
+}
+enum JobDirectory {
+    Temporary(tempfile::TempDir),
+    Durable {
+        _handle: cap_std::fs::Dir,
+        path: PathBuf,
+    },
+}
+impl JobDirectory {
+    fn path(&self) -> &Path {
+        match self {
+            Self::Temporary(dir) => dir.path(),
+            Self::Durable { path, .. } => path,
+        }
+    }
 }
 pub struct AgentJobs {
     executable: PathBuf,
     jobs: BTreeMap<String, Job>,
     sequence: u64,
+    store: Option<AgentStore>,
 }
 impl AgentJobs {
     pub fn new() -> Result<Self> {
         Ok(Self {
-            executable: std::env::current_exe().map_err(|e| e.to_string())?,
+            executable: running_executable()?,
             jobs: BTreeMap::new(),
             sequence: 0,
+            store: None,
         })
+    }
+    pub fn new_durable(
+        state_dir: &Path,
+        workspace: &Path,
+        pinned_workspace: &cap_std::fs::Dir,
+    ) -> Result<Self> {
+        let store = AgentStore::open(state_dir, workspace, pinned_workspace)?;
+        let snapshots = store.snapshots()?;
+        let intents = store.intents()?;
+        for intent in intents.values() {
+            if !snapshots.contains_key(&intent.snapshot_id) {
+                return Err("job intent references missing snapshot".into());
+            }
+        }
+        let receipts = store.receipts(&intents)?;
+        store.retained_bytes(&intents)?;
+        let mut jobs = BTreeMap::new();
+        let mut sequence = 0u64;
+        for (request_id, intent) in &intents {
+            let number = u64::from_str_radix(&intent.job_id[4..], 16).map_err(|e| e.to_string())?;
+            sequence = sequence.max(number);
+            if let Some(receipt) = receipts.get(request_id) {
+                let handle = store.open_job_dir(&intent.job_id)?;
+                let path = AgentStore::pinned_path(&handle);
+                jobs.insert(
+                    intent.job_id.clone(),
+                    Job {
+                        directory: Some(JobDirectory::Durable {
+                            _handle: handle,
+                            path,
+                        }),
+                        report: receipt.report.clone(),
+                        artifacts: receipt.artifacts.clone(),
+                    },
+                );
+            } else {
+                jobs.insert(
+                    intent.job_id.clone(),
+                    Job {
+                        directory: None,
+                        report: interrupted_report(intent),
+                        artifacts: BTreeMap::new(),
+                    },
+                );
+            }
+        }
+        Ok(Self {
+            executable: running_executable()?,
+            jobs,
+            sequence,
+            store: Some(store),
+        })
+    }
+    pub fn recovered_snapshots(&self) -> Result<BTreeMap<String, (Snapshot, Option<String>)>> {
+        self.store
+            .as_ref()
+            .ok_or("durable state not enabled")?
+            .snapshots()
+    }
+    pub fn persist_snapshot(
+        &self,
+        id: &str,
+        snapshot: &Snapshot,
+        parent: Option<&str>,
+    ) -> Result<Option<String>> {
+        match &self.store {
+            Some(store) => store.persist_snapshot(id, snapshot, parent),
+            None => Ok(parent.map(str::to_owned)),
+        }
     }
     pub fn capabilities(
         &self,
@@ -72,11 +175,53 @@ impl AgentJobs {
         params: &BTreeMap<String, Value>,
         cancel: Arc<AtomicBool>,
     ) -> Result<Value> {
+        self.evaluate_impl(
+            snapshot_id,
+            bundle_json,
+            mode,
+            outputs,
+            params,
+            None,
+            cancel,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn evaluate_with_request_id(
+        &mut self,
+        snapshot_id: &str,
+        bundle_json: &str,
+        mode: &str,
+        outputs: &[String],
+        params: &BTreeMap<String, Value>,
+        request_id: &str,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<Value> {
+        if self.store.is_none() {
+            return Err("durable request_id requires durable state".into());
+        }
+        self.evaluate_impl(
+            snapshot_id,
+            bundle_json,
+            mode,
+            outputs,
+            params,
+            Some(request_id),
+            cancel,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn evaluate_impl(
+        &mut self,
+        snapshot_id: &str,
+        bundle_json: &str,
+        mode: &str,
+        outputs: &[String],
+        params: &BTreeMap<String, Value>,
+        request_id: Option<&str>,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<Value> {
         if snapshot_id.is_empty() || snapshot_id.len() > 128 {
             return Err("invalid snapshot identifier".into());
-        }
-        if self.jobs.len() >= MAX_JOBS {
-            return Err("retained job limit reached; restart session to release candidates".into());
         }
         if !matches!(mode, "compile" | "inspect" | "build") {
             return Err("unknown evaluation mode".into());
@@ -105,6 +250,62 @@ impl AgentJobs {
         let bundle: Value = serde_json::from_str(bundle_json).map_err(|e| e.to_string())?;
         if bundle["recipe_bundle_schema_version"] != 1 {
             return Err("captured recipe bundle required".into());
+        }
+        let fingerprint = if let (Some(store), Some(request_id)) = (&self.store, request_id) {
+            crate::agent_store::request_hash(request_id)?;
+            let bundle_canonical = serde_json::to_vec(&bundle).map_err(|e| e.to_string())?;
+            let snapshots = store.snapshots()?;
+            let captured = snapshots
+                .get(snapshot_id)
+                .ok_or("durable request references missing snapshot")?;
+            if serde_json::to_value(&captured.0).map_err(|e| e.to_string())? != bundle {
+                return Err("durable request does not bind a captured snapshot".into());
+            }
+            let canonical=serde_json::to_vec(&json!({"durable_request_schema_version":crate::agent_store::SCHEMA,"executable_blake3":store.executable_digest(),"kernel_build_id":cad_kernel::KERNEL_BUILD_ID,"executor_build_id":cad_build::executor_build_id(),"snapshot_id":snapshot_id,"bundle_blake3":blake3::hash(&bundle_canonical).to_hex().to_string(),"mode":mode,"outputs":outputs,"params":params})).map_err(|e|e.to_string())?;
+            let fingerprint = blake3::hash(&canonical).to_hex().to_string();
+            if let Some(previous) = store.intents()?.get(request_id) {
+                if previous.fingerprint != fingerprint {
+                    return Err(
+                        "request_id conflicts with a different payload or executable identity"
+                            .into(),
+                    );
+                }
+                return self.job(&previous.job_id);
+            }
+            Some(fingerprint)
+        } else {
+            None
+        };
+        if self.jobs.len() >= MAX_JOBS {
+            return Err("retained job limit reached; restart session to release candidates".into());
+        }
+        let next_sequence = self
+            .sequence
+            .checked_add(1)
+            .ok_or("job identifier exhausted")?;
+        let id = format!("job_{next_sequence:016x}");
+        if let (Some(store), Some(request_id), Some(fingerprint)) =
+            (&self.store, request_id, &fingerprint)
+        {
+            let intent = Intent {
+                schema_version: crate::agent_store::SCHEMA,
+                request_id: request_id.to_owned(),
+                fingerprint: fingerprint.clone(),
+                job_id: id.clone(),
+                snapshot_id: snapshot_id.to_owned(),
+                mode: mode.to_owned(),
+                executable_digest: store.executable_digest().to_owned(),
+            };
+            store.persist_intent(&intent)?;
+            self.sequence = next_sequence;
+            self.jobs.insert(
+                id.clone(),
+                Job {
+                    directory: None,
+                    report: interrupted_report(&intent),
+                    artifacts: BTreeMap::new(),
+                },
+            );
         }
         let directory = tempfile::tempdir().map_err(|e| e.to_string())?;
         let mut file = fs::OpenOptions::new()
@@ -165,19 +366,21 @@ impl AgentJobs {
                 );
             }
         }
-        let used = self.jobs.values().try_fold(0u64, |n, j| {
-            tree_bytes(j.directory.path()).map(|v| n.saturating_add(v))
-        })?;
+        let used = if let Some(store) = &self.store {
+            store.retained_bytes(&store.intents()?)?
+        } else {
+            self.jobs
+                .values()
+                .try_fold(0u64, |n, j| match &j.directory {
+                    Some(dir) => tree_bytes(dir.path()).map(|v| n.saturating_add(v)),
+                    None => Ok(n),
+                })?
+        };
         let final_bytes = tree_bytes(directory.path())?;
         validate_retention(final_bytes, used, None)?;
         if cancel.load(Ordering::Relaxed) {
             return Err("candidate cancelled before retention".into());
         }
-        let next_sequence = self
-            .sequence
-            .checked_add(1)
-            .ok_or("job identifier exhausted")?;
-        let id = format!("job_{next_sequence:016x}");
         let manifest_hash = if mode == "build" && worker["success"] == true {
             Some(
                 blake3::hash(
@@ -196,11 +399,29 @@ impl AgentJobs {
             .collect();
         let report = json!({"job_id":id,"snapshot_id":snapshot_id,"mode":mode,"worker":worker,"artifacts":inventory,"publication":"immutable_candidate_only","manifest_hash":manifest_hash});
         validate_retention(final_bytes, used, Some(&report))?;
+        if let (Some(store), Some(request_id)) = (&self.store, request_id) {
+            store.copy_job_from_temp(&id, directory.path())?;
+            store.persist_receipt(request_id, &id, &report, &artifacts)?;
+            let handle = store.open_job_dir(&id)?;
+            let path = AgentStore::pinned_path(&handle);
+            self.jobs.insert(
+                id,
+                Job {
+                    directory: Some(JobDirectory::Durable {
+                        _handle: handle,
+                        path,
+                    }),
+                    report: report.clone(),
+                    artifacts,
+                },
+            );
+            return Ok(report);
+        }
         self.sequence = next_sequence;
         self.jobs.insert(
             id,
             Job {
-                directory,
+                directory: Some(JobDirectory::Temporary(directory)),
                 report: report.clone(),
                 artifacts,
             },
@@ -224,9 +445,20 @@ impl AgentJobs {
         if job.artifacts.is_empty() {
             return Err("job has no verified generation".into());
         }
+        let directory = job.directory.as_ref().ok_or("job was interrupted")?;
+        let temp;
+        let verification_path = if let Some(store) = &self.store {
+            store.verify_job_seal(id)?;
+            temp = tempfile::tempdir().map_err(|e| e.to_string())?;
+            store.copy_job_to_temp(id, temp.path())?;
+            store.verify_job_seal(id)?;
+            temp.path()
+        } else {
+            directory.path()
+        };
         run(
             &self.executable,
-            job.directory.path(),
+            verification_path,
             &[
                 "verify".into(),
                 "generation".into(),
@@ -240,7 +472,7 @@ impl AgentJobs {
     /// Allows discovery after a response-delivery/cancellation race.
     pub fn list_jobs(&self) -> Value {
         let jobs:Vec<_>=self.jobs.iter().map(|(id,job)| json!({"job_id":id,"snapshot_id":job.report["snapshot_id"],"mode":job.report["mode"],"success":job.report["worker"]["success"],"manifest_hash":job.report["manifest_hash"]})).collect();
-        json!({"jobs":jobs,"retention":"session_only"})
+        json!({"jobs":jobs,"retention":if self.store.is_some(){"durable_local"}else{"session_only"}})
     }
     pub fn job(&self, id: &str) -> Result<Value> {
         self.jobs
@@ -260,13 +492,18 @@ impl AgentJobs {
         }
         safe_name(name)?;
         let job = self.jobs.get(id).ok_or("unknown session job")?;
+        let directory = job.directory.as_ref().ok_or("job was interrupted")?;
         let (length, hash) = job
             .artifacts
             .get(name)
             .ok_or("artifact is not in verified candidate inventory")?;
         // Verification binds every returned chunk to the immutable candidate inventory.
-        let bytes = fs::read(job.directory.path().join("generation").join(name))
-            .map_err(|e| e.to_string())?;
+        let bytes = if let Some(store) = &self.store {
+            store.verify_job_seal(id)?;
+            store.read_job_file(id, &["generation", name], MAX_JOB_BYTES as usize)?
+        } else {
+            fs::read(directory.path().join("generation").join(name)).map_err(|e| e.to_string())?
+        };
         if bytes.len() as u64 != *length || blake3::hash(&bytes).to_hex().as_str() != hash {
             return Err("artifact integrity mismatch".into());
         }
@@ -432,6 +669,14 @@ fn run_process(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .envs(if native_worker {
+            vec![(
+                crate::worker_limits::PARENT_PID_ENV,
+                std::process::id().to_string(),
+            )]
+        } else {
+            Vec::new()
+        })
         .spawn()
         .map_err(|e| e.to_string())?;
     let overflow = Arc::new(AtomicBool::new(false));
@@ -614,7 +859,7 @@ mod tests {
         jobs.jobs.insert(
             "test".into(),
             Job {
-                directory: dir,
+                directory: Some(JobDirectory::Temporary(dir)),
                 report: json!({"snapshot_id":"source","mode":"build","worker":{"success":true,"result":{"private_large_report":"not in listing"}},"manifest_hash":"digest"}),
                 artifacts: BTreeMap::from([(
                     "test.json".into(),
@@ -640,6 +885,8 @@ mod tests {
         fs::write(
             jobs.jobs["test"]
                 .directory
+                .as_ref()
+                .unwrap()
                 .path()
                 .join("generation/test.json"),
             b"tampered",

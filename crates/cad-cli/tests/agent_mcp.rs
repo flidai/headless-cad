@@ -144,6 +144,7 @@ fn agent_proposes_diagnoses_repairs_verifies_and_replays_without_workspace_write
     for name in [
         "cad_capabilities",
         "cad_snapshot",
+        "cad_snapshots",
         "cad_read_source",
         "cad_revise",
         "cad_evaluate",
@@ -162,6 +163,19 @@ fn agent_proposes_diagnoses_repairs_verifies_and_replays_without_workspace_write
     let base = client.tool("cad_snapshot", json!({"recipe":"station.star"}), false);
     assert_eq!(base["source"], original);
     assert_eq!(base["workspace_modified"], false);
+    assert_eq!(
+        capabilities["agent_session"]["durable_state_enabled"],
+        false
+    );
+    assert_eq!(capabilities["agent_session"]["request_id_required"], false);
+    let snapshots = client.tool("cad_snapshots", json!({}), false);
+    assert_eq!(snapshots["snapshots"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        snapshots["snapshots"][0]["snapshot_id"],
+        base["snapshot_id"]
+    );
+    let rejected_key = client.tool("cad_evaluate", json!({"snapshot_id":base["snapshot_id"],"mode":"compile","request_id":"retry-is-not-durable"}), true);
+    assert!(rejected_key.to_string().contains("requires --state-dir"));
     let compiled = client.tool(
         "cad_evaluate",
         json!({"snapshot_id":base["snapshot_id"],"mode":"compile"}),
