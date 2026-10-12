@@ -1,4 +1,5 @@
 # Six native planar chamfers form a guide block with two inclined wear-pad seats.
+# Top bevels follow original stock faces through four preceding topology edits.
 # Only bounded convex edge chamfers are supported; no fit or loading is certified.
 corner = param(name = "corner", default = 4)
 bevel = param(name = "bevel", default = 1.5)
@@ -16,8 +17,8 @@ front_left = chamfer(id = "front_left", body = stock, face_normals = [[-1,0,0],[
 front_right = chamfer(id = "front_right", body = front_left, face_normals = [[1,0,0],[0,-1,0]], distance = corner)
 back_right = chamfer(id = "back_right", body = front_right, face_normals = [[1,0,0],[0,1,0]], distance = corner)
 back_left = chamfer(id = "back_left", body = back_right, face_normals = [[-1,0,0],[0,1,0]], distance = corner)
-front_bevel = chamfer(id = "front_bevel", body = back_left, face_normals = [[0,-1,0],[0,0,1]], distance = bevel)
-finished = chamfer(id = "back_bevel", body = front_bevel, face_normals = [[0,1,0],[0,0,1]], distance = bevel)
+front_bevel = chamfer_faces(id = "front_bevel", body = back_left, faces = [{"from_feature":stock,"role":"wall_y_min"},{"from_feature":stock,"role":"end_cap"}], distance = bevel)
+finished = chamfer_faces(id = "back_bevel", body = front_bevel, faces = [{"from_feature":stock,"role":"wall_y_max"},{"from_feature":stock,"role":"end_cap"}], distance = bevel)
 output(name = "stock", feature = stock)
 output(name = "block", feature = finished)
 assert_faces(id = "front_bevel_survives", from_feature = front_bevel, role = "chamfer", in_feature = finished, count = 1)

@@ -114,6 +114,20 @@ impl BuildResult {
         selector: &FaceSelector,
         remaining: &mut usize,
     ) -> FaceResolution {
+        self.selection_graph
+            .resolve_faces_with_remaining(selector, remaining)
+    }
+}
+
+impl SelectionGraph {
+    pub(super) fn insert(&mut self, id: String, result: Arc<OperationResult>) {
+        self.results.insert(id, result);
+    }
+    pub(super) fn resolve_faces_with_remaining(
+        &self,
+        selector: &FaceSelector,
+        remaining: &mut usize,
+    ) -> FaceResolution {
         use FaceResolutionStatus::*;
         let budget = *remaining;
         let mut resolution = FaceResolution {
@@ -142,7 +156,7 @@ impl BuildResult {
             .len()
             .saturating_add(selector.role.len())
             .saturating_add(selector.target_feature.len()));
-        let graph = &self.selection_graph;
+        let graph = self;
         let Some(anchor) = graph.results.get(&selector.anchor_feature) else {
             resolution.diagnostic = if graph
                 .nodes
@@ -221,7 +235,9 @@ impl BuildResult {
                 continue;
             }
             let slots: Vec<_> = match &graph.nodes[id] {
-                Feature::Chamfer { body, .. } => vec![("body", body)],
+                Feature::Chamfer { body, .. } | Feature::ChamferFaces { body, .. } => {
+                    vec![("body", body)]
+                }
                 Feature::Translate { body, .. } | Feature::Transform { body, .. } => {
                     vec![("input", body)]
                 }

@@ -150,3 +150,69 @@ fn identical_recipe_reuses_native_chamfers_and_topology_witnesses() {
         serde_json::to_value(second.face_datums).unwrap()
     );
 }
+
+#[test]
+fn semantic_top_bevels_follow_upstream_rotation_with_independent_moments() {
+    let q = std::f64::consts::FRAC_1_SQRT_2;
+    let poses = [
+        ([0., 0., 0., 1.], [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]]),
+        ([0., 0., q, q], [[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]),
+        (
+            [0.5, 0.5, 0., q],
+            [[0.5, 0.5, q], [0.5, 0.5, -q], [-q, q, 0.]],
+        ),
+    ];
+    let offset = [7., -4., 2.];
+    let mut engine = cad_build::BuildEngine::default();
+    for (d, e, h) in [(3., 0.75, 16.), (4., 1.5, 20.), (5., 2.25, 24.)] {
+        for (rotation, matrix) in poses {
+            let mut value = serde_json::to_value(recipe(d, e, h)).unwrap();
+            for key in [
+                "parts",
+                "assemblies",
+                "assembly_outputs",
+                "face_datums",
+                "section_views",
+            ] {
+                value.as_object_mut().unwrap().remove(key);
+            }
+            let features = value["features"].as_array_mut().unwrap();
+            let index = features
+                .iter()
+                .position(|f| f["id"] == "front_bevel")
+                .unwrap();
+            features[index]["body"] = "reoriented".into();
+            features.insert(index, serde_json::json!({"op":"transform", "id":"reoriented", "body":"back_left", "offset":offset, "rotation":rotation}));
+            let r = serde_json::from_value(value).unwrap();
+            let built = engine.build(&r).unwrap();
+            let p = built.outputs["block"]
+                .result
+                .model
+                .mass_properties(cad_kernel::Tolerance::default())
+                .unwrap();
+            let (volume, center, inertia) = expected(d, e, h);
+            near(p.volume, volume);
+            for (i, actual) in p.centroid.unwrap().into_iter().enumerate() {
+                near(
+                    actual,
+                    offset[i] + (0..3).map(|j| matrix[i][j] * center[j]).sum::<f64>(),
+                );
+            }
+            let actual = p.central_inertia.unwrap();
+            for i in 0..3 {
+                for j in 0..3 {
+                    let expected = (0..3)
+                        .flat_map(|a| {
+                            (0..3).map(move |b| matrix[i][a] * inertia[a][b] * matrix[j][b])
+                        })
+                        .sum::<f64>();
+                    near(actual[i][j], expected);
+                }
+            }
+            assert!(built
+                .face_assertions
+                .values()
+                .all(|a| a.status == cad_build::FaceResolutionStatus::Resolved));
+        }
+    }
+}

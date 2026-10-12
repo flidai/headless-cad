@@ -250,6 +250,14 @@ pub enum SketchPathSegment {
     },
 }
 
+/// Source-owned semantic face intent; snapshot-local handles are never authoring input.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChamferFace {
+    pub from_feature: String,
+    pub role: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Feature {
@@ -302,6 +310,13 @@ pub enum Feature {
         id: String,
         profile: String,
         height: f64,
+        op_version: u32,
+    },
+    ChamferFaces {
+        id: String,
+        body: String,
+        faces: [ChamferFace; 2],
+        distance: f64,
         op_version: u32,
     },
     Chamfer {
@@ -378,6 +393,7 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut height = None;
                 let mut body = None;
                 let mut face_normals = None;
+                let mut faces = None;
                 let mut distance = None;
                 let mut offset = None;
                 let mut rotation = None;
@@ -414,6 +430,7 @@ impl<'de> Deserialize<'de> for Feature {
                         }
                         "height" => read_field!(height, f64),
                         "body" => read_field!(body, String),
+                        "faces" => read_field!(faces, [ChamferFace; 2]),
                         "face_normals" => read_field!(face_normals, [[f64; 3]; 2]),
                         "distance" => read_field!(distance, f64),
                         "offset" => read_field!(offset, [f64; 3]),
@@ -442,6 +459,7 @@ impl<'de> Deserialize<'de> for Feature {
                                     "circular_holes",
                                     "height",
                                     "body",
+                                    "faces",
                                     "face_normals",
                                     "distance",
                                     "offset",
@@ -487,6 +505,7 @@ impl<'de> Deserialize<'de> for Feature {
                     ],
                     "revolve" => &["op", "id", "op_version", "profile"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
+                    "chamfer_faces" => &["op", "id", "op_version", "body", "faces", "distance"],
                     "chamfer" => &["op", "id", "op_version", "body", "face_normals", "distance"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
                     "transform" => &["op", "id", "op_version", "body", "offset", "rotation"],
@@ -504,6 +523,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "sketch",
                                 "extrude",
                                 "revolve",
+                                "chamfer_faces",
                                 "chamfer",
                                 "translate",
                                 "transform",
@@ -584,6 +604,13 @@ impl<'de> Deserialize<'de> for Feature {
                         profile: profile.ok_or_else(|| M::Error::missing_field("profile"))?,
                         height: height.ok_or_else(|| M::Error::missing_field("height"))?,
                     },
+                    "chamfer_faces" => Feature::ChamferFaces {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        faces: faces.ok_or_else(|| M::Error::missing_field("faces"))?,
+                        distance: distance.ok_or_else(|| M::Error::missing_field("distance"))?,
+                    },
                     "chamfer" => Feature::Chamfer {
                         id,
                         op_version,
@@ -645,6 +672,7 @@ impl Feature {
             | Self::Path { id, .. }
             | Self::Extrude { id, .. }
             | Self::Revolve { id, .. }
+            | Self::ChamferFaces { id, .. }
             | Self::Chamfer { id, .. }
             | Self::Translate { id, .. }
             | Self::Transform { id, .. }
@@ -661,6 +689,15 @@ impl Feature {
             | Self::Sketch { .. }
             | Self::Path { .. } => vec![],
             Self::Extrude { profile, .. } | Self::Revolve { profile, .. } => vec![profile],
+            Self::ChamferFaces { body, faces, .. } => {
+                let mut dependencies = vec![body.as_str()];
+                for face in faces {
+                    if !dependencies.contains(&face.from_feature.as_str()) {
+                        dependencies.push(&face.from_feature);
+                    }
+                }
+                dependencies
+            }
             Self::Chamfer { body, .. }
             | Self::Translate { body, .. }
             | Self::Transform { body, .. } => vec![body],
@@ -688,6 +725,7 @@ impl Feature {
             | Self::Path { op_version, .. }
             | Self::Extrude { op_version, .. }
             | Self::Revolve { op_version, .. }
+            | Self::ChamferFaces { op_version, .. }
             | Self::Chamfer { op_version, .. }
             | Self::Translate { op_version, .. }
             | Self::Transform { op_version, .. }
@@ -705,6 +743,7 @@ impl Feature {
             Self::Path { .. } => "path",
             Self::Extrude { .. } => "extrude",
             Self::Revolve { .. } => "revolve",
+            Self::ChamferFaces { .. } => "chamfer_faces",
             Self::Chamfer { .. } => "chamfer",
             Self::Translate { .. } => "translate",
             Self::Transform { .. } => "transform",
@@ -1112,6 +1151,15 @@ fn hash_feature(
                 }
             }
         }
+        Feature::ChamferFaces {
+            body,
+            faces,
+            distance,
+            ..
+        } => {
+            hash.update(&serde_json::to_vec(&(body, faces)).expect("face intent serializes"));
+            hash.update(&distance.to_le_bytes());
+        }
         Feature::Chamfer {
             face_normals,
             distance,
@@ -1433,6 +1481,18 @@ impl BuildEngine {
                         }
                     }
                 }
+                Feature::ChamferFaces {
+                    id,
+                    faces,
+                    distance,
+                    ..
+                } => {
+                    dimension(id, "distance", *distance)?;
+                    for face in faces {
+                        identifier("chamfer anchor", &face.from_feature)?;
+                        identifier("chamfer role", &face.role)?;
+                    }
+                }
                 Feature::Chamfer {
                     id,
                     face_normals,
@@ -1516,12 +1576,65 @@ impl BuildEngine {
         let mut hashes = BTreeMap::new();
         let mut evaluated: HashMap<String, Arc<OperationResult>> = HashMap::new();
         let mut stats = BuildStats::default();
+        let mut selection_graph =
+            selection::SelectionGraph::new(recipe, order.clone(), HashMap::new());
+        let mut assertion_work_remaining = MAX_FACE_ASSERTION_WORK;
         for &index in &order {
             let feature = &recipe.features[index];
             if !wanted.contains(feature.id()) {
                 continue;
             }
-            let hash = hash_feature(recipe, tolerance, feature, &hashes);
+            let mut hash = hash_feature(recipe, tolerance, feature, &hashes);
+            // Logical ancestry is always resolved before either cache lookup.
+            // Equal geometric hashes do not establish a semantic face reference.
+            let chamfer_normals = if let Feature::ChamferFaces {
+                id, body, faces, ..
+            } = feature
+            {
+                let mut normals = [[0.; 3]; 2];
+                let mut resolutions = Vec::new();
+                for (i, face) in faces.iter().enumerate() {
+                    let resolution = selection_graph.resolve_faces_with_remaining(
+                        &FaceSelector {
+                            anchor_feature: face.from_feature.clone(),
+                            role: face.role.clone(),
+                            target_feature: body.clone(),
+                            cardinality: FaceCardinality::Exactly { count: 1 },
+                        },
+                        &mut assertion_work_remaining,
+                    );
+                    if resolution.status != FaceResolutionStatus::Resolved
+                        || resolution.witnesses.len() != 1
+                    {
+                        return Err(BuildError::Kernel {
+                            feature: id.clone(),
+                            message: format!(
+                                "chamfer face {} selection {:?}: {}",
+                                i, resolution.status, resolution.diagnostic
+                            ),
+                        });
+                    }
+                    let model = &evaluated[body].model;
+                    let plane = model.faces[resolution.witnesses[0].target_face.0]
+                        .try_plane()
+                        .ok_or_else(|| BuildError::Kernel {
+                            feature: id.clone(),
+                            message: format!("chamfer face {i} is not planar"),
+                        })?;
+                    normals[i] = plane.normal;
+                    resolutions.push(resolution);
+                }
+                let mut binding = blake3::Hasher::new();
+                binding.update(hash.as_bytes());
+                binding.update(
+                    &serde_json::to_vec(&(&normals, &resolutions))
+                        .expect("finite face witnesses serialize"),
+                );
+                hash = binding.finalize().to_hex().to_string();
+                Some(normals)
+            } else {
+                None
+            };
             if let Feature::Sketch {
                 id,
                 sketch,
@@ -1612,6 +1725,12 @@ impl BuildEngine {
                             ),
                             _ => unreachable!("profile types validated before execution"),
                         },
+                        Feature::ChamferFaces { body, distance, .. } => cad_kernel::chamfer(
+                            &evaluated[body].model,
+                            chamfer_normals.expect("semantic faces resolved before cache"),
+                            *distance,
+                            tolerance,
+                        ),
                         Feature::Chamfer {
                             body,
                             face_normals,
@@ -1669,6 +1788,7 @@ impl BuildEngine {
                     stats.computed_solids += 1;
                     result
                 };
+                selection_graph.insert(feature.id().into(), Arc::clone(&result));
                 evaluated.insert(feature.id().into(), result);
             }
             hashes.insert(feature.id().into(), hash);
@@ -1697,7 +1817,6 @@ impl BuildEngine {
                 )
             })
             .collect();
-        let selection_graph = selection::SelectionGraph::new(recipe, order, evaluated.clone());
         let mut result = BuildResult {
             sketch_reports,
             scope,
@@ -1712,7 +1831,6 @@ impl BuildEngine {
             face_datums: BTreeMap::new(),
             selection_graph,
         };
-        let mut assertion_work_remaining = MAX_FACE_ASSERTION_WORK;
         for assertion in &recipe.face_assertions {
             let resolution = result
                 .resolve_faces_with_remaining(&assertion.selector, &mut assertion_work_remaining);

@@ -63,6 +63,11 @@ local cuts and attaches inclined wear pads to a generated chamfer datum. Its
 parameter corpus checks independent volume/centroid/inertia, while STEP checks
 verify support planes, sections and assembly placement. This bounded operation
 starts M5; the general edge-treatment and repair gates remain open.
+Semantic `chamfer_faces` now connects persistent face references to a native
+modeling consumer: original stock roles follow preceding cuts and rigid transforms
+before selecting the edge. Cache and publication checks must reject broken intent,
+including geometrically identical but unrelated anchors. General edge/vertex
+selectors and curved edge treatments remain open.
 
 Use the architecture's [delivery priorities](architecture.md#delivery-priorities-and-completion-authority)
 to select and review increments across modeling, assembly scale, inspection,

@@ -210,7 +210,7 @@
       "domain_ids": [
         "solid.chamfer"
       ],
-      "supported_domain": "Equal-distance local straight-edge chamfers on one strictly convex planar solid with exact outward unit-normal face criteria, complete body-face lineage and generated chamfer role. Six-operation guide-block chains with inclined datum-mounted wear pads; 27 native parameter combinations and seven independent STEP configurations including acute/obtuse rotated wedges.",
+      "supported_domain": "Equal-distance local straight-edge chamfers on one strictly convex planar solid, selected by exact outward unit normals or two exactly-one semantic generated-face references resolved through body lineage before cache reuse. Six-operation guide-block chains with inclined datum-mounted wear pads; 27 native parameter combinations and seven independent STEP configurations including semantic acute/obtuse rotated wedges.",
       "exclusions": [
         "Curved, nonconvex or multiple solids",
         "Unequal setbacks, simultaneous edge networks, fillets and implicit repair",
@@ -220,6 +220,7 @@
       "fixture": "examples/chamfered_guide_block.star",
       "checks": [
         "chamfer-kernel",
+        "chamfer-semantic",
         "chamfer-native",
         "chamfer-publication",
         "chamfer-independent"
@@ -579,6 +580,24 @@
         "{cad}",
         "--out-dir",
         "{artifacts}/chamfer"
+      ]
+    },
+    {
+      "id": "chamfer-semantic",
+      "kind": "native",
+      "argv": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "-p",
+        "cad-build",
+        "--test",
+        "chamfer_faces",
+        "-p",
+        "cad-recipe",
+        "--test",
+        "chamfer_faces"
       ]
     }
   ]

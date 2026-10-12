@@ -112,6 +112,7 @@ fn advertised_examples_compile_and_exercise_every_feature_operation() {
         "cut",
         "intersect",
         "chamfer",
+        "chamfer_faces",
     ]
     .into_iter()
     .map(str::to_owned)

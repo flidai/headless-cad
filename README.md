@@ -1991,3 +1991,16 @@ chains six chamfers, sections the result and mounts inclined wear pads through a
 generated-face datum in a repeated assembly. Its 27-configuration corpus checks
 volume, centroid and full inertia against independent domain integrals; separate
 STEP checks verify all twelve support planes, section areas and pad placement.
+
+Semantic chamfers can follow upstream edits and rotations through face lineage:
+
+```python
+bevel = chamfer_faces(id = "bevel", body = stock, faces = [
+    {"from_feature": stock, "role": "wall_y_min"},
+    {"from_feature": stock, "role": "end_cap"},
+], distance = 1.5)
+```
+
+Both references must resolve to exactly one adjacent planar face on `body`.
+Ambiguous, deleted or unrelated references fail before cached geometry can be
+reused. The guide-block recipe uses these references for its two top bevels.

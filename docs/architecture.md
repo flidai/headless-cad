@@ -651,10 +651,19 @@ multiple simultaneous edges and fillets remain unsupported.
 Feature hashing, native cache replay, Starlark/JSON IR and capability discovery
 include this operation. Semantic references propagate through the body map;
 generated chamfer faces can drive assertions and planar datum attachments.
+The `chamfer_faces` operation accepts two `{from_feature, role}` references
+instead of fixed world-space directions. Each must resolve to exactly one planar
+face of the current body through recorded topology lineage. Read normals from
+those current faces so an upstream rigid transform preserves selection intent.
+Resolve references before memory or disk cache reuse; missing, deleted, ambiguous,
+nonplanar or unrelated selections fail explicitly. Reference anchors participate
+in dependency ordering and hashing, while only the body participates in geometric
+history propagation. Selection work shares the build's resource budget.
 `chamfered_guide_block.star` chains six edge operations, sections the result and
 places inclined wear pads through a generated-face datum in repeated assemblies.
 The `modeling.planar-edge-chamfer` evidence case combines a 27-case independent
-moment-integral corpus, atomic publication rejection, imported STEP support-plane,
+moment-integral corpus plus nine upstream-rotation cases, atomic publication
+rejection, imported STEP support-plane,
 section and placement checks, plus acute/obtuse rigidly transformed wedge cases.
 This is a bounded start on M5; general curved edge treatment and controlled repair
 remain separate release obligations.

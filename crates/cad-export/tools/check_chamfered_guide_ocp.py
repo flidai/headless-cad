@@ -101,10 +101,11 @@ def wedge_case(cad,directory,obtuse,rotated):
     q=math.sqrt(.5);d=2;h=8
     def rotate(p):
         return [(p[0]+p[1])/2+q*p[2],(p[0]+p[1])/2-q*p[2],q*(p[1]-p[0])] if rotated else list(p)
-    normals=[rotate([0,-1,0]),rotate([q,-q,0] if obtuse else [-q,q,0])]
     source='profile=polygon(id="profile",points=[[0,0],[20,0],[30,10],[10,10]])\nstock=extrude(id="stock",profile=profile,height=8)\n'
-    if rotated:source+='stock=transform(id="placed",body=stock,offset=[7,-4,2],rotation=[0.5,0.5,0,0.7071067811865476])\n'
-    source+=f'edge=chamfer(id="edge",body=stock,face_normals={normals!r},distance=2)\noutput(name="body",feature=edge)\nassert_faces(id="new_face",from_feature=edge,role="chamfer",in_feature=edge,count=1)\n'
+    if rotated:source+='placed=transform(id="placed",body=stock,offset=[7,-4,2],rotation=[0.5,0.5,0,0.7071067811865476])\n'
+    body='placed' if rotated else 'stock'
+    wall='wall_1' if obtuse else 'wall_3'
+    source+=f'edge=chamfer_faces(id="edge",body={body},faces=[{{"from_feature":stock,"role":"wall_0"}},{{"from_feature":stock,"role":"{wall}"}}],distance=2)\noutput(name="body",feature=edge)\nassert_faces(id="new_face",from_feature=edge,role="chamfer",in_feature=edge,count=1)\n'
     recipe=directory/'source.star';recipe.write_text(source);generation=directory/'generation'
     command([cad,'build',recipe,'--out-dir',generation])
     removed=d*d*q*h/2;volume=1600-removed
