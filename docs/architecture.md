@@ -777,6 +777,24 @@ with selected-deck recipe inspection and no exact-body downloads. Angular
 conflicts preserve the last valid published generation. These prescribed
 attachments do not establish assembly-joint or load-solving capability.
 
+Sketch profiles now accept circular through-holes defined by solved centre and
+rim point references. The builder derives each radius from those returned points,
+validates the native mixed polygon/circle profile before cache access, and
+extrudes analytic cylindrical walls. Structural reference validation also covers
+unused features; circle-handle identity participates in the feature hash.
+Construction handles must be fully constrained, including their direction;
+this representation does not add independent circle or tangency variables to
+the solver. Polygon and circular holes share the existing 32-hole limit.
+`constrained_drill_jig.star` exercises independently dimensioned hole spacing
+and radii in a six-occurrence assembly with three shared definitions. Its guide
+placements are prescribed from the declared dimensions, not associations to
+solved cylindrical faces. Independent native tests cover 27 configurations,
+plate central inertia and material mass/centre, and selective rebuild behavior.
+Three independent STEP imports verify moments and six-occurrence hierarchy;
+nine browser cases check 216 bore/guide-ring/plate rays and captured source.
+A solved but geometrically invalid circle profile returns a structured feature
+error and preserves every previously published artifact.
+
 Evolve this constraint service separately from geometric construction. The target 2D sketch
 solver reports degrees of freedom, residuals, conflicting constraints, multiple
 solution branches, and convergence limits. Preserve branch/continuation intent

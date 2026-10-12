@@ -159,6 +159,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         constraints: Value,
         outline: Value,
         holes: Option<Value>,
+        circular_holes: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
         let definition: cad_build::Sketch = serde_json::from_str(&format!(
@@ -174,7 +175,15 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 .map_err(|_| anyhow::anyhow!("sketch holes must contain point identifier rings"))?,
             None => vec![],
         };
-        anyhow::ensure!(holes.len() <= MAX_POLYGON_HOLES, "too many sketch holes");
+        let circular_holes: Vec<cad_build::SketchCircleHole> = match circular_holes {
+            Some(value) => serde_json::from_str(&value.to_json()?)
+                .map_err(|error| anyhow::anyhow!("invalid sketch circular holes: {error}"))?,
+            None => vec![],
+        };
+        anyhow::ensure!(
+            holes.len() + circular_holes.len() <= MAX_POLYGON_HOLES,
+            "too many sketch holes"
+        );
         let loops: Vec<Vec<String>> = std::iter::once(outline).chain(holes).collect();
         anyhow::ensure!(
             loops.iter().all(|ring| ring.len() >= 3)
@@ -182,7 +191,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "sketch rings require at least 3 points and at most {MAX_POLYGON_POINTS} total vertices"
         );
         store(eval)?.feature(serde_json::json!({
-            "op":"sketch", "id":id, "sketch":definition, "loops":loops, "op_version":1
+            "op":"sketch", "id":id, "sketch":definition, "loops":loops, "circular_holes":circular_holes, "op_version":1
         }))?;
         Ok(id.to_owned())
     }

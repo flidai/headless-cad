@@ -31,7 +31,8 @@
     "test:serpentine": "node serpentine-check.cjs",
     "test:arc": "node arc-check.cjs",
     "test:sketch": "node sketch-check.cjs",
-    "test:angular-sketch": "node angular-sketch-check.cjs"
+    "test:angular-sketch": "node angular-sketch-check.cjs",
+    "test:drill-sketch": "node drill-sketch-check.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

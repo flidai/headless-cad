@@ -1070,6 +1070,37 @@ optional OCP environment for exchange acceptance. Circles/arcs
 in constrained sketches, tangency, branch-continuation policies and assembly
 joints remain future work.
 
+### Constrained circular holes
+
+`sketch(..., circular_holes=[{"center":"bore", "rim":"radius_handle"}])`
+uses solved point identifiers to define a circular through-hole. Its centre is
+`bore`; its radius is the solved distance to `radius_handle`. Add a distance
+constraint for the radius and, for example, a horizontal constraint to remove
+the handle's rotational freedom. Every construction point must be fully
+constrained. Initial guesses still select a local solution branch.
+
+These circles remain analytic through native extrusion and STEP. Polygonal and
+circular holes share the 32-hole limit; unknown handles, zero radii, touching,
+intersecting or outside holes fail validation before publication. This does not
+yet introduce independent circle variables, circular outer boundaries, arc or
+tangency constraints in the sketch solver.
+
+[constrained_drill_jig.star](examples/constrained_drill_jig.star) combines a
+three-hole plate, three shared annular guide bushings and two shared feet.
+Parameters are `pitch` (20..30 mm), `bore_radius` (3..5 mm), and `thickness`
+(6..10 mm). Hole spacing and radius come from sketch constraints. Guide
+placements reuse those declared dimensions as prescribed transforms; they are
+not associative circular-face attachments or a fit certification. Native tests
+cover 27 configurations using independent circle-subtraction formulas for
+volume, centroid and inertia, plus material rollups. Pitch edits rebuild only
+the plate; radius edits rebuild the plate and shared guide definition.
+Three independent STEP configurations check geometry and assembly hierarchy;
+`npm run test:drill-sketch --prefix tools/preview-check` checks 216 bore/ring/plate
+rays across nine browser cases. Invalid solved profiles return
+`invalid_polygon_profile`, the feature ID and a diagnostic, preserving the
+previous complete generation. Readers that do not support the new optional
+sketch field reject it explicitly.
+
 ### Native line and arc profiles
 
 `path(id, start, segments, circular_holes=[])` defines a closed convex CCW

@@ -2771,3 +2771,55 @@ fn angular_conflicts_report_separate_units_and_preserve_published_generation() {
         source.as_bytes()
     );
 }
+
+#[test]
+fn invalid_solved_circle_profile_preserves_last_valid_drill_jig() {
+    let directory = tempfile::tempdir().unwrap();
+    let source_path = directory.path().join("jig.star");
+    let output = directory.path().join("out");
+    let source = fs::read_to_string(example("constrained_drill_jig.star")).unwrap();
+    fs::write(&source_path, &source).unwrap();
+    let run = || {
+        cli(&[
+            "build",
+            source_path.to_str().unwrap(),
+            "--out-dir",
+            output.to_str().unwrap(),
+        ])
+    };
+    let valid = successful_json(run());
+    assert_eq!(
+        valid["sketch_reports"]["guide_layout"]["status"],
+        "fully_constrained"
+    );
+    let before = artifact_bytes(&output);
+    // Keep all equations valid but make native circle geometry extend outside
+    // the outer boundary. This must fail after solving, before publication.
+    let invalid = source.replace(
+        "{\"center\":center,\"rim\":center+\"_rim\"}",
+        "{\"center\":\"a\",\"rim\":center+\"_rim\"}",
+    );
+    assert_ne!(invalid, source);
+    fs::write(&source_path, &invalid).unwrap();
+    let failed = run();
+    assert!(!failed.status.success());
+    let error: serde_json::Value = serde_json::from_slice(&failed.stderr).unwrap();
+    assert_eq!(error["code"], "invalid_polygon_profile", "{error}");
+    assert_eq!(error["feature"], "guide_layout");
+    assert!(error["diagnostic"].as_str().is_some());
+    assert_eq!(artifact_bytes(&output), before);
+    // Explicitly selected output still enforces the same native validity gate.
+    let selected = cli(&[
+        "build",
+        source_path.to_str().unwrap(),
+        "--output",
+        "plate",
+        "--out-dir",
+        output.to_str().unwrap(),
+    ]);
+    assert!(!selected.status.success());
+    assert_eq!(artifact_bytes(&output), before);
+    fs::write(&source_path, &source).unwrap();
+    let restored = successful_json(run());
+    assert_eq!(restored["sketch_reports"], valid["sketch_reports"]);
+}

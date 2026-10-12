@@ -279,6 +279,12 @@ width 18..30 mm (defaults 60/30/24). Independent trigonometric native checks ove
 27 configurations pass, as do nine browser cases and three independent STEP
 oracle cases. Conflicting angles return separately unit-labelled residuals and
 preserve all artifacts of the previous valid generation.
+The circular-hole increment connects solved centre/rim handles to native
+cylindrical through-holes in extrusion. `constrained_drill_jig.star` adds a
+six-occurrence, three-definition assembly; independent 27-case checks cover
+plate moments, assembly material properties and parameter/cache behavior.
+This is point-handle circle construction; independent circle variables,
+constrained arc boundaries and tangency remain open.
 Advance toward constrained curves, tangency and explicit continuation
 before claiming general sketch coverage; rigid assembly joints are a separate
 solver milestone.

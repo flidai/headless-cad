@@ -1285,6 +1285,11 @@ fn main() {
             } else if let Some(build) = error.downcast_ref::<cad_build::BuildError>() {
                 report["code"] = json!("invalid_graph");
                 match build {
+                    cad_build::BuildError::PolygonProfile { feature, message } => {
+                        report["code"] = json!("invalid_polygon_profile");
+                        report["feature"] = json!(feature);
+                        report["diagnostic"] = json!(message);
+                    }
                     cad_build::BuildError::Sketch { feature, .. } => {
                         report["code"] = json!("invalid_sketch");
                         report["feature"] = json!(feature);

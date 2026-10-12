@@ -1350,5 +1350,43 @@
       "volume_tolerance_mm3": 0.01,
       "linear_tolerance_mm": 1e-05
     }
+  },
+  "constrained_drill_jig.star": {
+    "plate": {
+      "volume_mm3": 46793.628421021516,
+      "solids": 1,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          60,
+          8
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-05
+    },
+    "constrained_drill_jig": {
+      "volume_mm3": 66917.25666117691,
+      "solids": 6,
+      "bounds_mm": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          100,
+          60,
+          26
+        ]
+      ],
+      "volume_tolerance_mm3": 0.003,
+      "linear_tolerance_mm": 1e-05
+    }
   }
 }
