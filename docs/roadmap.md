@@ -5,6 +5,24 @@ commercial mechanical-design platforms. See [architecture.md](architecture.md)
 for binding architectural direction. This is a capability roadmap, not a promise
 of completion dates or an assertion that the present implementation has parity.
 
+
+## Current checkpoint
+
+The latest accepted kernel increment is native blind obround pockets with
+measured floor depths and remaining web. It follows associative slot centers
+and native slot-size drawings. Each has retained independent STEP, replay and
+browser receipts below. The viewer remains an inspector; Starlark and Git own
+modeling changes.
+
+The next modeling priority is **operation composability**: consecutive blind
+pocket operations at different depths on the same cap, with a four-pocket total
+limit and persistent references to earlier floors. Mixed through-slot/blind-pocket
+stock, general Booleans and arbitrary surfaces remain separate kernel work.
+
+The complete product is still experimental. All five commercial release gates
+remain open; accepted feature increments are evidence toward those gates, not
+substitutes for them.
+
 The competitive reference is Autodesk-class engineering workflows. The supplied
 commercial-CAD and virtualized-geometry briefs feed five parallel release tracks:
 robust modeling and persistent references (M1/M2/M5), bounded assembly inspection
@@ -1048,3 +1066,24 @@ drawing table. Five invalid revisions preserve the complete previous output.
 [Browser evidence](evidence/blind-slots-browser-local.json) covers the recessed
 floors, two section views, depth table and captured-source inspection. These
 checks establish this bounded pocket class; all five commercial gates stay open.
+
+
+The serial blind-machining increment targets a first locating pocket followed
+by a deeper relief pocket. Earlier floor faces move in canonical topology when
+new walls are inserted, so explicit input-face lineage must carry them into the
+finished part. Acceptance requires distinct-depth reconstruction and moments,
+reversed operation order yielding the same physical solid, unchanged first-stage
+geometry under a second-depth edit, preserved floor references, sections through
+each depth interval, and atomic refusal of overlaps, opposite-cap recuts and a
+fifth accumulated pocket.
+
+The [serial machining oracle](evidence/serial-blind-slots-local.json) passes six
+generated cases and two authored fixtures, including both caps, reversed
+operation order and rigid poses. Independent STEP solids have zero directed
+volume difference; native moments, per-pocket floor depths, three section
+levels, closed oriented meshes and captured replay pass. Earlier floor references
+remap to the correct rebuilt face, and a second-depth edit preserves first-stage
+STEP bytes and its feature hash. Six invalid revisions preserve the previous
+publication. [Browser checks](evidence/serial-blind-slots-browser-local.json)
+verify the floor remap, three section states, 3/7/5 mm measurements and source
+inspection. Mixed through/blind stock and all commercial release gates remain open.

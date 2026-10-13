@@ -3351,8 +3351,9 @@ cad build examples/blind_slot_fixture.star --param pocket_side=0 --param pocket_
 Inspect `fixture.preview.html` or `drawing-blind_fixture_machining.svg`. The
 sheet compares sections inside the pockets and through the remaining web, with
 a table of measured depths. The initial operation supports one to four
-separated pockets on one native prism cap at a shared depth; mixed-depth or
-repeated pocketing operations remain outside this domain.
+separated pockets on one native prism cap at a shared depth per operation.
+Consecutive operations may use different depths within a four-pocket total
+limit; overlapping cuts and opposite-cap recuts remain outside this domain.
 
 [Independent blind-pocket evidence](docs/evidence/blind-slots-local.json) covers
 six generated cases, two fixture variants and five publication-preserving
@@ -3360,3 +3361,26 @@ refusals. STEP solids match independent OCCT constructions, and the tests check
 mass properties, native floors, sections and closed oriented meshes.
 [Browser evidence](docs/evidence/blind-slots-browser-local.json) covers the
 recessed geometry, measured depth table and captured source.
+
+
+### Preserve references through consecutive machining operations
+
+`examples/serial_blind_fixture.star` cuts a locating pocket and then a deeper
+relief pocket. The finished part measures the first floor through its original
+feature reference, even though adding later walls moves its native face ID.
+
+```sh
+cad build examples/serial_blind_fixture.star --out-dir out/serial_blind_fixture
+cad build examples/serial_blind_fixture.star --param second_depth=8 \
+  --out-dir out/serial_blind_fixture_deeper
+```
+
+The `first_stage` output records the earlier operation; `fixture` is the finished
+solid. `drawing-serial_fixture_machining.svg` shows sections through both pockets,
+only the deeper pocket, and the intact web, with native floor measurements.
+
+[Independent serial-machining evidence](docs/evidence/serial-blind-slots-local.json)
+checks both operation orders, rigid poses, preserved floor lineage and
+first-stage geometry, exact native/STEP properties, replay and six refusal
+cases. [Browser evidence](docs/evidence/serial-blind-slots-browser-local.json)
+verifies the finished part's original-floor reference and measured drawing.

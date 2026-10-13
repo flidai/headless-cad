@@ -65,7 +65,7 @@ pub use convex_intersection::chamfer;
 mod longitudinal_fillet;
 pub use longitudinal_fillet::fillet_longitudinal;
 mod obround_slot;
-pub use blind_slot_prism::cut_blind_obround_slots;
+pub use blind_slot_prism::{blind_obround_slot_frame, cut_blind_obround_slots};
 pub use obround_slot::{cut_obround_slots, obround_slot_frame, ObroundSlot, SlotStockFrame};
 mod face_frame;
 mod mass_properties;

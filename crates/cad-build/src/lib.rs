@@ -2598,11 +2598,15 @@ impl BuildEngine {
                 ..
             } = feature
             {
-                let stock = cad_kernel::obround_slot_frame(&evaluated[body].model, tolerance)
-                    .map_err(|e| BuildError::Kernel {
-                        feature: id.clone(),
-                        message: e.to_string(),
-                    })?;
+                let stock = if matches!(feature, Feature::BlindSlotPattern { .. }) {
+                    cad_kernel::blind_obround_slot_frame(&evaluated[body].model, tolerance)
+                } else {
+                    cad_kernel::obround_slot_frame(&evaluated[body].model, tolerance)
+                }
+                .map_err(|e| BuildError::Kernel {
+                    feature: id.clone(),
+                    message: e.to_string(),
+                })?;
                 let dot3 =
                     |a: [f64; 3], b: [f64; 3]| a.iter().zip(b).map(|(x, y)| x * y).sum::<f64>();
                 let scale = frame_origin

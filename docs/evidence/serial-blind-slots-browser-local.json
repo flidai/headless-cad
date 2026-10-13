@@ -1,0 +1,18 @@
+{
+  "valid": true,
+  "pockets": 2,
+  "through_bores": 4,
+  "sections": 3,
+  "native_depth_rows": 3,
+  "source_navigation": true,
+  "read_only": true,
+  "manifest_sha256": "f5f92056b1f282d068f33c2f91a5e3b6857c19806d7623e257e87a0ca34db632",
+  "manifest_end_sha256": "f5f92056b1f282d068f33c2f91a5e3b6857c19806d7623e257e87a0ca34db632",
+  "script_sha256": "7fddfc4750d92e58d5c4d6323e83ec04d9e390e4536874e11aa64089da7bfc03",
+  "recipe_context_hash": "ec295e3b355b1fbd4456adf8210a565ebb7017f18f6e65fcd361f0d0ee93b6ce",
+  "source_provenance_sha256": "58d05192179de0fa5fc75c938ac2d032518d1a1325e1c2a9cc91266748906bb4",
+  "screenshots": [
+    "/tmp/cad-serial-blind-slots-drawing.png",
+    "/tmp/cad-serial-blind-slots-body.png"
+  ]
+}

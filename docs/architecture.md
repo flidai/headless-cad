@@ -3863,8 +3863,9 @@ floor. Source-frame coordinates map into the canonical stock frame; semantic
 cap selection and the depth participate in the feature identity.
 
 Admission requires enough material below the floor and strict separation from
-outer boundaries, through bores and other pockets. Existing slotted or pocketed
-stock is outside the initial domain. Reconstruction must account for every raw
+outer boundaries, through bores and other pockets. Existing through-slotted
+stock remains outside this domain; previously pocketed stock is admitted only
+under the same-cap composition contract below. Reconstruction must account for every raw
 face, loop, edge and support before analytic properties or tessellation accept
 the solid. Section planes on the floor or opening are topology events and must
 be refused where the section contract cannot certify them.
@@ -3873,3 +3874,19 @@ The release evidence must compare native properties and STEP geometry with an
 independently constructed solid, including both stock caps and rigid poses.
 Meshes must close with consistent orientation and shared rim/floor boundaries.
 A rendered cavity alone cannot establish that the exported solid is blind.
+
+
+### Composing blind machining operations
+
+The next extension keeps the same canonical blind-pocket family and a maximum
+of four accumulated disjoint capsules. Each operation may append pockets on the
+same opening cap with its own depth; reconstruction retains a depth for each
+pocket. Overlapping/deepening cuts and opposite-cap machining are outside this
+contract. Through-slot admission remains independent and must not acquire an
+implicit fallback for blind stock.
+
+Adding walls before the canonical floor-face block changes earlier floor IDs.
+The operation history must explicitly map those old floors to the rebuilt
+floors. New generated roles name only the newly authored pockets; earlier roles
+remain reachable through their source feature and input lineage. Analytic mass
+properties, face frames, sections and mesh floors must all use per-pocket depth.
