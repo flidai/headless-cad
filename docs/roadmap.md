@@ -1028,3 +1028,23 @@ pitch changes move the native centers. Four invalid edits preserve the entire
 previous publication. Browser acceptance is recorded separately in the
 [slot-position inspection receipt](evidence/slot-positions-browser-local.json).
 All five commercial gates remain open.
+
+The next modeling increment targets blind obround pockets with a native floor
+and an intact opposite cap. The initial domain is a separated pattern on one
+canonical convex prism cap with a shared depth. Acceptance requires closed
+native topology, strict reconstruction, exact mass properties, sections inside
+the pockets and remaining web, a watertight oriented mesh, independent STEP
+geometry checks, and publication-preserving refusals. This is a distinct native
+class; through-slot recognizers must not silently admit it. General pockets,
+mixed-depth machining and curved Booleans remain separate work.
+
+The [blind-pocket oracle](evidence/blind-slots-local.json) passes six generated
+geometry cases and two authored fixture variants. Cases cover both caps, one or
+four pockets, rigid poses and scaling. STEP solids have zero directed volume
+difference from independent OCCT Boolean constructions; volume, centroid, full
+inertia, floor trims, section areas and oriented mesh closure also pass. The
+fixture checks two native floor datums, three depth/web dimensions and their
+drawing table. Five invalid revisions preserve the complete previous output.
+[Browser evidence](evidence/blind-slots-browser-local.json) covers the recessed
+floors, two section views, depth table and captured-source inspection. These
+checks establish this bounded pocket class; all five commercial gates stay open.

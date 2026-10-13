@@ -1,0 +1,18 @@
+{
+  "valid": true,
+  "pockets": 2,
+  "through_bores": 4,
+  "sections": 2,
+  "native_depth_rows": 3,
+  "source_navigation": true,
+  "read_only": true,
+  "manifest_sha256": "e4e9708d661d3ad23efbc56e77e080ab944ddf0c9be8e8a783e381dead80980b",
+  "manifest_end_sha256": "e4e9708d661d3ad23efbc56e77e080ab944ddf0c9be8e8a783e381dead80980b",
+  "script_sha256": "d52d5d8e8930d8f83497f14a010e20b884323e1af31ab3c91fbed86af79fac58",
+  "recipe_context_hash": "be8cb0e97b1bdb7b4e49ea6f1090b2dfee6dd32c631e33d12858779a87b2ffac",
+  "source_provenance_sha256": "256f192a19f78a530104b8854b3f33f6cf2016c4d2ee568718c280202a722b48",
+  "screenshots": [
+    "/tmp/cad-blind-slots-drawing.png",
+    "/tmp/cad-blind-slots-body.png"
+  ]
+}

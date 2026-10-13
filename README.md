@@ -3334,3 +3334,29 @@ configurations, six dimensions, exact captured-source replay and four rejected
 edits that preserve published output. [Browser checks](docs/evidence/slot-positions-browser-local.json)
 cover both paper views and navigation from the selected part to its captured
 Starlark definition and imported body feature.
+
+### Machine blind obround pockets
+
+`examples/blind_slot_fixture.star` makes two finite-depth capsule pockets in a
+plate with four through bores. It retains native pocket floors and an intact
+back face, and measures both pocket depths and the remaining material from
+semantic planar faces.
+
+```sh
+cad build examples/blind_slot_fixture.star --out-dir out/blind_slot_fixture
+cad build examples/blind_slot_fixture.star --param pocket_side=0 --param pocket_depth=6 \
+  --out-dir out/blind_slot_fixture_underside
+```
+
+Inspect `fixture.preview.html` or `drawing-blind_fixture_machining.svg`. The
+sheet compares sections inside the pockets and through the remaining web, with
+a table of measured depths. The initial operation supports one to four
+separated pockets on one native prism cap at a shared depth; mixed-depth or
+repeated pocketing operations remain outside this domain.
+
+[Independent blind-pocket evidence](docs/evidence/blind-slots-local.json) covers
+six generated cases, two fixture variants and five publication-preserving
+refusals. STEP solids match independent OCCT constructions, and the tests check
+mass properties, native floors, sections and closed oriented meshes.
+[Browser evidence](docs/evidence/blind-slots-browser-local.json) covers the
+recessed geometry, measured depth table and captured source.

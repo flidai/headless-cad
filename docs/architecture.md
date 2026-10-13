@@ -3852,3 +3852,24 @@ between them and slot centers yields machining positions without repeating
 slot coordinates as authored datum offsets. Slot centers do not satisfy
 face-only seating or planar-face dimension contracts. Reports must preserve
 native lineage, target hashes and conservative occurrence-placement uncertainty.
+
+### Blind obround pocket admission
+
+Blind obround pockets are a separate native solid class, not a through-slot
+with a display-only floor. The first operation accepts one to four separated
+capsules on one selected cap, at a shared finite depth. It preserves the
+opposite cap and gives each pocket four finite walls and a planar capsule
+floor. Source-frame coordinates map into the canonical stock frame; semantic
+cap selection and the depth participate in the feature identity.
+
+Admission requires enough material below the floor and strict separation from
+outer boundaries, through bores and other pockets. Existing slotted or pocketed
+stock is outside the initial domain. Reconstruction must account for every raw
+face, loop, edge and support before analytic properties or tessellation accept
+the solid. Section planes on the floor or opening are topology events and must
+be refused where the section contract cannot certify them.
+
+The release evidence must compare native properties and STEP geometry with an
+independently constructed solid, including both stock caps and rigid poses.
+Meshes must close with consistent orientation and shared rim/floor boundaries.
+A rendered cavity alone cannot establish that the exported solid is blind.

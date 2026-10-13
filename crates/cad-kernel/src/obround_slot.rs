@@ -171,7 +171,10 @@ pub(crate) fn validate_slots(
     Ok(())
 }
 
-fn geometry(body: &ModelSnapshot, t: Tolerance) -> Result<(ArcPrismGeometry, usize), KernelError> {
+pub(crate) fn geometry(
+    body: &ModelSnapshot,
+    t: Tolerance,
+) -> Result<(ArcPrismGeometry, usize), KernelError> {
     let stock = crate::through_bore::stock(body, t)?;
     let (path, circles) = match stock.profile {
         crate::through_bore::Profile::Arc(g) => {

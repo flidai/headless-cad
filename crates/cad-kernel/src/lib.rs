@@ -30,6 +30,7 @@
 
 mod analytic;
 mod arc_prism;
+mod blind_slot_prism;
 mod bore_trim_clearance;
 mod bored_prism;
 mod cap_holes;
@@ -64,6 +65,7 @@ pub use convex_intersection::chamfer;
 mod longitudinal_fillet;
 pub use longitudinal_fillet::fillet_longitudinal;
 mod obround_slot;
+pub use blind_slot_prism::cut_blind_obround_slots;
 pub use obround_slot::{cut_obround_slots, obround_slot_frame, ObroundSlot, SlotStockFrame};
 mod face_frame;
 mod mass_properties;
@@ -409,6 +411,9 @@ impl ModelSnapshot {
             return v;
         }
         if let Ok(v) = bored_prism::volume(self) {
+            return v;
+        }
+        if let Ok(v) = blind_slot_prism::volume(self) {
             return v;
         }
         if self

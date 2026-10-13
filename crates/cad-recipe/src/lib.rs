@@ -81,6 +81,30 @@ mod slot_pattern_tests {
         wrong["features"][2]["slots"] = serde_json::json!([]);
         assert!(serde_json::from_value::<Recipe>(wrong).is_err());
     }
+
+    #[test]
+    fn blind_slots_lower_semantic_cap_and_shared_depth_without_raw_face_ids() {
+        let source = "p=rectangle(id='p',width=80,depth=60)\nb=extrude(id='b',profile=p,height=12)\ns=blind_slot_pattern(id='s',body=b,depth=4,frame_origin=[0,0,12],slots=[{'id':'fixture','center':[30,30],'direction':[1,0],'centerline_length':12,'radius':3}])\noutput(name='pocketed',feature=s)";
+        let recipe = from_starlark("blind.star", source).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        let ir = serde_json::to_value(&recipe).unwrap();
+        assert_eq!(ir["features"][2]["op"], "blind_slot_pattern");
+        assert_eq!(
+            ir["features"][2]["face"],
+            serde_json::json!({"from_feature":"b","role":"end_cap"})
+        );
+        assert_eq!(ir["features"][2]["depth"], 4.0);
+        assert_eq!(ir["features"][2]["pattern_slots"][0]["id"], "fixture");
+        assert_eq!(
+            serde_json::to_value(serde_json::from_value::<Recipe>(ir.clone()).unwrap()).unwrap(),
+            ir
+        );
+        let mut typo = ir;
+        typo["features"][2]["cap_face"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<Recipe>(typo).is_err());
+        assert!(from_starlark("bad.star", &source.replace("depth=4", "depth=0")).is_err());
+        assert!(from_starlark("bad.star", &source.replace("frame_origin=[0,0,12],", "")).is_err());
+    }
 }
 
 #[derive(Default, Debug, ProvidesStaticType)]
@@ -642,6 +666,65 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "op_version":1,"body":body,"pattern_slots":slots,
             "frame_origin":frame_origin,"frame_x_direction":frame_x_direction,
             "frame_y_direction":frame_y_direction}),
+        )?;
+        Ok(id.to_owned())
+    }
+    /// Named, partial-depth native obround pockets from one semantic cap.
+    #[allow(clippy::too_many_arguments)]
+    fn blind_slot_pattern(
+        id: &str,
+        body: &str,
+        depth: Value,
+        slots: Value,
+        frame_origin: Value,
+        from_feature: Option<&str>,
+        cap: Option<&str>,
+        frame_x_direction: Option<Value>,
+        frame_y_direction: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let depth = number(depth)?;
+        let slots: Vec<cad_build::SlotPatternSlot> = serde_json::from_str(&slots.to_json()?)
+            .map_err(|e| anyhow::anyhow!("invalid blind obround slot declarations: {e}"))?;
+        anyhow::ensure!(
+            !slots.is_empty() && slots.len() <= cad_build::MAX_SLOT_PATTERN_SLOTS,
+            "blind slot pattern requires 1..={} slots",
+            cad_build::MAX_SLOT_PATTERN_SLOTS
+        );
+        anyhow::ensure!(
+            depth.is_finite() && depth > 0.,
+            "blind slot depth must be finite positive"
+        );
+        let from_feature = from_feature.unwrap_or(body);
+        let cap = cap.unwrap_or("end_cap");
+        anyhow::ensure!(
+            !from_feature.is_empty()
+                && from_feature.trim() == from_feature
+                && !cap.is_empty()
+                && cap.trim() == cap,
+            "blind slot cap source and role must be nonempty identifiers"
+        );
+        let read_frame = |value: Value, label: &str| -> anyhow::Result<[f64; 3]> {
+            let xyz: [f64; 3] = serde_json::from_str(&value.to_json()?)
+                .map_err(|_| anyhow::anyhow!("{label} requires three finite numbers"))?;
+            anyhow::ensure!(xyz.iter().all(|v| v.is_finite()), "{label} must be finite");
+            Ok(xyz)
+        };
+        let frame_origin = read_frame(frame_origin, "frame_origin")?;
+        let frame_x_direction = match frame_x_direction {
+            Some(v) => read_frame(v, "frame_x_direction")?,
+            None => [1., 0., 0.],
+        };
+        let frame_y_direction = match frame_y_direction {
+            Some(v) => read_frame(v, "frame_y_direction")?,
+            None => [0., 1., 0.],
+        };
+        record_feature(
+            eval,
+            serde_json::json!({"op":"blind_slot_pattern","id":id,"op_version":1,
+                "body":body,"face":{"from_feature":from_feature,"role":cap},
+                "depth":depth,"pattern_slots":slots,"frame_origin":frame_origin,
+                "frame_x_direction":frame_x_direction,"frame_y_direction":frame_y_direction}),
         )?;
         Ok(id.to_owned())
     }
@@ -2054,11 +2137,11 @@ pub fn from_starlark_with_modules_and_provenance(
     let mechanism_bindings = graph.mechanism_bindings.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
-    let hole_pattern_schema = graph
-        .features
-        .borrow()
-        .iter()
-        .any(|feature| feature["op"] == "hole_pattern" || feature["op"] == "slot_pattern");
+    let hole_pattern_schema = graph.features.borrow().iter().any(|feature| {
+        feature["op"] == "hole_pattern"
+            || feature["op"] == "slot_pattern"
+            || feature["op"] == "blind_slot_pattern"
+    });
     let mut value = serde_json::json!({
         "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !slot_center_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() || !rigid_translation_groups.is_empty() { 2 } else { 1 },
         "units": "mm",

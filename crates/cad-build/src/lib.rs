@@ -538,6 +538,18 @@ pub enum Feature {
         slots: Vec<SlotPatternSlot>,
         op_version: u32,
     },
+    BlindSlotPattern {
+        id: String,
+        body: String,
+        face: ChamferFace,
+        depth: f64,
+        frame_origin: [f64; 3],
+        frame_x_direction: [f64; 3],
+        frame_y_direction: [f64; 3],
+        #[serde(rename = "pattern_slots")]
+        slots: Vec<SlotPatternSlot>,
+        op_version: u32,
+    },
     ChamferFaces {
         id: String,
         body: String,
@@ -777,6 +789,18 @@ impl<'de> Deserialize<'de> for Feature {
                         "frame_x_direction",
                         "frame_y_direction",
                     ],
+                    "blind_slot_pattern" => &[
+                        "op",
+                        "id",
+                        "op_version",
+                        "body",
+                        "face",
+                        "depth",
+                        "pattern_slots",
+                        "frame_origin",
+                        "frame_x_direction",
+                        "frame_y_direction",
+                    ],
                     "chamfer_faces" => &["op", "id", "op_version", "body", "faces", "distance"],
                     "chamfer" => &["op", "id", "op_version", "body", "face_normals", "distance"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
@@ -798,6 +822,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "fillet",
                                 "hole_pattern",
                                 "slot_pattern",
+                                "blind_slot_pattern",
                                 "chamfer_faces",
                                 "chamfer",
                                 "translate",
@@ -908,6 +933,19 @@ impl<'de> Deserialize<'de> for Feature {
                         slots: pattern_slots
                             .ok_or_else(|| M::Error::missing_field("pattern_slots"))?,
                     },
+                    "blind_slot_pattern" => Feature::BlindSlotPattern {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        face: face.ok_or_else(|| M::Error::missing_field("face"))?,
+                        depth: depth.ok_or_else(|| M::Error::missing_field("depth"))?,
+                        frame_origin: frame_origin
+                            .ok_or_else(|| M::Error::missing_field("frame_origin"))?,
+                        frame_x_direction: frame_x_direction.unwrap_or([1., 0., 0.]),
+                        frame_y_direction: frame_y_direction.unwrap_or([0., 1., 0.]),
+                        slots: pattern_slots
+                            .ok_or_else(|| M::Error::missing_field("pattern_slots"))?,
+                    },
                     "chamfer_faces" => Feature::ChamferFaces {
                         id,
                         op_version,
@@ -979,6 +1017,7 @@ impl Feature {
             | Self::Fillet { id, .. }
             | Self::HolePattern { id, .. }
             | Self::SlotPattern { id, .. }
+            | Self::BlindSlotPattern { id, .. }
             | Self::ChamferFaces { id, .. }
             | Self::Chamfer { id, .. }
             | Self::Translate { id, .. }
@@ -1005,7 +1044,7 @@ impl Feature {
                 }
                 dependencies
             }
-            Self::HolePattern { body, face, .. } => {
+            Self::HolePattern { body, face, .. } | Self::BlindSlotPattern { body, face, .. } => {
                 let mut dependencies = vec![body.as_str()];
                 if face.from_feature != *body {
                     dependencies.push(&face.from_feature);
@@ -1043,6 +1082,7 @@ impl Feature {
             | Self::Fillet { op_version, .. }
             | Self::HolePattern { op_version, .. }
             | Self::SlotPattern { op_version, .. }
+            | Self::BlindSlotPattern { op_version, .. }
             | Self::ChamferFaces { op_version, .. }
             | Self::Chamfer { op_version, .. }
             | Self::Translate { op_version, .. }
@@ -1064,6 +1104,7 @@ impl Feature {
             Self::Fillet { .. } => "fillet",
             Self::HolePattern { .. } => "hole_pattern",
             Self::SlotPattern { .. } => "slot_pattern",
+            Self::BlindSlotPattern { .. } => "blind_slot_pattern",
             Self::ChamferFaces { .. } => "chamfer_faces",
             Self::Chamfer { .. } => "chamfer",
             Self::Translate { .. } => "translate",
@@ -1254,6 +1295,8 @@ pub enum BuildError {
     HolePatternSchema,
     #[error("slot_pattern requires recipe schema version 2")]
     SlotPatternSchema,
+    #[error("blind_slot_pattern requires recipe schema version 2")]
+    BlindSlotPatternSchema,
     #[error("sketch feature '{feature}' did not solve completely")]
     SketchSolveFailed {
         feature: String,
@@ -1687,6 +1730,27 @@ fn hash_feature(
                 &serde_json::to_vec(&(slots, frame_origin, frame_x_direction, frame_y_direction))
                     .expect("validated slot intent serializes"),
             );
+        }
+        Feature::BlindSlotPattern {
+            face,
+            depth,
+            slots,
+            frame_origin,
+            frame_x_direction,
+            frame_y_direction,
+            ..
+        } => {
+            hash.update(
+                &serde_json::to_vec(&(
+                    face,
+                    slots,
+                    frame_origin,
+                    frame_x_direction,
+                    frame_y_direction,
+                ))
+                .expect("validated blind slot intent serializes"),
+            );
+            hash.update(&depth.to_le_bytes());
         }
         Feature::ChamferFaces {
             body,
@@ -2212,9 +2276,34 @@ impl BuildEngine {
                     frame_x_direction,
                     frame_y_direction,
                     ..
+                }
+                | Feature::BlindSlotPattern {
+                    id,
+                    slots,
+                    frame_origin,
+                    frame_x_direction,
+                    frame_y_direction,
+                    ..
                 } => {
                     if recipe.schema_version != 2 {
-                        return Err(BuildError::SlotPatternSchema);
+                        return Err(if matches!(feature, Feature::BlindSlotPattern { .. }) {
+                            BuildError::BlindSlotPatternSchema
+                        } else {
+                            BuildError::SlotPatternSchema
+                        });
+                    }
+                    if let Feature::BlindSlotPattern { face, depth, .. } = feature {
+                        if face.from_feature.is_empty()
+                            || face.role.is_empty()
+                            || face.from_feature.trim() != face.from_feature
+                            || face.role.trim() != face.role
+                        {
+                            return Err(BuildError::Sketch {
+                                feature: id.clone(),
+                                message: "blind slot requires a bounded semantic cap source".into(),
+                            });
+                        }
+                        dimension(id, "blind slot depth", *depth)?;
                     }
                     if slots.is_empty() || slots.len() > MAX_SLOT_PATTERN_SLOTS {
                         return Err(BuildError::ResourceLimit {
@@ -2498,6 +2587,15 @@ impl BuildEngine {
                 frame_y_direction,
                 slots,
                 ..
+            }
+            | Feature::BlindSlotPattern {
+                id,
+                body,
+                frame_origin,
+                frame_x_direction,
+                frame_y_direction,
+                slots,
+                ..
             } = feature
             {
                 let stock = cad_kernel::obround_slot_frame(&evaluated[body].model, tolerance)
@@ -2567,6 +2665,37 @@ impl BuildEngine {
                 );
                 hash = binding.finalize().to_hex().to_string();
                 pattern_slots = Some(converted);
+            }
+            if let Feature::BlindSlotPattern { id, body, face, .. } = feature {
+                let resolution = selection_graph.resolve_faces_with_remaining(
+                    &FaceSelector {
+                        anchor_feature: face.from_feature.clone(),
+                        role: face.role.clone(),
+                        target_feature: body.clone(),
+                        cardinality: FaceCardinality::Exactly { count: 1 },
+                    },
+                    &mut assertion_work_remaining,
+                );
+                if resolution.status != FaceResolutionStatus::Resolved
+                    || resolution.witnesses.len() != 1
+                {
+                    return Err(BuildError::Kernel {
+                        feature: id.clone(),
+                        message: format!(
+                            "blind slot cap selection {:?}: {}",
+                            resolution.status, resolution.diagnostic
+                        ),
+                    });
+                }
+                let cap = resolution.witnesses[0].target_face;
+                let mut binding = blake3::Hasher::new();
+                binding.update(hash.as_bytes());
+                binding.update(
+                    &serde_json::to_vec(&(&resolution, cap))
+                        .expect("blind slot cap witness serializes"),
+                );
+                hash = binding.finalize().to_hex().to_string();
+                pattern_cap = Some(cap);
             }
             if let Feature::HolePattern {
                 id,
@@ -2773,6 +2902,17 @@ impl BuildEngine {
                                 .expect("slot coordinates resolved before cache"),
                             tolerance,
                         ),
+                        Feature::BlindSlotPattern { body, depth, .. } => {
+                            cad_kernel::cut_blind_obround_slots(
+                                &evaluated[body].model,
+                                pattern_slots
+                                    .as_deref()
+                                    .expect("blind slot coordinates resolved before cache"),
+                                pattern_cap.expect("blind slot cap resolved before cache"),
+                                *depth,
+                                tolerance,
+                            )
+                        }
                         Feature::ChamferFaces { body, distance, .. } => cad_kernel::chamfer(
                             &evaluated[body].model,
                             chamfer_normals.expect("semantic faces resolved before cache"),

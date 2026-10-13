@@ -43,6 +43,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             .or_else(|_| crate::arc_prism::recognize(model, tolerance).map(|_| ()))
             .map(|_| ())
             .or_else(|_| crate::bored_prism::recognize(model, tolerance).map(|_| ()))
+            .or_else(|_| crate::blind_slot_prism::recognize(model, tolerance).map(|_| ()))
             .or_else(|_| crate::stepped_bore::recognize(model, tolerance).map(|_| ()));
         return ValidationReport {
             valid: result.is_ok(),
@@ -63,6 +64,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 .or_else(|_| crate::profile_prism::recognize(model, tolerance).map(|_| ()))
                 .or_else(|_| crate::revolve::recognize(model, tolerance).map(|_| ()))
                 .or_else(|_| crate::bored_prism::recognize(model, tolerance).map(|_| ()))
+                .or_else(|_| crate::blind_slot_prism::recognize(model, tolerance).map(|_| ()))
                 .or_else(|_| crate::stepped_bore::recognize(model, tolerance).map(|_| ()))
         } else {
             Err(crate::KernelError::InvalidTolerance)
