@@ -61,7 +61,7 @@ fn oriented(
     t: Tolerance,
 ) -> Result<OrbitBinding, KernelError> {
     let admitted = crate::convex_trim_clearance::admit(housing, t)?;
-    let g = admitted.geometry;
+    let g = &admitted;
     let stock = shaft(shaft_model, t).ok_or_else(bad)?;
     let world = housing
         .vertices
@@ -87,7 +87,7 @@ fn oriented(
     if !error.is_normal() || error > t.linear / 64. {
         return Err(KernelError::NumericRange);
     }
-    crate::convex_clearance::support::arc_consistency(housing, &g, error, t)?;
+    admitted.support_consistency(housing, error, t)?;
     let y = cross(g.axis, g.x_direction);
     let centers = g
         .circular_holes
@@ -111,7 +111,7 @@ fn oriented(
     // axial cap witness and excludes the remaining mounting holes.
     let guard = (4. * error).next_up();
     let disk_radius = stock.outer.max(bore.radius);
-    let inradius = crate::arc_prism::path_boundary_distance(&g.path, bore.center, t, error)?;
+    let inradius = admitted.boundary_inradius(bore.center, t, error)?;
     if inradius <= disk_radius + guard
         || g.circular_holes.iter().enumerate().any(|(i, other)| {
             i != index
@@ -217,7 +217,7 @@ fn oriented(
             axis: mul(d, 1. / distance),
         };
         return Ok(OrbitBinding {
-            bore_face_index: g.path.segments.len() + 2 + index,
+            bore_face_index: g.bore_faces[index].0,
             bore_origin,
             bore_axis: housing_axis,
             bore_radius: bore.radius,
@@ -352,6 +352,302 @@ mod tests {
             .unwrap()
             .model;
         translate(&cut, [0., 0., -10.], t).unwrap().model
+    }
+
+    fn drive_cover(r: f64, t: Tolerance) -> ModelSnapshot {
+        let outline = [
+            [-22., -26.],
+            [22., -26.],
+            [22., 14.],
+            [14., 22.],
+            [-14., 22.],
+            [-22., 14.],
+        ];
+        let holes = [
+            CircleHole {
+                center: [0., 0.],
+                radius: r + 4.5,
+            },
+            CircleHole {
+                center: [-17., 0.],
+                radius: 2.05,
+            },
+            CircleHole {
+                center: [17., 0.],
+                radius: 2.05,
+            },
+        ];
+        extrude_polygon_with_circular_holes(&outline, &[], &holes, 2., t)
+            .unwrap()
+            .model
+    }
+
+    fn drive_shaft(r: f64, p: f64, t: Tolerance) -> ModelSnapshot {
+        let stock = revolve_polygon(
+            &[
+                [0., 0.],
+                [r + 2., 0.],
+                [r + 2., 12.9],
+                [r, 12.9],
+                [r, 12.2 + p / 2.],
+                [r - 0.6, 12.2 + p / 2.],
+                [r - 0.6, 13.45 + p / 2.],
+                [r, 13.45 + p / 2.],
+                [r, 30.55 + p / 2.],
+                [r - 0.6, 30.55 + p / 2.],
+                [r - 0.6, 31.8 + p / 2.],
+                [r, 31.8 + p / 2.],
+                [r, p + 34.55],
+                [r - 0.6, p + 34.55],
+                [r - 0.6, p + 35.8],
+                [r, p + 35.8],
+                [r, p + 70.],
+                [0., p + 70.],
+            ],
+            t,
+        )
+        .unwrap()
+        .model;
+        let tool = translate(
+            &extrude_rectangle(4., 4.04, 13.5, t).unwrap().model,
+            [r - 2., -2.02, 15.25 + p / 2.],
+            t,
+        )
+        .unwrap()
+        .model;
+        boolean(&stock, &tool, BooleanOp::Difference, t)
+            .unwrap()
+            .model
+    }
+
+    #[test]
+    fn exact_polygon_drive_covers_clear_stepped_keyed_shaft_for_full_turn() {
+        let t = Tolerance::default();
+        for (r, p) in [(5., 60.), (6., 60.), (8., 90.)] {
+            let cover = drive_cover(r, t);
+            let shaft = drive_shaft(r, p, t);
+            for (z, nominal, required) in [(11., 2.5, 2.), (p + 33., 4.5, 4.)] {
+                let cover = translate(&cover, [0., 0., z], t).unwrap().model;
+                let q = cover.clearance(&shaft, t).unwrap();
+                assert_eq!(q.method, ClearanceMethod::BoreTrimWitness);
+                assert!(
+                    q.lower_bound_mm <= nominal && q.upper_bound_mm >= nominal,
+                    "{q:?}"
+                );
+                let orbit = cover
+                    .rotation_clearance(
+                        &shaft,
+                        [0., 0., 40.],
+                        [0., 0., 1.],
+                        std::f64::consts::TAU,
+                        required,
+                        t,
+                        3,
+                    )
+                    .unwrap();
+                assert_eq!(orbit.proof_kind, RotationProofKind::BoreWitnessOrbit);
+                assert_eq!(orbit.query_count, 3);
+                assert!(orbit.lower_bound_mm <= nominal && orbit.upper_bound_mm >= nominal);
+                assert!(orbit.lower_bound_mm >= required);
+                assert!(cover
+                    .rotation_clearance(
+                        &shaft,
+                        [0., 0., 40.],
+                        [0., 0., 1.],
+                        std::f64::consts::TAU,
+                        nominal + 0.0001,
+                        t,
+                        3,
+                    )
+                    .is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn polygon_cover_external_witness_and_common_pose() {
+        let t = Tolerance::default();
+        let cover = drive_cover(6., t);
+        let roller = translate(&extrude_circle(2., 2., t).unwrap().model, [40., 0., 0.], t)
+            .unwrap()
+            .model;
+        let external = cover.clearance(&roller, t).unwrap();
+        assert_eq!(external.method, ClearanceMethod::ConvexTrimWitness);
+        assert!(external.lower_bound_mm <= 16. && external.upper_bound_mm >= 16.);
+
+        let cover = translate(&cover, [0., 0., 11.], t).unwrap().model;
+        let shaft = drive_shaft(6., 60., t);
+        let frame = [0.5, 0.5, 0.5, 0.5];
+        let cover = transform(&cover, [13., -7., 15.], frame, t).unwrap().model;
+        let shaft = transform(&shaft, [13., -7., 15.], frame, t).unwrap().model;
+        let orbit = cover
+            .rotation_clearance(
+                &shaft,
+                [53., -7., 15.],
+                [1., 0., 0.],
+                -std::f64::consts::TAU,
+                2.,
+                t,
+                3,
+            )
+            .unwrap();
+        assert_eq!(orbit.proof_kind, RotationProofKind::BoreWitnessOrbit);
+        assert!(orbit.lower_bound_mm <= 2.5 && orbit.upper_bound_mm >= 2.5);
+    }
+
+    #[test]
+    fn polygon_cover_refuses_nonconvex_inner_polygon_blind_and_intruding_bore() {
+        let t = Tolerance::default();
+        let cover = drive_cover(6., t);
+        let shaft = drive_shaft(6., 60., t);
+        let outline = [
+            [-22., -26.],
+            [22., -26.],
+            [22., 14.],
+            [14., 22.],
+            [0., 16.],
+            [-14., 22.],
+            [-22., 14.],
+        ];
+        let circles = [
+            CircleHole {
+                center: [0., 0.],
+                radius: 10.5,
+            },
+            CircleHole {
+                center: [-17., 0.],
+                radius: 2.05,
+            },
+            CircleHole {
+                center: [17., 0.],
+                radius: 2.05,
+            },
+        ];
+        let concave = extrude_polygon_with_circular_holes(&outline, &[], &circles, 2., t)
+            .unwrap()
+            .model;
+        assert!(crate::convex_trim_clearance::admit(&concave, t).is_err());
+        let outline = [
+            [-22., -26.],
+            [22., -26.],
+            [22., 14.],
+            [14., 22.],
+            [-14., 22.],
+            [-22., 14.],
+        ];
+        let inner = vec![vec![[-16., -18.], [-16., -16.], [-14., -16.], [-14., -18.]]];
+        let with_inner = extrude_polygon_with_circular_holes(&outline, &inner, &circles, 2., t)
+            .unwrap()
+            .model;
+        assert!(crate::convex_trim_clearance::admit(&with_inner, t).is_err());
+
+        let blind_tool = translate(&extrude_circle(1., 1., t).unwrap().model, [0., -18., 1.], t)
+            .unwrap()
+            .model;
+        let blind = boolean(&cover, &blind_tool, BooleanOp::Difference, t)
+            .unwrap()
+            .model;
+        assert!(crate::convex_trim_clearance::admit(&blind, t).is_err());
+
+        // The shoulder is outside the cover's axial span but its containing
+        // stock disk reaches the other bore; that invalidates the orbit proof.
+        let oversized = revolve_polygon(
+            &[
+                [0., 0.],
+                [15., 0.],
+                [15., 5.],
+                [6., 5.],
+                [6., 40.],
+                [0., 40.],
+            ],
+            t,
+        )
+        .unwrap()
+        .model;
+        let placed = translate(&cover, [0., 0., 11.], t).unwrap().model;
+        assert!(query(&placed, &oversized, t).is_err());
+        assert!(placed.clearance(&oversized, t).is_err());
+        assert!(placed.clearance(&shaft, t).is_ok());
+    }
+
+    #[test]
+    fn polygon_cover_raw_support_and_alignment_perturbations_refuse() {
+        let t = Tolerance::default();
+        let cover = drive_cover(6., t);
+        let shaft = drive_shaft(6., 60., t);
+        let mut plane_shift = cover.clone();
+        if let Surface::Plane(plane) = &mut plane_shift.faces[1].surface {
+            plane.origin[2] += 2e-9;
+        }
+        assert!(crate::convex_trim_clearance::admit(&plane_shift, t).is_err());
+        assert!(plane_shift.clearance(&shaft, t).is_err());
+
+        let mut wall_shift = cover.clone();
+        if let Surface::Plane(plane) = &mut wall_shift.faces[2].surface {
+            for i in 0..3 {
+                plane.origin[i] += 2e-9 * plane.normal[i];
+            }
+        }
+        assert!(crate::convex_trim_clearance::admit(&wall_shift, t).is_err());
+        assert!(wall_shift.clearance(&shaft, t).is_err());
+
+        let mut circle_shift = cover.clone();
+        let circle_edge = circle_shift
+            .edges
+            .iter_mut()
+            .find(|edge| matches!(edge.curve, Curve::Circle(_)))
+            .unwrap();
+        if let Curve::Circle(circle) = &mut circle_edge.curve {
+            circle.radius += 2e-9;
+        }
+        assert!(crate::convex_trim_clearance::admit(&circle_shift, t).is_err());
+        assert!(circle_shift.clearance(&shaft, t).is_err());
+
+        let mut seam_shift = cover.clone();
+        let seam_edge = seam_shift
+            .edges
+            .iter_mut()
+            .rev()
+            .find(|edge| matches!(edge.curve, Curve::Line(_)))
+            .unwrap();
+        if let Curve::Line(line) = &mut seam_edge.curve {
+            line.origin[0] += 2e-9;
+        }
+        assert!(crate::convex_trim_clearance::admit(&seam_shift, t).is_err());
+        assert!(seam_shift.clearance(&shaft, t).is_err());
+
+        let mut coherent_bore_shift = cover.clone();
+        let base_edges = coherent_bore_shift.edges.len() - 9;
+        let base_faces = coherent_bore_shift.faces.len() - 3;
+        for edge in &mut coherent_bore_shift.edges[base_edges..base_edges + 2] {
+            if let Curve::Circle(circle) = &mut edge.curve {
+                circle.origin[0] += 2e-9;
+            }
+        }
+        if let Surface::Cylinder(wall) = &mut coherent_bore_shift.faces[base_faces].surface {
+            wall.origin[0] += 2e-9;
+        }
+        assert!(crate::convex_trim_clearance::admit(&coherent_bore_shift, t).is_err());
+        assert!(coherent_bore_shift.clearance(&shaft, t).is_err());
+
+        let placed = translate(&cover, [0., 0., 11.], t).unwrap().model;
+        let offaxis = translate(&shaft, [0.001, 0., 0.], t).unwrap().model;
+        assert!(placed.clearance(&offaxis, t).is_err());
+        let tilted = transform(
+            &shaft,
+            [0.; 3],
+            [0., 0.001_f64.sin(), 0., 0.001_f64.cos()],
+            t,
+        )
+        .unwrap()
+        .model;
+        assert!(placed.clearance(&tilted, t).is_err());
+        let far_cover = translate(&placed, [1e9, 0., 0.], t);
+        let far_shaft = translate(&shaft, [1e9, 0., 0.], t);
+        assert!(match (far_cover, far_shaft) {
+            (Ok(a), Ok(b)) => a.model.clearance(&b.model, t).is_err(),
+            _ => true,
+        });
     }
 
     #[test]

@@ -1,0 +1,273 @@
+{
+  "valid": true,
+  "executable_sha256": "c2b680902443fe0cefd1afb558709b70606fc097dd5c191c7ac47d41e0bf29c9",
+  "oracle_script_sha256": "12c471f0c538dba1d0ee607bc45375e16642e487cab35360465a63447de1e201",
+  "python_version": "3.13.15",
+  "ocp_distribution": "8.0.1.1.0",
+  "cases": [
+    {
+      "case": "plain_identity",
+      "shaft_kind": "plain",
+      "pose": "identity",
+      "source_sha256": "924092cb0f322fc38cca172d904d00deb58b3872229b27ae28fd9709a5f01e89",
+      "source_text": "# Generated independent polygon-bore clearance fixture: plain, identity, valid.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_stock = extrude(id=\"shaft_stock\", profile=circle(id=\"shaft_profile\", radius=6), height=7)\nshaft_body = translate(id=\"shaft_body\", body=shaft_stock, offset=[0,0,-3])\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.9,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "exact_gap_mm": 3,
+      "native_lower_bound_mm": 2.999999993568516,
+      "native_upper_bound_mm": 3.0000000023753346,
+      "proof_kind": "bore_witness_orbit",
+      "occt_directed_differences_mm3": {
+        "fixture/plate": [
+          0.0,
+          0.0
+        ],
+        "fixture/shaft": [
+          0.0,
+          0.0
+        ]
+      },
+      "sampled_phases": [
+        {
+          "phase": 0,
+          "occt_distance_mm": 2.9999999999999987
+        },
+        {
+          "phase": 0.125,
+          "occt_distance_mm": 2.9999999999999987
+        },
+        {
+          "phase": 0.25,
+          "occt_distance_mm": 2.9999999999999996
+        },
+        {
+          "phase": 0.375,
+          "occt_distance_mm": 3.0
+        },
+        {
+          "phase": 0.5,
+          "occt_distance_mm": 2.9999999999999996
+        },
+        {
+          "phase": 0.625,
+          "occt_distance_mm": 2.999999999999998
+        },
+        {
+          "phase": 0.75,
+          "occt_distance_mm": 2.9999999999999996
+        },
+        {
+          "phase": 0.875,
+          "occt_distance_mm": 3.0
+        },
+        {
+          "phase": 1,
+          "occt_distance_mm": 2.999999999999999
+        }
+      ]
+    },
+    {
+      "case": "stepped_identity",
+      "shaft_kind": "stepped",
+      "pose": "identity",
+      "source_sha256": "e7b298105f42f716be7ea338dfae68d07e0bce1a877b30676849b372276d5104",
+      "source_text": "# Generated independent polygon-bore clearance fixture: stepped, identity, valid.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_body = revolve(id=\"shaft_body\", profile=polygon(id=\"shaft_profile\", points=[[0,-3],[6.5,-3],[6.5,1],[5.5,1],[5.5,4],[0,4]]))\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.4,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "exact_gap_mm": 2.5,
+      "native_lower_bound_mm": 2.499999993531112,
+      "native_upper_bound_mm": 2.5000000023940223,
+      "proof_kind": "bore_witness_orbit",
+      "occt_directed_differences_mm3": {
+        "fixture/plate": [
+          0.0,
+          0.0
+        ],
+        "fixture/shaft": [
+          0.0,
+          0.0
+        ]
+      },
+      "sampled_phases": [
+        {
+          "phase": 0,
+          "occt_distance_mm": 2.4999999999999987
+        },
+        {
+          "phase": 0.125,
+          "occt_distance_mm": 2.499999999999999
+        },
+        {
+          "phase": 0.25,
+          "occt_distance_mm": 2.4999999999999996
+        },
+        {
+          "phase": 0.375,
+          "occt_distance_mm": 2.4999999999999996
+        },
+        {
+          "phase": 0.5,
+          "occt_distance_mm": 2.4999999999999996
+        },
+        {
+          "phase": 0.625,
+          "occt_distance_mm": 2.499999999999999
+        },
+        {
+          "phase": 0.75,
+          "occt_distance_mm": 2.5
+        },
+        {
+          "phase": 0.875,
+          "occt_distance_mm": 2.5
+        },
+        {
+          "phase": 1,
+          "occt_distance_mm": 2.4999999999999996
+        }
+      ]
+    },
+    {
+      "case": "stepped_oblique",
+      "shaft_kind": "stepped",
+      "pose": "oblique",
+      "source_sha256": "d4a7feb596170731f4df67dd280741cfb65ad3569ec0e468d6bf85211b20d9f5",
+      "source_text": "# Generated independent polygon-bore clearance fixture: stepped, oblique, valid.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_body = revolve(id=\"shaft_body\", profile=polygon(id=\"shaft_profile\", points=[[0,-3],[6.5,-3],[6.5,1],[5.5,1],[5.5,4],[0,4]]))\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0.1, 0.2, 0.3, 0.9273618495495703],offset=[11, -7, 13])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.4,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "exact_gap_mm": 2.5,
+      "native_lower_bound_mm": 2.499999993110258,
+      "native_upper_bound_mm": 2.5000000025686537,
+      "proof_kind": "bore_witness_orbit",
+      "occt_directed_differences_mm3": {
+        "fixture/plate": [
+          0.0,
+          0.0
+        ],
+        "fixture/shaft": [
+          0.0,
+          0.0
+        ]
+      },
+      "sampled_phases": [
+        {
+          "phase": 0,
+          "occt_distance_mm": 2.4999999999999987
+        },
+        {
+          "phase": 0.125,
+          "occt_distance_mm": 2.5
+        },
+        {
+          "phase": 0.25,
+          "occt_distance_mm": 2.4999999999999982
+        },
+        {
+          "phase": 0.375,
+          "occt_distance_mm": 2.4999999999999982
+        },
+        {
+          "phase": 0.5,
+          "occt_distance_mm": 2.4999999999999973
+        },
+        {
+          "phase": 0.625,
+          "occt_distance_mm": 2.499999999999995
+        },
+        {
+          "phase": 0.75,
+          "occt_distance_mm": 2.499999999999998
+        },
+        {
+          "phase": 0.875,
+          "occt_distance_mm": 2.5
+        },
+        {
+          "phase": 1,
+          "occt_distance_mm": 2.499999999999994
+        }
+      ]
+    }
+  ],
+  "rejected_cases": [
+    {
+      "case": "excessive_requirement",
+      "source_sha256": "3b08947640d4ce5e2626fa1b1e324165a91027e606c8eb17e713386af066b388",
+      "source_text": "# Generated independent polygon-bore clearance fixture: plain, identity, excessive_requirement.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_stock = extrude(id=\"shaft_stock\", profile=circle(id=\"shaft_profile\", radius=6), height=7)\nshaft_body = translate(id=\"shaft_body\", body=shaft_stock, offset=[0,0,-3])\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=3.1,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "plate_shaft_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: continuous rotation clearance: a sampled pose does not certify the required minimum; contact, insufficient clearance, or numerical threshold uncertainty cannot pass",
+        "error": "clearance check 'plate_shaft_gap' on 'polygon_bore_pair' failed: unsupported geometry: continuous rotation clearance: a sampled pose does not certify the required minimum; contact, insufficient clearance, or numerical threshold uncertainty cannot pass",
+        "lower_bound_mm": null,
+        "output_name": "polygon_bore_pair",
+        "upper_bound_mm": null
+      }
+    },
+    {
+      "case": "contact",
+      "source_sha256": "9658830a454ee4df1b76d6550b60cdf03052623183edd0df69d3d3e52d72bad4",
+      "source_text": "# Generated independent polygon-bore clearance fixture: plain, identity, contact.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":6},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_stock = extrude(id=\"shaft_stock\", profile=circle(id=\"shaft_profile\", radius=6), height=7)\nshaft_body = translate(id=\"shaft_body\", body=shaft_stock, offset=[0,0,-3])\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.9,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "plate_shaft_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders, hole-free convex line/arc right prisms, or convex axis-closed linear-meridian revolutions with a resolved support certificate",
+        "error": "clearance check 'plate_shaft_gap' on 'polygon_bore_pair' failed: unsupported geometry: convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders, hole-free convex line/arc right prisms, or convex axis-closed linear-meridian revolutions with a resolved support certificate",
+        "lower_bound_mm": null,
+        "output_name": "polygon_bore_pair",
+        "upper_bound_mm": null
+      }
+    },
+    {
+      "case": "offset_axis",
+      "source_sha256": "7c6be516840af2990f87cd1e55e8d4b70b0d6d0dd09f4a51a3ed85df9f3cb2e9",
+      "source_text": "# Generated independent polygon-bore clearance fixture: plain, identity, offset_axis.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_stock = extrude(id=\"shaft_stock\", profile=circle(id=\"shaft_profile\", radius=6), height=7)\nshaft_body = translate(id=\"shaft_body\", body=shaft_stock, offset=[0,0,-3])\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0.25,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.9,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "plate_shaft_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders, hole-free convex line/arc right prisms, or convex axis-closed linear-meridian revolutions with a resolved support certificate",
+        "error": "clearance check 'plate_shaft_gap' on 'polygon_bore_pair' failed: unsupported geometry: convex clearance requires two separated, validated single convex planar solids or finite solid circular cylinders, hole-free convex line/arc right prisms, or convex axis-closed linear-meridian revolutions with a resolved support certificate",
+        "lower_bound_mm": null,
+        "output_name": "polygon_bore_pair",
+        "upper_bound_mm": null
+      }
+    },
+    {
+      "case": "concave_outer",
+      "source_sha256": "6c3d961919e41e33f4838070b6eacacfca4d99e6a8ab75ad66b28120c8d5634a",
+      "source_text": "# Generated independent polygon-bore clearance fixture: plain, identity, concave_outer.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [0, 10], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_stock = extrude(id=\"shaft_stock\", profile=circle(id=\"shaft_profile\", radius=6), height=7)\nshaft_body = translate(id=\"shaft_body\", body=shaft_stock, offset=[0,0,-3])\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.9,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "plate_shaft_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "pre-placement clearance admission: operation exceeds resource limit: solid clearance topology budget exceeded",
+        "error": "clearance check 'plate_shaft_gap' on 'polygon_bore_pair' failed: pre-placement clearance admission: operation exceeds resource limit: solid clearance topology budget exceeded",
+        "lower_bound_mm": null,
+        "output_name": "polygon_bore_pair",
+        "upper_bound_mm": null
+      }
+    },
+    {
+      "case": "inner_polygon_hole",
+      "source_sha256": "d87be74ecbb4ef2592a1b0186fa39b31f6f86004bf5fe1c6f1baddcfb5d3d603",
+      "source_text": "# Generated independent polygon-bore clearance fixture: plain, identity, inner_polygon_hole.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], holes = [[[12,-2],[14,-2],[14,2],[12,2]]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-17,0],\"radius\":1.5},\n        {\"center\":[17,0],\"radius\":1.5},\n    ]), height=3)\nshaft_stock = extrude(id=\"shaft_stock\", profile=circle(id=\"shaft_profile\", radius=6), height=7)\nshaft_body = translate(id=\"shaft_body\", body=shaft_stock, offset=[0,0,-3])\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.9,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "diagnostic": {
+        "causes": [],
+        "code": "invalid_polygon_profile",
+        "diagnostic": "unsupported geometry: polygon must have resolved positive counterclockwise area",
+        "error": "invalid polygon profile 'plate_profile': unsupported geometry: polygon must have resolved positive counterclockwise area",
+        "feature": "plate_profile"
+      }
+    },
+    {
+      "case": "tangent_other_bore",
+      "source_sha256": "d9925585cf3ef1b625f8840f25054373c1441b3c6428d75e22f61bcb5192c9db",
+      "source_text": "# Generated independent polygon-bore clearance fixture: plain, identity, tangent_other_bore.\nplate_body = extrude(id=\"plate_body\", profile=polygon(id=\"plate_profile\",\n    points=[[-24, -18], [24, -18], [24, 12], [18, 18], [-18, 18], [-24, 12]], circular_holes=[\n        {\"center\":[0,0],\"radius\":9},\n        {\"center\":[-10.5,0],\"radius\":1.5},\n        {\"center\":[10.5,0],\"radius\":1.5},\n    ]), height=3)\nshaft_stock = extrude(id=\"shaft_stock\", profile=circle(id=\"shaft_profile\", radius=6), height=7)\nshaft_body = translate(id=\"shaft_body\", body=shaft_stock, offset=[0,0,-3])\nplate = part(id=\"plate\", body=plate_body, part_number=\"PB-PLATE\", material=\"Aluminum\", density_kg_per_m3=2700)\nshaft = part(id=\"shaft\", body=shaft_body, part_number=\"PB-SHAFT\", material=\"Steel\", density_kg_per_m3=7800)\npair = assembly(id=\"pair\", instances=[instance(id=\"plate\",part=plate),\n    instance(id=\"shaft\",part=shaft,offset=[0,0,0])])\nscene = assembly(id=\"scene\",instances=[assembly_instance(id=\"fixture\",assembly=pair,\n    rotation=[0, 0, 0, 1],offset=[0, 0, 0])])\nassembly_output(name=\"polygon_bore_pair\",assembly=scene)\noutput(name=\"plate\",feature=plate_body)\noutput(name=\"shaft\",feature=shaft_body)\nclearance_check(id=\"plate_shaft_gap\",output=\"polygon_bore_pair\",\n    left_instance_path=[\"fixture\",\"plate\"],right_instance_path=[\"fixture\",\"shaft\"],\n    min_clearance=2.9,rotation_group=\"rotor\")\nrigid_rotation_group(id=\"rotor\",output=\"polygon_bore_pair\",\n    instance_paths=[[\"fixture\",\"shaft\"]],reference_instance_path=[\"fixture\",\"shaft\"],\n    pivot=[0,0,0],axis=[0,0,1],angle_radians=6.283185307179586)\n",
+      "diagnostic": {
+        "causes": [],
+        "code": "invalid_polygon_profile",
+        "diagnostic": "unsupported geometry: invalid polygon prism with circular through holes",
+        "error": "invalid polygon profile 'plate_profile': unsupported geometry: invalid polygon prism with circular through holes",
+        "feature": "plate_profile"
+      }
+    }
+  ],
+  "scope": "Native full-turn named-pair proof; independent exact OCCT solids and sampled phases. No general collision, fastener, load or manufacturing certificate."
+}

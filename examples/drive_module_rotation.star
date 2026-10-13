@@ -268,6 +268,11 @@ def washer_checks():
         clearance_check(id = name+"_hub_gap", output = "drive_module_release", left_instance_path = [name], right_instance_path = ["drive_disc"], min_clearance = 0.09, rotation_group = "rotor")
 washer_checks()
 clearance_check(id = "shaft_washer_bush_gap", output = "drive_module_release", left_instance_path = ["shaft_washer"], right_instance_path = ["right_support","right_sleeve"], min_clearance = 0.09, rotation_group = "rotor")
+# The actual polygonal end covers are fixed while the keyed shaft turns. Native
+# whole-turn bore witnesses certify the shaft's clearance to each cover aperture.
+# These two checks do not stand in for all new hardware pair interactions.
+clearance_check(id = "left_cover_shaft_gap", output = "drive_module_release", left_instance_path = ["left_support","left_cover"], right_instance_path = ["shaft"], min_clearance = 2, rotation_group = "rotor")
+clearance_check(id = "right_cover_shaft_gap", output = "drive_module_release", left_instance_path = ["right_support","right_cover"], right_instance_path = ["shaft"], min_clearance = 4, rotation_group = "rotor")
 # Ring/groove, ring/washer and key/floor contacts are intentional. The open ring
 # is outside the clearance-query family; no full-annulus surrogate is queried.
 

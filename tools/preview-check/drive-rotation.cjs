@@ -10,7 +10,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
   assert.ok((await page.goto(`${base}/rigid-rotation-groups.html`)).ok());
   for(const link of await page.locator('a').evaluateAll(nodes=>nodes.map(n=>n.href)))assert.ok((await page.request.get(link)).ok(),link);
   const evidence=await(await page.request.get(`${base}/rigid-rotation-groups.json`)).json();
-  const group=evidence.groups.rotor;assert.equal(group.members.length,9);assert.equal(group.coverage,'named_pairs_only');assert.equal(group.clearance_check_ids.length,11);
+  const group=evidence.groups.rotor;assert.equal(group.members.length,9);assert.equal(group.coverage,'named_pairs_only');
+  assert.equal(group.clearance_check_ids.length,13);
+  for(const name of ['left_cover_shaft_gap','right_cover_shaft_gap'])
+   assert.ok(group.clearance_check_ids.includes(name),`native cover-shaft proof ${name}`);
   const assembly=await(await page.request.get(`${base}/drive_module_release.assembly.json`)).json();
   assert.equal(assembly.instances.length,30);assert.equal(Object.keys(assembly.definitions).length,14);
   const added=[
@@ -19,6 +22,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
   ];
   for(const path of added)assert.ok(assembly.instances.some(i=>i.id===JSON.stringify(path)),`placed ${path.join('/')}`);
   const source=await(await page.request.get(`${base}/recipe.star`)).text();
+  assert.ok(source.includes('left_cover_shaft_gap')&&source.includes('right_cover_shaft_gap'));
   const section=await(await page.request.get(`${base}/section-mounting_plan.json`)).json();
   const baseSection=section.occurrences.find(o=>o.instance_path.length===1&&o.instance_path[0]==='base');
   assert.ok(baseSection,'base occurrence has a native mounting section');

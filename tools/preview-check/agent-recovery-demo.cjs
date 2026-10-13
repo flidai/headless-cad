@@ -53,7 +53,9 @@ const assert=require('node:assert/strict');
     assert.ok(source.includes('id = "end_cover_body"'));
     assert.ok(source.includes('id = "cover_screw_body"'));
    }
-   assert.equal(Object.keys(manifest.clearance_checks).length,11);
+   const expectedChecks=source.includes('left_cover_shaft_gap')?13:11;
+   assert.equal(Object.keys(manifest.clearance_checks).length,expectedChecks);
+   if(fixture)assert.equal(fixture.named_continuous_clearance_checks,expectedChecks);
    assert.ok((await page.goto(`${base}/${name}/rotation-rotor.html`)).ok());
    assert.equal(await page.locator('#rotation-inspection').getAttribute('data-error'),null);
    await page.locator('#recipe-toggle').click();

@@ -2657,7 +2657,7 @@ reference body's frame; the builder resolves one shared world rotation.
 A `clearance_check` can reference `rotation_group = "rotor"` instead of a
 single-body translation or rotation.
 
-The eleven named positive-clearance pairs use 21 native distance queries.
+The thirteen named positive-clearance pairs use 27 native distance queries.
 Six pairs have both endpoints in the group, so common rigid motion preserves
 their initial distance. Five pairs use a new rotational-symmetry certificate
 against a stationary native circular extrusion or orthogonal full-turn
@@ -2665,6 +2665,10 @@ revolution. Complete boundary consistency, axis alignment and arithmetic
 allowances certify the full path. Three actual native queries accompany each
 symmetry proof; they are independent checks, not the continuous proof itself.
 Stationary conical or generally trimmed solids retain generic subdivision.
+Two additional cover-to-shaft pairs use native `bore_witness_orbit` proofs:
+the actual polygonal covers retain their central through-bores and separate
+screw-clearance holes. Their static distances are 2.5 mm on the left and 4.5 mm
+on the right; source obligations require at least 2 mm and 4 mm respectively.
 
 Clearance report schema 4 distinguishes `common_rigid_motion`, native rotational
 symmetry and Lipschitz subdivision. A symmetry proof carries explicit `[0,1]`
@@ -2688,11 +2692,11 @@ with live updates from another revision.
 
 `tools/check-drive-rotation.py` independently checks signed full turns across
 four parameter configurations, native proof identities, actual STEP sample
-witnesses, eleven distances at nine phases per case, all 435 occurrence pairs
+witnesses, thirteen distances at nine phases per case, all 435 occurrence pairs
 at each phase, and failed-publication preservation. For the 54 new cover/screw
 versus rotor pairs, separate conservative axial/radial bounds establish
 full-turn separation with an explicit numerical allowance. These independent
-bounds are distinct from the eleven native named-pair certificates. Sampling
+bounds are distinct from the thirteen native named-pair certificates. Sampling
 alone does not close collision or mechanical-release gates. Group membership
 does not certify ring installation, strength, preload or unlisted contacts.
 
@@ -3026,7 +3030,7 @@ The rotating drive (`examples/drive_module_rotation.star`) uses a rounded,
 four-hole mounting plate. `base_corner_radius` (2–10 mm, default 6) controls
 four native longitudinal fillets and their semantic radius dimensions on the
 mounting drawing. Its material assertions include the removed corner volume;
-the expanded 30-part assembly keeps its eleven named clearance checks and
+the expanded 30-part assembly has thirteen named clearance checks and
 nine-member rotation group. The viewer remains an inspector of the captured
 recipe and evidence. These nominal dimensions do not certify manufactured fit.
 
@@ -3040,8 +3044,11 @@ rotating shaft hardware. Source checks include machined material volume,
 pilot walls and floors, section diameters, and the unchanged shaft endplay.
 The assembly uses 14 part definitions; left and right housings have distinct
 geometry. Screw envelopes do not model threads, preload or rated retention.
-The eleven native continuous checks still cover their named original pairs;
-adding these parts does not implicitly extend that certificate.
+The original eleven native continuous checks retain their named scope; two
+additional native checks certify cover-to-shaft clearance for the full turn.
+The exact covers are recognized as convex polygon prisms with circular through
+bores. Blind bores, polygonal inner holes, nonconvex outer boundaries and
+noncoaxial shafts remain outside this proof family.
 
 The retained [independent geometry report](docs/evidence/drive-covers-local.json)
 covers four configurations, including the 16 mm shaft and 90 mm mounting pitch.
@@ -3050,6 +3057,14 @@ have guarded full-turn lower bounds of at least 2.4999 mm. Nine sampled poses
 per configuration show no positive-volume intersections among all 435 pairs.
 The [accepted offline replay](docs/evidence/drive-covers-offline-replay-local.json)
 matches 147 artifact files and 27 manifest fields after an agent restart.
+
+The subsequent [native polygon-bore validation](docs/evidence/drive-polygon-bore-clearance-local.json)
+checks all thirteen named drive proofs across four configurations. Separate
+[plain and stepped shaft cases](docs/evidence/polygon-bore-clearance-local.json)
+include a common oblique placement and six publication-preserving refusals.
+The [new accepted replay](docs/evidence/native-cover-clearance-replay-local.json)
+also confirms that the added proofs leave all 51 native B-rep/STEP/STL assets
+byte-identical to the prior drive, matched by output or part identity.
 
 `examples/rounded_bearing_fit.star` pairs a rounded, through-bored housing with
 a genuinely keyed shaft. Its static `bore_trim_witness` certificate checks the

@@ -431,19 +431,35 @@ fn lost_delivery_recovers_full_drive_inventory_without_rebuilding() {
         json!({"snapshot_id":snapshot["snapshot_id"],"mode":"build","request_id":"drive-delivery"});
     client.id += 1;
     client.send(json!({"jsonrpc":"2.0","id":client.id,"method":"tools/call","params":{"name":"cad_evaluate","arguments":args}}));
-    let until = std::time::Instant::now() + Duration::from_secs(30);
+    // The worker has a 60-second build contract; allow five seconds for the
+    // durable receipt to become observable under concurrent workspace tests.
+    let started = std::time::Instant::now();
+    let until = started + Duration::from_secs(65);
+    let receipts = state.path().join("receipts");
     loop {
-        let committed = fs::read_dir(state.path().join("receipts"))
+        let committed = fs::read_dir(&receipts)
             .unwrap()
             .filter_map(Result::ok)
             .any(|entry| entry.path().extension().is_some_and(|x| x == "json"));
         if committed {
             break;
         }
-        assert!(
-            std::time::Instant::now() < until,
-            "drive did not commit durable receipt"
-        );
+        if std::time::Instant::now() >= until {
+            let entries = fs::read_dir(&receipts)
+                .map(|items| {
+                    items
+                        .filter_map(Result::ok)
+                        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            panic!(
+                "drive did not commit durable receipt after {:?}; {} contains {:?}",
+                started.elapsed(),
+                receipts.display(),
+                entries
+            );
+        }
         std::thread::sleep(Duration::from_millis(10));
     }
     drop(client); // The caller never consumes the evaluation response.
@@ -460,7 +476,13 @@ fn lost_delivery_recovers_full_drive_inventory_without_rebuilding() {
     assert!(delivered["artifacts"].as_array().unwrap().len() > 64);
     let manifest: Value =
         serde_json::from_str(&recovered.artifact(&delivered, "manifest.json")).unwrap();
-    assert_eq!(manifest["clearance_checks"].as_object().unwrap().len(), 11);
+    assert_eq!(manifest["clearance_checks"].as_object().unwrap().len(), 13);
+    for id in ["left_cover_shaft_gap", "right_cover_shaft_gap"] {
+        assert_eq!(
+            manifest["clearance_checks"][id]["rotation_sweep"]["proof_kind"],
+            "bore_witness_orbit"
+        );
+    }
     assert_eq!(
         manifest["rigid_rotation_groups"]["rotor"]["members"]
             .as_array()

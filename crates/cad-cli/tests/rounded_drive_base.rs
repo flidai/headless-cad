@@ -25,7 +25,7 @@ fn success(output: std::process::Output) -> Value {
 fn verify(report: &Value, out: &Path, radius: f64, pitch: f64) {
     assert_eq!(report["outputs"]["drive_module_release"]["instances"], 30);
     assert_eq!(report["outputs"]["drive_module_release"]["definitions"], 14);
-    assert_eq!(report["clearance_checks"].as_object().unwrap().len(), 11);
+    assert_eq!(report["clearance_checks"].as_object().unwrap().len(), 13);
     assert_eq!(
         report["rigid_rotation_groups"]["rotor"]["members"]
             .as_array()
@@ -42,6 +42,20 @@ fn verify(report: &Value, out: &Path, radius: f64, pitch: f64) {
         .unwrap()
         .values()
         .all(|c| c["status"] == "passed"));
+    for (id, required, nominal) in [
+        ("left_cover_shaft_gap", 2., 2.5),
+        ("right_cover_shaft_gap", 4., 4.5),
+    ] {
+        let check = &report["clearance_checks"][id];
+        assert_eq!(check["query"]["method"], "bore_trim_witness");
+        assert_eq!(check["motion_proof"], "continuous_rotation");
+        assert_eq!(check["moving_endpoint"], "right");
+        assert_eq!(check["rotation_sweep"]["proof_kind"], "bore_witness_orbit");
+        assert_eq!(check["rotation_sweep"]["query_count"], 3);
+        assert!(check["rotation_sweep"]["bore_orbit"].is_object());
+        assert!(check["lower_bound_mm"].as_f64().unwrap() >= required);
+        assert!((check["lower_bound_mm"].as_f64().unwrap() - nominal).abs() < 1e-4);
+    }
     let volume = 6.
         * (80. * (pitch + 90.)
             - 36. * std::f64::consts::PI

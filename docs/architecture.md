@@ -3512,13 +3512,13 @@ add pilot wall/floor lineage, machined material volume and three section views
 with diameter dimensions. These checks describe nominal geometry; thread
 engagement, preload, installation and rated loads remain open.
 
-The eleven native continuous clearance declarations retain their original
-named-pair scope. The current clearance recognizers do not admit the exact
-multi-bore polygon covers or eccentric stepped screw shapes for these new
-queries. Independent full-phase envelope bounds and sampled OCCT checks must
-therefore be reported separately from native certificates. Neither extra
-parts nor independent nominal geometry evidence closes the commercial
-mechanical-intent or manufacturing release gates.
+The end-cover introduction retained the original eleven native continuous
+clearance declarations. Its independent full-phase envelope bounds and sampled
+OCCT checks are reported separately from those native certificates. The native
+polygon-bore extension below adds two cover-to-shaft declarations; eccentric
+stepped screws still fall outside the native query family. Neither extra parts
+nor nominal geometry evidence closes the commercial mechanical-intent or
+manufacturing release gates.
 
 The retained [independent end-cover evidence](evidence/drive-covers-local.json)
 pins source, executable and oracle identities across four configurations,
@@ -3536,3 +3536,47 @@ separately records process restart, sealed delivery and offline equality for
 six added cover/screw occurrences, expose their captured source and retain
 GET-only inspection. These are bounded nominal results, not physical retention
 or general contact certification.
+
+### Native clearance for polygonal through-bore covers
+
+The shared holed-envelope admission now recognizes both canonical convex
+line/arc prisms and convex polygon prisms with circular through-bores. The
+polygon branch retains the exact raw hole-free outer body and actual bore face
+IDs. It requires one convex outer loop, disjoint circular bores and consistent
+canonical cap/wall incidence; polygonal inner holes, blind bores and nonconvex
+outer bodies remain unsupported. Reconstructed frames cannot replace raw
+supports without reconciliation: planes, lines, cylinder/circle supports,
+periodic seam vertices and seam lines must agree within arithmetic allowances.
+
+External surviving-witness and nested bore-witness queries share this admission.
+The nested proof still needs an arithmetic-coaxial shaft, a guarded disk free of
+other bores, and witnesses on surviving native material. Polygon boundary
+inradius comes from exact line-segment distances with an explicit error charge.
+The full-turn orbit certificate charges support, placement and motion error
+into both final interval endpoints. Its auxiliary variation allowance is one
+quarter of the modeling tolerance; the complete final interval must still fit
+within that tolerance. This does not relax raw-support or coaxiality checks.
+
+The drive declares `left_cover_shaft_gap` >= 2 mm and
+`right_cover_shaft_gap` >= 4 mm, with nominal separations 2.5 mm and 4.5 mm.
+Each uses a native `bore_trim_witness` static query and a three-query
+`bore_witness_orbit` continuous certificate. Together with the unchanged eleven
+original declarations, the group has thirteen named checks and 27 native
+queries. The separate 54-pair independent envelope evidence retains its scope;
+these two added native proofs do not certify screw engagement, arbitrary
+assembly contacts, installation or load capacity.
+
+The retained [native drive report](evidence/drive-polygon-bore-clearance-local.json)
+pins the release executable, source and oracle across four configurations.
+It checks all thirteen proofs and 27 native queries, both new bore-witness
+orbits, unchanged exact STEP solids, independent full-turn bounds, nine sampled
+poses and five publication-preserving refusals. The separate
+[polygon-bore report](evidence/polygon-bore-clearance-local.json) embeds three
+plain/stepped/obliquely placed source fixtures and six refusal fixtures, with
+independent STEP solids and distances. The
+[accepted replay evidence](evidence/native-cover-clearance-replay-local.json)
+records 147 exact artifact comparisons and 27 semantic manifest fields after
+restart and offline rebuild. Across the previous and new release, 37 same-named
+geometry exports and fourteen definition BReps matched by part ID are byte
+identical. Versioned definition asset names change with kernel build identity;
+this comparison does not require those filenames to remain stable.

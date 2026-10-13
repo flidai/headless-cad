@@ -29,6 +29,10 @@ from OCP.TopAbs import TopAbs_FACE
 
 MOVING={('shaft',),('drive_disc',),('parallel_key',),('shaft_washer',),('shaft_ring',),
         ('hub_left_washer',),('hub_left_ring',),('hub_right_washer',),('hub_right_ring',)}
+COVER_SHAFT_CHECKS={
+    'left_cover_shaft_gap':(('left_support','left_cover'),2.5,2.0),
+    'right_cover_shaft_gap':(('right_support','right_cover'),4.5,4.0),
+}
 
 HOUSING_OUTLINE=[(-22,-26),(22,-26),(22,14),(14,22),(-14,22),(-22,14)]
 COVER_CENTERS=(-17,17)
@@ -110,6 +114,10 @@ def all_phase_new_pair_certificates(diameter,pitch):
     guard=max(1e-4,256*sys.float_info.epsilon*(pitch+100))
     for fixed_path,(fmin,fmax,radial_floor) in fixed.items():
         for moving_path,(mmin,mmax,radial_ceiling) in moving.items():
+            # The shaft's only r+2 shoulder ends at world X=10+12.9;
+            # later grooves/keyseat remove material from the r journal.
+            if moving_path==('shaft',) and fmin>=10+12.9:
+                radial_ceiling=diameter/2
             axial_gap=max(fmin-mmax,mmin-fmax,0)
             radial_gap=radial_floor-radial_ceiling
             raw_bound=max(axial_gap,radial_gap)
@@ -119,6 +127,7 @@ def all_phase_new_pair_certificates(diameter,pitch):
                 'minimum_distance_lower_bound_mm':bound,
                 'raw_geometric_bound_mm':raw_bound,
                 'arithmetic_and_export_guard_mm':guard,
+                'rotor_radial_ceiling_mm':radial_ceiling,
                 'method':'invariant_axial_interval' if axial_gap>=radial_gap else 'invariant_radial_exclusion',
             }
     d.require(len(certificates)==54,'all 6 new fixed × 9 rotor pairs certified')
@@ -208,8 +217,9 @@ def run_case(cad,directory,diameter,pitch,sign,radius):
     expected={'left_support_running_gap':.1,'right_support_running_gap':.15,
               'left_support_disc_gap':pitch/2-16,'right_support_disc_gap':pitch/2-14,'disc_shaft_gap':.15,
               'hub_left_washer_shaft_gap':.1,'hub_right_washer_shaft_gap':.1,'shaft_washer_shaft_gap':.1,
-              'hub_left_washer_hub_gap':.1,'hub_right_washer_hub_gap':.1,'shaft_washer_bush_gap':.1}
-    checks=manifest['clearance_checks'];d.require(set(checks)==set(expected),'eleven explicit pairs')
+              'hub_left_washer_hub_gap':.1,'hub_right_washer_hub_gap':.1,'shaft_washer_bush_gap':.1,
+              **{name:values[1] for name,values in COVER_SHAFT_CHECKS.items()}}
+    checks=manifest['clearance_checks'];d.require(set(checks)==set(expected),'thirteen explicit pairs')
     query_count=0;proofs={}
     for name,check in checks.items():
         d.require(check['rotation_group']=='rotor' and check['status']=='passed','group-bound passed check')
@@ -217,6 +227,41 @@ def run_case(cad,directory,diameter,pitch,sign,radius):
         both=left in MOVING and right in MOVING
         d.require(check['lower_bound_mm']<=expected[name]+1e-7 and check['upper_bound_mm']>=expected[name]-1e-7,'whole-path expected minimum')
         d.require(check['lower_bound_mm']>=check['declaration']['min_clearance'],'native lower bound meets requirement')
+        if name in COVER_SHAFT_CHECKS:
+            fixed_path,_,required=COVER_SHAFT_CHECKS[name]
+            d.require(left==fixed_path and right==('shaft',) and not both,
+                      'cover-shaft endpoint orientation '+name)
+            d.close(check['declaration']['min_clearance'],required,
+                    'cover-shaft authored minimum '+name)
+            d.require(check['query']['method']=='bore_trim_witness' and
+                      check['motion_proof']=='continuous_rotation' and
+                      check['moving_endpoint']=='right',
+                      'native circular-bore/shaft witness '+name)
+            sweep=check['rotation_sweep']
+            d.require(sweep['proof_kind']=='bore_witness_orbit' and
+                      sweep['query_count']==3 and sweep['intervals']==[],
+                      'native full-turn bore witness orbit '+name)
+            orbit=sweep['bore_orbit']
+            d.require('symmetry' not in sweep and orbit['start']==0 and orbit['end']==1,
+                      'explicit complete bore orbit interval '+name)
+            d.close(orbit['bore_radius_mm'],diameter/2+4.5,
+                    'selected actual cover bore radius '+name)
+            d.require(orbit['guarded_radius_mm']>=orbit['bore_radius_mm'] and
+                      orbit['shaft_stock_outer_radius_mm']<=diameter/2+2+1e-8 and
+                      orbit['axis_offset_mm']<1e-6 and
+                      orbit['axis_direction_departure']<1e-6 and
+                      orbit['distance_variation_bound_mm']>0 and
+                      orbit['lower_bound_mm']<=expected[name]<=orbit['upper_bound_mm'],
+                      'finite source-bound bore/stock full-turn geometry '+name)
+            d.require(sorted(sample['time'] for sample in sweep['samples'])==[0,.5,1],
+                      'three actual bore orbit samples '+name)
+            for sample in sweep['samples']:
+                moved=posed(shapes[right],sign*math.tau*sample['time'])
+                for side,shape in [('left',shapes[left]),('right',moved)]:
+                    d.require(boundary_distance(sample['query'][side+'_point'],shape)<2e-6,
+                              'native bore witness on exact STEP boundary '+name)
+            query_count+=3;proofs[name]='bore_witness_orbit'
+            continue
         if both:
             d.require(check['motion_proof']=='common_rigid_motion' and 'rotation_sweep' not in check,'same rigid transform preserves distance')
             query_count+=1;proofs[name]='common_rigid_motion'
@@ -234,7 +279,7 @@ def run_case(cad,directory,diameter,pitch,sign,radius):
                 for side,shape in [('left',shapes[stationary]),('right',moved)]:
                     d.require(boundary_distance(sample['query'][side+'_point'],shape)<2e-6,'native sample witness on actual STEP boundary')
             query_count+=3;proofs[name]='rotational_symmetry'
-    d.require(query_count==21,'twenty-one actual native group queries')
+    d.require(query_count==27,'twenty-seven actual native group queries')
     sampled=[]
     for phase in [0,.125,.25,.375,.5,.625,.75,.875,1]:
         actual={path:posed(shape,sign*math.tau*phase) if path in MOVING else shape for path,shape in shapes.items()}

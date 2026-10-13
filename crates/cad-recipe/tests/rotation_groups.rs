@@ -10,7 +10,7 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
     let group = &built.rigid_rotation_groups["rotor"];
     assert_eq!(group.members.len(), 9);
     assert_eq!(group.coverage, "named_pairs_only");
-    assert_eq!(group.clearance_check_ids.len(), 11);
+    assert_eq!(group.clearance_check_ids.len(), 13);
     assert_eq!(built.assemblies["drive_module_release"].instances.len(), 30);
     assert_eq!(built.assemblies["drive_module_release"].parts.len(), 14);
     assert_eq!(built.datum_dimensions.len(), 10);
@@ -54,7 +54,8 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
     assert!(built.tolerance_stacks["hub_axial_endplay"].measurement_interval_certified);
     let mut queries = 0;
     let mut common = 0;
-    for check in built.clearance_checks.values() {
+    let mut bore_orbits = 0;
+    for (id, check) in &built.clearance_checks {
         assert_eq!(check.rotation_group.as_deref(), Some("rotor"));
         assert!(check.lower_bound_mm >= check.declaration.min_clearance);
         if check.motion_proof.as_deref() == Some("common_rigid_motion") {
@@ -62,6 +63,29 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
             queries += 1;
             assert_eq!(check.moving_endpoint.as_deref(), Some("both"));
             assert!(check.rotation_sweep.is_none());
+        } else if ["left_cover_shaft_gap", "right_cover_shaft_gap"].contains(&id.as_str()) {
+            bore_orbits += 1;
+            assert_eq!(check.motion_proof.as_deref(), Some("continuous_rotation"));
+            assert_eq!(check.moving_endpoint.as_deref(), Some("right"));
+            assert_eq!(
+                serde_json::to_value(check.query.method).unwrap(),
+                "bore_trim_witness"
+            );
+            let sweep = check.rotation_sweep.as_ref().unwrap();
+            assert_eq!(
+                serde_json::to_value(sweep.proof_kind).unwrap(),
+                "bore_witness_orbit"
+            );
+            assert_eq!(sweep.query_count, 3);
+            let certificate = sweep.bore_orbit.as_ref().unwrap();
+            assert_eq!((certificate.start, certificate.end), (0., 1.));
+            let expected = if id == "left_cover_shaft_gap" {
+                2.5
+            } else {
+                4.5
+            };
+            assert!((check.lower_bound_mm - expected).abs() < 1e-4);
+            queries += sweep.query_count;
         } else {
             let sweep = check.rotation_sweep.as_ref().unwrap();
             assert_eq!(
@@ -75,7 +99,7 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
             queries += sweep.query_count;
         }
     }
-    assert_eq!((common, queries), (6, 21));
+    assert_eq!((common, bore_orbits, queries), (6, 2, 27));
     let mut reversed = replay.clone();
     reversed.rigid_rotation_groups[0].angle_radians *= -1.;
     let cached = engine.build(&reversed).unwrap();

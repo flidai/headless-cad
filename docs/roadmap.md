@@ -874,3 +874,10 @@ face lineage and section dimensions while preserving shaft endplay. The
 original eleven native motion checks keep their named scope. Continue toward
 native clearance for the exact added shapes, thread/fastener semantics,
 installation and load validation; nominal covers do not close R3 or R4.
+
+Native through-bore clearance now extends to the drive's actual convex polygon
+covers. Two source-owned cover-to-shaft full-turn checks augment the original
+eleven, using explicit native surviving-witness/orbit certificates. Admission
+checks the raw surfaces and seams and refuses unsupported pockets, polygonal
+inner holes and nonconvex stock. Continue toward eccentric fasteners and broader
+contact geometry; thirteen named checks do not close the mechanical-intent gate.

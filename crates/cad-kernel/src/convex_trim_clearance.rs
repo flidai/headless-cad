@@ -1,5 +1,5 @@
 //! Clearance from convex outer envelopes with certified surviving witnesses.
-//! Only circular through holes of canonical curved arc prisms are admitted.
+//! Only circular through holes of canonical convex line/arc prisms are admitted.
 use crate::convex_clearance::support;
 use crate::math::{cross, dot, norm, sub};
 use crate::*;
@@ -10,8 +10,189 @@ fn unsupported() -> KernelError {
 
 pub(crate) struct HoledEnvelope {
     outer: ModelSnapshot,
-    pub(crate) geometry: ArcPrismGeometry,
+    pub(crate) path: PlanarPath,
+    pub(crate) circular_holes: Vec<CircleHole>,
+    pub(crate) bore_faces: Vec<FaceId>,
+    pub(crate) origin: [f64; 3],
+    pub(crate) axis: [f64; 3],
+    pub(crate) x_direction: [f64; 3],
+    pub(crate) height: f64,
+    geometry: HoledGeometry,
     hole_error: f64,
+}
+
+enum HoledGeometry {
+    Arc(ArcPrismGeometry),
+    Polygon(ProfilePrismGeometry),
+}
+
+impl HoledEnvelope {
+    pub(crate) fn support_consistency(
+        &self,
+        model: &ModelSnapshot,
+        error: f64,
+        tolerance: Tolerance,
+    ) -> Result<(), KernelError> {
+        match &self.geometry {
+            HoledGeometry::Arc(g) => support::arc_consistency(model, g, error, tolerance),
+            HoledGeometry::Polygon(g) => polygon_consistency(model, g, error),
+        }
+    }
+
+    pub(crate) fn boundary_inradius(
+        &self,
+        center: [f64; 2],
+        tolerance: Tolerance,
+        error: f64,
+    ) -> Result<f64, KernelError> {
+        match &self.geometry {
+            HoledGeometry::Arc(_) => {
+                crate::arc_prism::path_boundary_distance(&self.path, center, tolerance, error)
+            }
+            HoledGeometry::Polygon(_) => {
+                let mut points = vec![self.path.start];
+                for segment in &self.path.segments[..self.path.segments.len() - 1] {
+                    let PathSegment::LineTo { end } = segment else {
+                        return Err(unsupported());
+                    };
+                    points.push(*end);
+                }
+                if !crate::simple_polygon::inside(center, &points) {
+                    return Err(unsupported());
+                }
+                let distance = (0..points.len())
+                    .map(|i| {
+                        crate::simple_polygon::distance(
+                            center,
+                            points[i],
+                            points[(i + 1) % points.len()],
+                        )
+                    })
+                    .fold(f64::INFINITY, f64::min);
+                Ok((distance - 4. * error).max(0.))
+            }
+        }
+    }
+}
+
+// The stripped polygon is the exact prefix of the raw body, not an envelope
+// inferred by fitting. Verify that every native plane and line stays within
+// the arithmetic guard of that prefix's vertices. The profile recognizer
+// separately proves canonical circle incidence and exact through topology;
+// these checks bind its reconstructed bore axes, ends and radii to raw walls
+// and edges without using modeling tolerance to move a support.
+fn polygon_consistency(
+    model: &ModelSnapshot,
+    geometry: &ProfilePrismGeometry,
+    error: f64,
+) -> Result<(), KernelError> {
+    let base = &geometry.base;
+    let direction = |a: [f64; 3], b: [f64; 3], extent: f64| {
+        norm(sub(a, b)) <= 128. * f64::EPSILON && norm(sub(a, b)) * extent <= error
+    };
+    for face in &base.faces {
+        let plane = face.try_plane().ok_or_else(unsupported)?;
+        if (norm(plane.normal) - 1.).abs() > 64. * f64::EPSILON {
+            return Err(KernelError::NumericRange);
+        }
+        for ring in &face.loops {
+            for point in base.loop_points(*ring).ok_or_else(unsupported)? {
+                if dot(sub(point, plane.origin), plane.normal).abs() > error {
+                    return Err(KernelError::NumericRange);
+                }
+            }
+        }
+    }
+    for edge in &base.edges {
+        let line = edge.try_line().ok_or_else(unsupported)?;
+        let a = base.vertices[edge.vertices[0].0].position;
+        let b = base.vertices[edge.vertices[1].0].position;
+        if norm(sub(line.origin, a)) > error
+            || (norm(line.direction) - 1.).abs() > 64. * f64::EPSILON
+            || norm(cross(sub(b, a), line.direction)) > error
+        {
+            return Err(KernelError::NumericRange);
+        }
+    }
+    let extent = base
+        .vertices
+        .iter()
+        .map(|vertex| norm(sub(vertex.position, geometry.origin)))
+        .fold(geometry.height, f64::max);
+    for (side, expected_normal) in [(0, geometry.axis.map(|value| -value)), (1, geometry.axis)] {
+        let cap = base.faces[side].try_plane().ok_or_else(unsupported)?;
+        if !direction(cap.normal, expected_normal, extent) {
+            return Err(KernelError::NumericRange);
+        }
+    }
+    for (i, bore) in geometry.bores.iter().enumerate() {
+        let f = base.faces.len() + i;
+        if bore.wall != FaceId(f) {
+            return Err(unsupported());
+        }
+        let Surface::Cylinder(wall) = &model.faces[f].surface else {
+            return Err(unsupported());
+        };
+        if norm(sub(wall.origin, bore.origin)) > error
+            || (wall.radius - bore.radius).abs() > error
+            || !direction(wall.axis, bore.axis, bore.height)
+            || !direction(wall.x_direction, bore.x_direction, bore.radius)
+        {
+            return Err(KernelError::NumericRange);
+        }
+        let lower = bore.origin;
+        let upper = std::array::from_fn(|j| bore.origin[j] + bore.height * bore.axis[j]);
+        if (bore.height - geometry.height).abs() > error
+            || !direction(bore.axis, geometry.axis, extent)
+        {
+            return Err(KernelError::NumericRange);
+        }
+        for (side, center) in [(0, lower), (1, upper)] {
+            let cap = base.faces[side].try_plane().ok_or_else(unsupported)?;
+            if dot(sub(center, cap.origin), cap.normal).abs()
+                + bore.radius * norm(cross(cap.normal, bore.axis))
+                > error
+            {
+                return Err(KernelError::NumericRange);
+            }
+        }
+        let rim = bore.x_direction.map(|value| value * bore.radius);
+        for (vertex, center) in [
+            (&model.vertices[base.vertices.len() + 2 * i], lower),
+            (&model.vertices[base.vertices.len() + 2 * i + 1], upper),
+        ] {
+            let expected = std::array::from_fn(|j| center[j] + rim[j]);
+            if norm(sub(vertex.position, expected)) > error {
+                return Err(KernelError::NumericRange);
+            }
+        }
+        for (edge, expected) in [
+            (&model.edges[base.edges.len() + 3 * i], lower),
+            (&model.edges[base.edges.len() + 3 * i + 1], upper),
+        ] {
+            let Curve::Circle(circle) = &edge.curve else {
+                return Err(unsupported());
+            };
+            if norm(sub(circle.origin, expected)) > error
+                || (circle.radius - bore.radius).abs() > error
+                || !direction(circle.axis, bore.axis, bore.height)
+                || !direction(circle.x_direction, bore.x_direction, bore.radius)
+            {
+                return Err(KernelError::NumericRange);
+            }
+        }
+        let seam = &model.edges[base.edges.len() + 3 * i + 2];
+        let line = seam.try_line().ok_or_else(unsupported)?;
+        let a = model.vertices[seam.vertices[0].0].position;
+        let b = model.vertices[seam.vertices[1].0].position;
+        if norm(sub(line.origin, a)) > error
+            || (norm(line.direction) - 1.).abs() > 64. * f64::EPSILON
+            || norm(cross(sub(b, a), line.direction)) > error
+        {
+            return Err(KernelError::NumericRange);
+        }
+    }
+    Ok(())
 }
 
 // ArcPrism::construct appends each hole after all outer primitives. Its
@@ -41,6 +222,17 @@ pub(crate) fn admit(m: &ModelSnapshot, t: Tolerance) -> Result<HoledEnvelope, Ke
     if !report.valid {
         return Err(KernelError::InvalidInput(report));
     }
+    if m.edges
+        .iter()
+        .any(|edge| matches!(edge.curve, Curve::CircularArc(_)))
+    {
+        admit_arc(m, t)
+    } else {
+        admit_polygon(m, t)
+    }
+}
+
+fn admit_arc(m: &ModelSnapshot, t: Tolerance) -> Result<HoledEnvelope, KernelError> {
     let geometry = crate::arc_prism::recognize(m, t)?;
     if geometry.circular_holes.is_empty()
         || !geometry
@@ -93,12 +285,92 @@ pub(crate) fn admit(m: &ModelSnapshot, t: Tolerance) -> Result<HoledEnvelope, Ke
     if !hole_error.is_normal() || hole_error > t.linear / 2. {
         return Err(KernelError::NumericRange);
     }
-    support::arc_consistency(m, &geometry, hole_error, t)?;
-    Ok(HoledEnvelope {
+    let admitted = HoledEnvelope {
         outer,
-        geometry,
+        path: geometry.path.clone(),
+        circular_holes: geometry.circular_holes.clone(),
+        bore_faces: (0..holes).map(|i| FaceId(n + 2 + i)).collect(),
+        origin: geometry.origin,
+        axis: geometry.axis,
+        x_direction: geometry.x_direction,
+        height: geometry.height,
+        geometry: HoledGeometry::Arc(geometry),
         hole_error,
-    })
+    };
+    admitted.support_consistency(m, hole_error, t)?;
+    Ok(admitted)
+}
+
+fn admit_polygon(m: &ModelSnapshot, t: Tolerance) -> Result<HoledEnvelope, KernelError> {
+    let geometry = crate::profile_prism::recognize(m, t)?;
+    if geometry.bores.is_empty()
+        || geometry.base.faces[0].loops.len() != 1
+        || geometry.base.faces[1].loops.len() != 1
+    {
+        return Err(unsupported());
+    }
+    geometry.base.validate_convex_clearance_operand(t)?;
+    let vertices = geometry
+        .base
+        .loop_points(geometry.base.faces[1].loops[0])
+        .ok_or_else(unsupported)?;
+    if vertices.len() < 3 {
+        return Err(unsupported());
+    }
+    let y = cross(geometry.axis, geometry.x_direction);
+    let points = vertices
+        .into_iter()
+        .map(|p| {
+            let d = sub(p, geometry.origin);
+            [dot(d, geometry.x_direction), dot(d, y)]
+        })
+        .collect::<Vec<_>>();
+    let path = PlanarPath {
+        start: points[0],
+        segments: points[1..]
+            .iter()
+            .chain(std::iter::once(&points[0]))
+            .map(|end| PathSegment::LineTo { end: *end })
+            .collect(),
+    };
+    let circular_holes = geometry
+        .bores
+        .iter()
+        .map(|bore| {
+            let d = sub(bore.origin, geometry.origin);
+            CircleHole {
+                center: [dot(d, geometry.x_direction), dot(d, y)],
+                radius: bore.radius,
+            }
+        })
+        .collect::<Vec<_>>();
+    let extent = points
+        .iter()
+        .map(|point| point[0].hypot(point[1]))
+        .fold(geometry.height, f64::max);
+    let world = m
+        .vertices
+        .iter()
+        .map(|vertex| norm(vertex.position))
+        .fold(norm(geometry.origin), f64::max);
+    let hole_error = ((32768. * world + 65536. * extent) * f64::EPSILON).next_up();
+    if !hole_error.is_normal() || hole_error > t.linear / 2. {
+        return Err(KernelError::NumericRange);
+    }
+    let admitted = HoledEnvelope {
+        outer: geometry.base.clone(),
+        path,
+        circular_holes,
+        bore_faces: geometry.bores.iter().map(|bore| bore.wall).collect(),
+        origin: geometry.origin,
+        axis: geometry.axis,
+        x_direction: geometry.x_direction,
+        height: geometry.height,
+        geometry: HoledGeometry::Polygon(geometry),
+        hole_error,
+    };
+    admitted.support_consistency(m, hole_error, t)?;
+    Ok(admitted)
 }
 
 fn sub2(a: [f64; 2], b: [f64; 2]) -> [f64; 2] {
@@ -109,25 +381,20 @@ fn norm2(v: [f64; 2]) -> f64 {
 }
 
 pub(crate) fn is_candidate(m: &ModelSnapshot, t: Tolerance) -> bool {
-    m.edges
-        .iter()
-        .any(|e| matches!(e.curve, Curve::CircularArc(_)))
-        && m.faces.first().is_some_and(|f| f.loops.len() > 1)
-        && crate::arc_prism::recognize(m, t).is_ok_and(|g| !g.circular_holes.is_empty())
+    m.faces.first().is_some_and(|f| f.loops.len() > 1) && admit(m, t).is_ok()
 }
 
 fn witness_survives(h: &HoledEnvelope, point: [f64; 3], guard: f64) -> bool {
-    let g = &h.geometry;
-    let delta = sub(point, g.origin);
-    let y = cross(g.axis, g.x_direction);
-    let projected = [dot(delta, g.x_direction), dot(delta, y)];
+    let delta = sub(point, h.origin);
+    let y = cross(h.axis, h.x_direction);
+    let projected = [dot(delta, h.x_direction), dot(delta, y)];
     // `arc_consistency` independently permits one hole_error of center,
     // radius, and supporting-axis drift. The transformed bore rim can move by
     // their sum; reserve another allowance for witness projection and cap
     // reconstruction. This is deliberately separate from modeling tolerance.
     let margin = (guard + 4. * h.hole_error).next_up();
     projected.iter().all(|v| v.is_finite())
-        && g.circular_holes.iter().all(|hole| {
+        && h.circular_holes.iter().all(|hole| {
             let separation = norm2(sub2(projected, hole.center));
             separation.is_finite() && separation > hole.radius + margin
         })

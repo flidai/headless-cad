@@ -290,9 +290,13 @@ fn bore_orbit_certificate(
         .next_up();
     let lower = (binding.query.lower_bound_mm - variation).next_down();
     let upper = (binding.query.upper_bound_mm + variation).next_up();
+    // This auxiliary gate gives the twice-charged variation at most half the
+    // tolerance budget (2 * variation <= tolerance/2). It is not the proof
+    // gate: both endpoints above already include the complete variation, and
+    // their final outward width must still fit the full tolerance below.
     if !roundoff.is_normal()
         || !variation.is_finite()
-        || variation > tolerance.linear / 8.
+        || variation > tolerance.linear / 4.
         || lower <= tolerance.linear
         || !upper.is_finite()
         || upper - lower > tolerance.linear

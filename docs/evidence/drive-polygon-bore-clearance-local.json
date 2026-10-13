@@ -1,0 +1,2594 @@
+{
+  "valid": true,
+  "executable_sha256": "c2b680902443fe0cefd1afb558709b70606fc097dd5c191c7ac47d41e0bf29c9",
+  "source_sha256": "d9491601818c97d47673c975eeca1648b639f17409f427164f21bb502d8dad83",
+  "oracle_script_sha256": "cec642a4cb2f27d4cb19332c474b2aba2b880860a49dad7014c494b1f75b07df",
+  "python_version": "3.13.15",
+  "ocp_distribution": "8.0.1.1.0",
+  "cases": [
+    {
+      "case": "d12-p60-turn1-r6",
+      "occurrences": 30,
+      "definitions": 14,
+      "fixed_rotor_certificates": {
+        "left_support/left_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 31.9999,
+          "raw_geometric_bound_mm": 32.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 32.4999,
+          "raw_geometric_bound_mm": 32.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.246211251235321,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 30.3999,
+          "raw_geometric_bound_mm": 30.4,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 29.199900000000003,
+          "raw_geometric_bound_mm": 29.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 46.09989999999999,
+          "raw_geometric_bound_mm": 46.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 47.59989999999999,
+          "raw_geometric_bound_mm": 47.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 80.09989999999999,
+          "raw_geometric_bound_mm": 80.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 81.59989999999999,
+          "raw_geometric_bound_mm": 81.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 4.4999,
+          "raw_geometric_bound_mm": 4.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 33.9999,
+          "raw_geometric_bound_mm": 34.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 34.4999,
+          "raw_geometric_bound_mm": 34.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.246211251235321,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 48.0999,
+          "raw_geometric_bound_mm": 48.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 49.5999,
+          "raw_geometric_bound_mm": 49.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 32.3999,
+          "raw_geometric_bound_mm": 32.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 31.199900000000003,
+          "raw_geometric_bound_mm": 31.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 2.9999,
+          "raw_geometric_bound_mm": 3.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 5.9999,
+          "raw_geometric_bound_mm": 6.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 24.9999,
+          "raw_geometric_bound_mm": 25.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 25.4999,
+          "raw_geometric_bound_mm": 25.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.246211251235321,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 23.3999,
+          "raw_geometric_bound_mm": 23.4,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 22.199900000000003,
+          "raw_geometric_bound_mm": 22.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 39.09989999999999,
+          "raw_geometric_bound_mm": 39.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 40.59989999999999,
+          "raw_geometric_bound_mm": 40.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 73.09989999999999,
+          "raw_geometric_bound_mm": 73.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 74.59989999999999,
+          "raw_geometric_bound_mm": 74.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 5.9999,
+          "raw_geometric_bound_mm": 6.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 24.9999,
+          "raw_geometric_bound_mm": 25.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 25.4999,
+          "raw_geometric_bound_mm": 25.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.246211251235321,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 23.3999,
+          "raw_geometric_bound_mm": 23.4,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 22.199900000000003,
+          "raw_geometric_bound_mm": 22.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 39.09989999999999,
+          "raw_geometric_bound_mm": 39.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 40.59989999999999,
+          "raw_geometric_bound_mm": 40.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 73.09989999999999,
+          "raw_geometric_bound_mm": 73.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 74.59989999999999,
+          "raw_geometric_bound_mm": 74.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 7.9999,
+          "raw_geometric_bound_mm": 8.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 26.9999,
+          "raw_geometric_bound_mm": 27.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 27.4999,
+          "raw_geometric_bound_mm": 27.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.246211251235321,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 41.0999,
+          "raw_geometric_bound_mm": 41.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 42.5999,
+          "raw_geometric_bound_mm": 42.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 25.399900000000006,
+          "raw_geometric_bound_mm": 25.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 24.199900000000003,
+          "raw_geometric_bound_mm": 24.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 5.9999,
+          "raw_geometric_bound_mm": 6.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 6.4999,
+          "raw_geometric_bound_mm": 6.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 7.9999,
+          "raw_geometric_bound_mm": 8.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 26.9999,
+          "raw_geometric_bound_mm": 27.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 27.4999,
+          "raw_geometric_bound_mm": 27.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.246211251235321,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 41.0999,
+          "raw_geometric_bound_mm": 41.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 42.5999,
+          "raw_geometric_bound_mm": 42.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 25.399900000000006,
+          "raw_geometric_bound_mm": 25.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 24.199900000000003,
+          "raw_geometric_bound_mm": 24.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 5.9999,
+          "raw_geometric_bound_mm": 6.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 6.4999,
+          "raw_geometric_bound_mm": 6.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.5,
+          "method": "invariant_radial_exclusion"
+        }
+      },
+      "nominal_contacts": {
+        "left_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 106.02875205865551,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "left_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "left_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 106.02875205865551,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "right_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        }
+      },
+      "actual_native_queries": 27,
+      "proofs": {
+        "disc_shaft_gap": "common_rigid_motion",
+        "hub_left_washer_hub_gap": "common_rigid_motion",
+        "hub_left_washer_shaft_gap": "common_rigid_motion",
+        "hub_right_washer_hub_gap": "common_rigid_motion",
+        "hub_right_washer_shaft_gap": "common_rigid_motion",
+        "left_cover_shaft_gap": "bore_witness_orbit",
+        "left_support_disc_gap": "rotational_symmetry",
+        "left_support_running_gap": "rotational_symmetry",
+        "right_cover_shaft_gap": "bore_witness_orbit",
+        "right_support_disc_gap": "rotational_symmetry",
+        "right_support_running_gap": "rotational_symmetry",
+        "shaft_washer_bush_gap": "rotational_symmetry",
+        "shaft_washer_shaft_gap": "common_rigid_motion"
+      },
+      "sampled_step_evidence": [
+        {
+          "phase": 0,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999947,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999883,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999719,
+            "left_cover_shaft_gap": 2.4999999999999942,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.1499999999999981,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999586
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.125,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999772,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999619,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999619,
+            "left_cover_shaft_gap": 2.4999999999999982,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.499999999999998,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999897,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999727
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.25,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999392,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999726,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999909,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999858,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999579
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.375,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999672,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999619,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999619,
+            "left_cover_shaft_gap": 2.4999999999999964,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999603,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999518
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.5,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999863,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999785,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999785,
+            "left_cover_shaft_gap": 2.4999999999999973,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999988,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999563
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.625,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999847,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999792,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999792,
+            "left_cover_shaft_gap": 2.4999999999999973,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999772,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999336
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.75,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999408,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999867,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999883,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999858,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999679
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.875,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999636,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999415,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999415,
+            "left_cover_shaft_gap": 2.5,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.500000000000001,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999944,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.0999999999999985
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 1,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999972,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999876,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999876,
+            "left_cover_shaft_gap": 2.4999999999999956,
+            "left_support_disc_gap": 14.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 16.0,
+            "right_support_running_gap": 0.14999999999999425,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999554
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        }
+      ],
+      "captured_source_replay": {
+        "valid": true,
+        "compared_files": [
+          "drive_module_release.step",
+          "housing.step",
+          "right_housing.step",
+          "end_cover.step",
+          "cover_screw_envelope.step",
+          "rigid-rotation-groups.json",
+          "section-left_cover_pilot_section.json",
+          "section-right_cover_pilot_section.json",
+          "section-end_cover_section.json"
+        ]
+      }
+    },
+    {
+      "case": "d14-p72-turn-1-r2",
+      "occurrences": 30,
+      "definitions": 14,
+      "fixed_rotor_certificates": {
+        "left_support/left_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 37.9999,
+          "raw_geometric_bound_mm": 38.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 38.4999,
+          "raw_geometric_bound_mm": 38.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.219544457292887,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 36.399899999999995,
+          "raw_geometric_bound_mm": 36.4,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 35.1999,
+          "raw_geometric_bound_mm": 35.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 52.09989999999999,
+          "raw_geometric_bound_mm": 52.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 53.59989999999999,
+          "raw_geometric_bound_mm": 53.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 92.09989999999999,
+          "raw_geometric_bound_mm": 92.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 93.59989999999999,
+          "raw_geometric_bound_mm": 93.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 4.4999,
+          "raw_geometric_bound_mm": 4.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 39.9999,
+          "raw_geometric_bound_mm": 40.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 40.4999,
+          "raw_geometric_bound_mm": 40.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.219544457292887,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 54.0999,
+          "raw_geometric_bound_mm": 54.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 55.5999,
+          "raw_geometric_bound_mm": 55.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 38.3999,
+          "raw_geometric_bound_mm": 38.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 37.1999,
+          "raw_geometric_bound_mm": 37.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 2.9999,
+          "raw_geometric_bound_mm": 3.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 4.9999,
+          "raw_geometric_bound_mm": 5.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 30.9999,
+          "raw_geometric_bound_mm": 31.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 31.4999,
+          "raw_geometric_bound_mm": 31.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.219544457292887,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 29.3999,
+          "raw_geometric_bound_mm": 29.4,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 28.199900000000003,
+          "raw_geometric_bound_mm": 28.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 45.09989999999999,
+          "raw_geometric_bound_mm": 45.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 46.59989999999999,
+          "raw_geometric_bound_mm": 46.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 85.09989999999999,
+          "raw_geometric_bound_mm": 85.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 86.59989999999999,
+          "raw_geometric_bound_mm": 86.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 4.9999,
+          "raw_geometric_bound_mm": 5.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 30.9999,
+          "raw_geometric_bound_mm": 31.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 31.4999,
+          "raw_geometric_bound_mm": 31.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.219544457292887,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 29.3999,
+          "raw_geometric_bound_mm": 29.4,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 28.199900000000003,
+          "raw_geometric_bound_mm": 28.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 45.09989999999999,
+          "raw_geometric_bound_mm": 45.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 46.59989999999999,
+          "raw_geometric_bound_mm": 46.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 85.09989999999999,
+          "raw_geometric_bound_mm": 85.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 86.59989999999999,
+          "raw_geometric_bound_mm": 86.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 6.9999,
+          "raw_geometric_bound_mm": 7.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 32.9999,
+          "raw_geometric_bound_mm": 33.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 33.4999,
+          "raw_geometric_bound_mm": 33.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.219544457292887,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 47.0999,
+          "raw_geometric_bound_mm": 47.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 48.5999,
+          "raw_geometric_bound_mm": 48.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 31.399900000000006,
+          "raw_geometric_bound_mm": 31.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 30.199900000000003,
+          "raw_geometric_bound_mm": 30.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 4.9999,
+          "raw_geometric_bound_mm": 5.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 5.4999,
+          "raw_geometric_bound_mm": 5.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 6.9999,
+          "raw_geometric_bound_mm": 7.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 32.9999,
+          "raw_geometric_bound_mm": 33.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 33.4999,
+          "raw_geometric_bound_mm": 33.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.219544457292887,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 47.0999,
+          "raw_geometric_bound_mm": 47.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 48.5999,
+          "raw_geometric_bound_mm": 48.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 31.399900000000006,
+          "raw_geometric_bound_mm": 31.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 30.199900000000003,
+          "raw_geometric_bound_mm": 30.200000000000003,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 4.9999,
+          "raw_geometric_bound_mm": 5.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 5.4999,
+          "raw_geometric_bound_mm": 5.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.5,
+          "method": "invariant_radial_exclusion"
+        }
+      },
+      "nominal_contacts": {
+        "left_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 115.4535300194249,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "left_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "left_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 115.4535300194249,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "right_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        }
+      },
+      "actual_native_queries": 27,
+      "proofs": {
+        "disc_shaft_gap": "common_rigid_motion",
+        "hub_left_washer_hub_gap": "common_rigid_motion",
+        "hub_left_washer_shaft_gap": "common_rigid_motion",
+        "hub_right_washer_hub_gap": "common_rigid_motion",
+        "hub_right_washer_shaft_gap": "common_rigid_motion",
+        "left_cover_shaft_gap": "bore_witness_orbit",
+        "left_support_disc_gap": "rotational_symmetry",
+        "left_support_running_gap": "rotational_symmetry",
+        "right_cover_shaft_gap": "bore_witness_orbit",
+        "right_support_disc_gap": "rotational_symmetry",
+        "right_support_running_gap": "rotational_symmetry",
+        "shaft_washer_bush_gap": "rotational_symmetry",
+        "shaft_washer_shaft_gap": "common_rigid_motion"
+      },
+      "sampled_step_evidence": [
+        {
+          "phase": 0,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999936,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999659,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999255,
+            "left_cover_shaft_gap": 2.4999999999999973,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.14999999999999575,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999701
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.125,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999886,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999443,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999443,
+            "left_cover_shaft_gap": 2.4999999999999982,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.499999999999998,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.14999999999999894,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.0999999999999967
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.25,
+          "distances_mm": {
+            "disc_shaft_gap": 0.1499999999999967,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999802,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999776,
+            "left_cover_shaft_gap": 2.5,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.14999999999999858,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999536
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.375,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999672,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999713,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999765,
+            "left_cover_shaft_gap": 2.4999999999999973,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.1499999999999986,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999608
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.5,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999886,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999348,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999631,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.1499999999999996,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999443
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.625,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999797,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999543,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999543,
+            "left_cover_shaft_gap": 2.4999999999999973,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.14999999999999508,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999577
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.75,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999655,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.0999999999999958,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999641,
+            "left_cover_shaft_gap": 2.5,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.14999999999999453,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999806
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.875,
+          "distances_mm": {
+            "disc_shaft_gap": 0.1499999999999931,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999067,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999067,
+            "left_cover_shaft_gap": 2.5,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.14999999999999714,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999289
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 1,
+          "distances_mm": {
+            "disc_shaft_gap": 0.1499999999999995,
+            "hub_left_washer_hub_gap": 0.10000000000000142,
+            "hub_left_washer_shaft_gap": 0.09999999999999488,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999508,
+            "left_cover_shaft_gap": 2.4999999999999982,
+            "left_support_disc_gap": 20.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 22.0,
+            "right_support_running_gap": 0.1499999999999958,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999494
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        }
+      ],
+      "captured_source_replay": {
+        "valid": true,
+        "compared_files": [
+          "drive_module_release.step",
+          "housing.step",
+          "right_housing.step",
+          "end_cover.step",
+          "cover_screw_envelope.step",
+          "rigid-rotation-groups.json",
+          "section-left_cover_pilot_section.json",
+          "section-right_cover_pilot_section.json",
+          "section-end_cover_section.json"
+        ]
+      }
+    },
+    {
+      "case": "d10-p90-turn1-r10",
+      "occurrences": 30,
+      "definitions": 14,
+      "fixed_rotor_certificates": {
+        "left_support/left_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 46.9999,
+          "raw_geometric_bound_mm": 47.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 47.4999,
+          "raw_geometric_bound_mm": 47.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.280109889280518,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 45.3999,
+          "raw_geometric_bound_mm": 45.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 44.1999,
+          "raw_geometric_bound_mm": 44.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 61.09989999999999,
+          "raw_geometric_bound_mm": 61.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 62.59989999999999,
+          "raw_geometric_bound_mm": 62.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 110.09989999999999,
+          "raw_geometric_bound_mm": 110.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 111.59989999999999,
+          "raw_geometric_bound_mm": 111.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 4.4999,
+          "raw_geometric_bound_mm": 4.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 5.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 48.9999,
+          "raw_geometric_bound_mm": 49.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 49.4999,
+          "raw_geometric_bound_mm": 49.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.280109889280518,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 63.09989999999999,
+          "raw_geometric_bound_mm": 63.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 64.59989999999999,
+          "raw_geometric_bound_mm": 64.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 47.3999,
+          "raw_geometric_bound_mm": 47.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 46.1999,
+          "raw_geometric_bound_mm": 46.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 2.9999,
+          "raw_geometric_bound_mm": 3.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 6.9999,
+          "raw_geometric_bound_mm": 7.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 39.9999,
+          "raw_geometric_bound_mm": 40.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 40.4999,
+          "raw_geometric_bound_mm": 40.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.280109889280518,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 38.3999,
+          "raw_geometric_bound_mm": 38.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 37.1999,
+          "raw_geometric_bound_mm": 37.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 54.09989999999999,
+          "raw_geometric_bound_mm": 54.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 55.59989999999999,
+          "raw_geometric_bound_mm": 55.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 103.09989999999999,
+          "raw_geometric_bound_mm": 103.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 104.59989999999999,
+          "raw_geometric_bound_mm": 104.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 6.9999,
+          "raw_geometric_bound_mm": 7.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 39.9999,
+          "raw_geometric_bound_mm": 40.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 40.4999,
+          "raw_geometric_bound_mm": 40.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.280109889280518,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 38.3999,
+          "raw_geometric_bound_mm": 38.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 37.1999,
+          "raw_geometric_bound_mm": 37.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 54.09989999999999,
+          "raw_geometric_bound_mm": 54.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 55.59989999999999,
+          "raw_geometric_bound_mm": 55.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 103.09989999999999,
+          "raw_geometric_bound_mm": 103.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 104.59989999999999,
+          "raw_geometric_bound_mm": 104.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 8.9999,
+          "raw_geometric_bound_mm": 9.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 5.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 41.9999,
+          "raw_geometric_bound_mm": 42.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 42.4999,
+          "raw_geometric_bound_mm": 42.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.280109889280518,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 56.09989999999999,
+          "raw_geometric_bound_mm": 56.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 57.59989999999999,
+          "raw_geometric_bound_mm": 57.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 40.3999,
+          "raw_geometric_bound_mm": 40.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 39.1999,
+          "raw_geometric_bound_mm": 39.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 6.9999,
+          "raw_geometric_bound_mm": 7.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 7.4999,
+          "raw_geometric_bound_mm": 7.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 8.9999,
+          "raw_geometric_bound_mm": 9.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 5.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 41.9999,
+          "raw_geometric_bound_mm": 42.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 42.4999,
+          "raw_geometric_bound_mm": 42.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.280109889280518,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 56.09989999999999,
+          "raw_geometric_bound_mm": 56.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 57.59989999999999,
+          "raw_geometric_bound_mm": 57.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 40.3999,
+          "raw_geometric_bound_mm": 40.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 39.1999,
+          "raw_geometric_bound_mm": 39.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 6.9999,
+          "raw_geometric_bound_mm": 7.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 7.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 7.4999,
+          "raw_geometric_bound_mm": 7.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 6.5,
+          "method": "invariant_radial_exclusion"
+        }
+      },
+      "nominal_contacts": {
+        "left_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 96.60397409788614,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "left_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "left_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 96.60397409788614,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "right_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        }
+      },
+      "actual_native_queries": 27,
+      "proofs": {
+        "disc_shaft_gap": "common_rigid_motion",
+        "hub_left_washer_hub_gap": "common_rigid_motion",
+        "hub_left_washer_shaft_gap": "common_rigid_motion",
+        "hub_right_washer_hub_gap": "common_rigid_motion",
+        "hub_right_washer_shaft_gap": "common_rigid_motion",
+        "left_cover_shaft_gap": "bore_witness_orbit",
+        "left_support_disc_gap": "rotational_symmetry",
+        "left_support_running_gap": "rotational_symmetry",
+        "right_cover_shaft_gap": "bore_witness_orbit",
+        "right_support_disc_gap": "rotational_symmetry",
+        "right_support_running_gap": "rotational_symmetry",
+        "shaft_washer_bush_gap": "rotational_symmetry",
+        "shaft_washer_shaft_gap": "common_rigid_motion"
+      },
+      "sampled_step_evidence": [
+        {
+          "phase": 0,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999938,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999497,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999473,
+            "left_cover_shaft_gap": 2.499999999999994,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999414,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999522
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.125,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999683,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999355,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.0999999999999947,
+            "left_cover_shaft_gap": 2.4999999999999987,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.499999999999997,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999813,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.099999999999993
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.25,
+          "distances_mm": {
+            "disc_shaft_gap": 0.1499999999999972,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999439,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999651,
+            "left_cover_shaft_gap": 2.4999999999999973,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999858,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999515
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.375,
+          "distances_mm": {
+            "disc_shaft_gap": 0.149999999999998,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999393,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999393,
+            "left_cover_shaft_gap": 2.4999999999999947,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.499999999999997,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.1499999999999985,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999297
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.5,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999858,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999673,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999673,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.15000000000000027,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999766
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.625,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999908,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999629,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999629,
+            "left_cover_shaft_gap": 2.499999999999996,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.499999999999998,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.1499999999999992,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999636
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.75,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999722,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999791,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999723,
+            "left_cover_shaft_gap": 2.4999999999999956,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999858,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999334
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.875,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999783,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999644,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999644,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.499999999999999,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999866,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999477
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 1,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999938,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999434,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999434,
+            "left_cover_shaft_gap": 2.499999999999994,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999689,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999684
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        }
+      ],
+      "captured_source_replay": {
+        "valid": true,
+        "compared_files": [
+          "drive_module_release.step",
+          "housing.step",
+          "right_housing.step",
+          "end_cover.step",
+          "cover_screw_envelope.step",
+          "rigid-rotation-groups.json",
+          "section-left_cover_pilot_section.json",
+          "section-right_cover_pilot_section.json",
+          "section-end_cover_section.json"
+        ]
+      }
+    },
+    {
+      "case": "d16-p90-turn1-r10",
+      "occurrences": 30,
+      "definitions": 14,
+      "fixed_rotor_certificates": {
+        "left_support/left_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 46.9999,
+          "raw_geometric_bound_mm": 47.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 47.4999,
+          "raw_geometric_bound_mm": 47.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.198039027185569,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 45.3999,
+          "raw_geometric_bound_mm": 45.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 44.1999,
+          "raw_geometric_bound_mm": 44.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 61.09989999999999,
+          "raw_geometric_bound_mm": 61.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 62.59989999999999,
+          "raw_geometric_bound_mm": 62.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 110.09989999999999,
+          "raw_geometric_bound_mm": 110.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 111.59989999999999,
+          "raw_geometric_bound_mm": 111.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft": {
+          "minimum_distance_lower_bound_mm": 4.4999,
+          "raw_geometric_bound_mm": 4.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | drive_disc": {
+          "minimum_distance_lower_bound_mm": 48.9999,
+          "raw_geometric_bound_mm": 49.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | parallel_key": {
+          "minimum_distance_lower_bound_mm": 49.4999,
+          "raw_geometric_bound_mm": 49.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.198039027185569,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 63.09989999999999,
+          "raw_geometric_bound_mm": 63.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 64.59989999999999,
+          "raw_geometric_bound_mm": 64.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 47.3999,
+          "raw_geometric_bound_mm": 47.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 46.1999,
+          "raw_geometric_bound_mm": 46.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 2.4999,
+          "raw_geometric_bound_mm": 2.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 2.9999,
+          "raw_geometric_bound_mm": 3.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 3.9999,
+          "raw_geometric_bound_mm": 4.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 39.9999,
+          "raw_geometric_bound_mm": 40.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 40.4999,
+          "raw_geometric_bound_mm": 40.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.198039027185569,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 38.3999,
+          "raw_geometric_bound_mm": 38.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 37.1999,
+          "raw_geometric_bound_mm": 37.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 54.09989999999999,
+          "raw_geometric_bound_mm": 54.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 55.59989999999999,
+          "raw_geometric_bound_mm": 55.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 103.09989999999999,
+          "raw_geometric_bound_mm": 103.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 104.59989999999999,
+          "raw_geometric_bound_mm": 104.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 3.9999,
+          "raw_geometric_bound_mm": 4.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "left_support/left_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 39.9999,
+          "raw_geometric_bound_mm": 40.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 40.4999,
+          "raw_geometric_bound_mm": 40.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.198039027185569,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 38.3999,
+          "raw_geometric_bound_mm": 38.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 37.1999,
+          "raw_geometric_bound_mm": 37.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 54.09989999999999,
+          "raw_geometric_bound_mm": 54.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 55.59989999999999,
+          "raw_geometric_bound_mm": 55.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 103.09989999999999,
+          "raw_geometric_bound_mm": 103.1,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "left_support/left_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 104.59989999999999,
+          "raw_geometric_bound_mm": 104.6,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft": {
+          "minimum_distance_lower_bound_mm": 5.9999,
+          "raw_geometric_bound_mm": 6.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 41.9999,
+          "raw_geometric_bound_mm": 42.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 42.4999,
+          "raw_geometric_bound_mm": 42.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.198039027185569,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 56.09989999999999,
+          "raw_geometric_bound_mm": 56.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 57.59989999999999,
+          "raw_geometric_bound_mm": 57.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 40.3999,
+          "raw_geometric_bound_mm": 40.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 39.1999,
+          "raw_geometric_bound_mm": 39.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_minus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 3.9999,
+          "raw_geometric_bound_mm": 4.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_minus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 4.4999,
+          "raw_geometric_bound_mm": 4.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft": {
+          "minimum_distance_lower_bound_mm": 5.9999,
+          "raw_geometric_bound_mm": 6.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 8.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | drive_disc": {
+          "minimum_distance_lower_bound_mm": 41.9999,
+          "raw_geometric_bound_mm": 42.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 24,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | parallel_key": {
+          "minimum_distance_lower_bound_mm": 42.4999,
+          "raw_geometric_bound_mm": 42.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.198039027185569,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_washer": {
+          "minimum_distance_lower_bound_mm": 56.09989999999999,
+          "raw_geometric_bound_mm": 56.099999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_left_ring": {
+          "minimum_distance_lower_bound_mm": 57.59989999999999,
+          "raw_geometric_bound_mm": 57.599999999999994,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_washer": {
+          "minimum_distance_lower_bound_mm": 40.3999,
+          "raw_geometric_bound_mm": 40.400000000000006,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | hub_right_ring": {
+          "minimum_distance_lower_bound_mm": 39.1999,
+          "raw_geometric_bound_mm": 39.2,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_axial_interval"
+        },
+        "right_support/right_cover_screw_plus | shaft_washer": {
+          "minimum_distance_lower_bound_mm": 3.9999,
+          "raw_geometric_bound_mm": 4.0,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 10.0,
+          "method": "invariant_radial_exclusion"
+        },
+        "right_support/right_cover_screw_plus | shaft_ring": {
+          "minimum_distance_lower_bound_mm": 4.4999,
+          "raw_geometric_bound_mm": 4.5,
+          "arithmetic_and_export_guard_mm": 0.0001,
+          "rotor_radial_ceiling_mm": 9.5,
+          "method": "invariant_radial_exclusion"
+        }
+      },
+      "nominal_contacts": {
+        "left_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 124.87830798019428,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "left_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "left_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_cover_flange": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 124.87830798019428,
+          "basis": "matched coplanar annular faces; distinct exact STEP solids"
+        },
+        "right_screw_minus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        },
+        "right_screw_plus_seat": {
+          "occt_min_distance_mm": 0,
+          "analytic_contact_area_mm2": 15.071790755597034,
+          "basis": "matched coplanar head/clearance annulus; distinct exact STEP solids"
+        }
+      },
+      "actual_native_queries": 27,
+      "proofs": {
+        "disc_shaft_gap": "common_rigid_motion",
+        "hub_left_washer_hub_gap": "common_rigid_motion",
+        "hub_left_washer_shaft_gap": "common_rigid_motion",
+        "hub_right_washer_hub_gap": "common_rigid_motion",
+        "hub_right_washer_shaft_gap": "common_rigid_motion",
+        "left_cover_shaft_gap": "bore_witness_orbit",
+        "left_support_disc_gap": "rotational_symmetry",
+        "left_support_running_gap": "rotational_symmetry",
+        "right_cover_shaft_gap": "bore_witness_orbit",
+        "right_support_disc_gap": "rotational_symmetry",
+        "right_support_running_gap": "rotational_symmetry",
+        "shaft_washer_bush_gap": "rotational_symmetry",
+        "shaft_washer_shaft_gap": "common_rigid_motion"
+      },
+      "sampled_step_evidence": [
+        {
+          "phase": 0,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999905,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999686,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999686,
+            "left_cover_shaft_gap": 2.4999999999999982,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999927,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999655
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.125,
+          "distances_mm": {
+            "disc_shaft_gap": 0.1499999999999969,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999414,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999414,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.4999999999999964,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.1499999999999972,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999594
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.25,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999317,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999543,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.099999999999997,
+            "left_cover_shaft_gap": 2.5,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999739,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999776
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.375,
+          "distances_mm": {
+            "disc_shaft_gap": 0.1499999999999958,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999465,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999644,
+            "left_cover_shaft_gap": 2.499999999999997,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.499999999999997,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.1499999999999987,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999729
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.5,
+          "distances_mm": {
+            "disc_shaft_gap": 0.1499999999999982,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999486,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999486,
+            "left_cover_shaft_gap": 2.5,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999925,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999586
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.625,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999758,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999666,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999666,
+            "left_cover_shaft_gap": 2.4999999999999987,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.4999999999999964,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.1499999999999964,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999483
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.75,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999633,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999667,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.0999999999999957,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999858,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999781
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 0.875,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999677,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999604,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999604,
+            "left_cover_shaft_gap": 2.499999999999999,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999783,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999264
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        },
+        {
+          "phase": 1,
+          "distances_mm": {
+            "disc_shaft_gap": 0.14999999999999936,
+            "hub_left_washer_hub_gap": 0.09999999999999432,
+            "hub_left_washer_shaft_gap": 0.09999999999999579,
+            "hub_right_washer_hub_gap": 0.09999999999999432,
+            "hub_right_washer_shaft_gap": 0.09999999999999579,
+            "left_cover_shaft_gap": 2.4999999999999956,
+            "left_support_disc_gap": 29.0,
+            "left_support_running_gap": 0.10000000000000142,
+            "right_cover_shaft_gap": 4.5,
+            "right_support_disc_gap": 31.0,
+            "right_support_running_gap": 0.14999999999999572,
+            "shaft_washer_bush_gap": 0.09999999999999432,
+            "shaft_washer_shaft_gap": 0.09999999999999466
+          },
+          "pairs": 435,
+          "maximum_overlap_mm3": 0.0
+        }
+      ],
+      "captured_source_replay": {
+        "valid": true,
+        "compared_files": [
+          "drive_module_release.step",
+          "housing.step",
+          "right_housing.step",
+          "end_cover.step",
+          "cover_screw_envelope.step",
+          "rigid-rotation-groups.json",
+          "section-left_cover_pilot_section.json",
+          "section-right_cover_pilot_section.json",
+          "section-end_cover_section.json"
+        ]
+      }
+    }
+  ],
+  "rejected_edits": [
+    {
+      "case": "offset_axis",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "left_support_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: solid clearance requires certified convex separation or separated coaxial full-turn linear-meridian material regions or parallel circular extrusions; overlap/contact and unresolved alignment are not classified",
+        "error": "clearance check 'left_support_running_gap' on 'drive_module_release' failed: unsupported geometry: solid clearance requires certified convex separation or separated coaxial full-turn linear-meridian material regions or parallel circular extrusions; overlap/contact and unresolved alignment are not classified",
+        "lower_bound_mm": null,
+        "output_name": "drive_module_release",
+        "upper_bound_mm": null
+      }
+    },
+    {
+      "case": "missing_reference",
+      "diagnostic": {
+        "causes": [],
+        "code": "invalid_rotation_group",
+        "diagnostic": "members must be unique and include the reference occurrence",
+        "error": "invalid rotation group 'rotor' on 'drive_module_release': members must be unique and include the reference occurrence",
+        "group_id": "rotor",
+        "output_name": "drive_module_release"
+      }
+    },
+    {
+      "case": "excessive_gap",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "left_support_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: continuous rotation clearance: a sampled pose does not certify the required minimum; contact, insufficient clearance, or numerical threshold uncertainty cannot pass",
+        "error": "clearance check 'left_support_running_gap' on 'drive_module_release' failed: unsupported geometry: continuous rotation clearance: a sampled pose does not certify the required minimum; contact, insufficient clearance, or numerical threshold uncertainty cannot pass",
+        "lower_bound_mm": null,
+        "output_name": "drive_module_release",
+        "upper_bound_mm": null
+      }
+    },
+    {
+      "case": "pilot_reaches_opposite_cap",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: blind hole 'cover_minus' leaves insufficient floor thickness",
+        "error": "feature 'housing_left_pilots' failed: unsupported geometry: blind hole 'cover_minus' leaves insufficient floor thickness",
+        "feature": "housing_left_pilots",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "e159c66256f10560b6a583cb8e0850d863fe5b9210b275442b3cb312d395bcb1"
+        }
+      }
+    },
+    {
+      "case": "pilot_breaks_outer_wall",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: invalid polygon prism with circular through holes",
+        "error": "feature 'housing_left_pilots' failed: unsupported geometry: invalid polygon prism with circular through holes",
+        "feature": "housing_left_pilots",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "e159c66256f10560b6a583cb8e0850d863fe5b9210b275442b3cb312d395bcb1"
+        }
+      }
+    }
+  ],
+  "scope": "Native continuous named-pair proofs plus conservative full-turn bounds for 54 new fixed/rotor pairs; independent sampled STEP checks of all pairs. No general assembly collision, installation or load certification"
+}
