@@ -85,6 +85,10 @@ pub(super) fn scope(
         validation_roots.insert(datum.anchor_feature.clone());
         validation_roots.insert(parts[datum.part.as_str()].feature.clone());
     }
+    for datum in &recipe.slot_center_datums {
+        validation_roots.insert(datum.anchor_feature.clone());
+        validation_roots.insert(parts[datum.part.as_str()].feature.clone());
+    }
     let asserted: BTreeSet<_> = recipe
         .property_assertions
         .iter()

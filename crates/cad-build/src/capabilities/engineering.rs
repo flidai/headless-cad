@@ -132,6 +132,22 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         "supported planar face frame uses material area centroid and outward normal; ambiguous, nonplanar or unsupported faces fail",
         "rigid attachment datum, not a manufacturing GD&T datum system",
     ]);
+    let mut slot_center_datum = object_spec(
+        "slot_center_datum",
+        vec![
+            arg("part", reference("part_definition")),
+            arg("name", T::String),
+            arg("anchor_feature", reference("solid_feature")),
+            arg("role", T::String),
+            arg("cap_role", T::String),
+        ],
+    );
+    slot_center_datum.obligations.extend([
+        "Starlark slot_center_datum(from_feature,role,cap='start_cap') is a separate associative part datum kind",
+        "exact four-wall semantic role and one start/end native cap face of a rebuilt obround ArcPrism; native slot center on cap with X along centerline, Z outward and Y=Z cross X",
+        "global selected-output and warm-cache source obligation; report binds wall/cap selections, native frame and arithmetic guard, part content hash",
+        "shares fixed/face datum name and per-part 1024 frame limit; nominal planar seating and directed planar datum dimensions remain face-only",
+    ]);
     let mut exchange = object_spec(
         "exchange_requirement",
         vec![
@@ -635,6 +651,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         assertion,
         property,
         datum,
+        slot_center_datum,
         exchange,
         section,
         anchor,

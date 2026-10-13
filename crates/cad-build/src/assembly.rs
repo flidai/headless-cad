@@ -121,6 +121,7 @@ pub(super) fn validate<'a>(
         .map(|part| (part.id.clone(), part.clone()))
         .collect();
     face_datums::add_placeholders(recipe, &mut part_definitions);
+    slot_center_datums::add_placeholders(recipe, &mut part_definitions);
     cad_assembly::validate_attachment_definitions(&part_definitions, &definitions)
         .map_err(|error| BuildError::AssemblyGraph(error.to_string()))?;
     let mut exported_leaves = 0usize;
@@ -177,6 +178,7 @@ pub(super) fn evaluate(
     evaluated: &HashMap<String, Arc<OperationResult>>,
     tolerance: Tolerance,
     face_datums: &ResolvedFaceDatums,
+    slot_center_datums: &ResolvedSlotCenterDatums,
     requested_outputs: &[String],
 ) -> Result<BTreeMap<String, BuiltAssembly>, BuildError> {
     let selected: Vec<_> = recipe
@@ -210,6 +212,13 @@ pub(super) fn evaluate(
                                         .map(|(name, resolution)| (name.clone(), resolution.frame))
                                 }),
                         )
+                        .chain(slot_center_datums.get(&definition.id).into_iter().flat_map(
+                            |frames| {
+                                frames
+                                    .iter()
+                                    .map(|(name, resolution)| (name.clone(), resolution.frame))
+                            },
+                        ))
                         .collect(),
                     content_hash: hashes[&definition.feature].clone(),
                     result: Arc::clone(&evaluated[&definition.feature]),

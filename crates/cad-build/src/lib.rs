@@ -101,6 +101,11 @@ pub use face_datums::{
     FaceDatumDefinition, FaceDatumResolution, ResolvedFaceDatums, MAX_FACE_DATUMS,
     MAX_FACE_DATUM_GEOMETRY_WORK,
 };
+mod slot_center_datums;
+pub use slot_center_datums::{
+    ResolvedSlotCenterDatums, SlotCenterDatumDefinition, SlotCenterDatumResolution,
+    MAX_SLOT_CENTER_DATUMS,
+};
 mod selection;
 pub use assembly::{MAX_ASSEMBLIES, MAX_FEATURES, MAX_INSTANCES, MAX_OUTPUTS, MAX_PARTS};
 pub use cad_assembly::{
@@ -133,6 +138,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("demand.rs").as_slice(),
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
+            include_bytes!("slot_center_datums.rs").as_slice(),
             include_bytes!("mechanisms.rs").as_slice(),
             include_bytes!("motion_studies.rs").as_slice(),
             include_bytes!("property_assertions.rs").as_slice(),
@@ -210,6 +216,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub slot_center_datums: Vec<SlotCenterDatumDefinition>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanisms: Vec<MechanismDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanism_bindings: Vec<MechanismBinding>,
@@ -266,6 +274,8 @@ impl<'de> Deserialize<'de> for Recipe {
             rigid_translation_groups: Option<Vec<RigidTranslationGroup>>,
             #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
+            #[serde(default, deserialize_with = "present_vec")]
+            slot_center_datums: Option<Vec<SlotCenterDatumDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             mechanisms: Option<Vec<MechanismDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
@@ -352,6 +362,11 @@ impl<'de> Deserialize<'de> for Recipe {
                 "face datums require recipe schema version 2",
             ));
         }
+        if raw.schema_version == 1 && raw.slot_center_datums.is_some() {
+            return Err(serde::de::Error::custom(
+                "slot center datums require recipe schema version 2",
+            ));
+        }
         Ok(Self {
             schema_version: raw.schema_version,
             units: raw.units,
@@ -373,6 +388,7 @@ impl<'de> Deserialize<'de> for Recipe {
             rigid_rotation_groups: raw.rigid_rotation_groups.unwrap_or_default(),
             rigid_translation_groups: raw.rigid_translation_groups.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
+            slot_center_datums: raw.slot_center_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
             mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
             motion_studies: raw.motion_studies.unwrap_or_default(),
@@ -1109,6 +1125,7 @@ pub struct BuildResult {
     pub rigid_rotation_groups: BTreeMap<String, RigidRotationGroupReport>,
     pub rigid_translation_groups: BTreeMap<String, RigidTranslationGroupReport>,
     pub face_datums: ResolvedFaceDatums,
+    pub slot_center_datums: ResolvedSlotCenterDatums,
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
     pub mechanism_bindings: Vec<MechanismBindingReport>,
     pub mechanism_context_hash: String,
@@ -1274,6 +1291,12 @@ pub enum BuildError {
     },
     #[error("face datum '{part}/{name}' could not form a rigid frame: {message}")]
     FaceDatumFrame {
+        part: String,
+        name: String,
+        message: String,
+    },
+    #[error("slot center datum '{part}/{name}' failed: {message}")]
+    SlotCenterDatumFailed {
         part: String,
         name: String,
         message: String,
@@ -1956,6 +1979,7 @@ impl BuildEngine {
         rotation_groups::preflight(recipe)?;
         translation_groups::preflight(recipe)?;
         face_datums::preflight(recipe)?;
+        slot_center_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
         }
@@ -2862,6 +2886,7 @@ impl BuildEngine {
             rigid_rotation_groups: BTreeMap::new(),
             rigid_translation_groups: BTreeMap::new(),
             face_datums: BTreeMap::new(),
+            slot_center_datums: BTreeMap::new(),
             motion_studies: mechanism_evaluation.motion_studies,
             mechanism_reports: mechanism_evaluation.reports,
             mechanism_bindings: mechanism_evaluation.bindings,
@@ -2890,6 +2915,13 @@ impl BuildEngine {
                 .insert(assertion.id.clone(), resolution);
         }
         result.face_datums = face_datums::resolve(
+            recipe,
+            &result,
+            &evaluated,
+            tolerance,
+            &mut assertion_work_remaining,
+        )?;
+        result.slot_center_datums = slot_center_datums::resolve(
             recipe,
             &result,
             &evaluated,
@@ -2932,6 +2964,7 @@ impl BuildEngine {
             &evaluated,
             tolerance,
             &result.face_datums,
+            &result.slot_center_datums,
             &assembly_requests,
         )?;
         result.property_assertions = property_assertions::evaluate(

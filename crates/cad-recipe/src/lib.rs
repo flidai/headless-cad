@@ -104,6 +104,7 @@ struct GraphStore {
     rigid_rotation_groups: RefCell<Vec<serde_json::Value>>,
     rigid_translation_groups: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
+    slot_center_datums: RefCell<Vec<serde_json::Value>>,
     mechanisms: RefCell<Vec<serde_json::Value>>,
     motion_studies: RefCell<Vec<serde_json::Value>>,
     mechanism_bindings: RefCell<Vec<serde_json::Value>>,
@@ -1672,6 +1673,31 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(heap.alloc(serde_json::json!({"kind":"face_datum","anchor_feature":from_feature,"role":role,"x_direction":x_direction,"offset":offset})))
     }
 
+    /// A native obround-slot center on one end cap of the owning part.
+    fn slot_center_datum<'v>(
+        from_feature: &str,
+        role: &str,
+        cap: Option<&str>,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        let cap = cap.unwrap_or("start_cap");
+        anyhow::ensure!(
+            !from_feature.is_empty()
+                && from_feature.trim() == from_feature
+                && !role.is_empty()
+                && role.trim() == role
+                && !cap.is_empty()
+                && cap.trim() == cap,
+            "slot center feature and roles must be nonempty identifiers"
+        );
+        Ok(heap.alloc(serde_json::json!({
+            "kind":"slot_center_datum",
+            "anchor_feature":from_feature,
+            "role":role,
+            "cap_role":cap
+        })))
+    }
+
     /// Give a solid feature a reusable part-definition identity.
     #[allow(clippy::too_many_arguments)]
     fn part(
@@ -1728,6 +1754,21 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 anyhow::ensure!(
                     references.len() < cad_build::MAX_FACE_DATUMS,
                     "recipe exceeds face datum limit"
+                );
+                references.push(serde_json::to_value(definition)?);
+            } else if value.get("kind").and_then(serde_json::Value::as_str)
+                == Some("slot_center_datum")
+            {
+                let object = value.as_object_mut().unwrap();
+                object.remove("kind");
+                object.insert("part".into(), id.into());
+                object.insert("name".into(), name.into());
+                let definition: cad_build::SlotCenterDatumDefinition =
+                    serde_json::from_value(value)?;
+                let mut references = graph.slot_center_datums.borrow_mut();
+                anyhow::ensure!(
+                    references.len() < cad_build::MAX_SLOT_CENTER_DATUMS,
+                    "recipe exceeds slot center datum limit"
                 );
                 references.push(serde_json::to_value(definition)?);
             } else {
@@ -2007,6 +2048,7 @@ pub fn from_starlark_with_modules_and_provenance(
     let rigid_rotation_groups = graph.rigid_rotation_groups.into_inner();
     let rigid_translation_groups = graph.rigid_translation_groups.into_inner();
     let face_datums = graph.face_datums.into_inner();
+    let slot_center_datums = graph.slot_center_datums.into_inner();
     let mechanisms = graph.mechanisms.into_inner();
     let motion_studies = graph.motion_studies.into_inner();
     let mechanism_bindings = graph.mechanism_bindings.into_inner();
@@ -2018,7 +2060,7 @@ pub fn from_starlark_with_modules_and_provenance(
         .iter()
         .any(|feature| feature["op"] == "hole_pattern" || feature["op"] == "slot_pattern");
     let mut value = serde_json::json!({
-        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() || !rigid_translation_groups.is_empty() { 2 } else { 1 },
+        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !slot_center_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() || !rigid_translation_groups.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -2072,6 +2114,9 @@ pub fn from_starlark_with_modules_and_provenance(
     }
     if !face_datums.is_empty() {
         value["face_datums"] = serde_json::json!(face_datums);
+    }
+    if !slot_center_datums.is_empty() {
+        value["slot_center_datums"] = serde_json::json!(slot_center_datums);
     }
     let recipe = serde_json::from_value(value)?;
     let provenance = provenance::finish(raw_provenance, filename, source, modules, &call_spans)?;

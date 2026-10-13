@@ -3312,3 +3312,25 @@ that does not fit its allocated viewport.
 The [independent slot-dimension checks](docs/evidence/slot-dimensions-local.json)
 cover four geometry/paper configurations, actual STEP slot surfaces and SVG
 annotation coordinates, exact replay, and seven publication-preserving refusals.
+
+### Locate slots from native machining references
+
+`examples/drive_module_slot_positions.star` derives each slot center from its
+native walls and cap, then dimensions it from the surviving left and lower stock
+faces. A second view measures horizontal and vertical center pitches. The recipe
+uses associative geometry references rather than copied center coordinates.
+
+```sh
+cad build examples/drive_module_slot_positions.star --out-dir out/drive_module_slot_positions
+```
+
+Open `drawing-base_slot_positions.svg` to inspect the two views. The section
+reports retain the selected slot walls, cap, native center frame and arithmetic
+uncertainty. These are nominal projected measurements, not GD&T or manufactured
+part acceptance.
+
+[Independent STEP checks](docs/evidence/slot-positions-local.json) cover four
+configurations, six dimensions, exact captured-source replay and four rejected
+edits that preserve published output. [Browser checks](docs/evidence/slot-positions-browser-local.json)
+cover both paper views and navigation from the selected part to its captured
+Starlark definition and imported body feature.

@@ -43,6 +43,8 @@ pub struct SectionDimensionReport {
     pub from_witness: SectionAnchorWitness,
     pub to_witness: SectionAnchorWitness,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub arithmetic_uncertainty_mm: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tolerance: Option<DimensionToleranceReport>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -289,6 +291,8 @@ pub struct SectionAnchorWitness {
     pub resolved_plane: SectionPlane,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub semantic_datum: Option<FaceDatumResolution>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot_datum: Option<SlotCenterDatumResolution>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -599,6 +603,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
 fn resolve_anchor(
     view: &SectionView,
     face_datums: &ResolvedFaceDatums,
+    slot_center_datums: &ResolvedSlotCenterDatums,
     assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
     tolerance: Tolerance,
 ) -> Result<Option<SectionAnchorWitness>, BuildError> {
@@ -658,6 +663,10 @@ fn resolve_anchor(
             .get(&instance.part)
             .and_then(|d| d.get(&anchor.datum))
             .cloned(),
+        slot_datum: slot_center_datums
+            .get(&instance.part)
+            .and_then(|d| d.get(&anchor.datum))
+            .cloned(),
     }))
 }
 
@@ -665,6 +674,7 @@ fn dimensions(
     view: &SectionView,
     plane: SectionPlane,
     face_datums: &ResolvedFaceDatums,
+    slot_center_datums: &ResolvedSlotCenterDatums,
     assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
     tolerance: Tolerance,
 ) -> Result<Vec<SectionDimensionReport>, BuildError> {
@@ -690,12 +700,26 @@ fn dimensions(
             endpoint.normal = [0., 0., 1.];
             endpoint.x_direction = [1., 0., 0.];
             endpoint.dimensions.clear();
-            resolve_anchor(&endpoint, face_datums, assemblies, tolerance)
-                .map_err(|e| fail(e.to_string(), None))?
-                .ok_or_else(|| fail("missing dimension endpoint witness".into(), None))
+            resolve_anchor(
+                &endpoint,
+                face_datums,
+                slot_center_datums,
+                assemblies,
+                tolerance,
+            )
+            .map_err(|e| fail(e.to_string(), None))?
+            .ok_or_else(|| fail("missing dimension endpoint witness".into(), None))
         };
         let from_witness = resolve(&d.from)?;
         let to_witness = resolve(&d.to)?;
+        if view.anchor.is_some()
+            && (from_witness.slot_datum.is_some() || to_witness.slot_datum.is_some())
+        {
+            return Err(fail(
+                "slot-center projected dimensions require an unanchored section plane until plane ancestry is certified".into(),
+                None,
+            ));
+        }
         let project = |p: [f64; 3]| {
             let delta = std::array::from_fn::<_, 3, _>(|i| p[i] - plane.origin[i]);
             [0, 1].map(|i| {
@@ -755,7 +779,79 @@ fn dimensions(
                 Some(value_mm),
             ));
         }
-        if d.min.is_some_and(|a| value_mm < a) || d.max.is_some_and(|a| value_mm > a) {
+        let slot_endpoint_guard = |witness: &SectionAnchorWitness| -> Result<f64, BuildError> {
+            let assembly = &assemblies[&view.output];
+            let raw_translation = crate::translation_groups::ancestry_translation_scale(
+                assembly,
+                &witness.instance_path,
+            )
+            .map_err(|e| fail(format!("slot center placement: {e}"), None))?;
+            let source = &assembly.parts[&witness.part_id].result.model;
+            let bounds = source.bounds();
+            let source_scale = bounds
+                .min
+                .into_iter()
+                .chain(bounds.max)
+                .map(f64::abs)
+                .fold(0., f64::max)
+                .max((0..3).map(|i| bounds.max[i] - bounds.min[i]).sum());
+            let world_scale = witness
+                .world_frame
+                .translation
+                .into_iter()
+                .chain(witness.occurrence_frame.translation)
+                .chain(plane.origin)
+                .map(f64::abs)
+                .fold(0., f64::max);
+            let depth = witness.instance_path.len() as f64;
+            let placement = (((source_scale + world_scale) * 1024.
+                + (source_scale + raw_translation + world_scale + 1.) * depth * 4096.)
+                * f64::EPSILON)
+                .next_up();
+            if !placement.is_finite() || placement > tolerance.linear / 32. {
+                return Err(fail(
+                    "slot center placement exceeds dimension precision budget".into(),
+                    None,
+                ));
+            }
+            let native_guard = if let Some(slot) = &witness.slot_datum {
+                slot.native.arithmetic_uncertainty_mm
+            } else if witness.semantic_datum.is_some() {
+                // The other endpoint can be a native face centroid. Charge its
+                // source support arithmetic as well as the slot's center.
+                (source_scale.max(1.) * 65536. * f64::EPSILON).next_up()
+            } else {
+                // A fixed datum location is explicit source intent.
+                0.
+            };
+            let guard = (native_guard + placement).next_up();
+            if !guard.is_finite() || guard > tolerance.linear / 8. {
+                return Err(fail(
+                    "slot center origin uncertainty is unresolved".into(),
+                    None,
+                ));
+            }
+            Ok(guard)
+        };
+        let arithmetic_uncertainty_mm =
+            if from_witness.slot_datum.is_some() || to_witness.slot_datum.is_some() {
+                let from_guard = slot_endpoint_guard(&from_witness)?;
+                let to_guard = slot_endpoint_guard(&to_witness)?;
+                let total = (from_guard + to_guard + scale.max(1.) * 128. * f64::EPSILON).next_up();
+                if !total.is_finite() || total > tolerance.linear / 4. {
+                    return Err(fail(
+                        "slot center projected dimension uncertainty is unresolved".into(),
+                        None,
+                    ));
+                }
+                Some(total)
+            } else {
+                None
+            };
+        let guard = arithmetic_uncertainty_mm.unwrap_or(0.);
+        if d.min.is_some_and(|a| value_mm - guard < a)
+            || d.max.is_some_and(|a| value_mm + guard > a)
+        {
             return Err(fail(
                 "projected dimension lies outside declared bounds".into(),
                 Some(value_mm),
@@ -776,6 +872,7 @@ fn dimensions(
             to_point,
             from_witness,
             to_witness,
+            arithmetic_uncertainty_mm,
         });
     }
     Ok(reports)
@@ -1475,7 +1572,13 @@ pub(super) fn evaluate(
                 limit: MAX_SECTION_VIEW_WORK,
             });
         }
-        let anchor_witness = resolve_anchor(v, face_datums, assemblies, tolerance)?;
+        let anchor_witness = resolve_anchor(
+            v,
+            face_datums,
+            &build.slot_center_datums,
+            assemblies,
+            tolerance,
+        )?;
         let plane = anchor_witness
             .as_ref()
             .map_or(v.plane(), |a| a.resolved_plane);
@@ -1495,7 +1598,14 @@ pub(super) fn evaluate(
                 actual_area: Some(area),
             });
         }
-        let dimensions = dimensions(v, plane, face_datums, assemblies, tolerance)?;
+        let dimensions = dimensions(
+            v,
+            plane,
+            face_datums,
+            &build.slot_center_datums,
+            assemblies,
+            tolerance,
+        )?;
         let circle_dimensions = circle_dimensions(
             v,
             &query,

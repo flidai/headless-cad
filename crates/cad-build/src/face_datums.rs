@@ -85,7 +85,7 @@ pub(super) fn add_placeholders(recipe: &Recipe, parts: &mut BTreeMap<String, Par
             .insert(datum.name.clone(), RigidTransform::default());
     }
 }
-fn rigid_frame(frame: cad_kernel::FaceFrame) -> Result<RigidTransform, String> {
+pub(super) fn rigid_frame(frame: cad_kernel::FaceFrame) -> Result<RigidTransform, String> {
     let axes = [frame.x_axis, frame.y_axis, frame.z_axis];
     let m: [[f64; 3]; 3] = std::array::from_fn(|i| std::array::from_fn(|j| axes[j][i]));
     let trace = m[0][0] + m[1][1] + m[2][2];

@@ -3834,3 +3834,21 @@ alongside optional short paper labels. Paper publication rejects slot lines
 crossing any annotation label as well as overlapping labels.
 These are section dimensions; they do not introduce general hidden-line
 projection, GD&T or manufactured-part conformance.
+
+### Native slot-center machining references
+
+A slot-center datum is an associative frame derived from an exact native
+four-wall capsule and one of its two caps. Its origin is the capsule center on
+the selected cap, its X axis follows the capsule centerline, and its Z axis is
+the cap's outward normal. The frame retains the selected native faces,
+centerline endpoints and an arithmetic construction bound. It does not require
+the datum origin to lie in cap material: the center is a geometric reference
+inside the aperture.
+
+This datum kind supplies part/assembly references for projected dimensions in
+unanchored section views. Anchored section planes are refused for these
+measurements until their placement uncertainty is certified. Native sidewall face datums establish edge references; projecting
+between them and slot centers yields machining positions without repeating
+slot coordinates as authored datum offsets. Slot centers do not satisfy
+face-only seating or planar-face dimension contracts. Reports must preserve
+native lineage, target hashes and conservative occurrence-placement uncertainty.

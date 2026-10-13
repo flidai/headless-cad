@@ -285,6 +285,9 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "face_datums": build.face_datums,
         "outputs": outputs,
     });
+    if !build.slot_center_datums.is_empty() {
+        summary["slot_center_datums"] = json!(build.slot_center_datums);
+    }
     if !build.rigid_translation_groups.is_empty() {
         summary["rigid_translation_groups"] = json!(build.rigid_translation_groups);
     }
@@ -558,7 +561,7 @@ fn difference(before: &Value, after: &Value) -> Value {
         "before_bindings": before["mechanism_bindings"], "after_bindings": after["mechanism_bindings"],
         "before_context_hash": before["mechanism_context_hash"], "after_context_hash": after["mechanism_context_hash"],
     });
-    json!({"outputs":changes,"rigid_translation_groups":{"before":before["rigid_translation_groups"],"after":after["rigid_translation_groups"]},"rigid_rotation_groups":{"before":before["rigid_rotation_groups"],"after":after["rigid_rotation_groups"]},"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"nominal_seating_checks":{"before":before["nominal_seating_checks"],"after":after["nominal_seating_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"rigid_translation_groups":{"before":before["rigid_translation_groups"],"after":after["rigid_translation_groups"]},"rigid_rotation_groups":{"before":before["rigid_rotation_groups"],"after":after["rigid_rotation_groups"]},"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"nominal_seating_checks":{"before":before["nominal_seating_checks"],"after":after["nominal_seating_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"slot_center_datums":{"before":before["slot_center_datums"],"after":after["slot_center_datums"]},"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -1961,6 +1964,16 @@ fn main() {
                             "anchor_content_hash": anchor_content_hash,
                             "target_content_hash": target_content_hash,
                         });
+                    }
+                    cad_build::BuildError::SlotCenterDatumFailed {
+                        part,
+                        name,
+                        message,
+                    } => {
+                        report["code"] = json!("slot_center_datum_failed");
+                        report["part"] = json!(part);
+                        report["datum"] = json!(name);
+                        report["diagnostic"] = json!(message);
                     }
                     cad_build::BuildError::FaceDatumFrame { part, name, .. } => {
                         report["code"] = json!("face_datum_frame_failed");

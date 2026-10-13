@@ -513,6 +513,7 @@ fn envelope_objects(operations: &[OperationCapability]) -> Vec<ObjectSpec> {
         ("rigid_rotation_groups", "rigid_rotation_group"),
         ("rigid_translation_groups", "rigid_translation_group"),
         ("face_datums", "face_datum"),
+        ("slot_center_datums", "slot_center_datum"),
         ("mechanisms", "mechanism_definition"),
         ("motion_studies", "motion_study_definition"),
         ("mechanism_bindings", "mechanism_binding"),

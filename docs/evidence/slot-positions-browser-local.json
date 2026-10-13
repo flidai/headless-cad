@@ -1,0 +1,16 @@
+{
+  "valid": true,
+  "dimensions": 6,
+  "viewports": 2,
+  "paper_font_mm": 2.8,
+  "no_label_overlaps": true,
+  "no_line_label_crossings": true,
+  "read_only": true,
+  "manifest_sha256": "9af23aacc6dfc5a78afc0c0820d5a9048c74e0172991377660b7b49328367f03",
+  "manifest_end_sha256": "9af23aacc6dfc5a78afc0c0820d5a9048c74e0172991377660b7b49328367f03",
+  "script_sha256": "b0f1c9c201061bd0fd0d41420cc02d7c9795ed54da5b9b0038bf320841834357",
+  "recipe_context_hash": "00e1cbe61b3f83da78a9ab0a1a1f8365877c225bee789ebee0a96b7453652d4b",
+  "captured_source_sha256": "f4f375acbf4b7e2a6d81c3549da99dd6e424e112e9f923c9c6ce0ab7d4c91f4e",
+  "provenance_sha256": "20a500969a6cebc8707bed03be8080a57c43dc76863fa2cec9651dd3990ad2dc",
+  "screenshot": "/tmp/cad-slot-positions.png"
+}

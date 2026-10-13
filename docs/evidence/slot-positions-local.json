@@ -1,0 +1,498 @@
+{
+  "valid": true,
+  "executable_sha256": "8b7e16594eccefda1125d255313ff03dcca0f205e9e95c0c6ed036ad30d26191",
+  "oracle_script_sha256": "9dcb22dca0be3defd4f462a4595b5c34342f053a0ea181818ae6fcbb7cdc7f7b",
+  "source_inventory_sha256": {
+    "crates/cad-build/src/section_views.rs": "e71cb7351828d68eea56830ec067844157540fb064d2f38d1d5c746692081871",
+    "crates/cad-build/src/slot_center_datums.rs": "dfda91f467e539cfc6f911ad343596f4c98e74bb98995feff221b6c9699e82b8",
+    "crates/cad-cli/src/drawing.rs": "98a87628b0f2013821b3f1b856b7eb609ee0033cafde7fe3e4a1c7d95cee4612",
+    "crates/cad-cli/src/section.rs": "35ee5c474a9676db1bfd76d3f77f819f68fd9ae434f58e940c03d101f3a341d1",
+    "crates/cad-export/src/drawing.rs": "34151926eb73357e3c46f41ec10490b81f86ec04aad876688de716ce953dc764",
+    "crates/cad-export/src/section.rs": "df4e08bb86448d14e2e5e5cea744ec0bb2ee6f67c1d35f8d94407a337f965a32",
+    "crates/cad-export/tools/check_angle_fixture_ocp.py": "abfe02cb7b71cd6188c04c329f7fa8d166e47e5e03f9aa2bf8a74b6ee262588f",
+    "crates/cad-export/tools/check_apex_ocp.py": "a7e5771a329e72a95eb16038d5c96e7051a6a0c8662339f2f61f49116fdf2370",
+    "crates/cad-export/tools/check_arc_prisms_ocp.py": "d615a610314c9d96eea45e83ddd835e9dc1bf5d1d51e2b8d7e5aacb6a4b34c6b",
+    "crates/cad-export/tools/check_assembly_ocp.py": "6f9c696910f9517886a521b7888338e3d5be08555ad9d0113d2e7100692cc20a",
+    "crates/cad-export/tools/check_blind_bores_ocp.py": "4f8275a724bd3dc8c33a648507bcce3bd05c83febd5bc2dbcd524cd0d4e321f3",
+    "crates/cad-export/tools/check_blind_pallet_ocp.py": "90b41ee27e43c4b2149a99da7bd57a3293fde2f329185522d1d998ff00697a58",
+    "crates/cad-export/tools/check_bom_csv.py": "97a0928e202acda3805455069be1867574cc287bcd71107332ef40e0e2da7e90",
+    "crates/cad-export/tools/check_capsule_link_ocp.py": "6615f86d74eee644db19304c2a8fac0fff602fddde35c9692b4cbf07d7c3a109",
+    "crates/cad-export/tools/check_chamfered_guide_ocp.py": "8967663c04462fb55c184476f9988f6be0912920f3ebdf07b5d60af8c895e5b6",
+    "crates/cad-export/tools/check_common_ocp.py": "bc531c267236de3a8b4fa5f190d09d912d6ecef7e202b875128df9ee2eb38c26",
+    "crates/cad-export/tools/check_concave_holes_ocp.py": "8dc584e95eedae39f6c76d5b4ed6724a63c011d56e19e5834fa6e08dac5eba0d",
+    "crates/cad-export/tools/check_constrained_fixture_ocp.py": "c526cea1fe9768889d02e7b45da9aad992ca4371bb4797a67c9072c79f6dbee0",
+    "crates/cad-export/tools/check_counterbored_fixture_ocp.py": "bf36d00aa6e8d5d13cfef4554c759753907cb42e6bdd26ad137b1f83a77296fc",
+    "crates/cad-export/tools/check_counterbores_ocp.py": "57713019b4c2beb5015aae3763261e40a9ac5c436be5b417f9c2cba4b782ebda",
+    "crates/cad-export/tools/check_countersinks_ocp.py": "668dc48fd82f50304427ee130cf8918fb77078bec71d6b858272d55ceac95f7c",
+    "crates/cad-export/tools/check_countersunk_bearing_cover_ocp.py": "b1878e9e9d399651b7ca76e1eedcc1d01c6fb1ba93124489eb04d25e0cf6955e",
+    "crates/cad-export/tools/check_drill_jig_ocp.py": "0ab4bbba28469815236a892e64523a078511e3a6280111666c2e5852d665bc65",
+    "crates/cad-export/tools/check_four_bar_ocp.py": "f4ad7d8692f465ebfa379b93937478a10bd4a1f30b677271cf47265e0f6237a1",
+    "crates/cad-export/tools/check_jointed_stage_ocp.py": "256d1cd31b3582753e6768fa4ef9aaeb1c9f87bfbedd14f2c09bc0b80a7fb9e5",
+    "crates/cad-export/tools/check_machined_bearing_ocp.py": "695bc21152c3d7a17afa1647c7ae7cf5cf3d85ad62432f3c8bbbd91dba65463a",
+    "crates/cad-export/tools/check_modular_bore_ocp.py": "9a7909125d00fc208f2cb20605970fb0d50f7ff5825141db7894e7a2627f8145",
+    "crates/cad-export/tools/check_modular_stage_ocp.py": "53c2a01ff51e28b7b4c536f7d89becf9c80c8dacba185dee9934fb7b1b7e3cc0",
+    "crates/cad-export/tools/check_motion_ocp.py": "3150384e4b7f34500f740a99790d9a77111c73ba92552ab2edb9b4781d4b5fe7",
+    "crates/cad-export/tools/check_properties_ocp.py": "ecf3f877f62135ef815f5f00c92692817849ab3da58ee95582d594d13586e857",
+    "crates/cad-export/tools/check_round_bearing_cartridge_ocp.py": "3a1bc6e1124ce1b482e045e19376025785bcff5b9b706096ffbff94eb810d9a8",
+    "crates/cad-export/tools/check_round_stock_ocp.py": "313be5ddf2d2725283d6b619bb22a9e04b78d9898b7b509a11f9800b2aadbc1a",
+    "crates/cad-export/tools/check_section_anchors_ocp.py": "72f970602bc5ddcac4d0d8980c8729a49e15d1598559e7be80f8d867ce0f97ea",
+    "crates/cad-export/tools/check_section_circle_dimensions_ocp.py": "33de655eb2b2124cc68466852463b0f2fda7a57ffd244d642fe52c645de90939",
+    "crates/cad-export/tools/check_section_dimensions_ocp.py": "8c3d79bb195645476ff18b09a365dc3ba5e787d3d9e0ff6316b0fac414783f6a",
+    "crates/cad-export/tools/check_section_views_ocp.py": "042bef9b1f25efdaa6dd8f2305f6841f8793193c8af815d565a69ec659e0c7b5",
+    "crates/cad-export/tools/check_sections_ocp.py": "77c8f5a241e07a17058a3e0de1fce8beeaf81ec1f2b6409d6e3a4b1c097de08f",
+    "crates/cad-export/tools/check_split_bearing_ocp.py": "f1b860bce06d5a95761a92071bbb3f991fe8b175a2d9f5e89dcc77efe48d0958",
+    "crates/cad-export/tools/check_step_materials_ocp.py": "e9bb582ca6ecd95ae6fcfe2cc09600d120750e26ab0c51d2a667bb46d0342a54",
+    "crates/cad-export/tools/check_step_metadata_ocp.py": "b9c2d102fac050d7c992562c926ee847d59810eefaa010fbf7ba70bc59264c59",
+    "crates/cad-export/tools/check_step_ocp.py": "7235d4f4ae84cc8dd6f19237ba11eca47352afcb3e1440e3c24b5d70c1d150d7",
+    "crates/cad-export/tools/check_tangent_fixture_ocp.py": "2f1110b9913afbe66da2106822df88e1bea501042376b9ea9c0081e590b8a077",
+    "crates/cad-export/tools/check_through_bores_ocp.py": "0b0dea78349a605962710275352dc21c03d4252b92dffbdbe41e0baf6fdf8933",
+    "crates/cad-export/tools/check_twin_lobe_ocp.py": "8525f83cdfa3cb11afd6e7134c8a61580a3ea8751d4492d5bffb6e4f2f81e78a",
+    "crates/cad-kernel/src/slot_datum.rs": "81b378b6eeaf1fc53296ee567b80d5e56a3ba0b2753258529d34ba5604a5c175",
+    "crates/cad-recipe/src/lib.rs": "af0bd0aa6a01f2fbc9df7fe6323d0c212307844faa38fc3b6fa32b361619f6c6",
+    "examples/drive_module_rotation.star": "02a6123e7f4ba673e5a59b5abd1151ab88b7c17ed11e687b2875f319ab8c9110",
+    "examples/drive_module_slot_positions.star": "f4f375acbf4b7e2a6d81c3549da99dd6e424e112e9f923c9c6ce0ab7d4c91f4e",
+    "examples/drive_module_slot_positions.star.lock.json": "a52b01746058bd9d682d852fabf2cfbcd01d4d040367e983e110db879e683966",
+    "tools/bench-agent-stream.py": "8f0792c9dbac2e55f9059cb26ef37370643defd51ad7ca3fdd706c7e503913ab",
+    "tools/bench-export-spool.py": "e9506162b6ed1485c9fd2c1fdabea8fdba504fea4f45e9d934f6804b55a79b18",
+    "tools/check-coaxial-clearance.py": "f75a1d8263b3a6c4859f03971c90a4f8b1700b392e398ebc68fe5c5c9e6b91b3",
+    "tools/check-convex-clearance.py": "0e85dd56ded209d024c4f3f7d7f2009aca967a4d30d8541f559b93a7539f2b0d",
+    "tools/check-cylinder-clearance.py": "09eb0c3795f7e1c7c4cb15b26fb8c3e53c6df807fe09c12d227cfb0c1405810a",
+    "tools/check-disjoint-stock.py": "74675811f25eaee609da8347a1cbc93c9ddacc3ad06dd809b6d11e12c4bde60d",
+    "tools/check-drive-module.py": "e5aa864859972c80e892f6b30dabf069dcabf767d645c6c8b38800060ffdaff6",
+    "tools/check-drive-rotation.py": "10938e85c1d47216a3dbd98335ce7b1c5c7bfe6dfbf120215e27585187c22921",
+    "tools/check-fillet-dimensions.py": "84d6e382658f6ba2cde1e5c3f52256b03e242698fe52488a32977a6e0f43b68d",
+    "tools/check-hub-keyway.py": "d8b9ddfc9adba7017bffe58d8b2a52eaf1a076dd192045718c0edb896dd5c30c",
+    "tools/check-keyed-clearance.py": "0f0bc8e8bd3fd4fb4b52286523027387b6c65441d535270f6f304f0570b4cbc4",
+    "tools/check-keyed-coupling.py": "e8d1aac5cd2efc4e6b6fefc9c818d7048a643e08938becf45aa7555ae2029c7a",
+    "tools/check-keyed-drive-module.py": "148d283f9ee82615f6b97d263a4c978c7e3aad2942c0179d89119364d6129c47",
+    "tools/check-keyseat.py": "b3a402ff4b03a148a496eb51aaf16267743e6549767f202c793f77da69f8aff8",
+    "tools/check-longitudinal-fillet.py": "6afdde3e7a4043dc5fc654ed790b571e02525a77f6fb2fb01580b9d4c54cc402",
+    "tools/check-obround-slots.py": "730a75374a71eec4db19852605df7d1266d8f76fa18fcda8bcc1274ed347aee6",
+    "tools/check-parallel-clearance.py": "74282df908b423a701e67ce7a7bb8e48e6e3b3ec50589a8fa4efb627d3d3b15a",
+    "tools/check-polygon-bore-rotation.py": "12c471f0c538dba1d0ee607bc45375e16642e487cab35360465a63447de1e201",
+    "tools/check-retained-drive-module.py": "d82389e37def121fe9ecb8eec82df1fcdd6ca9f47e407be4744647db201731ea",
+    "tools/check-retained-shaft.py": "5270cf83474033b301770c168703400b8c9e44073cab5fc537bf910ddeb060bc",
+    "tools/check-revolved-clearance.py": "04bbd402f3358ecee4e861724a2ec462c88024243ede3b9d62b7abfcd82c2b66",
+    "tools/check-rotation-clearance.py": "4492623a1341a2fadfdde9491718ee233dddd8604feecdf2491896728ca4f8a5",
+    "tools/check-rounded-bearing-fit.py": "6f5d06a868e08b9a910952fe535dd5b3faddcda693735ca36fb578d9b6879a24",
+    "tools/check-rounded-rotor.py": "2241d06afefa6bd3dd484c1e81e944384656516d333c42ec069615ee81dcdb5f",
+    "tools/check-sketched-blind-boundaries.py": "b3a0bbe4130d4f184b41f4be9359cf1894d91dd7a928d4da9e3b148974b747e6",
+    "tools/check-sketched-blind-housing.py": "2801bda00d52d4b778221a15d48ed63c4744318a027cde0ebb84e4c09767cc86",
+    "tools/check-slot-adjustment.py": "df2336011e835a720b09bf37552b5268abd446760a0ccbead91d64a60d0a1084",
+    "tools/check-slot-dimensions.py": "99fe41c678047eeac6e3c66b7c81c79b781d2f002537d4d59d1de5fbd1518c68",
+    "tools/check-slot-positions.py": "9dcb22dca0be3defd4f462a4595b5c34342f053a0ea181818ae6fcbb7cdc7f7b",
+    "tools/check-source-provenance.py": "978d738560ac6eaed8c5f883f2c3f3b6f78de357434d939946157a3d4ca59532",
+    "tools/check-tightened-mounting.py": "5f19c2f6d9e407d53fb0237aa1feeebe94614a25c7850f0da731e202f303b4f4",
+    "tools/check-tolerance-stacks.py": "b2802b766e60c9482d2195e5bff7c1440ad27756bf1f71329932ac25d78159b0",
+    "tools/check-translation-clearance.py": "e4f6a684d9748dd31b7bf6ab375088c38d27f3c15f4b0ffed82047f9d60ff66e"
+  },
+  "python": "3.13.15",
+  "ocp": "8.0.1.1.0",
+  "cases": [
+    {
+      "name": "default",
+      "parameters": {},
+      "slot_centers": {
+        "front_minus": [
+          33.0,
+          -28.0
+        ],
+        "front_plus": [
+          33.0,
+          28.0
+        ],
+        "rear_minus": [
+          93.0,
+          -28.0
+        ],
+        "rear_plus": [
+          93.0,
+          28.0
+        ]
+      },
+      "edge_faces": {
+        "left_edge": [
+          0.0,
+          -5.921189464667501e-16,
+          3.0
+        ],
+        "lower_edge": [
+          75.0,
+          -40.0,
+          3.0
+        ]
+      },
+      "dimensions": {
+        "front_x": 33.0,
+        "rear_x": 93.0,
+        "lower_y": 12.0,
+        "upper_y": 68.0,
+        "pitch_x": 60.0,
+        "pitch_y": 56.0
+      },
+      "svg_counts": {
+        "slot_positions": 4,
+        "slot_pitches": 2,
+        "paper_slot_positions": 4,
+        "paper_slot_pitches": 2
+      },
+      "replayed_files": 10,
+      "feature_hashes": {
+        "base_back_right": "d7c7f92939ab7a6174242c622c7e1d86f534bb6c1f3046dfb00b55d30e766a92",
+        "base_body": "3b986147b37391dbce14a992f9f579d859ef26a03a411dfac5ae1f51ebaeccd6",
+        "base_front_left": "0915795e93ed3d1812b8ceac95639deb24f21fc954864783c13c1b0a3daa328c",
+        "base_front_right": "bbe84394f8cdd44658511438f9953c53dc37ae0b40b0e6192bb15d7b2a67f9d3",
+        "base_profile": "672f954b9d758900aea6fc8d0abbdf92402526714ececc09a9e20ee9705a1866",
+        "base_slotted": "bfb1c5de4c19c46da2da45efcf86adc72e1f4a966cae7a9ee5aab2c407324af7",
+        "base_stock": "35039a15a9875a6bba486f1c7b5d47474acb265dc8bb62ed15e7e09676367516",
+        "bolt_body": "a9fdb3b11b355bbf6477d9300652684fdcafcde8a4e00c99f69bc7eda72a00f4",
+        "bolt_profile": "476d3fe2328d4481dd000984ba42f802c4f331c1be6f20a2ec093c14fdca81a3",
+        "clamp_body": "59484f3c2831500e6e210b6e9b32e878e6de2da6479d61b6ab62230c50a666dc",
+        "clamp_profile": "6e2a844aa9de731173a8445f8d06cb888ccbe2b671dd64cbaf507d2ba1f33984",
+        "cover_screw_body": "d55d5f2ebe3db4f7c25a90fc38f4ab3a03467c374c53b31707c0d2a6832eb0d4",
+        "cover_screw_profile": "1614ddc61e0145e6c0881e1e60fcc18293e883c620311546b143a374f0307da1",
+        "disc_body": "dcf8e2ae8acde4fb8d13a4e88e1616ecbba4f9745dad2fe937b9416eb647cc95",
+        "disc_profile": "2087207f6c6036d097cb7aeadb7fd301d63720b997cc7e8f43b086de279b060d",
+        "disc_stock": "013efe525814e79ecb2dcb2a687bc908757642fce0ca9e157bd877702e49b91b",
+        "end_cover_body": "29a6d187d359318a7c126369b8ecbe5f73bb6c20f17ad4730ba492c3f3ec1029",
+        "end_cover_profile": "0636100cf46208017c17e084d407a6cad4e725934ccb50509db0224358ed735a",
+        "housing_body": "3de57ff8fda448a37c6510dfc10c2500200d231bc377de2b59ec891fc8debd40",
+        "housing_left_pilots": "d4543b2dd438cdbcb3fc5cf2f5132ce5c2e7aafc3ae6d3293d9bc48c4e494fee",
+        "housing_profile": "d9a6fcf006ccddfdbcccde7b84928226284973ce57197e5f0a4945cea47e8092",
+        "housing_right_pilots": "ef02ddbec75b89dd3858331e5d51e7a2c77e5799213e68196c5adc6d3b2e42c5",
+        "key_body": "e69f88e44719ee5bcb2a3b960557e10e2afe37e763e296c72e0db6b6b73832f8",
+        "key_profile": "96c66aa1af314881b0bbc0fbd312320c91e75f66d7054b811ba21486cd6fe635",
+        "keyway_box": "deeabe7fdb8a57764719ce8d266aa8c7239a7191c54db656813f46ad0f12c5ae",
+        "keyway_profile": "6acd2af67e72c09f7a78b99b7fc5ca75a81fbcd635d82270af79c72142f8c0f6",
+        "keyway_tool": "cf1d5c27c0b4d58b8a73da6f368304f68bf975eea8a992792ccc5ffcc2969ff4",
+        "nut_body": "be893e4fa350f6fb249d25dd8e21fcb6da6dffd3de8d4be20a378087ea1bc9d5",
+        "nut_profile": "1214ef87534e2acc11f52feba10e17c336501700c70aad2c9a1eb50a642bb115",
+        "ring_body": "3968a7523d1a49c25688c880a3d3bdf5d5031b9b3f91f21540a725c41a332b24",
+        "ring_profile": "04b6ddf5a2bc992e24bb418623fd16d4ccdfe1887f096a9fa93ebb96660ee2e1",
+        "seat_box": "af0cebd5c26e2fba9f005451c99d767b418acf8ceb80790b8f030a373250efbb",
+        "seat_profile": "89cfd48f2494d5967995f2c628836d089a9814daf50036f6b7899b1e0f384561",
+        "seat_tool": "d224011c638bddc3dce916f76d11f5db7319493e2178f4c5191bc0d02b63c108",
+        "shaft_body": "fadb4674c51d6235620feb719e9bd058494920111c53ba88bea3dc310ece05b9",
+        "shaft_profile": "f20e6a64a57e88ea384b428e1e983bf321e39be42b3f74c6342633c7ead27b98",
+        "shaft_stock": "f96ae5631495be5ac25d9def2a5f569557ed0c8280531872d3d7ba1960a363e8",
+        "sleeve_body": "a37ee95453d3cf0b7831d57345d37cb0f6409ad13c9d439576018d88612d7ef2",
+        "sleeve_profile": "73c09d078eb0ba2a5e4128137d44890e9ce5f248a27dace4ec27bdda827c3ead",
+        "washer_body": "084752f8d3048279522f39462d43a965c7c284766e0eb6305e9d096c512ac0b1",
+        "washer_profile": "0179f2a97682bb7e184a544f1dff63cec68fcd656adb17eb1c7ed857eb8a32ad"
+      },
+      "base_content_hash": "bfb1c5de4c19c46da2da45efcf86adc72e1f4a966cae7a9ee5aab2c407324af7",
+      "recipe_context_hash": "00e1cbe61b3f83da78a9ab0a1a1f8365877c225bee789ebee0a96b7453652d4b"
+    },
+    {
+      "name": "wide_pitch",
+      "parameters": {
+        "mounting_pitch": 90
+      },
+      "slot_centers": {
+        "front_minus": [
+          33.0,
+          -28.0
+        ],
+        "front_plus": [
+          33.0,
+          28.0
+        ],
+        "rear_minus": [
+          123.0,
+          -28.0
+        ],
+        "rear_plus": [
+          123.0,
+          28.0
+        ]
+      },
+      "edge_faces": {
+        "left_edge": [
+          0.0,
+          -5.921189464667501e-16,
+          3.0
+        ],
+        "lower_edge": [
+          90.0,
+          -40.0,
+          3.0
+        ]
+      },
+      "dimensions": {
+        "front_x": 33.0,
+        "rear_x": 123.0,
+        "lower_y": 12.0,
+        "upper_y": 68.0,
+        "pitch_x": 90.0,
+        "pitch_y": 56.0
+      },
+      "svg_counts": {
+        "slot_positions": 4,
+        "slot_pitches": 2,
+        "paper_slot_positions": 4,
+        "paper_slot_pitches": 2
+      },
+      "replayed_files": 10,
+      "feature_hashes": {
+        "base_back_right": "ad840ff5519ef2a991d6e30060b0d960ce73fd19f3c8c9ca1a84a9c6396e4436",
+        "base_body": "2d9b666f5907e9b6330111873bf6bb00c93255a7b8afa9071ce82229bec475f8",
+        "base_front_left": "a6dc8b0335be65b63c606f4675f59fbf331eb60e17b6b4800a77c829474e56ab",
+        "base_front_right": "b30b0c8c4aaf533b858ec8a1dfbb5ff7944e204cdd0a873619339597917b703b",
+        "base_profile": "cf268c273465606d4e81041fc16ff4e4e90e09589074db186bc8de31fc5de532",
+        "base_slotted": "fb6ba5426eb9b9cbc163f928150aff77014466a09a7f990f2522bc1c6d8e83df",
+        "base_stock": "d37074b1f8fa702606095d8e640315be8a15d4f3bfdbac97e8a1cea1c3836960",
+        "bolt_body": "a9fdb3b11b355bbf6477d9300652684fdcafcde8a4e00c99f69bc7eda72a00f4",
+        "bolt_profile": "476d3fe2328d4481dd000984ba42f802c4f331c1be6f20a2ec093c14fdca81a3",
+        "clamp_body": "59484f3c2831500e6e210b6e9b32e878e6de2da6479d61b6ab62230c50a666dc",
+        "clamp_profile": "6e2a844aa9de731173a8445f8d06cb888ccbe2b671dd64cbaf507d2ba1f33984",
+        "cover_screw_body": "d55d5f2ebe3db4f7c25a90fc38f4ab3a03467c374c53b31707c0d2a6832eb0d4",
+        "cover_screw_profile": "1614ddc61e0145e6c0881e1e60fcc18293e883c620311546b143a374f0307da1",
+        "disc_body": "dcf8e2ae8acde4fb8d13a4e88e1616ecbba4f9745dad2fe937b9416eb647cc95",
+        "disc_profile": "2087207f6c6036d097cb7aeadb7fd301d63720b997cc7e8f43b086de279b060d",
+        "disc_stock": "013efe525814e79ecb2dcb2a687bc908757642fce0ca9e157bd877702e49b91b",
+        "end_cover_body": "29a6d187d359318a7c126369b8ecbe5f73bb6c20f17ad4730ba492c3f3ec1029",
+        "end_cover_profile": "0636100cf46208017c17e084d407a6cad4e725934ccb50509db0224358ed735a",
+        "housing_body": "3de57ff8fda448a37c6510dfc10c2500200d231bc377de2b59ec891fc8debd40",
+        "housing_left_pilots": "d4543b2dd438cdbcb3fc5cf2f5132ce5c2e7aafc3ae6d3293d9bc48c4e494fee",
+        "housing_profile": "d9a6fcf006ccddfdbcccde7b84928226284973ce57197e5f0a4945cea47e8092",
+        "housing_right_pilots": "ef02ddbec75b89dd3858331e5d51e7a2c77e5799213e68196c5adc6d3b2e42c5",
+        "key_body": "e69f88e44719ee5bcb2a3b960557e10e2afe37e763e296c72e0db6b6b73832f8",
+        "key_profile": "96c66aa1af314881b0bbc0fbd312320c91e75f66d7054b811ba21486cd6fe635",
+        "keyway_box": "deeabe7fdb8a57764719ce8d266aa8c7239a7191c54db656813f46ad0f12c5ae",
+        "keyway_profile": "6acd2af67e72c09f7a78b99b7fc5ca75a81fbcd635d82270af79c72142f8c0f6",
+        "keyway_tool": "cf1d5c27c0b4d58b8a73da6f368304f68bf975eea8a992792ccc5ffcc2969ff4",
+        "nut_body": "be893e4fa350f6fb249d25dd8e21fcb6da6dffd3de8d4be20a378087ea1bc9d5",
+        "nut_profile": "1214ef87534e2acc11f52feba10e17c336501700c70aad2c9a1eb50a642bb115",
+        "ring_body": "3968a7523d1a49c25688c880a3d3bdf5d5031b9b3f91f21540a725c41a332b24",
+        "ring_profile": "04b6ddf5a2bc992e24bb418623fd16d4ccdfe1887f096a9fa93ebb96660ee2e1",
+        "seat_box": "af0cebd5c26e2fba9f005451c99d767b418acf8ceb80790b8f030a373250efbb",
+        "seat_profile": "89cfd48f2494d5967995f2c628836d089a9814daf50036f6b7899b1e0f384561",
+        "seat_tool": "670155634372be8a47feef1d6975a963de663c09a824b862b4bf30795a34a4c5",
+        "shaft_body": "07f1173c28147985423e218c95d92752a7cb2aa962d9fdd2c9d2a21e7f16f541",
+        "shaft_profile": "3f0c8ed17d04e59e1596977fb15ab811e8d23f9160030ffd4b39b2af082f452b",
+        "shaft_stock": "3c4a25a8c2ad422601d8a335c655591323d3f72bf89784bb3f9add7f17dcdba0",
+        "sleeve_body": "a37ee95453d3cf0b7831d57345d37cb0f6409ad13c9d439576018d88612d7ef2",
+        "sleeve_profile": "73c09d078eb0ba2a5e4128137d44890e9ce5f248a27dace4ec27bdda827c3ead",
+        "washer_body": "084752f8d3048279522f39462d43a965c7c284766e0eb6305e9d096c512ac0b1",
+        "washer_profile": "0179f2a97682bb7e184a544f1dff63cec68fcd656adb17eb1c7ed857eb8a32ad"
+      },
+      "base_content_hash": "fb6ba5426eb9b9cbc163f928150aff77014466a09a7f990f2522bc1c6d8e83df",
+      "recipe_context_hash": "133669d3db6d6019993cfdd2937385cc778a1298c7b76d986c8cb1f7b1589b3f"
+    },
+    {
+      "name": "long_slot",
+      "parameters": {
+        "base_slot_length": 8
+      },
+      "slot_centers": {
+        "front_minus": [
+          33.0,
+          -28.0
+        ],
+        "front_plus": [
+          33.0,
+          28.0
+        ],
+        "rear_minus": [
+          93.0,
+          -28.0
+        ],
+        "rear_plus": [
+          93.0,
+          28.0
+        ]
+      },
+      "edge_faces": {
+        "left_edge": [
+          0.0,
+          -5.921189464667501e-16,
+          3.0
+        ],
+        "lower_edge": [
+          75.0,
+          -40.0,
+          3.0
+        ]
+      },
+      "dimensions": {
+        "front_x": 33.0,
+        "rear_x": 93.0,
+        "lower_y": 12.0,
+        "upper_y": 68.0,
+        "pitch_x": 60.0,
+        "pitch_y": 56.0
+      },
+      "svg_counts": {
+        "slot_positions": 4,
+        "slot_pitches": 2,
+        "paper_slot_positions": 4,
+        "paper_slot_pitches": 2
+      },
+      "replayed_files": 10,
+      "feature_hashes": {
+        "base_back_right": "d7c7f92939ab7a6174242c622c7e1d86f534bb6c1f3046dfb00b55d30e766a92",
+        "base_body": "3b986147b37391dbce14a992f9f579d859ef26a03a411dfac5ae1f51ebaeccd6",
+        "base_front_left": "0915795e93ed3d1812b8ceac95639deb24f21fc954864783c13c1b0a3daa328c",
+        "base_front_right": "bbe84394f8cdd44658511438f9953c53dc37ae0b40b0e6192bb15d7b2a67f9d3",
+        "base_profile": "672f954b9d758900aea6fc8d0abbdf92402526714ececc09a9e20ee9705a1866",
+        "base_slotted": "04c0815f18d6e9f8df3e5b9d361a2d659c250b401166f8c61904231f043f7afe",
+        "base_stock": "35039a15a9875a6bba486f1c7b5d47474acb265dc8bb62ed15e7e09676367516",
+        "bolt_body": "a9fdb3b11b355bbf6477d9300652684fdcafcde8a4e00c99f69bc7eda72a00f4",
+        "bolt_profile": "476d3fe2328d4481dd000984ba42f802c4f331c1be6f20a2ec093c14fdca81a3",
+        "clamp_body": "59484f3c2831500e6e210b6e9b32e878e6de2da6479d61b6ab62230c50a666dc",
+        "clamp_profile": "6e2a844aa9de731173a8445f8d06cb888ccbe2b671dd64cbaf507d2ba1f33984",
+        "cover_screw_body": "d55d5f2ebe3db4f7c25a90fc38f4ab3a03467c374c53b31707c0d2a6832eb0d4",
+        "cover_screw_profile": "1614ddc61e0145e6c0881e1e60fcc18293e883c620311546b143a374f0307da1",
+        "disc_body": "dcf8e2ae8acde4fb8d13a4e88e1616ecbba4f9745dad2fe937b9416eb647cc95",
+        "disc_profile": "2087207f6c6036d097cb7aeadb7fd301d63720b997cc7e8f43b086de279b060d",
+        "disc_stock": "013efe525814e79ecb2dcb2a687bc908757642fce0ca9e157bd877702e49b91b",
+        "end_cover_body": "29a6d187d359318a7c126369b8ecbe5f73bb6c20f17ad4730ba492c3f3ec1029",
+        "end_cover_profile": "0636100cf46208017c17e084d407a6cad4e725934ccb50509db0224358ed735a",
+        "housing_body": "3de57ff8fda448a37c6510dfc10c2500200d231bc377de2b59ec891fc8debd40",
+        "housing_left_pilots": "d4543b2dd438cdbcb3fc5cf2f5132ce5c2e7aafc3ae6d3293d9bc48c4e494fee",
+        "housing_profile": "d9a6fcf006ccddfdbcccde7b84928226284973ce57197e5f0a4945cea47e8092",
+        "housing_right_pilots": "ef02ddbec75b89dd3858331e5d51e7a2c77e5799213e68196c5adc6d3b2e42c5",
+        "key_body": "e69f88e44719ee5bcb2a3b960557e10e2afe37e763e296c72e0db6b6b73832f8",
+        "key_profile": "96c66aa1af314881b0bbc0fbd312320c91e75f66d7054b811ba21486cd6fe635",
+        "keyway_box": "deeabe7fdb8a57764719ce8d266aa8c7239a7191c54db656813f46ad0f12c5ae",
+        "keyway_profile": "6acd2af67e72c09f7a78b99b7fc5ca75a81fbcd635d82270af79c72142f8c0f6",
+        "keyway_tool": "cf1d5c27c0b4d58b8a73da6f368304f68bf975eea8a992792ccc5ffcc2969ff4",
+        "nut_body": "be893e4fa350f6fb249d25dd8e21fcb6da6dffd3de8d4be20a378087ea1bc9d5",
+        "nut_profile": "1214ef87534e2acc11f52feba10e17c336501700c70aad2c9a1eb50a642bb115",
+        "ring_body": "3968a7523d1a49c25688c880a3d3bdf5d5031b9b3f91f21540a725c41a332b24",
+        "ring_profile": "04b6ddf5a2bc992e24bb418623fd16d4ccdfe1887f096a9fa93ebb96660ee2e1",
+        "seat_box": "af0cebd5c26e2fba9f005451c99d767b418acf8ceb80790b8f030a373250efbb",
+        "seat_profile": "89cfd48f2494d5967995f2c628836d089a9814daf50036f6b7899b1e0f384561",
+        "seat_tool": "d224011c638bddc3dce916f76d11f5db7319493e2178f4c5191bc0d02b63c108",
+        "shaft_body": "fadb4674c51d6235620feb719e9bd058494920111c53ba88bea3dc310ece05b9",
+        "shaft_profile": "f20e6a64a57e88ea384b428e1e983bf321e39be42b3f74c6342633c7ead27b98",
+        "shaft_stock": "f96ae5631495be5ac25d9def2a5f569557ed0c8280531872d3d7ba1960a363e8",
+        "sleeve_body": "a37ee95453d3cf0b7831d57345d37cb0f6409ad13c9d439576018d88612d7ef2",
+        "sleeve_profile": "73c09d078eb0ba2a5e4128137d44890e9ce5f248a27dace4ec27bdda827c3ead",
+        "washer_body": "084752f8d3048279522f39462d43a965c7c284766e0eb6305e9d096c512ac0b1",
+        "washer_profile": "0179f2a97682bb7e184a544f1dff63cec68fcd656adb17eb1c7ed857eb8a32ad"
+      },
+      "base_content_hash": "04c0815f18d6e9f8df3e5b9d361a2d659c250b401166f8c61904231f043f7afe",
+      "recipe_context_hash": "daa83a84e080d8a397104a8921a00251970334eb28068b9f4bec6101c6f6270b"
+    },
+    {
+      "name": "paper_three_quarter_scale",
+      "parameters": {
+        "position_drawing_scale": 0.75
+      },
+      "slot_centers": {
+        "front_minus": [
+          33.0,
+          -28.0
+        ],
+        "front_plus": [
+          33.0,
+          28.0
+        ],
+        "rear_minus": [
+          93.0,
+          -28.0
+        ],
+        "rear_plus": [
+          93.0,
+          28.0
+        ]
+      },
+      "edge_faces": {
+        "left_edge": [
+          0.0,
+          -5.921189464667501e-16,
+          3.0
+        ],
+        "lower_edge": [
+          75.0,
+          -40.0,
+          3.0
+        ]
+      },
+      "dimensions": {
+        "front_x": 33.0,
+        "rear_x": 93.0,
+        "lower_y": 12.0,
+        "upper_y": 68.0,
+        "pitch_x": 60.0,
+        "pitch_y": 56.0
+      },
+      "svg_counts": {
+        "slot_positions": 4,
+        "slot_pitches": 2,
+        "paper_slot_positions": 4,
+        "paper_slot_pitches": 2
+      },
+      "replayed_files": 10,
+      "feature_hashes": {
+        "base_back_right": "d7c7f92939ab7a6174242c622c7e1d86f534bb6c1f3046dfb00b55d30e766a92",
+        "base_body": "3b986147b37391dbce14a992f9f579d859ef26a03a411dfac5ae1f51ebaeccd6",
+        "base_front_left": "0915795e93ed3d1812b8ceac95639deb24f21fc954864783c13c1b0a3daa328c",
+        "base_front_right": "bbe84394f8cdd44658511438f9953c53dc37ae0b40b0e6192bb15d7b2a67f9d3",
+        "base_profile": "672f954b9d758900aea6fc8d0abbdf92402526714ececc09a9e20ee9705a1866",
+        "base_slotted": "bfb1c5de4c19c46da2da45efcf86adc72e1f4a966cae7a9ee5aab2c407324af7",
+        "base_stock": "35039a15a9875a6bba486f1c7b5d47474acb265dc8bb62ed15e7e09676367516",
+        "bolt_body": "a9fdb3b11b355bbf6477d9300652684fdcafcde8a4e00c99f69bc7eda72a00f4",
+        "bolt_profile": "476d3fe2328d4481dd000984ba42f802c4f331c1be6f20a2ec093c14fdca81a3",
+        "clamp_body": "59484f3c2831500e6e210b6e9b32e878e6de2da6479d61b6ab62230c50a666dc",
+        "clamp_profile": "6e2a844aa9de731173a8445f8d06cb888ccbe2b671dd64cbaf507d2ba1f33984",
+        "cover_screw_body": "d55d5f2ebe3db4f7c25a90fc38f4ab3a03467c374c53b31707c0d2a6832eb0d4",
+        "cover_screw_profile": "1614ddc61e0145e6c0881e1e60fcc18293e883c620311546b143a374f0307da1",
+        "disc_body": "dcf8e2ae8acde4fb8d13a4e88e1616ecbba4f9745dad2fe937b9416eb647cc95",
+        "disc_profile": "2087207f6c6036d097cb7aeadb7fd301d63720b997cc7e8f43b086de279b060d",
+        "disc_stock": "013efe525814e79ecb2dcb2a687bc908757642fce0ca9e157bd877702e49b91b",
+        "end_cover_body": "29a6d187d359318a7c126369b8ecbe5f73bb6c20f17ad4730ba492c3f3ec1029",
+        "end_cover_profile": "0636100cf46208017c17e084d407a6cad4e725934ccb50509db0224358ed735a",
+        "housing_body": "3de57ff8fda448a37c6510dfc10c2500200d231bc377de2b59ec891fc8debd40",
+        "housing_left_pilots": "d4543b2dd438cdbcb3fc5cf2f5132ce5c2e7aafc3ae6d3293d9bc48c4e494fee",
+        "housing_profile": "d9a6fcf006ccddfdbcccde7b84928226284973ce57197e5f0a4945cea47e8092",
+        "housing_right_pilots": "ef02ddbec75b89dd3858331e5d51e7a2c77e5799213e68196c5adc6d3b2e42c5",
+        "key_body": "e69f88e44719ee5bcb2a3b960557e10e2afe37e763e296c72e0db6b6b73832f8",
+        "key_profile": "96c66aa1af314881b0bbc0fbd312320c91e75f66d7054b811ba21486cd6fe635",
+        "keyway_box": "deeabe7fdb8a57764719ce8d266aa8c7239a7191c54db656813f46ad0f12c5ae",
+        "keyway_profile": "6acd2af67e72c09f7a78b99b7fc5ca75a81fbcd635d82270af79c72142f8c0f6",
+        "keyway_tool": "cf1d5c27c0b4d58b8a73da6f368304f68bf975eea8a992792ccc5ffcc2969ff4",
+        "nut_body": "be893e4fa350f6fb249d25dd8e21fcb6da6dffd3de8d4be20a378087ea1bc9d5",
+        "nut_profile": "1214ef87534e2acc11f52feba10e17c336501700c70aad2c9a1eb50a642bb115",
+        "ring_body": "3968a7523d1a49c25688c880a3d3bdf5d5031b9b3f91f21540a725c41a332b24",
+        "ring_profile": "04b6ddf5a2bc992e24bb418623fd16d4ccdfe1887f096a9fa93ebb96660ee2e1",
+        "seat_box": "af0cebd5c26e2fba9f005451c99d767b418acf8ceb80790b8f030a373250efbb",
+        "seat_profile": "89cfd48f2494d5967995f2c628836d089a9814daf50036f6b7899b1e0f384561",
+        "seat_tool": "d224011c638bddc3dce916f76d11f5db7319493e2178f4c5191bc0d02b63c108",
+        "shaft_body": "fadb4674c51d6235620feb719e9bd058494920111c53ba88bea3dc310ece05b9",
+        "shaft_profile": "f20e6a64a57e88ea384b428e1e983bf321e39be42b3f74c6342633c7ead27b98",
+        "shaft_stock": "f96ae5631495be5ac25d9def2a5f569557ed0c8280531872d3d7ba1960a363e8",
+        "sleeve_body": "a37ee95453d3cf0b7831d57345d37cb0f6409ad13c9d439576018d88612d7ef2",
+        "sleeve_profile": "73c09d078eb0ba2a5e4128137d44890e9ce5f248a27dace4ec27bdda827c3ead",
+        "washer_body": "084752f8d3048279522f39462d43a965c7c284766e0eb6305e9d096c512ac0b1",
+        "washer_profile": "0179f2a97682bb7e184a544f1dff63cec68fcd656adb17eb1c7ed857eb8a32ad"
+      },
+      "base_content_hash": "bfb1c5de4c19c46da2da45efcf86adc72e1f4a966cae7a9ee5aab2c407324af7",
+      "recipe_context_hash": "a41550d9df7d7ee48e88172265e661276401b33c8c2507ec55c4b4acbf8d22a6"
+    }
+  ],
+  "refusals": [
+    {
+      "case": "missing_role",
+      "code": "slot_center_datum_failed",
+      "diagnostic": "slot wall role must resolve to exactly four native faces: Unsupported: anchor 'base_slotted' has no generated role 'missing_slot'"
+    },
+    {
+      "case": "partial_wall",
+      "code": "slot_center_datum_failed",
+      "diagnostic": "slot wall role must resolve to exactly four native faces: Resolved: generated role resolved through explicit operation lineage"
+    },
+    {
+      "case": "wrong_cap",
+      "code": "slot_center_datum_failed",
+      "diagnostic": "slot cap role must resolve to one native face: Unsupported: anchor 'base_slotted' has no generated role 'wall_0'"
+    },
+    {
+      "case": "impossible_bound",
+      "code": "section_dimension_failed",
+      "diagnostic": "projected dimension lies outside declared bounds"
+    }
+  ],
+  "scope": "Native slot-center and surviving planar-edge datum positions from STEP; projected paper dimensions, not GD&T or manufactured-part conformance."
+}

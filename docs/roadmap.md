@@ -1009,3 +1009,22 @@ changes preserve exact STEP bytes. Seven key artifacts replay byte-for-byte in
 each case, and seven invalid edits preserve the previous complete generation.
 [Browser checks](evidence/slot-dimensions-browser-local.json) verify all 12 labels,
 line clearance and captured root/module source inspection on the live sheet.
+
+The next machining-reference increment derives associative slot-center datums
+from the native four-wall capsule and its selected cap. Existing projected
+section dimensions then locate centers from surviving stock sidewalls and
+measure center pitches. Acceptance requires STEP-derived center/edge positions,
+slot-length edits preserving centers, pitch edits moving them, conservative
+arithmetic intervals, rejection without publication, captured-source inspection
+and exact replay. These are nominal machining references; GD&T and manufactured
+part inspection remain open.
+
+The [slot-position oracle](evidence/slot-positions-local.json) now passes four
+configurations: default, wider mounting pitch, longer slots, and paper scale
+0.75. It independently measures STEP capsule centers and stock sidewalls,
+verifies six projected dimensions and their SVG endpoints, and replays ten
+artifacts exactly per case. Slot-length changes preserve center positions;
+pitch changes move the native centers. Four invalid edits preserve the entire
+previous publication. Browser acceptance is recorded separately in the
+[slot-position inspection receipt](evidence/slot-positions-browser-local.json).
+All five commercial gates remain open.
