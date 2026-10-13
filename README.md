@@ -3625,3 +3625,8 @@ checks recipe selection and the native dimension drawing. Inspect the
 [motor housing](http://localhost:8080/motor_mount_housing/motor_mount_housing.gpu.html)
 with the development server running. This remains experimental, bounded modeling;
 general curved Booleans and arbitrary-profile fit are not implemented.
+
+Both assembly viewers include native dimension, nominal seating, pocket-fit and
+clearance cards for the displayed output. Open a card to inspect measured bounds,
+its motion scope, the native report JSON and captured recipe. These are published
+headless build results; the viewer remains read-only.

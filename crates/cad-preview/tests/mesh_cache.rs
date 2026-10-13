@@ -20,6 +20,7 @@ fn context(hash: &str) -> RecipeContext {
         content_hash: hash.into(),
         recipe_context_hash: "captured-source".into(),
         property_assertions: Default::default(),
+        native_engineering_checks: Default::default(),
     }
 }
 #[test]

@@ -229,6 +229,7 @@ mod tests {
             content_hash: "assembly-hash".into(),
             recipe_context_hash: "context".into(),
             property_assertions: BTreeMap::new(),
+            native_engineering_checks: Default::default(),
         };
         let (index, assets) = build(
             "root",

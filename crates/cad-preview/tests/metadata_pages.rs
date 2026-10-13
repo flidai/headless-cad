@@ -89,6 +89,7 @@ fn fixture() -> (BuiltAssembly, RecipeContext) {
         content_hash: assembly.content_hash.clone(),
         recipe_context_hash: "pinned-recipe-context".into(),
         property_assertions: Default::default(),
+        native_engineering_checks: Default::default(),
     };
     (assembly, context)
 }

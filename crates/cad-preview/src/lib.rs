@@ -64,6 +64,28 @@ pub struct RecipeContext {
     /// The publisher binds these reports into `recipe_context_hash`.
     #[serde(default)]
     pub property_assertions: BTreeMap<String, EngineeringCheck>,
+    /// Current-output native check summaries, bound to the captured report bytes
+    /// by the publisher. These are display evidence, never viewer-side solvers.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub native_engineering_checks: BTreeMap<String, NativeEngineeringCheck>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NativeEngineeringCheck {
+    pub kind: String,
+    pub id: String,
+    pub output: String,
+    pub status: String,
+    pub scope: String,
+    pub target_content_hash: String,
+    /// Named native report values with units encoded in the names, such as
+    /// `lower_bound_mm`. No display mesh measurement enters this map.
+    pub quantities: BTreeMap<String, f64>,
+    pub instance_paths: Vec<Vec<String>>,
+    pub report_file: String,
+    /// BLAKE3 digest of the canonical serialized native report entry.
+    pub report_digest: String,
 }
 
 /// Read-only evidence supplied by the headless builder, never measured from a mesh.
@@ -464,6 +486,67 @@ fn render_html_template(
                 ));
             }
         }
+        if recipe.native_engineering_checks.len() > 256 {
+            return Err(PreviewError::Recipe("too many native engineering checks"));
+        }
+        for (key, check) in &recipe.native_engineering_checks {
+            let report = match check.kind.as_str() {
+                "datum_dimension" => "datum-dimensions.json",
+                "nominal_seating" => "nominal-seating-checks.json",
+                "pocket_fit" => "pocket-fit-checks.json",
+                "clearance" => "clearance-checks.json",
+                _ => {
+                    return Err(PreviewError::Recipe(
+                        "unknown native engineering check kind",
+                    ))
+                }
+            };
+            let identifier = |value: &str| {
+                !value.is_empty()
+                    && value.len() <= 128
+                    && value.bytes().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')
+                    })
+            };
+            if key != &format!("{}.{}", check.kind, check.id)
+                || !identifier(&check.id)
+                || check.output != recipe.output_name
+                || check.target_content_hash != recipe.content_hash
+                || check.status != "passed"
+                || !matches!(
+                    (check.kind.as_str(), check.scope.as_str()),
+                    ("datum_dimension", "Directed native datum distance")
+                        | ("nominal_seating", "Local nominal planar seating")
+                        | ("pocket_fit", "Complete capsule footprint and axial overlap")
+                        | ("clearance", "Initial pose")
+                        | ("clearance", "Entire declared motion path")
+                )
+                || check.report_file != report
+                || check.report_digest.len() != 64
+                || !check
+                    .report_digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit())
+                || check.quantities.len() > 8
+                || check.quantities.is_empty()
+                || check
+                    .quantities
+                    .iter()
+                    .any(|(name, value)| !identifier(name) || !value.is_finite())
+                || check.instance_paths.len() != 2
+                || check.instance_paths.iter().any(|path| {
+                    path.is_empty()
+                        || path.len() > 64
+                        || path
+                            .iter()
+                            .any(|segment| segment.trim().is_empty() || segment.len() > 256)
+                })
+            {
+                return Err(PreviewError::Recipe(
+                    "invalid or mismatched native engineering check evidence",
+                ));
+            }
+        }
     }
     let value = serde_json::to_value(data)?;
     let has_holes = |body: &serde_json::Value| {
@@ -774,6 +857,7 @@ mod tests {
             content_hash: "geometry-test".into(),
             recipe_context_hash: "recipe-test".into(),
             property_assertions: Default::default(),
+            native_engineering_checks: Default::default(),
         };
         let html = to_html_with_recipe(&model, &recipe).unwrap();
         assert_eq!(html.matches("<script>").count(), 2);
@@ -814,6 +898,7 @@ mod tests {
             content_hash: "geometry-test".into(),
             recipe_context_hash: "recipe-test".into(),
             property_assertions: Default::default(),
+            native_engineering_checks: Default::default(),
         };
         assert!(matches!(
             to_html_with_recipe(&model, &recipe),
@@ -851,6 +936,7 @@ mod tests {
                     message: Some("</script><script>globalThis.pwned=true</script>".into()),
                 },
             )]),
+            native_engineering_checks: Default::default(),
         };
         let html = to_html_with_recipe(&model, &context).unwrap();
         assert!(!html.contains("<img src=x>"));
@@ -881,6 +967,66 @@ mod tests {
             .next()
             .unwrap()
             .target_content_hash = "stale-body".into();
+        assert!(matches!(
+            to_html_with_recipe(&model, &context),
+            Err(PreviewError::Recipe(_))
+        ));
+    }
+
+    #[test]
+    fn native_engineering_evidence_is_current_bounded_and_read_only() {
+        let model = extrude_rectangle(1.0, 2.0, 3.0, Tolerance::default())
+            .unwrap()
+            .model;
+        let mut context = RecipeContext {
+            language: "starlark".into(),
+            source: "# captured source\n".into(),
+            source_name: "part.star".into(),
+            modules: Default::default(),
+            source_bundle_hash: None,
+            source_provenance: None,
+            output_name: "part".into(),
+            feature_id: "body".into(),
+            parameters: BTreeMap::new(),
+            content_hash: "body-hash".into(),
+            recipe_context_hash: "context-hash".into(),
+            property_assertions: Default::default(),
+            native_engineering_checks: BTreeMap::from([(
+                "datum_dimension.depth".into(),
+                NativeEngineeringCheck {
+                    kind: "datum_dimension".into(),
+                    id: "depth".into(),
+                    output: "part".into(),
+                    status: "passed".into(),
+                    scope: "Directed native datum distance".into(),
+                    target_content_hash: "body-hash".into(),
+                    quantities: BTreeMap::from([("measured_mm".into(), 3.0)]),
+                    instance_paths: vec![vec!["part".into()], vec!["part".into()]],
+                    report_file: "datum-dimensions.json".into(),
+                    report_digest: "a".repeat(64),
+                },
+            )]),
+        };
+        let html = to_html_with_recipe(&model, &context).unwrap();
+        assert!(html.contains("Native report JSON"));
+        assert!(html.contains("Captured recipe source"));
+        assert!(html.contains("datum-dimensions.json"));
+        assert!(html.contains("\"native_engineering_checks\""));
+        let mut stale = context.clone();
+        stale
+            .native_engineering_checks
+            .get_mut("datum_dimension.depth")
+            .unwrap()
+            .target_content_hash = "old-body".into();
+        assert!(matches!(
+            to_html_with_recipe(&model, &stale),
+            Err(PreviewError::Recipe(_))
+        ));
+        let check = context
+            .native_engineering_checks
+            .get_mut("datum_dimension.depth")
+            .unwrap();
+        check.report_file = "../outside.json".into();
         assert!(matches!(
             to_html_with_recipe(&model, &context),
             Err(PreviewError::Recipe(_))

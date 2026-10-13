@@ -23,6 +23,7 @@ mod capabilities;
 mod clearance;
 mod datum_dimensions;
 mod drawing;
+mod engineering_panel;
 mod exchange;
 mod integrity;
 mod nominal_seating;
@@ -1237,6 +1238,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             "artifact": source_artifact,
             "parameter_overrides": parameters,
         });
+        let native_engineering_checks = engineering_panel::collect(&build)?;
         summary["recipe_context_hash"] = json!(blake3::hash(&serde_json::to_vec(&json!({
             "source_hash": summary["recipe_source_hash"],
             "source_bundle_hash": snapshot.bundle_hash(),
@@ -1244,6 +1246,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             "generation_mode": summary["generation_mode"],
             "scope": summary["scope"],
             "property_assertions": summary["property_assertions"],
+            "native_engineering_checks": native_engineering_checks,
             "exchange_requirements": recipe.exchange_requirements,
             "section_views": recipe.section_views,
             "section_build_id": section::implementation_id(),
@@ -1331,6 +1334,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 feature_id: output.feature_id.clone(),
                 parameters: parameters.clone(),
                 property_assertions: property_assertions.clone(),
+                native_engineering_checks: BTreeMap::new(),
                 content_hash: output.content_hash.clone(),
                 recipe_context_hash: summary["recipe_context_hash"]
                     .as_str()
@@ -1467,6 +1471,10 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 feature_id: assembly.assembly_id.clone(),
                 parameters: parameters.clone(),
                 property_assertions: property_assertions.clone(),
+                native_engineering_checks: native_engineering_checks
+                    .get(name)
+                    .cloned()
+                    .unwrap_or_default(),
                 content_hash: assembly.content_hash.clone(),
                 recipe_context_hash: summary["recipe_context_hash"].as_str().unwrap().to_owned(),
             };
@@ -1542,6 +1550,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 feature_id: study.definition.mechanism.clone(),
                 parameters: parameters.clone(),
                 property_assertions: property_assertions.clone(),
+                native_engineering_checks: BTreeMap::new(),
                 content_hash: blake3::hash(&serde_json::to_vec(study)?)
                     .to_hex()
                     .to_string(),

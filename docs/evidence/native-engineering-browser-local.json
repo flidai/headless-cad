@@ -1,0 +1,103 @@
+{
+  "binary_sha256_after": "342ecfcaff1d4fc42c319027983d645a1139753359957d353a09967955bc1297",
+  "binary_sha256_before": "342ecfcaff1d4fc42c319027983d645a1139753359957d353a09967955bc1297",
+  "browser": {
+    "errors": [],
+    "helper_sha256": "eb2d34e08a471b735dfa4f17f7ec20318ed71a7070eec02bee81ae033bca2552",
+    "rows": [
+      {
+        "check_count": 3,
+        "kinds": {
+          "datum_dimension": 3
+        },
+        "recipe_context_hash": "f32d4e2cfc8f2506164039fcffc90070640cf89e735d505c561cd2be15554735",
+        "url": "http://localhost:8080/motor_mount_housing/motor_mount_housing.gpu.html"
+      },
+      {
+        "check_count": 3,
+        "kinds": {
+          "datum_dimension": 3
+        },
+        "recipe_context_hash": "f32d4e2cfc8f2506164039fcffc90070640cf89e735d505c561cd2be15554735",
+        "url": "http://localhost:8080/motor_mount_housing/motor_mount_housing.preview.html"
+      },
+      {
+        "check_count": 6,
+        "kinds": {
+          "datum_dimension": 2,
+          "nominal_seating": 2,
+          "pocket_fit": 2
+        },
+        "recipe_context_hash": "f6303bb326b2cd5907e75e8090717d0a60768ba2e5ea9bfe2215688caf957d7e",
+        "url": "http://localhost:8080/seated_pocket_inserts/seated_pocket_inserts.gpu.html"
+      },
+      {
+        "check_count": 6,
+        "kinds": {
+          "datum_dimension": 2,
+          "nominal_seating": 2,
+          "pocket_fit": 2
+        },
+        "recipe_context_hash": "f6303bb326b2cd5907e75e8090717d0a60768ba2e5ea9bfe2215688caf957d7e",
+        "url": "http://localhost:8080/seated_pocket_inserts/seated_pocket_inserts.preview.html"
+      },
+      {
+        "check_count": 4,
+        "scope": "Entire declared motion path",
+        "url": "http://localhost:8080/drive_module_pocketed_adjustment/drive_module_adjustment.gpu.html"
+      },
+      {
+        "check_count": 4,
+        "scope": "Entire declared motion path",
+        "url": "http://localhost:8080/drive_module_pocketed_adjustment/drive_module_adjustment.preview.html"
+      }
+    ],
+    "status": "passed",
+    "writes": []
+  },
+  "interpretation": "Read-only viewer cards display source-bound current-output native report values and declared scope. This is display evidence only; browser did not author modeling operations.",
+  "live_artifact_sha256": {
+    "drive_module_pocketed_adjustment/clearance-checks.json": "a3be314d28b18c7af5d2d013b5722c27e610ea710a590309870e1cceee50636e",
+    "drive_module_pocketed_adjustment/drive_module_adjustment.gpu.html": "6c9f8478c58212f1059c5b57656c20044d1772c48f22976eaa74b9c903f01f11",
+    "drive_module_pocketed_adjustment/drive_module_adjustment.preview.html": "17753d5a7dc03b8df03f88359d0ca5cb6d3db0ac6c65f127e4f9fb17e4a12a46",
+    "drive_module_pocketed_adjustment/manifest.json": "1ec1491c3e8082b5ffc9bed03807fd3a3e2098798a9b0760a5ff37cf1f38d9fe",
+    "drive_module_pocketed_adjustment/recipe.star": "b029060d6c60733db98427d0194431e43dc15979a06e498ea1bdde75cd14cb19",
+    "motor_mount_housing/datum-dimensions.json": "6ae5da8399e63b48dba3f7834b4169250c17f4ef1b18dfa02e3fb5d4fc0ad0a1",
+    "motor_mount_housing/manifest.json": "499c804313c31331b23ee31135d3b86719e16759ea650f8b47b5b8c70430f86a",
+    "motor_mount_housing/motor_mount_housing.gpu.html": "8a1db48a45efc5072a0306a93b58175caa3ebbd6500d4a12a5bd8f63219036bc",
+    "motor_mount_housing/motor_mount_housing.preview.html": "a749d84577595dc36c029c7d12731d36eab20285341043cb364e0d63087052db",
+    "motor_mount_housing/recipe.star": "edf565409a6a183bf0700bd9eb63e0fcb9f7549cecd7eb965c3492e7d63c2ca2",
+    "seated_pocket_inserts/datum-dimensions.json": "6c98a84db631522cc2613898f7ae34a7ab69d7d14c556cddd1f9d8bf64a44012",
+    "seated_pocket_inserts/manifest.json": "7df073fabf3d6df5e9e6c443ece8adca4914e210e21840a22282597477dcba36",
+    "seated_pocket_inserts/nominal-seating-checks.json": "12ca3998413bf19d0029bccffba43542ab119bd3c3c00d43770c044b79104f63",
+    "seated_pocket_inserts/pocket-fit-checks.json": "f0b19ffea0f4de02192eb2b848b28b9b1fa20cc91f9378dc35081d27798667b5",
+    "seated_pocket_inserts/recipe.star": "693b928c40bc3eaacc79eeee704389958a3bf667676e63d9c00292c0c7cd0712",
+    "seated_pocket_inserts/seated_pocket_inserts.gpu.html": "9600f1d2cce294c2c7cb157959c60bdddc51b72ff1879e7bd35f202f3e0a5228",
+    "seated_pocket_inserts/seated_pocket_inserts.preview.html": "2293eebdc71142e216cce7c9bd384e14f59c9cf5badf7adf95a7437d8e99cec2"
+  },
+  "source_and_helper_sha256_after": {
+    "crates/cad-cli/src/engineering_panel.rs": "56791fd60ad38904316d1f072fc8203fdd2766e3d26838e65082204b83fdd55d",
+    "crates/cad-cli/src/main.rs": "21a6042a851b82b2dddb6ec861f430eedc4587806e71048ebbc90362071f6ae9",
+    "crates/cad-preview/src/gpu-viewer.html": "e0dd5cf185d9e25fac389b1ffb68a9ce0be39559ce7b74ab63fc8339347beaa3",
+    "crates/cad-preview/src/lib.rs": "5af063d498d7d1a5fff7a1347672876426e819180e1f6ef52dc8f9ab14844bd6",
+    "crates/cad-preview/src/viewer.html": "a76401e55174395e8dfe0c9effa242b1a8b94906aa2c5b91d5d098076a5628be",
+    "tools/preview-check/native-engineering.cjs": "eb2d34e08a471b735dfa4f17f7ec20318ed71a7070eec02bee81ae033bca2552"
+  },
+  "source_and_helper_sha256_before": {
+    "crates/cad-cli/src/engineering_panel.rs": "56791fd60ad38904316d1f072fc8203fdd2766e3d26838e65082204b83fdd55d",
+    "crates/cad-cli/src/main.rs": "21a6042a851b82b2dddb6ec861f430eedc4587806e71048ebbc90362071f6ae9",
+    "crates/cad-preview/src/gpu-viewer.html": "e0dd5cf185d9e25fac389b1ffb68a9ce0be39559ce7b74ab63fc8339347beaa3",
+    "crates/cad-preview/src/lib.rs": "5af063d498d7d1a5fff7a1347672876426e819180e1f6ef52dc8f9ab14844bd6",
+    "crates/cad-preview/src/viewer.html": "a76401e55174395e8dfe0c9effa242b1a8b94906aa2c5b91d5d098076a5628be",
+    "tools/preview-check/native-engineering.cjs": "eb2d34e08a471b735dfa4f17f7ec20318ed71a7070eec02bee81ae033bca2552"
+  },
+  "status": "passed",
+  "visual_inspection": {
+    "gpu_seated": "passed",
+    "portable_motion": "passed",
+    "screenshot_sha256": {
+      "/tmp/cad-native-engineering-gpu-seated.png": "12eb52a4f531af07ee2723a7b318c4a5517b52cf7df43cee5d88551fa69ee3fc",
+      "/tmp/cad-native-engineering-portable-motion.png": "7c5a46a1a85709332d7aec3d78216a5595238c5338aba166c751d5285d90d716"
+    }
+  }
+}

@@ -158,6 +158,7 @@ mod tests {
             content_hash: "body-hash".into(),
             recipe_context_hash: "context-hash".into(),
             property_assertions: BTreeMap::new(),
+            native_engineering_checks: Default::default(),
             source_provenance: Some(json!({"schema_version":1,"kind":"source_provenance",
                 "recipe_context_hash":"context-hash","recipe_source_hash":blake3::hash(source.as_bytes()).to_hex().to_string(),
                 "source_bundle_hash":null,

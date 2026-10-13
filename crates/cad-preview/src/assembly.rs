@@ -722,6 +722,7 @@ mod tests {
             content_hash: assembly.content_hash.clone(),
             recipe_context_hash: "source".into(),
             property_assertions: Default::default(),
+            native_engineering_checks: Default::default(),
         };
         let bundle = to_assembly_stream_bundle(&assembly, &recipe, true).unwrap();
         assert_eq!(bundle.assets.len(), 1);
@@ -831,6 +832,7 @@ mod tests {
                 content_hash: assembly.content_hash.clone(),
                 recipe_context_hash: "source".into(),
                 property_assertions: Default::default(),
+                native_engineering_checks: Default::default(),
             };
             let bundle = to_assembly_stream_bundle(&assembly, &recipe, false).unwrap();
             let metadata: serde_json::Value = serde_json::from_str(&bundle.scene_json).unwrap();
@@ -1044,6 +1046,7 @@ mod tests {
             content_hash: assembly.content_hash.clone(),
             recipe_context_hash: "source-hash".into(),
             property_assertions: Default::default(),
+            native_engineering_checks: Default::default(),
         };
         let html = to_assembly_html(&assembly, &context).unwrap();
         let mut hostile = context.clone();

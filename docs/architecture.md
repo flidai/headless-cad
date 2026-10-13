@@ -4091,3 +4091,20 @@ areas/normals. Native coordinates and rim vertices are never moved, welded or
 removed to make a candidate pass. The untouched opposite stock cap is triangulated
 from its actual stock loops, without artificial pocket-fill seams. Unresolved
 coverage or floating-point conditioning still refuses tessellation.
+
+### Inspection contract: embedded native engineering reports
+
+The publisher derives bounded display summaries of datum dimensions, nominal
+seating, capsule pocket fit and clearance from native build reports. It validates
+current output identity, exact occurrence paths, part hashes and placement frames
+before embedding them. Assemblies receive only checks declared for that output;
+part-only and mechanism-local motion previews receive no assembly check summaries.
+Existing global property report display remains explicit about other outputs.
+
+Each summary records its native report entry's canonical-JSON BLAKE3 digest. The
+complete summary maps participate in the captured recipe context hash, so a change
+to any referenced report payload changes inspection identity. Read-only report
+links use fixed same-directory basenames. The GPU and portable viewers display
+native quantities without recomputing measurements from display meshes, preserve
+full numeric bounds, and distinguish initial-pose clearance from whole-path
+certificates. Recipe navigation exposes captured source and never executes tools.

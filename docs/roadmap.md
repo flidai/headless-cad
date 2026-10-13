@@ -1245,3 +1245,19 @@ models fail validation. Face identities and physical geometry are preserved,
 while native model hashes and source-keyed caches correctly change. The corrected
 kernel passes 259 tests; profile, seating and mounting integration regressions
 and strict workspace Clippy pass. All five commercial gates remain open.
+
+### Current-output engineering inspection
+
+Both assembly viewers now show native datum dimensions, nominal seating, capsule
+fit and clearance summaries alongside captured source. Published cards bind the
+current assembly, occurrence paths, part identities, placement frames and full
+native report entry digest. Static and continuous-motion scopes remain explicit;
+part-only previews do not inherit assembly check cards.
+
+The [browser receipt](evidence/native-engineering-browser-local.json) covers both
+viewers for the housing, seated inserts and pocketed drive adjustment: three
+housing dimensions, six insert obligations and four whole-path clearances, with
+report/manifest agreement and zero errors or writes. Publisher stale-evidence
+checks, source provenance regressions, 23 preview tests and strict workspace
+Clippy pass. This improves inspection of established native obligations; it adds
+no new contact or motion-solving domain and closes no commercial release gate.

@@ -114,6 +114,40 @@ function renderEngineeringChecks(context) {
   card.append(text('p','Target content hash: '+check.target_content_hash,'muted engineering-check-hash'));
   container.append(card);
  }
+ const native=context?.native_engineering_checks;
+ const nativeEntries=native&&typeof native==='object'&&!Array.isArray(native)?Object.entries(native):[];
+ summary.textContent=entries.length+nativeEntries.length
+  ? 'Captured native build results for named outputs. Open each report for complete witness geometry and bounds.'
+  : 'No engineering checks included in this artifact.';
+ const reportFor={datum_dimension:'datum-dimensions.json',nominal_seating:'nominal-seating-checks.json',pocket_fit:'pocket-fit-checks.json',clearance:'clearance-checks.json'};
+ const labelFor={datum_dimension:'Datum dimension',nominal_seating:'Nominal seating',pocket_fit:'Pocket fit',clearance:'Clearance'};
+ for(const [key,check] of nativeEntries){
+  const card=document.createElement('details');card.className='engineering-check native-engineering-check';card.dataset.checkId=key;
+  const identifier=value=>typeof value==='string'&&value.length>0&&value.length<=128&&/^[A-Za-z0-9_.-]+$/.test(value);
+  const quantities=check?.quantities;
+  const valid=check&&typeof check==='object'&&key===check.kind+'.'+check.id&&identifier(check.id)&&Object.hasOwn(reportFor,check.kind)
+   &&check.output===context.output_name&&check.target_content_hash===context.content_hash&&check.status==='passed'
+   &&({datum_dimension:['Directed native datum distance'],nominal_seating:['Local nominal planar seating'],pocket_fit:['Complete capsule footprint and axial overlap'],clearance:['Initial pose','Entire declared motion path']}[check.kind]||[]).includes(check.scope)
+   &&check.report_file===reportFor[check.kind]&&typeof check.report_digest==='string'&&/^[0-9a-fA-F]{64}$/.test(check.report_digest)
+   &&quantities&&typeof quantities==='object'&&!Array.isArray(quantities)&&Object.keys(quantities).length>0&&Object.keys(quantities).length<=8
+   &&Object.entries(quantities).every(([name,value])=>identifier(name)&&typeof value==='number'&&Number.isFinite(value))
+   &&Array.isArray(check.instance_paths)&&check.instance_paths.length===2&&check.instance_paths.every(path=>Array.isArray(path)&&path.length>0&&path.length<=64&&path.every(segment=>typeof segment==='string'&&segment.trim().length>0&&new TextEncoder().encode(segment).length<=256));
+  if(!valid){card.dataset.status='unavailable';card.append(text('summary',key+' · Evidence unavailable'));card.append(text('p','Captured native check evidence is malformed or does not match this output.'));container.append(card);continue;}
+  card.dataset.status=check.status;card.dataset.kind=check.kind;card.dataset.output=check.output;
+  card.append(text('summary',check.id+' · '+labelFor[check.kind]+' · Passed'));
+  const values=Object.entries(quantities).map(([name,value])=>name.replaceAll('_',' ')+': '+String(value));
+  card.append(text('p',values.join(' · '),'engineering-check-actual'));
+  card.append(text('p','Output: '+check.output+' · current build'));
+  card.append(text('p','Scope: '+check.scope));
+  if(check.instance_paths.length)card.append(text('p','Occurrences: '+check.instance_paths.map(path=>path.join(' / ')).join(' · ')));
+  const links=document.createElement('p');
+  const report=document.createElement('a');report.href=reportFor[check.kind];report.textContent='Native report JSON';report.target='_blank';report.rel='noopener';links.append(report);
+  const source=document.createElement('button');source.type='button';source.textContent='Captured recipe source';source.className='engineering-source-link';
+  source.onclick=()=>{const panel=document.getElementById('recipe-panel');if(panel.hidden)document.getElementById('recipe-toggle').click();document.getElementById('recipe-source').focus();};
+  links.append(document.createTextNode(' · '),source);card.append(links);
+  card.append(text('p','Native report entry BLAKE3: '+check.report_digest,'muted engineering-check-hash'));
+  container.append(card);
+ }
 }
 
 const sourceNavigator=new CadSourceNavigation({picker:document.getElementById('recipe-module'),source:document.getElementById('recipe-source'),row:document.getElementById('recipe-module-row')});
