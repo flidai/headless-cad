@@ -28,6 +28,21 @@ and the separate assembly-scale workload.
 Track completion in the [commercial release readiness ledger](architecture.md#commercial-release-readiness);
 all five product gates remain open, independently of individual increment acceptance.
 
+The current manufacturing increment adds source-owned tables of native datum
+dimensions to section sheets. The drive example measures pilot depth, remaining
+housing thickness and cover thickness directly from semantic faces; its screw
+geometry follows depth/thickness parameters with a nominal tip gap. Acceptance
+requires native-report/drawing binding, independent STEP measurements, layout
+rejection, captured-source replay and preservation of failed generations.
+This advances nominal machining documentation; projected drawings, GD&T and the
+complete manufacturing-release gate remain open.
+Retained [STEP and table evidence](evidence/machining-tables-local.json) covers
+five configurations and ten publication-preserving refusals; the
+[accepted offline replay](evidence/machining-tables-replay-local.json) matches
+149 artifacts and 27 manifest fields. Paper-sized annotation readability is the
+next drawing increment, followed by authored size bands and an axial allowance
+stack; these are distinct from nominal measurement correctness.
+
 M3's large-assembly gate also includes the architecture's
 [exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):
 test one oversized unique-body operation as well as repeated-part assemblies,

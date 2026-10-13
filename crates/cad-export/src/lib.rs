@@ -15,7 +15,10 @@ mod assembly;
 mod bom;
 mod drawing;
 mod fidelity;
-pub use drawing::{drawing_sheet_to_svg, DrawingSheet, DrawingSheetView};
+pub use drawing::{
+    drawing_sheet_to_svg, DrawingDimensionRow, DrawingDimensionTable, DrawingSheet,
+    DrawingSheetView,
+};
 mod section;
 pub use assembly::{assembly_to_step, assembly_to_stl, assembly_to_stl_with_cache};
 pub use bom::bom_to_csv;

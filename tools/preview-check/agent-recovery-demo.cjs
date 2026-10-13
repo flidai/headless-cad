@@ -56,6 +56,15 @@ const assert=require('node:assert/strict');
    const expectedChecks=source.includes('left_cover_shaft_gap')?13:11;
    assert.equal(Object.keys(manifest.clearance_checks).length,expectedChecks);
    if(fixture)assert.equal(fixture.named_continuous_clearance_checks,expectedChecks);
+   if(fixture){
+    const tableSource=source.includes('id = "end_cover_machining"');
+    assert.equal(Object.keys(manifest.datum_dimensions).length,tableSource?20:10);
+    assert.equal(fixture.native_axial_dimensions,tableSource?20:10);
+    if(tableSource){
+     assert.equal(fixture.native_machining_dimension_rows,10);
+     assert.equal(manifest.drawing_sheets.end_cover_machining.status,'published');
+    }
+   }
    assert.ok((await page.goto(`${base}/${name}/rotation-rotor.html`)).ok());
    assert.equal(await page.locator('#rotation-inspection').getAttribute('data-error'),null);
    await page.locator('#recipe-toggle').click();

@@ -21,6 +21,11 @@ const assert=require('node:assert/strict');
    assert.equal(manifest.outputs.drive_module_release.definitions,covers?14:11);
    assert.equal(Object.keys(manifest.clearance_checks).length,
     source.includes('left_cover_shaft_gap')?13:11);
+   if(covers){
+    const tableSource=source.includes('id = "end_cover_machining"');
+    assert.equal(Object.keys(manifest.datum_dimensions).length,tableSource?20:10);
+    if(tableSource)assert.equal(manifest.drawing_sheets.end_cover_machining.status,'published');
+   }
    assert.ok((await page.goto(`${base}/${name}/rotation-rotor.html`)).ok());
    assert.equal(await page.locator('#rotation-inspection').getAttribute('data-error'),null);
    await page.locator('#recipe-toggle').click();

@@ -1,0 +1,968 @@
+{
+  "valid": true,
+  "source_workspace_unchanged": true,
+  "durable_jobs": 3,
+  "recovered_retry_results": 3,
+  "deliveries": [
+    {
+      "mode": "verified_generation_stream",
+      "seconds": 1.8575869030319154,
+      "read_calls": 593,
+      "bytes": 31922076,
+      "artifacts": 176
+    },
+    {
+      "mode": "verified_generation_stream",
+      "seconds": 1.3123247800394893,
+      "read_calls": 614,
+      "bytes": 33129228,
+      "artifacts": 176
+    }
+  ],
+  "offline_replay": {
+    "valid": true,
+    "accepted_revision_id": "270e4f5fa4ea19b78d1a3c5468a4be5a92cbd086eab34fcc3afe84a06819d099",
+    "accepted_job_id": "job_0000000000000003",
+    "accepted_manifest_digest": "ca76a7041e978db17b361f59fcff7cc47e60eaa80f4ce7f6f6786f3e9a95664c",
+    "accepted_build_executable_blake3": "0d10e2bd4a59776ecdc6d1f1e2458370a925b7d3570fdb6308f37a7267dd5e4e",
+    "replay_executable_sha256": "51fae0dc7f496715ff9e9b3017a5256b8a03bdc67373650c2675847cc9c51418",
+    "source_kind": "captured_root_source",
+    "source_name": "drive_module_rotation.star",
+    "parameter_overrides": {},
+    "scope": {
+      "evaluated_features": [
+        "base_back_right",
+        "base_body",
+        "base_front_left",
+        "base_front_right",
+        "base_profile",
+        "base_stock",
+        "bolt_body",
+        "bolt_profile",
+        "clamp_body",
+        "clamp_profile",
+        "cover_screw_body",
+        "cover_screw_profile",
+        "disc_body",
+        "disc_profile",
+        "disc_stock",
+        "end_cover_body",
+        "end_cover_profile",
+        "housing_body",
+        "housing_left_pilots",
+        "housing_profile",
+        "housing_right_pilots",
+        "key_body",
+        "key_profile",
+        "keyway_box",
+        "keyway_profile",
+        "keyway_tool",
+        "nut_body",
+        "nut_profile",
+        "ring_body",
+        "ring_profile",
+        "seat_box",
+        "seat_profile",
+        "seat_tool",
+        "shaft_body",
+        "shaft_profile",
+        "shaft_stock",
+        "sleeve_body",
+        "sleeve_profile",
+        "washer_body",
+        "washer_profile"
+      ],
+      "mode": "all",
+      "requested_outputs": [
+        "base",
+        "bearing_fit_inspection",
+        "cover_screw_envelope",
+        "drive_disc",
+        "drive_module_release",
+        "end_cover",
+        "housing",
+        "parallel_key",
+        "retaining_ring",
+        "right_housing",
+        "shaft",
+        "sleeve",
+        "washer"
+      ],
+      "skipped_features": [],
+      "validation_roots": [
+        "base_back_right",
+        "base_body",
+        "base_front_left",
+        "base_front_right",
+        "bolt_body",
+        "clamp_body",
+        "cover_screw_body",
+        "disc_body",
+        "end_cover_body",
+        "housing_body",
+        "housing_left_pilots",
+        "housing_right_pilots",
+        "key_body",
+        "nut_body",
+        "ring_body",
+        "shaft_body",
+        "shaft_stock",
+        "sleeve_body",
+        "washer_body"
+      ]
+    },
+    "generation_mode": "full",
+    "compared_files": [
+      {
+        "name": "base.brep.json",
+        "bytes": 32105,
+        "sha256": "3945e51f31f67b8d50efa1155ccbcc466888f14c98097f88cb290fc495057ae0"
+      },
+      {
+        "name": "base.exchange.json",
+        "bytes": 14495,
+        "sha256": "78fce25e99e1b74a98850a0126b4d302402d751ad3c9a7d08cbc084b6156b6e9"
+      },
+      {
+        "name": "base.preview.svg",
+        "bytes": 76705,
+        "sha256": "a7cdb33e097ef9d91ee5be064a215f56522c35b7a1e4b5e4cd944515ef6e6b0e"
+      },
+      {
+        "name": "base.step",
+        "bytes": 19359,
+        "sha256": "4ec89173e459ec3558127754b37ff19e5215e42ab2b14c88e078711f2ae70416"
+      },
+      {
+        "name": "base.stl",
+        "bytes": 202045,
+        "sha256": "dc990abeac7ae9c2bf96b1448f8497fc7235c0d8d6c01d358f49783001ef265c"
+      },
+      {
+        "name": "bearing_fit_inspection.assembly.json",
+        "bytes": 12957,
+        "sha256": "699c7ccc7714357b77a772967e0c8ad086d745f2ecc96d849f5f753b8e780d63"
+      },
+      {
+        "name": "bearing_fit_inspection.bom.json",
+        "bytes": 3758,
+        "sha256": "fddaf84a35afa68a63aa2ac8c671393001e6c165b0193957811b8d5ad553a5f4"
+      },
+      {
+        "name": "bearing_fit_inspection.display.json",
+        "bytes": 2561155,
+        "sha256": "fc13a54d530005dd50f93ef9b60620df6fe06ed11aafde2bb93719805faa7780"
+      },
+      {
+        "name": "bearing_fit_inspection.exchange.json",
+        "bytes": 14478,
+        "sha256": "731b6c9346ea59f57ea0ce1bb0d27cc89505bd8f82c9b290690e42f582717380"
+      },
+      {
+        "name": "bearing_fit_inspection.metadata.json",
+        "bytes": 797,
+        "sha256": "eefe9c3320c2bbb892d71e6e5242c22de2f9db2dae8feba2b4b63fdb08d6bfe3"
+      },
+      {
+        "name": "bearing_fit_inspection.preview.svg",
+        "bytes": 525308,
+        "sha256": "0111444a5ac84d4465056146e4465788b9f2fbe34741b153ce391e45e0cd993a"
+      },
+      {
+        "name": "bearing_fit_inspection.step",
+        "bytes": 80010,
+        "sha256": "b7ee28e9706f18c22c79fac7f749e8379bee1fff364ea2be36cb11743fd14608"
+      },
+      {
+        "name": "bearing_fit_inspection.stl",
+        "bytes": 1523290,
+        "sha256": "f8cc351a74e0265439ec7c44e6399dd6923f90a9e9511a953e9347fcda59122e"
+      },
+      {
+        "name": "bearing_fit_inspection.stream.json",
+        "bytes": 20588,
+        "sha256": "30b413b56719c4f2188de87cf6a793ae69dae34b6402151fa3d434d96b7bd72b"
+      },
+      {
+        "name": "clearance-checks.json",
+        "bytes": 59529,
+        "sha256": "e6acad1e31eb6f9eb30de4d6dd8edd59a9d3b1d0999dddff429e738e6f94b1b9"
+      },
+      {
+        "name": "cover_screw_envelope.brep.json",
+        "bytes": 7057,
+        "sha256": "d786e31727c6df5ad63be5f63a4a7259d347cbdc620af158f971d165f56d6fac"
+      },
+      {
+        "name": "cover_screw_envelope.exchange.json",
+        "bytes": 14541,
+        "sha256": "5e3c771a50309dbd2c799ed6aee39bbfddab18198f6eb95bd71a6ae09e4a420b"
+      },
+      {
+        "name": "cover_screw_envelope.preview.svg",
+        "bytes": 19705,
+        "sha256": "1fb517c54cd19437db4ea80832ca65f0332a7e2e369d52f76b3efeb3ddea1471"
+      },
+      {
+        "name": "cover_screw_envelope.step",
+        "bytes": 5794,
+        "sha256": "8338b81bb638adba9fb1c978be022036f87462d85af73b945e7ec8160da736ab"
+      },
+      {
+        "name": "cover_screw_envelope.stl",
+        "bytes": 73440,
+        "sha256": "143a1ae3eb4da4d0560dac3d951ee4e2d80debb1cd16f8ab13c8db26102c93de"
+      },
+      {
+        "name": "datum-dimensions.json",
+        "bytes": 153427,
+        "sha256": "3fdba878e08387512cc9c93844da1ee04af3f6e81298c517901be8fe30c7ccf3"
+      },
+      {
+        "name": "definition-01ac21b59bc2a9a1cb5903e6cdfd1bf0d010780ef22493f0c11a44e3be0a639b.brep.json",
+        "bytes": 22764,
+        "sha256": "6832d934f450227b70cc8379642acdc3139fe308b3ab6e3c852c8987bc0c4305"
+      },
+      {
+        "name": "definition-0337adf9c41f6d025650d3e1790e693789fb6d55c411cfde6061c9744372a8e1.brep.json",
+        "bytes": 23976,
+        "sha256": "4b28f1bb1a4af780328c7f36844b3fd0464934c6875ba5b1c64e94400e60f1cb"
+      },
+      {
+        "name": "definition-33411a4b8b091ce8e86a4189e9e1ca98e238998afd0d061f6189160c5ba7eb13.brep.json",
+        "bytes": 17472,
+        "sha256": "9ab375d52269d246dcea63a8af2e0a34e31ba1e12e73fb0c554c372c5502933b"
+      },
+      {
+        "name": "definition-3c3a46c375b1ebb82ea5568bd8f4a519c1520646970a9b16ea30fbf7d6743cd3.brep.json",
+        "bytes": 23988,
+        "sha256": "c25d17b68a8b88dc04e38756f67e27a933854966014a151c3269c75ffff70a98"
+      },
+      {
+        "name": "definition-5a0864e3bef42818e82a8367e559064ca1b69a1a723bfa93805f4bac3e7e24a0.brep.json",
+        "bytes": 7058,
+        "sha256": "9290d3ec03c859eabca22f568b5e98910f3ebb74f561fc344f699dc47c358d95"
+      },
+      {
+        "name": "definition-6f0e3edc2f9c79e5524e61ea6387f2c674ceba5b986476fecf3b03ae9e0c0d1a.brep.json",
+        "bytes": 6428,
+        "sha256": "237c711464d70a087727fe7cab914ab6f2e0a2dc79cc638f1bc91b2da7a1fdf9"
+      },
+      {
+        "name": "definition-76a6432aaa20275a5ff018588d294328f466173018e8ccb07737a82923f3c26b.brep.json",
+        "bytes": 43263,
+        "sha256": "8051f735e4f7fad7607a725cfb196bd62cbfecd12f59cf1eca42d4bad6bf8e6b"
+      },
+      {
+        "name": "definition-a51669e24230f5a01a3f3819de03828afc44905dccaf9a99db40d22d9053f5f6.brep.json",
+        "bytes": 7057,
+        "sha256": "d786e31727c6df5ad63be5f63a4a7259d347cbdc620af158f971d165f56d6fac"
+      },
+      {
+        "name": "definition-a545d373a2a6050e9d99c1123acca7d67e6042d46028b81c301361f2bbff9273.brep.json",
+        "bytes": 6428,
+        "sha256": "2f732cbeb89f3841d2f7829657db49df35fdd4657f9b1c8112a4e2940e2dc462"
+      },
+      {
+        "name": "definition-cda1cc535210797c31374cd4c60e18d1c7cf40cecfd85aef40cf47b6863e37b2.brep.json",
+        "bytes": 16719,
+        "sha256": "dca5343b873b7b79530fb0975a43b5cd881118fe2cca3814fd7c3e564c5c0225"
+      },
+      {
+        "name": "definition-dd4e5fb5f0391d076fcd366f1cc4641d25bd7e0e2cd1e90a7055f00817476e72.brep.json",
+        "bytes": 9806,
+        "sha256": "885e3ef4a86de3c7a2ad794475a457e1f1121a155343574af489572bd8f9c64b"
+      },
+      {
+        "name": "definition-dee3a8b0471abc34718d9645ff24e8efab2495506786d835108e97b0c9f5074c.brep.json",
+        "bytes": 15416,
+        "sha256": "3308d84b0bb820ac9dd77987066118d6c16c2b7c6e9138ac14db86f511230dc4"
+      },
+      {
+        "name": "definition-e0f41517bee84ef0124bca2b18c70cb341b41daef646bc33f34dfc2a906ad207.brep.json",
+        "bytes": 32105,
+        "sha256": "3945e51f31f67b8d50efa1155ccbcc466888f14c98097f88cb290fc495057ae0"
+      },
+      {
+        "name": "definition-eaa20684f4d01b92070333e488a164a0341bf35fe9bfba8efb6d0628d8f14753.brep.json",
+        "bytes": 9956,
+        "sha256": "b42efeafd5f709879fc589a5591d8bf60f4adebf5cc14933c350aede29fa7810"
+      },
+      {
+        "name": "drawing-drive_module_sections.json",
+        "bytes": 4084,
+        "sha256": "d844faf798fb22b8c45acbd6b6347001514e634e47ff0367f1b3a1d8952b16b7"
+      },
+      {
+        "name": "drawing-drive_module_sections.svg",
+        "bytes": 17620,
+        "sha256": "930742fbbecdbc1222acda44bd400968acba26cedea65f8b2602afe80c33eb97"
+      },
+      {
+        "name": "drawing-end_cover_machining.json",
+        "bytes": 105135,
+        "sha256": "708daa9fd4be00e4acfedbeef548f315c5816e12395faed01dbf6a67b27a1d30"
+      },
+      {
+        "name": "drawing-end_cover_machining.svg",
+        "bytes": 15335,
+        "sha256": "09652d56763e4b79fa24bb1364800608d7739e48d73f53c3d711e2c4e13f4432"
+      },
+      {
+        "name": "drive_disc.brep.json",
+        "bytes": 16719,
+        "sha256": "dca5343b873b7b79530fb0975a43b5cd881118fe2cca3814fd7c3e564c5c0225"
+      },
+      {
+        "name": "drive_disc.exchange.json",
+        "bytes": 14512,
+        "sha256": "71644bca16302c179deb8a565a0b9d5da66a375228694bba106f0214f77ae228"
+      },
+      {
+        "name": "drive_disc.preview.svg",
+        "bytes": 60145,
+        "sha256": "f538473b2076f7caba7ad463f9c1efa82c8da6847c1bf3b88b77366aa1cf50de"
+      },
+      {
+        "name": "drive_disc.step",
+        "bytes": 9892,
+        "sha256": "63c9b485ac82c93cbd4720387f65b54f19a8989fc3d01d31145ad5eeb394c32a"
+      },
+      {
+        "name": "drive_disc.stl",
+        "bytes": 160474,
+        "sha256": "84c8c61623e94a2834d5aaaa5e4aa64cffd96b4df839c20ba505bdb4b00b00c7"
+      },
+      {
+        "name": "drive_module_release.assembly.json",
+        "bytes": 40055,
+        "sha256": "4af8bc700ac81f435c150744e74602f622f2ab7a182854f58d5f2aa56cb7043b"
+      },
+      {
+        "name": "drive_module_release.bom.json",
+        "bytes": 9435,
+        "sha256": "80c91f5617d20ce79bd156071ee071a7c3bcd4295fe176c59b259b77bd13f9a4"
+      },
+      {
+        "name": "drive_module_release.display.json",
+        "bytes": 4608659,
+        "sha256": "972e566f5a2f5a387d508403efddea3414ec060241d2c2c17b5bbe25d71e4057"
+      },
+      {
+        "name": "drive_module_release.exchange.json",
+        "bytes": 14493,
+        "sha256": "5d77c449f09b358cb2e91e3ff9a48edbfe0611573ce9531d35d2ea482f91c99e"
+      },
+      {
+        "name": "drive_module_release.metadata.json",
+        "bytes": 812,
+        "sha256": "9e3c23c939df1b3ba8a1038c0594157ff8233769216380f761697aa7e62e2a88"
+      },
+      {
+        "name": "drive_module_release.preview.svg",
+        "bytes": 1390669,
+        "sha256": "2bc5a4675c622bc64c9111ae4ae691ca74490797568735c876b4dbc920640fa5"
+      },
+      {
+        "name": "drive_module_release.step",
+        "bytes": 185499,
+        "sha256": "762180c4d2d1d635f87eaa863f7e9b8e11d5fdf2241579c7e780ec0cd62cac8b"
+      },
+      {
+        "name": "drive_module_release.stl",
+        "bytes": 4138658,
+        "sha256": "8dacb2465cb7d8b0ef9b72e9881ec2dc3b3331ae11b94cd614d26a1d5402f43f"
+      },
+      {
+        "name": "drive_module_release.stream.json",
+        "bytes": 56248,
+        "sha256": "ac92606a6225af41df695dd0cc5825c31ea28b2013716f8c4b5dd825c8156013"
+      },
+      {
+        "name": "end_cover.brep.json",
+        "bytes": 22764,
+        "sha256": "6832d934f450227b70cc8379642acdc3139fe308b3ab6e3c852c8987bc0c4305"
+      },
+      {
+        "name": "end_cover.exchange.json",
+        "bytes": 14510,
+        "sha256": "8da1345a4d61524bdb788b0a499739d788d7c7eac9b65c5cb6552001c414b4d3"
+      },
+      {
+        "name": "end_cover.preview.svg",
+        "bytes": 52210,
+        "sha256": "3f6022b847a6291c9fe6573f6d5ce945b26cb79902ec916613f5a1f72c3c5ec2"
+      },
+      {
+        "name": "end_cover.step",
+        "bytes": 14844,
+        "sha256": "08146a1679d7e51e061a976b09b44a7b3bf28e288ce590ecf7d935c166c86544"
+      },
+      {
+        "name": "end_cover.stl",
+        "bytes": 134200,
+        "sha256": "344d2c635547f3fe3b5db796a9336c8a826d50198fbbb391140d0cbe7516bff6"
+      },
+      {
+        "name": "housing.brep.json",
+        "bytes": 23976,
+        "sha256": "4b28f1bb1a4af780328c7f36844b3fd0464934c6875ba5b1c64e94400e60f1cb"
+      },
+      {
+        "name": "housing.exchange.json",
+        "bytes": 14504,
+        "sha256": "96c7a6a806266b6f19feedaf9a4895e436d2831d87818f55c699fed3f7143080"
+      },
+      {
+        "name": "housing.preview.svg",
+        "bytes": 50158,
+        "sha256": "637f6ec4ff6728f146f062132cc169afeb698b69c4d0e268be12f86bebf73c18"
+      },
+      {
+        "name": "housing.step",
+        "bytes": 15754,
+        "sha256": "33a82df9885e34d36d8855b2d589face5f2a67922839fdbf4f5b4187ad6677a0"
+      },
+      {
+        "name": "housing.stl",
+        "bytes": 156856,
+        "sha256": "e4b9889a6e1d4f19c814f23d43069443967dc36414e605a350e33f2f3b9b565e"
+      },
+      {
+        "name": "mesh-049956ce045bbf06a52e45e8248003554a25d550a1d7f4f6b979e2268ed292c8.display.json",
+        "bytes": 15675,
+        "sha256": "049956ce045bbf06a52e45e8248003554a25d550a1d7f4f6b979e2268ed292c8"
+      },
+      {
+        "name": "mesh-066dae419946b7466e0da3253db3d7bb08e94c4e15b4b298f0bdfc7127c6e6a6.display.json",
+        "bytes": 18119,
+        "sha256": "066dae419946b7466e0da3253db3d7bb08e94c4e15b4b298f0bdfc7127c6e6a6"
+      },
+      {
+        "name": "mesh-07e70eccb2dbc000c62273ad4d9890b80ee91c2d49c15a428eaa8f3e23242f2a.display.json",
+        "bytes": 54884,
+        "sha256": "07e70eccb2dbc000c62273ad4d9890b80ee91c2d49c15a428eaa8f3e23242f2a"
+      },
+      {
+        "name": "mesh-18db5a2d2b60f236610983bce297b0ee3e0a41555f0f470eaf463bab5175ebfe.display.json",
+        "bytes": 37659,
+        "sha256": "18db5a2d2b60f236610983bce297b0ee3e0a41555f0f470eaf463bab5175ebfe"
+      },
+      {
+        "name": "mesh-1d6ce1a73da55460e56e17fb8d69de873a9e05a33eee9820d32c015dd8538308.display.json",
+        "bytes": 46124,
+        "sha256": "1d6ce1a73da55460e56e17fb8d69de873a9e05a33eee9820d32c015dd8538308"
+      },
+      {
+        "name": "mesh-2122beed0e67143098c6ec56b71f84436ac945a168a98f96d89670efb0dfdf04.display.json",
+        "bytes": 12464,
+        "sha256": "2122beed0e67143098c6ec56b71f84436ac945a168a98f96d89670efb0dfdf04"
+      },
+      {
+        "name": "mesh-218a1c5143723abd00e1b4ddbae78ebac8edc957539680a32de4e99f74da4f89.display.json",
+        "bytes": 16895,
+        "sha256": "218a1c5143723abd00e1b4ddbae78ebac8edc957539680a32de4e99f74da4f89"
+      },
+      {
+        "name": "mesh-2be563a61af12d0f9d76d4ec4630e184d70404c8a10660958f0ceb0c58757d59.display.json",
+        "bytes": 42399,
+        "sha256": "2be563a61af12d0f9d76d4ec4630e184d70404c8a10660958f0ceb0c58757d59"
+      },
+      {
+        "name": "mesh-53b18a86c1e2f62d0cf572ec12a49c0c1a508310bfabcdce1aaf2d29eebc43ac.display.json",
+        "bytes": 12353,
+        "sha256": "53b18a86c1e2f62d0cf572ec12a49c0c1a508310bfabcdce1aaf2d29eebc43ac"
+      },
+      {
+        "name": "mesh-694212f5eeba213342fd4d4f6243f28476d1e329e4513c46c0923552fdc9c840.display.json",
+        "bytes": 24464,
+        "sha256": "694212f5eeba213342fd4d4f6243f28476d1e329e4513c46c0923552fdc9c840"
+      },
+      {
+        "name": "mesh-6c2f0ffdbe4fb11e6e731b72b54d92800615a576945f026bd9858f73668b2c21.display.json",
+        "bytes": 46028,
+        "sha256": "6c2f0ffdbe4fb11e6e731b72b54d92800615a576945f026bd9858f73668b2c21"
+      },
+      {
+        "name": "mesh-6f7b73ac42abed24a4738a9190654325fe1808ce82da558615a13c7d59209fb6.display.json",
+        "bytes": 21093,
+        "sha256": "6f7b73ac42abed24a4738a9190654325fe1808ce82da558615a13c7d59209fb6"
+      },
+      {
+        "name": "mesh-6fb28dce096c5f7d8a5c800ad0a129e5ddf1f128f8caa898a3f17effb53c504f.display.json",
+        "bytes": 54926,
+        "sha256": "6fb28dce096c5f7d8a5c800ad0a129e5ddf1f128f8caa898a3f17effb53c504f"
+      },
+      {
+        "name": "mesh-71b66da2723d922a5fc621d18832af774f9197b886faca57e92aa3168eb7aa38.display.json",
+        "bytes": 121579,
+        "sha256": "71b66da2723d922a5fc621d18832af774f9197b886faca57e92aa3168eb7aa38"
+      },
+      {
+        "name": "mesh-726763d11e7c1616f2567aa29c8e17ff53c637c59d0fe180d3a8c88630a6e045.display.json",
+        "bytes": 19542,
+        "sha256": "726763d11e7c1616f2567aa29c8e17ff53c637c59d0fe180d3a8c88630a6e045"
+      },
+      {
+        "name": "mesh-751efee75dc75e3b4c3530d5bdf054225bf98049dc9e7f6759f365ec969fc94f.display.json",
+        "bytes": 39835,
+        "sha256": "751efee75dc75e3b4c3530d5bdf054225bf98049dc9e7f6759f365ec969fc94f"
+      },
+      {
+        "name": "mesh-859de4a41998db34a270c7564c3623d48eaf6638d28e3c60c96850b23cba020a.display.json",
+        "bytes": 122724,
+        "sha256": "859de4a41998db34a270c7564c3623d48eaf6638d28e3c60c96850b23cba020a"
+      },
+      {
+        "name": "mesh-871848173259c22aec0aad58ace55db0f96f832a417a5e306953a4d86253d1a4.display.json",
+        "bytes": 882,
+        "sha256": "871848173259c22aec0aad58ace55db0f96f832a417a5e306953a4d86253d1a4"
+      },
+      {
+        "name": "mesh-87398cea8b5b2215e6b5ee74883315a946e8584d30d572d168417868b242eab4.display.json",
+        "bytes": 36112,
+        "sha256": "87398cea8b5b2215e6b5ee74883315a946e8584d30d572d168417868b242eab4"
+      },
+      {
+        "name": "mesh-8b783ff397fed7b7eed37edeba69d66bbda2293be9a6e6ff490c8f6ddf66cf43.display.json",
+        "bytes": 37755,
+        "sha256": "8b783ff397fed7b7eed37edeba69d66bbda2293be9a6e6ff490c8f6ddf66cf43"
+      },
+      {
+        "name": "mesh-8cdf00b4058e7c928387ec5a968c50119ba0df864bbf9c39b238d58f26e55483.display.json",
+        "bytes": 153847,
+        "sha256": "8cdf00b4058e7c928387ec5a968c50119ba0df864bbf9c39b238d58f26e55483"
+      },
+      {
+        "name": "mesh-920dd87aa71df3e549b93b0fffce9c9dbbe19f2f090f16d10167e98c283226af.display.json",
+        "bytes": 55238,
+        "sha256": "920dd87aa71df3e549b93b0fffce9c9dbbe19f2f090f16d10167e98c283226af"
+      },
+      {
+        "name": "mesh-9b3b4d0827343aea4ff0a35647867489c3d3c43445f2396bead6161cecc15bbb.display.json",
+        "bytes": 23562,
+        "sha256": "9b3b4d0827343aea4ff0a35647867489c3d3c43445f2396bead6161cecc15bbb"
+      },
+      {
+        "name": "mesh-a5a7dd3ea4012bd56e9eb4d3fc6107e9ad46d6f9f356bafed5159b748c0a1d35.display.json",
+        "bytes": 81410,
+        "sha256": "a5a7dd3ea4012bd56e9eb4d3fc6107e9ad46d6f9f356bafed5159b748c0a1d35"
+      },
+      {
+        "name": "mesh-ac4dd4d8143f52509bc9106f497bb5625001fc3e5d1412d03a6efb7716a42e0e.display.json",
+        "bytes": 100855,
+        "sha256": "ac4dd4d8143f52509bc9106f497bb5625001fc3e5d1412d03a6efb7716a42e0e"
+      },
+      {
+        "name": "mesh-adb141c96b665650da354fa0c169c368dddddbe6ad0ab070eff61d91633d24f3.display.json",
+        "bytes": 74780,
+        "sha256": "adb141c96b665650da354fa0c169c368dddddbe6ad0ab070eff61d91633d24f3"
+      },
+      {
+        "name": "mesh-af1c36314a76bdacfa87111803228591c33de153a16969451bbee4dd20d3889e.display.json",
+        "bytes": 13945,
+        "sha256": "af1c36314a76bdacfa87111803228591c33de153a16969451bbee4dd20d3889e"
+      },
+      {
+        "name": "mesh-b3a3dc48b37f2e821dc963847652bb5464a2bc461a8b4fd24aa286804ed89f71.display.json",
+        "bytes": 27140,
+        "sha256": "b3a3dc48b37f2e821dc963847652bb5464a2bc461a8b4fd24aa286804ed89f71"
+      },
+      {
+        "name": "mesh-b5aaa9592e7c0020a98736e4b05ce3de29d9da976684908bad149680b6e1143b.display.json",
+        "bytes": 15752,
+        "sha256": "b5aaa9592e7c0020a98736e4b05ce3de29d9da976684908bad149680b6e1143b"
+      },
+      {
+        "name": "mesh-b8507219b4e8e065ea6e11c0cb704f8a8b4444ae70b68efe902419b553d7f6c9.display.json",
+        "bytes": 512010,
+        "sha256": "b8507219b4e8e065ea6e11c0cb704f8a8b4444ae70b68efe902419b553d7f6c9"
+      },
+      {
+        "name": "mesh-c3f0bcee4e7b15fac291fae117736136610637b26536de7d1fd73ac35998c823.display.json",
+        "bytes": 35363,
+        "sha256": "c3f0bcee4e7b15fac291fae117736136610637b26536de7d1fd73ac35998c823"
+      },
+      {
+        "name": "mesh-c8d784dc607813a1b0c8d885f6f7b0a7f7134183d1d177b21ed8a6810a3e5764.display.json",
+        "bytes": 47617,
+        "sha256": "c8d784dc607813a1b0c8d885f6f7b0a7f7134183d1d177b21ed8a6810a3e5764"
+      },
+      {
+        "name": "mesh-c94e1d6eda9135a10531563f29230cfbab8e9bca61d70e613cd2c10e141c91d8.display.json",
+        "bytes": 162250,
+        "sha256": "c94e1d6eda9135a10531563f29230cfbab8e9bca61d70e613cd2c10e141c91d8"
+      },
+      {
+        "name": "mesh-cd05ef7a4c4607685fbbe19155284413b745c9f225e811f5ce22d19abc172da0.display.json",
+        "bytes": 133633,
+        "sha256": "cd05ef7a4c4607685fbbe19155284413b745c9f225e811f5ce22d19abc172da0"
+      },
+      {
+        "name": "mesh-cf0dd56f11f545f6d0ca02191fb7b3aeaf65c0f9419337b4b8a5065a957f2e88.display.json",
+        "bytes": 13937,
+        "sha256": "cf0dd56f11f545f6d0ca02191fb7b3aeaf65c0f9419337b4b8a5065a957f2e88"
+      },
+      {
+        "name": "mesh-d328dde12658e61910d0334be3ac483f9211ac1a97387c01e6d2313567a2b24f.display.json",
+        "bytes": 58320,
+        "sha256": "d328dde12658e61910d0334be3ac483f9211ac1a97387c01e6d2313567a2b24f"
+      },
+      {
+        "name": "mesh-e1f6bd1823365ff5105a32f09c566c643342c60e247ff08219b3c55574f3c331.display.json",
+        "bytes": 13561,
+        "sha256": "e1f6bd1823365ff5105a32f09c566c643342c60e247ff08219b3c55574f3c331"
+      },
+      {
+        "name": "mesh-e85c8d40c673b5640b684d9813be6c759e1f7bd43a30df0505e99067cc5a31dd.display.json",
+        "bytes": 122484,
+        "sha256": "e85c8d40c673b5640b684d9813be6c759e1f7bd43a30df0505e99067cc5a31dd"
+      },
+      {
+        "name": "mesh-e932e1dcbc2bbc1270a749eaf332375ae2153ea4a1f6b70ff626a59221c8cbbf.display.json",
+        "bytes": 73156,
+        "sha256": "e932e1dcbc2bbc1270a749eaf332375ae2153ea4a1f6b70ff626a59221c8cbbf"
+      },
+      {
+        "name": "mesh-f65f9ed593aa6faf020c2b89c5a4edbe46ee2571df7b173d85494f00cededbfc.display.json",
+        "bytes": 18696,
+        "sha256": "f65f9ed593aa6faf020c2b89c5a4edbe46ee2571df7b173d85494f00cededbfc"
+      },
+      {
+        "name": "metadata-208473e8420e03c155d805fb128632edfb35c564c746938f4b876fe35ec34604.display.json",
+        "bytes": 12838,
+        "sha256": "208473e8420e03c155d805fb128632edfb35c564c746938f4b876fe35ec34604"
+      },
+      {
+        "name": "metadata-9fd106f33f70fd985456ec8c6784a17ef4d45a620ba9157d6be3dcab2cb8780a.display.json",
+        "bytes": 58931,
+        "sha256": "9fd106f33f70fd985456ec8c6784a17ef4d45a620ba9157d6be3dcab2cb8780a"
+      },
+      {
+        "name": "parallel_key.brep.json",
+        "bytes": 9956,
+        "sha256": "b42efeafd5f709879fc589a5591d8bf60f4adebf5cc14933c350aede29fa7810"
+      },
+      {
+        "name": "parallel_key.exchange.json",
+        "bytes": 14516,
+        "sha256": "37d6e73b6331ba3bba959302d86a3b954e7480844d897439c87b737e463e2cc9"
+      },
+      {
+        "name": "parallel_key.preview.svg",
+        "bytes": 1906,
+        "sha256": "84b0b032310fae5788bdbdbfc9c4c8c5eea2b741a7ecfa748a577c0c6e9469f0"
+      },
+      {
+        "name": "parallel_key.step",
+        "bytes": 2955,
+        "sha256": "a732a2d1d41232deade1086b7a92889574f4601adb1de59bbe98613969f1a9c0"
+      },
+      {
+        "name": "parallel_key.stl",
+        "bytes": 1601,
+        "sha256": "f2e1ada0c286b9fc52c46ccd81ab26424759d28dd606227db10338b652928c4b"
+      },
+      {
+        "name": "recipe.json",
+        "bytes": 73702,
+        "sha256": "86cf97b4f07cb6078991654de428543b4569937c8837f2aa948fb3f342e59622"
+      },
+      {
+        "name": "recipe.star",
+        "bytes": 35505,
+        "sha256": "7a7366d4b23a40df9c949c49228f522904c323960ae8e6121fa171241a4fd59d"
+      },
+      {
+        "name": "retaining_ring.brep.json",
+        "bytes": 17472,
+        "sha256": "9ab375d52269d246dcea63a8af2e0a34e31ba1e12e73fb0c554c372c5502933b"
+      },
+      {
+        "name": "retaining_ring.exchange.json",
+        "bytes": 14523,
+        "sha256": "d1ad91fa2b0694e4259cc1d6b521a6db805bb958fc119cacae7253fd64714516"
+      },
+      {
+        "name": "retaining_ring.preview.svg",
+        "bytes": 36835,
+        "sha256": "fff7a9348bf38d427e47986f68d05128a2a175052273f70977d860a930f57da6"
+      },
+      {
+        "name": "retaining_ring.step",
+        "bytes": 9595,
+        "sha256": "b0eab8458fa3a31dd48883a18f971c0ca50a381198029a18df2e58681ae0ea8d"
+      },
+      {
+        "name": "retaining_ring.stl",
+        "bytes": 99815,
+        "sha256": "152f3e573f6f577ef523b17e6a26419d579f4f1540461750eb7cf1ab9ff14844"
+      },
+      {
+        "name": "right_housing.brep.json",
+        "bytes": 23988,
+        "sha256": "c25d17b68a8b88dc04e38756f67e27a933854966014a151c3269c75ffff70a98"
+      },
+      {
+        "name": "right_housing.exchange.json",
+        "bytes": 14522,
+        "sha256": "2a681849d2cfab9cf20e98e5e92a2b1bbb19bbeca684f311e71d78cb7f932186"
+      },
+      {
+        "name": "right_housing.preview.svg",
+        "bytes": 61798,
+        "sha256": "3783af87f6d7c45ecac7b0423cf9bddd6aa6af403a935b9c2b2857b8315b692b"
+      },
+      {
+        "name": "right_housing.step",
+        "bytes": 15768,
+        "sha256": "1327965597286f65b583595d5f02a0958b094adfaf11d55f59d3ca69e564c0fc"
+      },
+      {
+        "name": "right_housing.stl",
+        "bytes": 157216,
+        "sha256": "ccd8946f2426164acce51ce30540709401cb5378773c490cf2063e81db8553c7"
+      },
+      {
+        "name": "rigid-rotation-groups.json",
+        "bytes": 8580,
+        "sha256": "561ca7f0275d3995b42b20532f1005ba0b8fa8c6fe75e34876ebcf1eb1e2ac0e"
+      },
+      {
+        "name": "section-bearing_section.json",
+        "bytes": 59308,
+        "sha256": "7e95af49a76cc8d38785b4faabb206e8aa09cfd9b3ea994f6cfce80ae43a4d67"
+      },
+      {
+        "name": "section-bearing_section.svg",
+        "bytes": 39078,
+        "sha256": "ba685cce90f2bacbd9d07e540e4377dea6e82637d732db6d57b1102f923870c5"
+      },
+      {
+        "name": "section-end_cover_section.json",
+        "bytes": 47600,
+        "sha256": "810dec9f1fa7a84814ec9c91fe35ba4f7538b9d64dae426105cd5e3407e51af3"
+      },
+      {
+        "name": "section-end_cover_section.svg",
+        "bytes": 31608,
+        "sha256": "b5502fc9a8c147779ce30fb81ea52c9a7fb8e11fc58d06b35a5061889169afdc"
+      },
+      {
+        "name": "section-left_cover_pilot_section.json",
+        "bytes": 45971,
+        "sha256": "430b1ea9a641a17d693fa16e340374fb76254d53f24140bc004fb407ec4b40d3"
+      },
+      {
+        "name": "section-left_cover_pilot_section.svg",
+        "bytes": 30119,
+        "sha256": "03d61a9ac98c974cb253fcc91d3d2fc6fb14c1d8d8e95823eb09d01e228c96d4"
+      },
+      {
+        "name": "section-mounting_plan.json",
+        "bytes": 81261,
+        "sha256": "ba69b25209c3d922ad4c06af8803b11dbe515639ffdde96626e9c648d76084c1"
+      },
+      {
+        "name": "section-mounting_plan.svg",
+        "bytes": 53843,
+        "sha256": "5a16fa65865681749d76c75b8b4f292e141a123460a19c9ac9b762328bc0e0c2"
+      },
+      {
+        "name": "section-right_cover_pilot_section.json",
+        "bytes": 46001,
+        "sha256": "ce3940e66a0b5615f19ce38c625d1ef08ee1c57a57986b89ec1df4ba5130e0f7"
+      },
+      {
+        "name": "section-right_cover_pilot_section.svg",
+        "bytes": 30216,
+        "sha256": "93d0db3b50b02ed95676498441775123f0fca75cf5fda26e8acfc6eabdef4990"
+      },
+      {
+        "name": "shaft.brep.json",
+        "bytes": 43263,
+        "sha256": "8051f735e4f7fad7607a725cfb196bd62cbfecd12f59cf1eca42d4bad6bf8e6b"
+      },
+      {
+        "name": "shaft.exchange.json",
+        "bytes": 14498,
+        "sha256": "71b52b975d1de2b2f2082a5b7d7fd707883b26291a18052017953b67e1603891"
+      },
+      {
+        "name": "shaft.preview.svg",
+        "bytes": 273819,
+        "sha256": "d48e58002bd8ca6b40a284fb8f1a7bff6649c4a789c77d7b232d3478d56dd216"
+      },
+      {
+        "name": "shaft.step",
+        "bytes": 27531,
+        "sha256": "eab4eaf1b367fab8bae22df3ee7dd6fcb6c271ad5f4162a81dcdd982b663fce5"
+      },
+      {
+        "name": "shaft.stl",
+        "bytes": 862306,
+        "sha256": "5134de15f4b98c98c0a72187ecbf5dca55fb297521fbcb2c7bebe6e376e55326"
+      },
+      {
+        "name": "sleeve.brep.json",
+        "bytes": 9806,
+        "sha256": "885e3ef4a86de3c7a2ad794475a457e1f1121a155343574af489572bd8f9c64b"
+      },
+      {
+        "name": "sleeve.exchange.json",
+        "bytes": 14500,
+        "sha256": "efedcc8fdd4194f51da527c6af4e9f40bff654c9b761dcd0d9cc8744939d80b9"
+      },
+      {
+        "name": "sleeve.preview.svg",
+        "bytes": 88153,
+        "sha256": "385f529372c83561b2b4433f6045b094ab0316bd7e750e27f593f1777ae568b9"
+      },
+      {
+        "name": "sleeve.step",
+        "bytes": 7807,
+        "sha256": "612197ac3b16bda6194244ebb38027b938d1ed43e77fc6667f5bb9ddd577c4fb"
+      },
+      {
+        "name": "sleeve.stl",
+        "bytes": 232853,
+        "sha256": "6f17fb45edbf59f540d8c707dea82b9583f853689c79b4891f8266a43c19e26a"
+      },
+      {
+        "name": "tolerance-stacks.json",
+        "bytes": 14028,
+        "sha256": "0bf453b3e6ec9c72d1e23d3ae1f6aef1d8d92dc1c6bafb8bf91473e04f47139a"
+      },
+      {
+        "name": "washer.brep.json",
+        "bytes": 6428,
+        "sha256": "237c711464d70a087727fe7cab914ab6f2e0a2dc79cc638f1bc91b2da7a1fdf9"
+      },
+      {
+        "name": "washer.exchange.json",
+        "bytes": 14500,
+        "sha256": "463a34568b4856beb73154495cda3a5664a0e0b4ac7115f00a79688e0fd4faad"
+      },
+      {
+        "name": "washer.preview.svg",
+        "bytes": 41763,
+        "sha256": "4edfeca5376436fd48455157232cd07541c5b6ab835001147bcb3c6aca621db5"
+      },
+      {
+        "name": "washer.step",
+        "bytes": 5569,
+        "sha256": "317d35555a85d5e221ea589d1bbd7ec970dcc32537491ac646d44a35ba1c4632"
+      },
+      {
+        "name": "washer.stl",
+        "bytes": 128307,
+        "sha256": "4f8ef1ba254aad4bdb69aa112807b8d91a3ccc0fc72d2ab8876b35cc7ddd6924"
+      }
+    ],
+    "excluded_files": [
+      "base.preview.html",
+      "bearing_fit_inspection.bom.csv",
+      "bearing_fit_inspection.gpu.html",
+      "bearing_fit_inspection.paged.html",
+      "bearing_fit_inspection.preview.html",
+      "bearing_fit_inspection.stream.html",
+      "clearance-checks.html",
+      "cover_screw_envelope.preview.html",
+      "datum-dimensions.html",
+      "drive_disc.preview.html",
+      "drive_module_release.bom.csv",
+      "drive_module_release.gpu.html",
+      "drive_module_release.paged.html",
+      "drive_module_release.preview.html",
+      "drive_module_release.stream.html",
+      "end_cover.preview.html",
+      "housing.preview.html",
+      "manifest.json",
+      "parallel_key.preview.html",
+      "retaining_ring.preview.html",
+      "right_housing.preview.html",
+      "rigid-rotation-groups.html",
+      "rotation-rotor.html",
+      "shaft.preview.html",
+      "sleeve.preview.html",
+      "tolerance-stacks.html",
+      "washer.preview.html"
+    ],
+    "comparison": "SHA-256 exact bytes for native geometry, exchange, source and engineering JSON/SVG; manifest and HTML excluded",
+    "semantic_manifest_fields": [
+      "schema_version",
+      "manifest_schema_version",
+      "units",
+      "tolerance",
+      "kernel_version",
+      "kernel_build_id",
+      "executor_build_id",
+      "solver_build_id",
+      "recipe_source_hash",
+      "face_datums",
+      "mechanism_context_hash",
+      "feature_hashes",
+      "outputs",
+      "face_assertions",
+      "property_assertions",
+      "clearance_checks",
+      "datum_dimensions",
+      "tolerance_stacks",
+      "rigid_rotation_groups",
+      "section_views",
+      "drawing_sheets",
+      "exchange_requirements",
+      "exchange_policy_status",
+      "sketch_reports",
+      "mechanism_reports",
+      "motion_studies",
+      "mechanism_bindings"
+    ],
+    "delivery_verify": {
+      "algorithm": "blake3",
+      "manifest_hash": "ca76a7041e978db17b361f59fcff7cc47e60eaa80f4ce7f6f6786f3e9a95664c",
+      "schema_version": 1,
+      "valid": true,
+      "verified_bytes": 32638926,
+      "verified_files": 175
+    },
+    "replay_verify": {
+      "algorithm": "blake3",
+      "manifest_hash": "ca76a7041e978db17b361f59fcff7cc47e60eaa80f4ce7f6f6786f3e9a95664c",
+      "schema_version": 1,
+      "valid": true,
+      "verified_bytes": 32638926,
+      "verified_files": 175
+    }
+  },
+  "mechanical_fixture": {
+    "before": {
+      "occurrences": 30,
+      "definitions": 14,
+      "rotor_members": 9,
+      "named_continuous_clearance_checks": 13,
+      "native_axial_dimensions": 20,
+      "native_machining_dimension_rows": 10,
+      "face_attached_pilot_patterns": [
+        "housing_left_pilots",
+        "housing_right_pilots"
+      ],
+      "scope": "Ten new native face-to-face machining rows and a nominal 0.5 mm screw-tip floor gap; covers and screw envelopes do not establish threads, preload or rated load"
+    },
+    "after": {
+      "occurrences": 30,
+      "definitions": 14,
+      "rotor_members": 9,
+      "named_continuous_clearance_checks": 13,
+      "native_axial_dimensions": 20,
+      "native_machining_dimension_rows": 10,
+      "face_attached_pilot_patterns": [
+        "housing_left_pilots",
+        "housing_right_pilots"
+      ],
+      "scope": "Ten new native face-to-face machining rows and a nominal 0.5 mm screw-tip floor gap; covers and screw envelopes do not establish threads, preload or rated load"
+    }
+  },
+  "scope": "One local writer; accepted source replay uses the same pinned local executable and verified captured delivery, not an external release, hosted service or autonomous AI reasoning",
+  "evidence_sha256": "a18ef15380fcd245426a3128a521a1276a7278ec9934dce1923a5768d920f2ba"
+}

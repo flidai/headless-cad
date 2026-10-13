@@ -186,3 +186,108 @@ fn sheet_and_total_viewport_limits_are_preflight_obligations() {
         })
     ));
 }
+
+fn native_table_value() -> Value {
+    json!({"schema_version":2,"units":"mm","features":[
+        {"op":"rectangle","id":"profile","width":20,"depth":10},
+        {"op":"extrude","id":"body","profile":"profile","height":8}],
+        "outputs":[{"name":"part","feature":"body"}],
+        "parts":[{"id":"block","feature":"body"}],
+        "face_datums":[
+            {"part":"block","name":"start","anchor_feature":"body","role":"start_cap","x_direction":[1,0,0]},
+            {"part":"block","name":"end","anchor_feature":"body","role":"end_cap","x_direction":[1,0,0]}],
+        "assemblies":[{"id":"assembly","instances":[{"id":"block","part":"block"}]}],
+        "assembly_outputs":[{"name":"machine","assembly":"assembly"}],
+        "datum_dimensions":[{"id":"thickness","output":"machine",
+            "from":{"instance_path":["block"],"datum":"start"},
+            "to":{"instance_path":["block"],"datum":"end"},"direction":-1}],
+        "section_views":[{"id":"plan","output":"part","origin":[0,0,4]}],
+        "drawing_sheets":[{"id":"machining","title":"Machining","revision":"A","width":210,"height":297,
+            "views":[{"view":"plan","x":10,"y":10,"width":190,"height":150,"scale":1}],
+            "dimension_tables":[{"id":"dimensions","title":"Native dimensions","output":"machine","x":10,"y":170,"width":190,"height":55,
+                "rows":[{"dimension":"thickness","label":"Stock thickness"}]}]}]})
+}
+
+#[test]
+fn table_binds_native_dimension_even_for_selected_other_output() {
+    let recipe = parse(native_table_value());
+    let result = BuildEngine::default()
+        .build_outputs(&recipe, &["part".into()])
+        .unwrap();
+    assert_eq!(result.datum_dimensions["thickness"].value_mm, 8.);
+    assert_eq!(
+        result.drawing_sheets["machining"].datum_dimension_ids,
+        ["thickness"]
+    );
+    assert_eq!(
+        result.drawing_sheets["machining"]
+            .declaration
+            .dimension_tables[0]
+            .rows[0]
+            .label,
+        "Stock thickness"
+    );
+}
+
+#[test]
+fn tables_reject_wrong_native_refs_and_layout_before_geometry() {
+    for (field, value) in [("dimension", json!("unknown")), ("label", json!("\n"))] {
+        let mut v = native_table_value();
+        v["drawing_sheets"][0]["dimension_tables"][0]["rows"][0][field] = value;
+        v["features"][0]["width"] = json!(-1);
+        assert!(matches!(
+            BuildEngine::default().build_outputs(&parse(v), &["part".into()]),
+            Err(BuildError::InvalidDrawingSheet { .. })
+        ));
+    }
+    for (field, value) in [
+        ("output", json!("part")),
+        ("y", json!(100)),
+        ("width", json!(50)),
+        ("height", json!(10)),
+    ] {
+        let mut v = native_table_value();
+        v["drawing_sheets"][0]["dimension_tables"][0][field] = value;
+        v["features"][0]["width"] = json!(-1);
+        assert!(
+            matches!(
+                BuildEngine::default().build_outputs(&parse(v), &["part".into()]),
+                Err(BuildError::InvalidDrawingSheet { .. })
+            ),
+            "{field}"
+        );
+    }
+    let mut v = native_table_value();
+    v["drawing_sheets"][0]["dimension_tables"][0]["rows"][0]["value_mm"] = json!(8);
+    assert!(serde_json::from_value::<Recipe>(v).is_err());
+}
+
+#[test]
+fn table_and_view_share_case_insensitive_paper_id_namespace() {
+    let mut v = native_table_value();
+    v["drawing_sheets"][0]["dimension_tables"][0]["id"] = json!("PLAN");
+    assert!(matches!(
+        cad_build::build(&parse(v)),
+        Err(BuildError::InvalidDrawingSheet { .. })
+    ));
+}
+
+#[test]
+fn generated_svg_table_and_row_ids_cannot_alias() {
+    let mut v = native_table_value();
+    v["drawing_sheets"][0]["width"] = json!(420);
+    let first = &mut v["drawing_sheets"][0]["dimension_tables"][0];
+    first["id"] = json!("a-b");
+    let mut second = first.clone();
+    second["id"] = json!("a");
+    second["rows"][0]["dimension"] = json!("b");
+    second["x"] = json!(215);
+    v["drawing_sheets"][0]["dimension_tables"]
+        .as_array_mut()
+        .unwrap()
+        .push(second);
+    assert!(matches!(
+        cad_build::build(&parse(v)),
+        Err(BuildError::InvalidDrawingSheet { message, .. }) if message.contains("generated drawing table")
+    ));
+}

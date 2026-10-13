@@ -51,7 +51,86 @@ fn sheet() -> DrawingSheet {
                 circles: vec![],
             },
         ],
+        dimension_tables: vec![],
     }
+}
+
+#[test]
+fn native_dimension_tables_render_rounded_values_and_reject_bad_layout() {
+    use cad_export::{DrawingDimensionRow, DrawingDimensionTable};
+    let mut s = sheet();
+    s.dimension_tables.push(DrawingDimensionTable {
+        id: "machine".into(),
+        title: "Machining & setup".into(),
+        x: 10.,
+        y: 100.,
+        width: 190.,
+        height: 48.,
+        rows: vec![DrawingDimensionRow {
+            dimension: "pilot_depth".into(),
+            label: "Pilot <floor>".into(),
+            value_mm: 5.00000001,
+            lower_bound_mm: 5.0,
+            upper_bound_mm: 5.00000002,
+        }],
+    });
+    let svg = drawing_sheet_to_svg(&s).unwrap();
+    assert!(svg.contains("id=\"drawing-table-machine-pilot_depth\""));
+    assert!(svg.contains("Machining &amp; setup"));
+    assert!(svg.contains("Pilot &lt;floor&gt;"));
+    assert!(svg.contains("≈ 5.000 mm"));
+    assert!(svg.contains("Nominal native geometry"));
+    let mut bad = s.clone();
+    bad.dimension_tables[0].y = 40.;
+    assert!(drawing_sheet_to_svg(&bad).is_err(), "table/view overlap");
+    let mut bad = s.clone();
+    bad.dimension_tables[0].height = 15.;
+    assert!(drawing_sheet_to_svg(&bad).is_err(), "row overflow");
+    let mut bad = s.clone();
+    bad.dimension_tables[0].rows[0].label = "W".repeat(100);
+    assert!(drawing_sheet_to_svg(&bad).is_err(), "label overflow");
+    let mut bad = s.clone();
+    bad.dimension_tables[0].rows[0].lower_bound_mm = 6.;
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "invalid numerical bound"
+    );
+    let mut bad = s.clone();
+    bad.dimension_tables[0].rows[0].value_mm = f64::INFINITY;
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "invalid numerical value"
+    );
+    let mut bad = s.clone();
+    bad.dimension_tables[0].rows[0].label = "bad\0".into();
+    assert!(drawing_sheet_to_svg(&bad).is_err(), "invalid XML text");
+    let mut bad = s.clone();
+    bad.dimension_tables[0].id = "plate".into();
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "duplicate view/table ID"
+    );
+    let mut bad = s.clone();
+    bad.dimension_tables[0].id = "a".into();
+    bad.dimension_tables[0].width = 80.;
+    bad.dimension_tables[0].rows[0].dimension = "b".into();
+    let mut second = bad.dimension_tables[0].clone();
+    second.id = "a-b".into();
+    second.x = 110.;
+    second.rows[0].dimension = "c".into();
+    bad.dimension_tables.push(second);
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "emitted table DOM ID collision"
+    );
+    let mut bad = s.clone();
+    bad.views[0].id = "drawing-table-a".into();
+    bad.dimension_tables[0].id = "a".into();
+    bad.dimension_tables[0].rows[0].dimension = "section-contours-0".into();
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "table row must not alias a generated section fragment"
+    );
 }
 #[test]
 fn true_scale_native_paths_and_escaped_title_block() {

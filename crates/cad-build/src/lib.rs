@@ -54,7 +54,9 @@ pub use dimension_tolerance::{DimensionTolerance, DimensionToleranceReport};
 mod drawing_sheets;
 mod exchange_requirements;
 pub use drawing_sheets::{
-    DrawingSheet, DrawingSheetReport, DrawingViewport, DRAWING_MARGIN_MM, DRAWING_TITLE_BLOCK_MM,
+    DrawingDimensionRow, DrawingDimensionTable, DrawingSheet, DrawingSheetReport, DrawingViewport,
+    DRAWING_MARGIN_MM, DRAWING_TITLE_BLOCK_MM, MAX_DRAWING_DIMENSION_ROWS,
+    MAX_DRAWING_DIMENSION_ROWS_PER_TABLE, MAX_DRAWING_DIMENSION_TABLES_PER_SHEET,
     MAX_DRAWING_SHEETS, MAX_DRAWING_VIEWPORTS, MAX_DRAWING_VIEWPORTS_PER_SHEET,
 };
 mod section_views;
@@ -2645,7 +2647,8 @@ impl BuildEngine {
         )?;
         result.tolerance_stacks =
             tolerance_stacks::evaluate(recipe, &result.section_views, &result.datum_dimensions)?;
-        result.drawing_sheets = drawing_sheets::evaluate(recipe, &result.section_views)?;
+        result.drawing_sheets =
+            drawing_sheets::evaluate(recipe, &result.section_views, &result.datum_dimensions)?;
         result.assemblies = assertion_assemblies
             .into_iter()
             .filter(|(name, _)| result.scope.requested_outputs.binary_search(name).is_ok())

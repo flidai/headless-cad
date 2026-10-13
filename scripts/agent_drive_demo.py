@@ -126,15 +126,19 @@ def drive_summary(manifest):
     assert assembly['definitions'] == 14
     members = manifest['rigid_rotation_groups']['rotor']['members']
     assert len(members) == 9
-    assert len(manifest['datum_dimensions']) == 10
+    has_machining_sheet = 'end_cover_machining' in manifest['drawing_sheets']
+    assert len(manifest['datum_dimensions']) == (20 if has_machining_sheet else 10)
     for feature in ('housing_left_pilots', 'housing_right_pilots'):
         assert feature in manifest['sketch_reports']
     return {'occurrences': assembly['instances'], 'definitions': assembly['definitions'],
             'rotor_members': len(members),
             'named_continuous_clearance_checks': len(manifest['clearance_checks']),
             'native_axial_dimensions': len(manifest['datum_dimensions']),
+            'native_machining_dimension_rows': 10 if has_machining_sheet else 0,
             'face_attached_pilot_patterns': ['housing_left_pilots', 'housing_right_pilots'],
-            'scope': 'Nominal end covers and unthreaded screw envelopes; named clearance checks do not certify every contact, thread engagement or load capacity'}
+            'scope': ('Ten new native face-to-face machining rows and a nominal 0.5 mm screw-tip floor gap; covers and screw envelopes do not establish threads, preload or rated load'
+                      if has_machining_sheet else
+                      'Nominal end covers and unthreaded screw envelopes; named clearance checks do not certify every contact, thread engagement or load capacity')}
 
 
 def main():
@@ -218,8 +222,8 @@ def main():
 <p>A real local MCP client captured the Starlark recipe, built a candidate, received a native clearance failure, repaired the source, and delivered verified artifacts. The source workspace was unchanged.</p>
 <div class="cards"><section><h2>Revision A</h2><p>12 mm shaft · 60 mm mounting pitch</p><a href="before/rotation-rotor.html">Inspect rotating drive and captured source →</a></section>
 <section><h2>Revision B</h2><p>14 mm shaft · 72 mm mounting pitch</p><a href="after/rotation-rotor.html">Inspect repaired revision and captured source →</a></section></div>
-<ul><li>30 components from 14 definitions, including two removable bearing covers and four nominal screw envelopes.</li><li>9 rotor members, {len(manifests[1]['clearance_checks'])} named continuous clearance checks, 10 native axial dimensions.</li><li>Invalid 0.3 mm minimum clearance rejected; earlier candidate preserved.</li><li>Captured source replayed offline after server exit with identical native B-reps and STEP.</li></ul>
-<p><a href="report.json">Client trace and native rejection</a> · <a href="after/clearance-checks.html">Clearance evidence</a> · <a href="after/tolerance-stacks.html">Tolerance stacks</a> · <a href="after/drive_module_release.step">Download STEP</a></p>
+<ul><li>30 components from 14 definitions, including two removable bearing covers and four nominal screw envelopes.</li><li>9 rotor members, {len(manifests[1]['clearance_checks'])} named continuous clearance checks, {len(manifests[1]['datum_dimensions'])} native axial dimensions, including ten measured machining rows.</li><li>Nominal screw-tip floor gap: 0.5 mm; threads, preload and rated loads remain unverified.</li><li>Invalid 0.3 mm minimum clearance rejected; earlier candidate preserved.</li><li>Captured source replayed offline after server exit with identical native B-reps and STEP.</li></ul>
+<p><a href="report.json">Client trace and native rejection</a> · <a href="after/clearance-checks.html">Clearance evidence</a> · <a href="after/drawing-end_cover_machining.svg">End-cover machining sheet</a> · <a href="after/tolerance-stacks.html">Tolerance stacks</a> · <a href="after/drive_module_release.step">Download STEP</a></p>
 <small>This is a scripted interface acceptance fixture, not a claim of autonomous engineering. Viewer controls inspect only. Named-pair proofs do not certify all assembly contacts or rated loads.</small>''')
         root.rename(destination)
     print(json.dumps({'valid': True, 'url_path': str(destination / 'index.html'), 'tool_calls': len(trace)}, indent=2))

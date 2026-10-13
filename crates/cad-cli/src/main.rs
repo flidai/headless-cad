@@ -1558,8 +1558,8 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             artifacts.push((json_file, json_text))?;
             artifacts.push((svg_file, svg_text))?;
         }
-        drawing::publish(&build, &mut summary, &mut artifacts)?;
         datum_dimensions::publish(&build, &summary, &mut artifacts)?;
+        drawing::publish(&build, &mut summary, &mut artifacts)?;
         tolerance_stacks::publish(&build, &summary, &mut artifacts)?;
         clearance::publish(&build, &summary, &mut artifacts)?;
         rigid_rotation::publish(&build, &summary, &mut artifacts)?;

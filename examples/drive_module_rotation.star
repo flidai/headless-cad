@@ -14,6 +14,8 @@ mounting_pitch = param(name = "mounting_pitch", default = 60)
 base_corner_radius = param(name = "base_corner_radius", default = 6)
 required_clearance = param(name = "required_clearance", default = 0.09)
 minimum_endplay = param(name = "minimum_endplay", default = 0.1)
+pilot_depth = param(name = "pilot_depth", default = 5)
+cover_thickness = param(name = "cover_thickness", default = 2)
 
 def validate_parameters():
     if shaft_diameter < 10 or shaft_diameter > 16:
@@ -26,6 +28,10 @@ def validate_parameters():
         fail("minimum_endplay must be positive")
     if required_clearance <= 0:
         fail("required_clearance must be positive")
+    if pilot_depth < 4 or pilot_depth > 6:
+        fail("pilot_depth must be 4..6 mm")
+    if cover_thickness < 1.5 or cover_thickness > 3:
+        fail("cover_thickness must be 1.5..3 mm")
 validate_parameters()
 
 r = shaft_diameter / 2
@@ -50,8 +56,10 @@ housing_body = extrude(id = "housing_body", profile = polygon(id = "housing_prof
 # The cap is asymmetric in Y; its area centroid moves with the bearing bore.
 # Offsetting the face-local sketch origin puts both pilots on the shaft axis Y=0.
 pilot_radius = 1.75
-pilot_depth = 5
 pilot_half_pitch = 17
+flange_thickness = 2
+tip_clearance = 0.5
+screw_shank_length = pilot_depth-tip_clearance+flange_thickness+cover_thickness
 cap_centroid_y = -16384.0/(3*(2048-pi*(r+4.025)*(r+4.025)))
 def end_cover_pilots(feature_id, cap_role, offset_y):
     points = [
@@ -83,11 +91,11 @@ housing_right_pilots = end_cover_pilots("housing_right_pilots", "end_cap", -cap_
 cover_body = extrude(id = "end_cover_body", profile = polygon(id = "end_cover_profile",
     points = [[-22,-26],[22,-26],[22,14],[14,22],[-14,22],[-22,14]],
     circular_holes = [{"center":[0,0],"radius":r+4.5}]
-        + [{"center":[x,0],"radius":2.05} for x in [-pilot_half_pitch,pilot_half_pitch]]), height = 2)
+        + [{"center":[x,0],"radius":2.05} for x in [-pilot_half_pitch,pilot_half_pitch]]), height = cover_thickness)
 # Nominal unthreaded screw envelopes: 3.3 mm shank, 6 mm head. This models
 # engagement and head seating, not threads, preload, torque or rated retention.
 cover_screw_body = revolve(id = "cover_screw_body", profile = polygon(id = "cover_screw_profile",
-    points = [[0,0],[1.65,0],[1.65,9],[3,9],[3,11],[0,11]]))
+    points = [[0,0],[1.65,0],[1.65,screw_shank_length],[3,screw_shank_length],[3,screw_shank_length+2],[0,screw_shank_length+2]]))
 sleeve_body = revolve(id = "sleeve_body", profile = polygon(id = "sleeve_profile", points = [
     [r+0.15,0],[r+6,0],[r+6,2],[r+4,2],[r+4,18],[r+0.15,18],
 ]))
@@ -128,10 +136,21 @@ clamp = part(id = "clamp_bar", body = clamp_body, part_number = "DM-CLAMP", revi
 nut = part(id = "nut_envelope", body = nut_body, part_number = "DM-NUT-ENVELOPE", revision = design_revision, description = "Underside clamp nut envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800)
 base = part(id = "base", body = base_body, part_number = "DM-BASE", revision = design_revision, description = "Four-hole mounting plate with native tangent corner fillets", material = "Aluminum", density_kg_per_m3 = 2700)
 housing = part(id = "housing_left", body = housing_left_pilots, part_number = "DM-HOUSING-L", revision = design_revision, description = "Left bearing housing with two outboard blind end-cover pilots", material = "Aluminum", density_kg_per_m3 = 2700,
-    datums = {"axis":datum(), "seat":datum(offset = [0,-26,0])})
+    datums = {"axis":datum(), "seat":datum(offset = [0,-26,0]),
+        "outboard":face_datum(from_feature = housing_body, role = "start_cap", x_direction = [1,0,0]),
+        "inboard":face_datum(from_feature = housing_body, role = "end_cap", x_direction = [1,0,0]),
+        "minus_floor":face_datum(from_feature = housing_left_pilots, role = "hole_cover_minus_floor", x_direction = [1,0,0]),
+        "plus_floor":face_datum(from_feature = housing_left_pilots, role = "hole_cover_plus_floor", x_direction = [1,0,0])})
 right_housing = part(id = "housing_right", body = housing_right_pilots, part_number = "DM-HOUSING-R", revision = design_revision, description = "Right bearing housing with two outboard blind end-cover pilots", material = "Aluminum", density_kg_per_m3 = 2700,
-    datums = {"axis":datum(), "seat":datum(offset = [0,-26,0])})
-end_cover = part(id = "end_cover", body = cover_body, part_number = "DM-END-COVER", revision = design_revision, description = "Removable sleeve-flange retainer plate with two screw clearances", material = "Aluminum", density_kg_per_m3 = 2700)
+    datums = {"axis":datum(), "seat":datum(offset = [0,-26,0]),
+        "outboard":face_datum(from_feature = housing_body, role = "end_cap", x_direction = [1,0,0]),
+        "inboard":face_datum(from_feature = housing_body, role = "start_cap", x_direction = [1,0,0]),
+        "minus_floor":face_datum(from_feature = housing_right_pilots, role = "hole_cover_minus_floor", x_direction = [1,0,0]),
+        "plus_floor":face_datum(from_feature = housing_right_pilots, role = "hole_cover_plus_floor", x_direction = [1,0,0])})
+end_cover = part(id = "end_cover", body = cover_body, part_number = "DM-END-COVER", revision = design_revision, description = "Removable sleeve-flange retainer plate with two screw clearances", material = "Aluminum", density_kg_per_m3 = 2700, datums = {
+    "start":face_datum(from_feature = cover_body, role = "start_cap", x_direction = [1,0,0]),
+    "end":face_datum(from_feature = cover_body, role = "end_cap", x_direction = [1,0,0]),
+})
 cover_screw = part(id = "cover_screw_envelope", body = cover_screw_body, part_number = "DM-COVER-SCREW-ENVELOPE", revision = design_revision, description = "Nominal unthreaded end-cover screw envelope; no preload or thread model", material = "Steel", density_kg_per_m3 = 7800)
 sleeve = part(id = "sleeve", body = sleeve_body, part_number = "DM-SLEEVE", revision = design_revision, description = "Flanged bronze bush seated against the outer housing face", material = "Bronze", density_kg_per_m3 = 8800, datums = {
     "outer_thrust":face_datum(from_feature = sleeve_body, role = "segment_0", x_direction = [1,0,0]),
@@ -159,13 +178,13 @@ bolt = part(id = "clamp_bolt_envelope", body = bolt_body, part_number = "DM-CLAM
 left_support = assembly(id = "left_support_definition", instances = [
     instance(id = "housing", part = housing),
     instance(id = "sleeve", part = sleeve, offset = [0,0,-2]),
-    instance(id = "left_cover", part = end_cover, offset = [0,0,-4]),
-] + [instance(id = "left_cover_screw_"+tag, part = cover_screw, offset = [x,0,5], rotation = [1,0,0,0]) for tag,x in [("minus",-pilot_half_pitch),("plus",pilot_half_pitch)]])
+    instance(id = "left_cover", part = end_cover, offset = [0,0,-flange_thickness-cover_thickness]),
+] + [instance(id = "left_cover_screw_"+tag, part = cover_screw, offset = [x,0,pilot_depth-tip_clearance], rotation = [1,0,0,0]) for tag,x in [("minus",-pilot_half_pitch),("plus",pilot_half_pitch)]])
 right_support = assembly(id = "right_support_definition", instances = [
     instance(id = "right_housing", part = right_housing),
     instance(id = "right_sleeve", part = sleeve, offset = [0,0,18], rotation = [1,0,0,0]),
     instance(id = "right_cover", part = end_cover, offset = [0,0,18]),
-] + [instance(id = "right_cover_screw_"+tag, part = cover_screw, offset = [x,0,11]) for tag,x in [("minus",-pilot_half_pitch),("plus",pilot_half_pitch)]])
+] + [instance(id = "right_cover_screw_"+tag, part = cover_screw, offset = [x,0,16-pilot_depth+tip_clearance]) for tag,x in [("minus",-pilot_half_pitch),("plus",pilot_half_pitch)]])
 module = assembly(id = "drive_module_release", instances = [
     instance(id = "base", part = base),
     instance(id = "left_clamp", part = clamp, offset = [27,0,54]),
@@ -219,7 +238,7 @@ def cover_engineering_checks():
         for tag, label_x in [("minus",-12),("plus",12)]:
             section_circle_dimension(view = view_id, id = side+"_cover_"+tag+"_diameter", from_feature = body, role = "hole_cover_"+tag+"_wall", kind = "diameter", label_offset = [label_x,12], min = 2*pilot_radius-0.000001, max = 2*pilot_radius+0.000001)
     cover_section_area = 2048-pi*(r+4.5)*(r+4.5)-2*pi*2.05*2.05
-    section_view(id = "end_cover_section", output = "end_cover", origin = [0,0,1], min_area = cover_section_area-0.00001, max_area = cover_section_area+0.00001)
+    section_view(id = "end_cover_section", output = "end_cover", origin = [0,0,cover_thickness/2], min_area = cover_section_area-0.00001, max_area = cover_section_area+0.00001)
     section_circle_dimension(view = "end_cover_section", id = "cover_sleeve_aperture", from_feature = cover_body, role = "circular_hole_0_wall", kind = "diameter", label_offset = [0,18], min = 2*(r+4.5)-0.000001, max = 2*(r+4.5)+0.000001)
     for tag, index, label_x in [("minus",1,-12),("plus",2,12)]:
         section_circle_dimension(view = "end_cover_section", id = "cover_"+tag+"_clearance", from_feature = cover_body, role = "circular_hole_"+str(index)+"_wall", kind = "diameter", label_offset = [label_x,-12], min = 4.1-0.000001, max = 4.1+0.000001)
@@ -228,8 +247,8 @@ cover_engineering_checks()
 # Independent material-volume formulas include actual holes, not bounding boxes.
 base_volume = (80*(p+90)-4*pi*3*3-(4-pi)*base_corner_radius*base_corner_radius)*6
 housing_volume = (44*48-64-pi*(r+4.025)*(r+4.025))*16-2*pi*pilot_radius*pilot_radius*pilot_depth
-cover_volume = (2048-pi*(r+4.5)*(r+4.5)-2*pi*2.05*2.05)*2
-cover_screw_volume = pi*(1.65*1.65*9+3*3*2)
+cover_volume = (2048-pi*(r+4.5)*(r+4.5)-2*pi*2.05*2.05)*cover_thickness
+cover_screw_volume = pi*(1.65*1.65*screw_shank_length+3*3*2)
 sleeve_volume = pi*((r+6)*(r+6)-(r+0.15)*(r+0.15))*2+pi*((r+4)*(r+4)-(r+0.15)*(r+0.15))*16
 half_width = 2.02
 bore = r+0.15
@@ -314,6 +333,46 @@ def retention_thickness_dimensions():
         datum_dimension(id = name+"_thickness", output = "drive_module_release", from_instance_path = [name], from_datum = "start", to_instance_path = [name], to_datum = "end", direction = -1,
             tolerance = {"nominal":1.2,"lower":-0.01,"upper":0.01})
 retention_thickness_dimensions()
+# These values are computed from resolved native planar faces in the assembled
+# occurrences. Bounds assert nominal model geometry, not machining tolerance.
+def cover_machining_dimensions():
+    for side, housing_id in [("left","housing"),("right","right_housing")]:
+        path = [side+"_support",housing_id]
+        for tag in ["minus","plus"]:
+            datum_dimension(id = side+"_cover_"+tag+"_depth", output = "drive_module_release",
+                from_instance_path = path, from_datum = "outboard",
+                to_instance_path = path, to_datum = tag+"_floor", direction = -1,
+                min = pilot_depth-0.0001, max = pilot_depth+0.0001)
+            datum_dimension(id = side+"_cover_"+tag+"_remaining_floor", output = "drive_module_release",
+                from_instance_path = path, from_datum = "inboard",
+                to_instance_path = path, to_datum = tag+"_floor", direction = -1,
+                min = 16-pilot_depth-0.0001, max = 16-pilot_depth+0.0001)
+        cover_path = [side+"_support", "left_cover" if side == "left" else "right_cover"]
+        datum_dimension(id = side+"_cover_thickness", output = "drive_module_release",
+            from_instance_path = cover_path, from_datum = "start",
+            to_instance_path = cover_path, to_datum = "end", direction = -1,
+            min = cover_thickness-0.0001, max = cover_thickness+0.0001)
+cover_machining_dimensions()
+# The views show both native drilled sections and the cover aperture; the
+# tables bind each printed number to an evaluated face-to-face datum report.
+def machining_rows(side):
+    return [
+        {"dimension":side+"_cover_minus_depth","label":"Minus pilot depth"},
+        {"dimension":side+"_cover_plus_depth","label":"Plus pilot depth"},
+        {"dimension":side+"_cover_minus_remaining_floor","label":"Minus remaining floor"},
+        {"dimension":side+"_cover_plus_remaining_floor","label":"Plus remaining floor"},
+        {"dimension":side+"_cover_thickness","label":"Retainer cover thickness"},
+    ]
+drawing_sheet(id = "end_cover_machining", title = "End-cover pilot machining and retainer dimensions", revision = design_revision, width = 420, height = 297,
+    views = [
+        {"view":"left_cover_pilot_section","x":10,"y":10,"width":130,"height":170,"scale":0.8},
+        {"view":"right_cover_pilot_section","x":150,"y":10,"width":130,"height":170,"scale":0.8},
+        {"view":"end_cover_section","x":290,"y":10,"width":120,"height":170,"scale":0.8},
+    ],
+    dimension_tables = [
+        {"id":"left_pilots","title":"LEFT HOUSING / COVER","output":"drive_module_release","x":10,"y":190,"width":195,"height":64,"rows":machining_rows("left")},
+        {"id":"right_pilots","title":"RIGHT HOUSING / COVER","output":"drive_module_release","x":215,"y":190,"width":195,"height":64,"rows":machining_rows("right")},
+    ])
 tolerance_stack(id = "shaft_axial_endplay", terms = [
     {"datum_dimension":"shaft_stop_span","coefficient":1},
     {"datum_dimension":"bush_outer_span","coefficient":-1},

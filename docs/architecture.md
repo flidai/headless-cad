@@ -2057,6 +2057,25 @@ unconditional performance/correctness guarantee for engineering assemblies.
 
 ## Queries, drawings, and engineering deliverables
 
+Source-owned drawing sheets support bounded native dimension tables. A table
+owns its paper rectangle and display labels, and references `datum_dimension`
+IDs on one assembly output. Native datum reports supply every numerical cell;
+recipes cannot substitute an authored value. Whole-recipe preflight validates
+references, output agreement, limits, text fit and nonoverlapping paper regions,
+including selected-output builds. Limits are eight tables per sheet, sixteen
+rows per table and 128 rows per recipe. The exporter independently checks its
+typed input, finite measurement intervals and rendered identifier uniqueness.
+
+The CLI stages `datum-dimensions.json` before the drawings, compares its native
+reports with the build result, and binds its digest into each table-bearing
+drawing report. Each row retains the complete face/part/occurrence witness and
+numerical interval; SVG prints rounded nominal millimetres. Table-bearing sheets
+use drawing-report schema 2, while existing sheets retain schema 1. Atomic
+publication and captured-source replay apply to the report and SVG together.
+The drive's second A3 sheet measures ten pilot and cover dimensions. Its
+parameterized screw envelopes maintain a nominal 0.5 mm tip gap; threads,
+preload, load capacity and manufactured-part conformance remain outside scope.
+
 `cad section` implements the first authoritative planar-section query. It
 returns oriented native lines/circular arcs with face provenance, plane frame,
 units, area and centroid, bound to captured source, overrides, output content and

@@ -13,7 +13,13 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
     assert_eq!(group.clearance_check_ids.len(), 13);
     assert_eq!(built.assemblies["drive_module_release"].instances.len(), 30);
     assert_eq!(built.assemblies["drive_module_release"].parts.len(), 14);
-    assert_eq!(built.datum_dimensions.len(), 10);
+    assert_eq!(built.datum_dimensions.len(), 20);
+    assert_eq!(
+        built.drawing_sheets["end_cover_machining"]
+            .datum_dimension_ids
+            .len(),
+        10
+    );
     let r = 12. / 2.;
     let pi = std::f64::consts::PI;
     let housing_volume =
@@ -40,8 +46,25 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
                 })
                 .unwrap();
             assert!((diameter.value_mm - 3.5).abs() < 1e-9);
+            assert!(
+                (built.datum_dimensions[&format!("{side}_cover_{tag}_depth")].value_mm - 5.).abs()
+                    < 1e-9
+            );
+            assert!(
+                (built.datum_dimensions[&format!("{side}_cover_{tag}_remaining_floor")].value_mm
+                    - 11.)
+                    .abs()
+                    < 1e-9
+            );
         }
+        assert!(
+            (built.datum_dimensions[&format!("{side}_cover_thickness")].value_mm - 2.).abs() < 1e-9
+        );
     }
+    let screw_volume = pi * (1.65f64.powi(2) * 8.5 + 3f64.powi(2) * 2.);
+    assert!(
+        (built.outputs["cover_screw_envelope"].result.model.volume() - screw_volume).abs() < 1e-6
+    );
     let cover_area = 2048. - pi * (r + 4.5f64).powi(2) - 2. * pi * 2.05f64.powi(2);
     assert!((built.outputs["end_cover"].result.model.volume() - 2. * cover_area).abs() < 1e-6);
     assert_eq!(

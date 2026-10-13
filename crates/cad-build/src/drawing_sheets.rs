@@ -5,6 +5,9 @@ use super::*;
 pub const MAX_DRAWING_SHEETS: usize = 16;
 pub const MAX_DRAWING_VIEWPORTS_PER_SHEET: usize = 32;
 pub const MAX_DRAWING_VIEWPORTS: usize = 256;
+pub const MAX_DRAWING_DIMENSION_TABLES_PER_SHEET: usize = 8;
+pub const MAX_DRAWING_DIMENSION_ROWS_PER_TABLE: usize = 16;
+pub const MAX_DRAWING_DIMENSION_ROWS: usize = 128;
 pub const DRAWING_MARGIN_MM: f64 = 10.;
 pub const DRAWING_TITLE_BLOCK_MM: f64 = 25.;
 
@@ -21,6 +24,26 @@ pub struct DrawingViewport {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct DrawingDimensionRow {
+    pub dimension: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DrawingDimensionTable {
+    pub id: String,
+    pub title: String,
+    pub output: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub rows: Vec<DrawingDimensionRow>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DrawingSheet {
     pub id: String,
     pub title: String,
@@ -28,6 +51,8 @@ pub struct DrawingSheet {
     pub width: f64,
     pub height: f64,
     pub views: Vec<DrawingViewport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dimension_tables: Vec<DrawingDimensionTable>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -37,6 +62,10 @@ pub struct DrawingSheetReport {
     /// Sorted unique references into BuildResult.section_views, retaining its
     /// native queries and witnesses without duplicating geometry per viewport.
     pub section_view_ids: Vec<String>,
+    /// Sorted unique native datum-dimension references. Resolved witnesses live
+    /// in BuildResult.datum_dimensions and the published engineering report.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub datum_dimension_ids: Vec<String>,
 }
 
 fn safe_id(id: &str) -> bool {
@@ -71,6 +100,14 @@ fn safe_id(id: &str) -> bool {
                 | "LPT9"
         )
 }
+fn native_dimension_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+}
+
 impl DrawingSheet {
     pub fn validate(&self) -> Result<(), BuildError> {
         let fail = |message: &str| BuildError::InvalidDrawingSheet {
@@ -99,7 +136,7 @@ impl DrawingSheet {
         }
         let mut view_ids = BTreeSet::new();
         for (i, view) in self.views.iter().enumerate() {
-            if !view_ids.insert(&view.view) {
+            if !view_ids.insert(view.view.to_ascii_lowercase()) {
                 return Err(fail("a section view may appear only once per sheet"));
             }
             if view.view.is_empty() || view.view.len() > 128 || view.view.trim() != view.view {
@@ -133,6 +170,94 @@ impl DrawingSheet {
                 }
             }
         }
+        if self.dimension_tables.len() > MAX_DRAWING_DIMENSION_TABLES_PER_SHEET {
+            return Err(fail("at most 8 native dimension tables per sheet"));
+        }
+        let mut table_ids = view_ids;
+        let mut generated_table_ids = BTreeSet::new();
+        for (i, table) in self.dimension_tables.iter().enumerate() {
+            if !safe_id(&table.id) || !table_ids.insert(table.id.to_ascii_lowercase()) {
+                return Err(fail("dimension table IDs must be unique portable IDs and not collide with viewport IDs"));
+            }
+            if !generated_table_ids
+                .insert(format!("drawing-table-{}", table.id).to_ascii_lowercase())
+            {
+                return Err(fail("generated drawing table IDs collide"));
+            }
+            if !text(&table.title, 128)
+                || table.output.is_empty()
+                || table.output.len() > 256
+                || table.output.trim() != table.output
+                || table.output.chars().any(char::is_control)
+            {
+                return Err(fail(
+                    "dimension table requires bounded title and exact output ID",
+                ));
+            }
+            if table.rows.is_empty() || table.rows.len() > MAX_DRAWING_DIMENSION_ROWS_PER_TABLE {
+                return Err(fail("dimension table requires 1..16 rows"));
+            }
+            let mut row_ids = BTreeSet::new();
+            for row in &table.rows {
+                if !generated_table_ids.insert(
+                    format!("drawing-table-{}-{}", table.id, row.dimension).to_ascii_lowercase(),
+                ) {
+                    return Err(fail("generated drawing table row IDs collide"));
+                }
+                if !native_dimension_id(&row.dimension)
+                    || !text(&row.label, 96)
+                    || !row_ids.insert(row.dimension.to_ascii_lowercase())
+                {
+                    return Err(fail("dimension table rows require unique native dimension IDs and bounded labels"));
+                }
+            }
+            if [table.x, table.y, table.width, table.height]
+                .iter()
+                .any(|v| !v.is_finite())
+                || table.width <= 0.
+                || table.height <= 0.
+                || table.x < DRAWING_MARGIN_MM
+                || table.y < DRAWING_MARGIN_MM
+                || table.width > self.width - DRAWING_MARGIN_MM - table.x
+                || table.height > self.height - DRAWING_MARGIN_MM - DRAWING_TITLE_BLOCK_MM - table.y
+            {
+                return Err(fail("dimension table exceeds printable area"));
+            }
+            // The renderer reserves a 10 mm header/footer and 8 mm per row.
+            // Reserve sufficient geometry so it cannot silently clip rows.
+            if table.width < 80. || table.height < 10. + table.rows.len() as f64 * 8. {
+                return Err(fail("dimension table is too small for its rows"));
+            }
+            // Match the renderer's conservative fixed type geometry. UTF-8
+            // byte count overestimates rendered glyphs, so never admits a
+            // label the renderer would later clip.
+            if table.title.len() as f64 * 3.2 * 0.7 > table.width - 6.
+                || table
+                    .rows
+                    .iter()
+                    .any(|r| r.label.len() as f64 * 2.8 * 0.7 > table.width - 42.)
+            {
+                return Err(fail("dimension table text does not fit its declared width"));
+            }
+            for view in &self.views {
+                if table.x < view.x + view.width
+                    && view.x < table.x + table.width
+                    && table.y < view.y + view.height
+                    && view.y < table.y + table.height
+                {
+                    return Err(fail("dimension table overlaps a viewport"));
+                }
+            }
+            for other in &self.dimension_tables[..i] {
+                if table.x < other.x + other.width
+                    && other.x < table.x + table.width
+                    && table.y < other.y + other.height
+                    && other.y < table.y + table.height
+                {
+                    return Err(fail("dimension table interiors overlap"));
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -148,14 +273,54 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
         });
     }
     let mut count = 0;
+    let mut row_count = 0;
     let mut ids = BTreeSet::new();
     let sections: BTreeSet<_> = recipe
         .section_views
         .iter()
         .map(|view| view.id.as_str())
         .collect();
+    let dimensions: BTreeMap<_, _> = recipe
+        .datum_dimensions
+        .iter()
+        .map(|d| (d.id.as_str(), d.output.as_str()))
+        .collect();
     for sheet in &recipe.drawing_sheets {
         sheet.validate()?;
+        row_count += sheet
+            .dimension_tables
+            .iter()
+            .map(|t| t.rows.len())
+            .sum::<usize>();
+        if row_count > MAX_DRAWING_DIMENSION_ROWS {
+            return Err(BuildError::ResourceLimit {
+                resource: "drawing dimension rows",
+                limit: MAX_DRAWING_DIMENSION_ROWS,
+            });
+        }
+        for table in &sheet.dimension_tables {
+            if !recipe
+                .assembly_outputs
+                .iter()
+                .any(|o| o.name == table.output)
+            {
+                return Err(BuildError::InvalidDrawingSheet {
+                    id: sheet.id.clone(),
+                    message: format!("unknown dimension table output '{}'", table.output),
+                });
+            }
+            for row in &table.rows {
+                if dimensions.get(row.dimension.as_str()) != Some(&table.output.as_str()) {
+                    return Err(BuildError::InvalidDrawingSheet {
+                        id: sheet.id.clone(),
+                        message: format!(
+                            "native dimension '{}' is unknown or belongs to a different output",
+                            row.dimension
+                        ),
+                    });
+                }
+            }
+        }
         if !ids.insert(sheet.id.to_ascii_lowercase()) {
             return Err(BuildError::InvalidDrawingSheet {
                 id: sheet.id.clone(),
@@ -184,6 +349,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
 pub(super) fn evaluate(
     recipe: &Recipe,
     sections: &BTreeMap<String, SectionViewReport>,
+    dimensions: &BTreeMap<String, DatumDimensionReport>,
 ) -> Result<BTreeMap<String, DrawingSheetReport>, BuildError> {
     recipe
         .drawing_sheets
@@ -198,12 +364,26 @@ pub(super) fn evaluate(
                     });
                 }
             }
+            let dimension_ids: BTreeSet<_> = sheet
+                .dimension_tables
+                .iter()
+                .flat_map(|t| t.rows.iter().map(|r| r.dimension.clone()))
+                .collect();
+            for id in &dimension_ids {
+                if !dimensions.contains_key(id) {
+                    return Err(BuildError::InvalidDrawingSheet {
+                        id: sheet.id.clone(),
+                        message: format!("native dimension '{id}' was not evaluated"),
+                    });
+                }
+            }
             Ok((
                 sheet.id.clone(),
                 DrawingSheetReport {
                     declaration: sheet.clone(),
                     status: "layout_validated".into(),
                     section_view_ids: ids.into_iter().collect(),
+                    datum_dimension_ids: dimension_ids.into_iter().collect(),
                 },
             ))
         })

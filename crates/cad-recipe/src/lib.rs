@@ -929,6 +929,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         width: Value,
         height: Value,
         views: Value,
+        dimension_tables: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let sheet = cad_build::DrawingSheet {
@@ -938,6 +939,11 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             width: number(width)?,
             height: number(height)?,
             views: serde_json::from_str(&views.to_json()?)?,
+            dimension_tables: dimension_tables
+                .filter(|v| !v.is_none())
+                .map(|v| -> anyhow::Result<_> { Ok(serde_json::from_str(&v.to_json()?)?) })
+                .transpose()?
+                .unwrap_or_default(),
         };
         sheet.validate()?;
         let graph = store(eval)?;

@@ -463,6 +463,28 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
     }
     viewport.arguments[5].units = Some("paper mm / model mm");
     viewport.obligations.extend(["top-left paper origin; X right, Y down; finite coordinates and strictly positive sizes and explicit scale", "viewport wholly within sheet's 10 mm margins, additionally reserving 25 mm at bottom for title block; touching boundaries allowed, overlapping interiors rejected", "exact section_view ID, unique within sheet; repeated section across different sheets allowed"]);
+    let mut dimension_row = object_spec(
+        "drawing_dimension_row",
+        vec![arg("dimension", T::String), arg("label", T::String)],
+    );
+    dimension_row.obligations.extend(["exact native datum_dimension ID on same table output; no source-authored numeric value", "nonempty trimmed label without controls, at most 96 UTF-8 bytes; each dimension once per table"]);
+    let mut dimension_table = object_spec(
+        "drawing_dimension_table",
+        vec![
+            arg("id", T::String),
+            arg("title", T::String),
+            arg("output", T::String),
+            arg("x", T::Number),
+            arg("y", T::Number),
+            arg("width", T::Number),
+            arg("height", T::Number),
+            arg("rows", array(object("drawing_dimension_row"), None)),
+        ],
+    );
+    for field in &mut dimension_table.arguments[3..7] {
+        field.units = Some("paper mm");
+    }
+    dimension_table.obligations.extend(["at most 8 tables per sheet, 1..16 rows per table and 128 rows per recipe; unique portable table IDs per sheet", "rectangles lie within printable margins and do not overlap section viewports or other tables; minimum 80 mm width and 10+8 mm per row height", "output must be declared assembly output and equal every referenced native datum_dimension output; values and witnesses come only from evaluated native reports"]);
     let mut sheet = object_spec(
         "drawing_sheet",
         vec![
@@ -472,14 +494,23 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             arg("width", T::Number),
             arg("height", T::Number),
             arg("views", array(object("drawing_viewport"), None)),
+            optional(
+                arg(
+                    "dimension_tables",
+                    array(object("drawing_dimension_table"), None),
+                ),
+                json!([]),
+            ),
         ],
     );
     sheet.arguments[3].units = Some("paper mm");
     sheet.arguments[4].units = Some("paper mm");
-    sheet.obligations.extend(["recipe.drawing_sheets requires schema 2 even when empty; null and unknown fields rejected", "case-insensitive unique IDs: 1..128 ASCII letters/digits/underscore/hyphen, excluding reserved Windows device names", "nonempty trimmed title/revision without controls, maximum 256/64 UTF-8 bytes; finite positive paper dimensions at most 2000 mm", "at most 16 sheets, 1..32 viewports each, 256 total; all section references and layout validated before geometry, even for selected outputs", "Starlark drawing_sheet(id,title,revision,width,height,views) references already declared section_view IDs; each viewport dictionary requires view,x,y,width,height,scale", "report status layout_validated certifies layout and references only; geometry/annotation scale fit remains pending publication; report retains declaration and sorted unique section_view_ids, native query/witnesses remain in section_views; no projected hidden-line views or GD&T support implied"]);
+    sheet.obligations.extend(["recipe.drawing_sheets requires schema 2 even when empty; null and unknown fields rejected", "case-insensitive unique IDs: 1..128 ASCII letters/digits/underscore/hyphen, excluding reserved Windows device names", "nonempty trimmed title/revision without controls, maximum 256/64 UTF-8 bytes; finite positive paper dimensions at most 2000 mm", "at most 16 sheets, 1..32 viewports each, 256 total; all section references and layout validated before geometry, even for selected outputs", "Starlark drawing_sheet(id,title,revision,width,height,views,dimension_tables=None) references already declared section_view IDs; each viewport dictionary requires view,x,y,width,height,scale; table rows reference native datum_dimension IDs on the same declared assembly output", "report status layout_validated certifies layout and references only; geometry/annotation scale fit remains pending publication; report retains declaration and sorted unique section_view_ids/datum_dimension_ids; native witnesses remain in section_views and datum_dimensions; no projected hidden-line views or GD&T support implied"]);
     vec![
         sheet,
         viewport,
+        dimension_table,
+        dimension_row,
         dimensional_tolerance,
         stack,
         stack_term,

@@ -2385,6 +2385,38 @@ These sheets compose native section curves and the existing datum and circle
 dimensions. Optional dimensional tolerances are described below. Projected hidden-line views,
 fit classes, GD&T and a complete approved manufacturing release remain open.
 
+Sheets also accept `dimension_tables`, which print evaluated native
+`datum_dimension` measurements. Each table declares `id`, `title`, `output`,
+paper `x`, `y`, `width`, `height`, and `rows` containing a `dimension` ID and
+display `label`. Values are measured from the referenced faces, not authored
+table cells. Every row must belong to the table's assembly output.
+There are at most eight tables per sheet, sixteen rows per table, and 128 rows
+per recipe. Table bounds, text fit, references and overlap are validated;
+invalid declarations preserve the previous published generation.
+
+Table SVG values are rounded to three decimal places in millimetres and marked
+as nominal geometry. Drawing JSON retains each complete native witness and the
+digest of `datum-dimensions.json`, including source context, occurrence paths,
+part identities and numerical bounds. Sheets with tables use drawing report
+schema 2; sheets without tables retain schema 1.
+
+The rotating drive's `end_cover_machining` A3 sheet combines three native
+sections with ten measurements: four pilot depths, four remaining housing
+thicknesses and two cover thicknesses. `pilot_depth` accepts 4–6 mm (default 5)
+and `cover_thickness` accepts 1.5–3 mm (default 2). Screw placement and shank
+length follow these parameters, leaving a nominal 0.5 mm gap at each pilot
+floor while the heads remain seated on the covers. The assembly now has twenty
+native datum dimensions, including its ten existing retention measurements.
+The [independent STEP checks](docs/evidence/machining-tables-local.json) cover
+five configurations, including both parameter extremes: all thirty exported
+components match independently constructed solids, the ten table measurements
+match exported face planes, and all four screw-tip gaps measure 0.5 mm. Ten
+invalid edits preserve the preceding generation.
+The [accepted revision replay](docs/evidence/machining-tables-replay-local.json)
+matches 149 artifact files and 27 manifest fields after restart and an offline
+rebuild. The existing section labels remain small at this layout scale; paper-unit
+annotation sizing is a separate drawing improvement.
+
 
 ### Authored dimensional tolerances
 
