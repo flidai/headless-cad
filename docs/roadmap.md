@@ -990,3 +990,22 @@ positive intersection volume. Five rejected revisions preserve every published
 artifact. The receipt pins the release binary and 72 recipe, lock and oracle
 helper files. This establishes the declared endpoint geometry, not preload,
 thread engagement or load capacity.
+
+The current drawing increment adds native capsule width, centerline length and
+overall length to existing analytic sections. A separate imported drive recipe
+adds a machining sheet for all four base slots without changing the geometry
+recipe. Acceptance requires independent STEP semicylinder measurements, actual
+SVG arrow/extension coordinates at two paper scales, source-bound reports,
+slot-only rebuilding, invalid selection/bounds/layout refusals and exact captured
+bundle replay. This advances M6 while projected drawings and GD&T remain open.
+
+The [slot dimension oracle](evidence/slot-dimensions-local.json) now passes four
+cases: 2/6/8 mm slot center spacing, wider support spacing, and a second paper
+scale. It measures eight actual STEP semicylinder walls per case and checks all
+12 native dimension values, extension/arrow endpoints, center marks, visible
+size bands and paper label bounds. Labels retain a 2.8 mm print height at scales
+1 and 0.75. Slot-length edits change only the slotted base feature; paper scale
+changes preserve exact STEP bytes. Seven key artifacts replay byte-for-byte in
+each case, and seven invalid edits preserve the previous complete generation.
+[Browser checks](evidence/slot-dimensions-browser-local.json) verify all 12 labels,
+line clearance and captured root/module source inspection on the live sheet.

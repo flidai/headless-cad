@@ -112,6 +112,87 @@ pub struct SectionCircleDimensionReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tolerance: Option<DimensionToleranceReport>,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SectionSlotDimensionKind {
+    Width,
+    OverallLength,
+    CenterlineLength,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SectionSlotDimension {
+    pub id: String,
+    pub anchor_feature: String,
+    pub role: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instance_path: Option<Vec<String>>,
+    pub kind: SectionSlotDimensionKind,
+    pub label_offset: [f64; 2],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tolerance: Option<DimensionTolerance>,
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct SectionSlotDimensionReport {
+    pub declaration: SectionSlotDimension,
+    pub status: String,
+    pub value_mm: f64,
+    pub measurement: cad_kernel::SectionSlotMeasurement,
+    /// Error reserved for composing and applying the authored occurrence path.
+    /// The kernel measurement's own bound covers only the placed native model.
+    pub placement_uncertainty_mm: f64,
+    pub total_arithmetic_uncertainty_mm: f64,
+    pub selection: FaceResolution,
+    pub anchor_content_hash: Option<String>,
+    pub target_content_hash: String,
+    pub instance_id: Option<String>,
+    pub instance_path: Option<Vec<String>>,
+    pub part_id: Option<String>,
+    pub occurrence_frame: Option<cad_assembly::RigidTransform>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tolerance: Option<DimensionToleranceReport>,
+}
+impl SectionSlotDimension {
+    pub fn validate(&self) -> Result<(), String> {
+        if !safe_id(&self.id)
+            || self.anchor_feature.is_empty()
+            || self.anchor_feature.trim() != self.anchor_feature
+            || self.role.is_empty()
+            || self.role.trim() != self.role
+        {
+            return Err("invalid slot dimension ID, anchor feature or role".into());
+        }
+        if self.instance_path.as_ref().is_some_and(|path| {
+            !valid_anchor(&SectionAnchor {
+                instance_path: path.clone(),
+                datum: "unused".into(),
+            })
+        }) {
+            return Err("invalid literal slot dimension occurrence path".into());
+        }
+        if self.label_offset.iter().any(|v| !v.is_finite())
+            || self.label_offset == [0., 0.]
+            || [self.min, self.max]
+                .into_iter()
+                .flatten()
+                .any(|v| !v.is_finite() || v < 0.)
+            || matches!((self.min, self.max), (Some(a), Some(b)) if a > b)
+        {
+            return Err(
+                "slot label offset must be finite nonzero; bounds finite nonnegative and ordered"
+                    .into(),
+            );
+        }
+        if let Some(tolerance) = &self.tolerance {
+            tolerance.validate()?;
+        }
+        Ok(())
+    }
+}
 impl SectionCircleDimension {
     pub fn validate(&self) -> Result<(), String> {
         if self.coverage == SectionCircleCoverage::SingleArc
@@ -218,6 +299,8 @@ pub struct SectionView {
     pub dimensions: Vec<SectionDimension>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub circle_dimensions: Vec<SectionCircleDimension>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub slot_dimensions: Vec<SectionSlotDimension>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anchor: Option<SectionAnchor>,
     pub origin: [f64; 3],
@@ -273,7 +356,9 @@ impl SectionView {
                 return Err(fail("anchor needs a literal leaf path of 1..64 IDs and datum; IDs must be nonempty, at most 1024 bytes, without surrounding whitespace"));
             }
         }
-        if self.dimensions.len() + self.circle_dimensions.len() > MAX_SECTION_DIMENSIONS_PER_VIEW {
+        if self.dimensions.len() + self.circle_dimensions.len() + self.slot_dimensions.len()
+            > MAX_SECTION_DIMENSIONS_PER_VIEW
+        {
             return Err(fail("at most 32 dimensions per section view"));
         }
         let mut ids = BTreeSet::new();
@@ -287,6 +372,13 @@ impl SectionView {
         for d in &self.circle_dimensions {
             d.validate()
                 .map_err(|e| fail(&format!("circle dimension '{}': {e}", d.id)))?;
+            if !ids.insert(d.id.to_ascii_lowercase()) {
+                return Err(fail("duplicate dimension ID within view"));
+            }
+        }
+        for d in &self.slot_dimensions {
+            d.validate()
+                .map_err(|e| fail(&format!("slot dimension '{}': {e}", d.id)))?;
             if !ids.insert(d.id.to_ascii_lowercase()) {
                 return Err(fail("duplicate dimension ID within view"));
             }
@@ -339,6 +431,8 @@ pub struct SectionViewReport {
     pub query: SectionQuery,
     pub dimensions: Vec<SectionDimensionReport>,
     pub circle_dimensions: Vec<SectionCircleDimensionReport>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub slot_dimensions: Vec<SectionSlotDimensionReport>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor_witness: Option<SectionAnchorWitness>,
 }
@@ -454,7 +548,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     if recipe
         .section_views
         .iter()
-        .map(|v| v.dimensions.len() + v.circle_dimensions.len())
+        .map(|v| v.dimensions.len() + v.circle_dimensions.len() + v.slot_dimensions.len())
         .sum::<usize>()
         > MAX_SECTION_DIMENSIONS
     {
@@ -486,6 +580,12 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
             .any(|d| d.instance_path.is_some() != assembly)
         {
             return Err(BuildError::InvalidSectionView{id:v.id.clone(),message:"circle dimensions require an exact leaf path for assembly outputs and no path for bodies".into()});
+        }
+        if v.slot_dimensions
+            .iter()
+            .any(|d| d.instance_path.is_some() != assembly)
+        {
+            return Err(BuildError::InvalidSectionView{id:v.id.clone(),message:"slot dimensions require an exact leaf path for assembly outputs and no path for bodies".into()});
         }
         if !ids.insert(v.id.to_ascii_lowercase()) || !outputs.contains(&v.output) {
             return Err(BuildError::InvalidSectionView {
@@ -1067,6 +1167,254 @@ fn circle_dimensions(
     Ok(reports)
 }
 
+fn slot_dimensions(
+    view: &SectionView,
+    query: &SectionQuery,
+    context: (&BuildResult, &HashMap<String, Arc<OperationResult>>),
+    assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
+    tolerance: Tolerance,
+    selection_work: &mut usize,
+    work: &mut usize,
+) -> Result<Vec<SectionSlotDimensionReport>, BuildError> {
+    let (build, models) = context;
+    let mut reports = Vec::with_capacity(view.slot_dimensions.len());
+    for d in &view.slot_dimensions {
+        let fail = |message: String, actual_value| BuildError::SectionDimensionFailed {
+            view: view.id.clone(),
+            id: d.id.clone(),
+            output: view.output.clone(),
+            message,
+            actual_value,
+        };
+        let (target, hash, model, instance_id, instance_path, part_id, occurrence_frame) =
+            if let Some(path) = &d.instance_path {
+                let assembly = &assemblies[&view.output];
+                *work = work.saturating_add(assembly.instances.len());
+                if *work > MAX_SECTION_VIEW_WORK {
+                    return Err(BuildError::ResourceLimit {
+                        resource: "section view geometry work",
+                        limit: MAX_SECTION_VIEW_WORK,
+                    });
+                }
+                let mut matches = assembly
+                    .instances
+                    .iter()
+                    .filter(|i| assembly.instance_paths.get(&i.id) == Some(path));
+                let instance = matches.next().ok_or_else(|| {
+                    fail("slot dimension occurrence path does not exist".into(), None)
+                })?;
+                if matches.next().is_some() {
+                    return Err(fail(
+                        "ambiguous slot dimension occurrence path".into(),
+                        None,
+                    ));
+                }
+                let part = &assembly.parts[&instance.part];
+                if !query
+                    .occurrences
+                    .iter()
+                    .any(|s| s.instance_id == instance.id)
+                {
+                    return Err(fail("missing occurrence section".into(), None));
+                }
+                (
+                    part.feature_id.clone(),
+                    part.content_hash.clone(),
+                    &part.result.model,
+                    Some(instance.id.clone()),
+                    Some(path.clone()),
+                    Some(instance.part.clone()),
+                    Some(instance.transform),
+                )
+            } else {
+                (
+                    query.feature_id.clone(),
+                    query.content_hash.clone(),
+                    &models[&query.feature_id].model,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+            };
+        let selection = build.resolve_faces_with_remaining(
+            &FaceSelector {
+                anchor_feature: d.anchor_feature.clone(),
+                role: d.role.clone(),
+                target_feature: target,
+                cardinality: FaceCardinality::All,
+            },
+            selection_work,
+        );
+        if selection.status != FaceResolutionStatus::Resolved || selection.witnesses.len() != 4 {
+            return Err(fail(
+                format!(
+                    "slot wall selection {:?}: {} (expected exactly four native walls)",
+                    selection.status, selection.diagnostic
+                ),
+                None,
+            ));
+        }
+        let faces: [cad_kernel::FaceId; 4] = selection
+            .witnesses
+            .iter()
+            .map(|w| w.target_face)
+            .collect::<Vec<_>>()
+            .try_into()
+            .map_err(|_| fail("slot requires four native wall faces".into(), None))?;
+        *work = work
+            .saturating_add(model.vertices.len())
+            .saturating_add(model.edges.len())
+            .saturating_add(model.faces.len())
+            .saturating_add(model.loops.iter().map(|l| l.edges.len()).sum::<usize>());
+        if *work > MAX_SECTION_VIEW_WORK {
+            return Err(BuildError::ResourceLimit {
+                resource: "section view geometry work",
+                limit: MAX_SECTION_VIEW_WORK,
+            });
+        }
+        let placement_uncertainty_mm = if let Some(path) = &instance_path {
+            *work = work.saturating_add(path.len());
+            if *work > MAX_SECTION_VIEW_WORK {
+                return Err(BuildError::ResourceLimit {
+                    resource: "section view geometry work",
+                    limit: MAX_SECTION_VIEW_WORK,
+                });
+            }
+            let assembly = &assemblies[&view.output];
+            let path_translation_scale =
+                crate::translation_groups::ancestry_translation_scale(assembly, path)
+                    .map_err(|e| fail(format!("slot occurrence path precision: {e}"), None))?;
+            let bounds = model.bounds();
+            let source_scale = bounds
+                .min
+                .into_iter()
+                .chain(bounds.max)
+                .map(f64::abs)
+                .fold(0., f64::max)
+                .max((0..3).map(|i| bounds.max[i] - bounds.min[i]).sum());
+            let frame_scale = occurrence_frame
+                .unwrap()
+                .translation
+                .into_iter()
+                .map(f64::abs)
+                .fold(0., f64::max);
+            let plane_scale = query
+                .section
+                .plane
+                .origin
+                .into_iter()
+                .map(f64::abs)
+                .fold(0., f64::max);
+            let depth = path.len() as f64;
+            let uncertainty = (((source_scale + frame_scale + plane_scale) * 1024.
+                + (source_scale + path_translation_scale + frame_scale + plane_scale + 1.)
+                    * depth
+                    * 4096.)
+                * f64::EPSILON)
+                .next_up();
+            if !uncertainty.is_finite() || uncertainty > tolerance.linear / 32. {
+                return Err(fail(
+                    "slot occurrence placement exceeds measurement precision budget".into(),
+                    None,
+                ));
+            }
+            uncertainty
+        } else {
+            0.
+        };
+        let placed = occurrence_frame
+            .map(|frame| {
+                cad_kernel::transform(model, frame.translation, frame.rotation, tolerance)
+                    .map(|op| op.model)
+            })
+            .transpose()
+            .map_err(|e| fail(format!("slot occurrence placement: {e}"), None))?;
+        let measured_model = placed.as_ref().unwrap_or(model);
+        let section = measured_model
+            .section(query.section.plane, tolerance)
+            .map_err(|e| fail(format!("slot native section: {e}"), None))?;
+        *work = work.saturating_add(
+            section
+                .loops
+                .iter()
+                .map(|loop_| loop_.segments.len())
+                .sum::<usize>(),
+        );
+        if *work > MAX_SECTION_VIEW_WORK {
+            return Err(BuildError::ResourceLimit {
+                resource: "section view geometry work",
+                limit: MAX_SECTION_VIEW_WORK,
+            });
+        }
+        let measurement =
+            cad_kernel::measure_section_slot(measured_model, &section, faces, tolerance)
+                .map_err(|e| fail(format!("native slot section measurement: {e}"), None))?;
+        let value_mm = match d.kind {
+            SectionSlotDimensionKind::Width => measurement.width_mm,
+            SectionSlotDimensionKind::OverallLength => measurement.overall_length_mm,
+            SectionSlotDimensionKind::CenterlineLength => measurement.centerline_length_mm,
+        };
+        let guard = (measurement.arithmetic_uncertainty_mm + placement_uncertainty_mm).next_up();
+        if !value_mm.is_finite() || !guard.is_finite() || guard < 0. {
+            return Err(fail("slot measurement exceeds numeric range".into(), None));
+        }
+        if d.min.is_some_and(|v| value_mm - guard < v)
+            || d.max.is_some_and(|v| value_mm + guard > v)
+        {
+            return Err(fail(
+                "slot measurement uncertainty exceeds declared bounds".into(),
+                Some(value_mm),
+            ));
+        }
+        let label = [
+            measurement.center[0] + d.label_offset[0],
+            measurement.center[1] + d.label_offset[1],
+        ];
+        let [a, b] = measurement.centerline_endpoints;
+        let run = [b[0] - a[0], b[1] - a[1]];
+        let squared = run[0] * run[0] + run[1] * run[1];
+        if !squared.is_normal() || !label.into_iter().all(f64::is_finite) {
+            return Err(fail(
+                "slot label offset must place a finite label outside the slot".into(),
+                None,
+            ));
+        }
+        let fraction = ((label[0] - a[0]) * run[0] + (label[1] - a[1]) * run[1]) / squared;
+        let fraction = fraction.clamp(0., 1.);
+        let distance =
+            (label[0] - a[0] - fraction * run[0]).hypot(label[1] - a[1] - fraction * run[1]);
+        if !distance.is_finite() || distance <= measurement.radius_mm + tolerance.linear + guard {
+            return Err(fail(
+                "slot label offset must place a finite label outside the slot".into(),
+                None,
+            ));
+        }
+        reports.push(SectionSlotDimensionReport {
+            tolerance: d
+                .tolerance
+                .as_ref()
+                .map(|spec| spec.report(value_mm, tolerance))
+                .transpose()
+                .map_err(|message| fail(message, Some(value_mm)))?,
+            declaration: d.clone(),
+            status: "passed".into(),
+            value_mm,
+            measurement,
+            placement_uncertainty_mm,
+            total_arithmetic_uncertainty_mm: guard,
+            selection,
+            anchor_content_hash: build.feature_hashes.get(&d.anchor_feature).cloned(),
+            target_content_hash: hash,
+            instance_id,
+            instance_path,
+            part_id,
+            occurrence_frame,
+        });
+    }
+    Ok(reports)
+}
+
 pub(super) fn evaluate(
     recipe: &Recipe,
     build: &BuildResult,
@@ -1157,6 +1505,15 @@ pub(super) fn evaluate(
             selection_work,
             &mut work,
         )?;
+        let slot_dimensions = slot_dimensions(
+            v,
+            &query,
+            (build, models),
+            assemblies,
+            tolerance,
+            selection_work,
+            &mut work,
+        )?;
         reports.insert(
             v.id.clone(),
             SectionViewReport {
@@ -1166,6 +1523,7 @@ pub(super) fn evaluate(
                 anchor_witness,
                 dimensions,
                 circle_dimensions,
+                slot_dimensions,
             },
         );
     }

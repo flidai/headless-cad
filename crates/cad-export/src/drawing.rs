@@ -1,5 +1,8 @@
 //! Source-authored paper layout of native sections; no projected HLR or GD&T.
-use crate::{ExportError, SectionCircleDimensionAnnotation, SectionDimensionAnnotation};
+use crate::{
+    ExportError, SectionCircleDimensionAnnotation, SectionDimensionAnnotation,
+    SectionSlotDimensionAnnotation,
+};
 use cad_kernel::PlanarSection;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -57,6 +60,7 @@ pub struct DrawingSheetView {
     pub sections: Vec<PlanarSection>,
     pub dimensions: Vec<SectionDimensionAnnotation>,
     pub circles: Vec<SectionCircleDimensionAnnotation>,
+    pub slots: Vec<SectionSlotDimensionAnnotation>,
 }
 fn invalid(message: &str) -> ExportError {
     ExportError::InvalidModel(message.into())
@@ -162,6 +166,7 @@ pub fn drawing_sheet_to_svg(sheet: &DrawingSheet) -> Result<String, ExportError>
             &view.label,
             &view.dimensions,
             &view.circles,
+            &view.slots,
             style.as_ref(),
         )?;
         let [left, top, width, height] = layout.view_box;

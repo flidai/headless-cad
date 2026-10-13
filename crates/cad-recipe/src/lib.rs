@@ -1219,6 +1219,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         let view = cad_build::SectionView {
             dimensions: vec![],
             circle_dimensions: vec![],
+            slot_dimensions: vec![],
             id: id.into(),
             output: output.into(),
             anchor,
@@ -1301,6 +1302,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             .map(|v| {
                 v["dimensions"].as_array().map_or(0, Vec::len)
                     + v["circle_dimensions"].as_array().map_or(0, Vec::len)
+                    + v["slot_dimensions"].as_array().map_or(0, Vec::len)
             })
             .sum();
         anyhow::ensure!(
@@ -1381,6 +1383,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             .map(|v| {
                 v["dimensions"].as_array().map_or(0, Vec::len)
                     + v["circle_dimensions"].as_array().map_or(0, Vec::len)
+                    + v["slot_dimensions"].as_array().map_or(0, Vec::len)
             })
             .sum();
         anyhow::ensure!(
@@ -1397,6 +1400,78 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             target["circle_dimensions"] = serde_json::json!([]);
         }
         target["circle_dimensions"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::to_value(dimension)?);
+        serde_json::from_value::<cad_build::SectionView>(target.clone())?.validate()?;
+        Ok(NoneType)
+    }
+
+    /// Measure all four native walls of one complete obround slot in a declared section.
+    fn section_slot_dimension(
+        view: &str,
+        id: &str,
+        from_feature: &str,
+        role: &str,
+        label_offset: Value,
+        kind: Option<&str>,
+        instance_path: Option<Value>,
+        min: Option<Value>,
+        max: Option<Value>,
+        tolerance: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let dimension = cad_build::SectionSlotDimension {
+            id: id.into(),
+            anchor_feature: from_feature.into(),
+            role: role.into(),
+            instance_path: instance_path
+                .filter(|v| !v.is_none())
+                .map(|v| occurrence_path(v, "instance_path"))
+                .transpose()?,
+            kind: match kind.unwrap_or("width") {
+                "width" => cad_build::SectionSlotDimensionKind::Width,
+                "overall_length" => cad_build::SectionSlotDimensionKind::OverallLength,
+                "centerline_length" => cad_build::SectionSlotDimensionKind::CenterlineLength,
+                _ => anyhow::bail!(
+                    "slot dimension kind must be width, overall_length or centerline_length"
+                ),
+            },
+            label_offset: serde_json::from_str(&label_offset.to_json()?)?,
+            min: min.filter(|v| !v.is_none()).map(number).transpose()?,
+            max: max.filter(|v| !v.is_none()).map(number).transpose()?,
+            tolerance: tolerance
+                .filter(|v| !v.is_none())
+                .map(|v| -> anyhow::Result<cad_build::DimensionTolerance> {
+                    Ok(serde_json::from_str(&v.to_json()?)?)
+                })
+                .transpose()?,
+        };
+        dimension.validate().map_err(anyhow::Error::msg)?;
+        let graph = store(eval)?;
+        let mut views = graph.section_views.borrow_mut();
+        let total: usize = views
+            .iter()
+            .map(|v| {
+                v["dimensions"].as_array().map_or(0, Vec::len)
+                    + v["circle_dimensions"].as_array().map_or(0, Vec::len)
+                    + v["slot_dimensions"].as_array().map_or(0, Vec::len)
+            })
+            .sum();
+        anyhow::ensure!(
+            total < cad_build::MAX_SECTION_DIMENSIONS,
+            "too many section dimensions"
+        );
+        let target = views
+            .iter_mut()
+            .find(|v| v["id"].as_str() == Some(view))
+            .ok_or_else(|| {
+                anyhow::anyhow!("section_slot_dimension view must already be declared")
+            })?;
+        if target.get("slot_dimensions").is_none() {
+            target["slot_dimensions"] = serde_json::json!([]);
+        }
+        target["slot_dimensions"]
             .as_array_mut()
             .unwrap()
             .push(serde_json::to_value(dimension)?);

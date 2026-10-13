@@ -77,6 +77,9 @@ pub(super) fn scope(
         for d in &view.circle_dimensions {
             validation_roots.insert(d.anchor_feature.clone());
         }
+        for d in &view.slot_dimensions {
+            validation_roots.insert(d.anchor_feature.clone());
+        }
     }
     for datum in &recipe.face_datums {
         validation_roots.insert(datum.anchor_feature.clone());

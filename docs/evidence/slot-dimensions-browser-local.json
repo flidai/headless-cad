@@ -1,0 +1,16 @@
+{
+  "valid": true,
+  "script_sha256": "6f503fc4bef089a2df5afe9096a24c543ccbcc860c8d9e7ff5e88dc6323100f1",
+  "manifest_end_sha256": "29be811f3e463752f7333b1a42b39340acded756ced708757918dda19f0cfb91",
+  "dimensions": 12,
+  "paper_scale": 0.9999999809918545,
+  "paper_font_mm": 2.8,
+  "no_label_overlaps": true,
+  "no_line_label_crossings": true,
+  "captured_source_sha256": "9c87c285c42f5a7a7bb5600db023cfa8999182ee45ae9c5645b0400807e953c0",
+  "provenance_sha256": "5cc6846754d41af2aec1c83a118959406c0f35db2b038423e2f757f16cb5ab12",
+  "manifest_sha256": "29be811f3e463752f7333b1a42b39340acded756ced708757918dda19f0cfb91",
+  "recipe_context_hash": "c705730ee571d327e791b317188f304b510934fb82dea0911f497d517db67766",
+  "read_only": true,
+  "screenshot": "/tmp/cad-slot-dimensions-final.png"
+}

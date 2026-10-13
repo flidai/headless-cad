@@ -256,6 +256,58 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
     ));
     circle_dimension.obligations.extend(["Starlark section_circle_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind diameter", "nonempty semantic face lineage selection in the owning body or exact assembly leaf occurrence; path absent for body and required for assembly", "default full_circle coverage requires selected descendants cover exactly one complete native circular section loop; consistent center/radius/orientation, continuous full turn; no partial coverage, multiple loops, duplicate winding, nearest-face guesses or mesh fitting", "label_offset is relative to circle center in drawing mm and must place label strictly outside circle; bounds inclusive native radius/diameter in mm", "shares IDs and 32-perview/1024-global limits with projected dimensions, and shared face-assertion traversal budget; all source views validate globally on cache hits and selected builds"]);
     circle_dimension.obligations.extend(["explicit coverage single_arc requires kind radius, exactly one selected native face descendant and exactly one native Arc segment across all loops of the exact body or occurrence", "single_arc refuses zero, full-turn, duplicate, noncircular or unresolved angular extents; report arc retains face, loop/segment indices, angular span and midpoint tip; arithmetic_uncertainty_mm bounds support evaluation only, not physical geometry or manufacturing tolerance", "radius remains the native nominal analytic support value; world/native origins and occurrence placement enter arithmetic admission; existing native dimension bounds, tolerance and stack scalar semantics remain unchanged"]);
+    let mut slot_dimension = object_spec(
+        "section_slot_dimension",
+        vec![
+            arg("id", T::String),
+            arg("anchor_feature", reference("solid_feature")),
+            arg("role", T::String),
+            optional(
+                arg(
+                    "instance_path",
+                    T::Nullable {
+                        value: Box::new(array(reference("occurrence_path_component"), None)),
+                    },
+                ),
+                json!(null),
+            ),
+            arg(
+                "kind",
+                T::Enum {
+                    values: vec!["width", "overall_length", "centerline_length"],
+                },
+            ),
+            arg("label_offset", numbers(2)),
+            optional(
+                arg(
+                    "min",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+            optional(
+                arg(
+                    "max",
+                    T::Nullable {
+                        value: Box::new(T::Number),
+                    },
+                ),
+                json!(null),
+            ),
+            optional(
+                arg(
+                    "tolerance",
+                    T::Nullable {
+                        value: Box::new(object("dimension_tolerance")),
+                    },
+                ),
+                json!(null),
+            ),
+        ],
+    );
+    slot_dimension.obligations.extend(["Starlark section_slot_dimension attaches to an already declared view; from_feature maps to anchor_feature; default kind width", "one strictly rebuilt native ArcPrism obround slot selected by the exact four-wall semantic face role; complete native line/arc section loop only, no mesh or nearest-face inference", "width, overall_length or centerline_length are measured from the native slot; reported center, axis, endpoints, four section segment witnesses and arithmetic uncertainty bind the result", "exact occurrence path required for assembly target and absent for body; 32 dimensions per view and 1024 across recipe shared with projected/circle dimensions, plus shared face-selection and geometry-work budgets", "every authored ancestor translation and path depth enter a separate placement uncertainty; attached occurrence frames and unresolved precision refuse; report carries kernel, placement and total arithmetic guards", "label offset must place a finite label outside the slot; total-guarded min/max and authored tolerance are global obligations on selected builds and cache hits"]);
     let mut clearance = object_spec(
         "clearance_check",
         vec![
@@ -441,6 +493,13 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
                 json!([]),
             ),
             optional(
+                arg(
+                    "slot_dimensions",
+                    array(object("section_slot_dimension"), None),
+                ),
+                json!([]),
+            ),
+            optional(
                 arg("dimensions", array(object("section_dimension"), None)),
                 json!([]),
             ),
@@ -480,7 +539,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         "drawing_annotation_label",
         vec![arg("dimension", T::String), arg("tag", T::String)],
     );
-    paper_annotation_label.obligations.extend(["exact section dimension or circle dimension ID on the referenced view", "tag is 1..12 ASCII letters/digits/underscore/hyphen, starts with a letter; unique case-insensitively per styled viewport", "tag is a short identifier only; renderer appends native measured value and kind"]);
+    paper_annotation_label.obligations.extend(["exact section, circle or slot dimension ID on the referenced view", "tag is 1..12 ASCII letters/digits/underscore/hyphen, starts with a letter; unique case-insensitively per styled viewport", "tag is a short identifier only; renderer appends native measured value and kind"]);
     let mut viewport = object_spec(
         "drawing_viewport",
         vec![
@@ -581,6 +640,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         anchor,
         dimension,
         circle_dimension,
+        slot_dimension,
     ]
 }
 

@@ -8,6 +8,145 @@ fn plane() -> SectionPlane {
         x_direction: [1., 0., 0.],
     }
 }
+
+#[test]
+fn slot_dimensions_render_native_extents_and_reject_inconsistent_capsules() {
+    use cad_export::{SectionSlotDimensionAnnotation as Slot, SectionSlotDimensionKind as Kind};
+    let section = extrude_rectangle(40., 20., 10., Tolerance::default())
+        .unwrap()
+        .model
+        .section(plane(), Tolerance::default())
+        .unwrap();
+    let slot = Slot {
+        tolerance: None,
+        id: "slot-a".into(),
+        kind: Kind::OverallLength,
+        center: [20., 10.],
+        centerline_endpoints: [[17., 10.], [23., 10.]],
+        axis: [1., 0.],
+        radius_mm: 3.,
+        arithmetic_uncertainty_mm: 0.,
+        label_offset: [0., 12.],
+        value_mm: 12.,
+    };
+    let svg = cad_export::slot_dimensioned_sections_to_svg(
+        std::slice::from_ref(&section),
+        "native",
+        &[],
+        &[],
+        std::slice::from_ref(&slot),
+    )
+    .unwrap();
+    assert!(svg.contains("class=\"slot-dimension\" data-dimension-id=\"slot-a\" data-kind=\"overall_length\" data-value-mm=\"12\""));
+    assert!(
+        svg.contains("data-native-from-x=\"14\" data-native-from-y=\"10\" data-native-to-x=\"26\"")
+    );
+    assert!(svg.contains("x1=\"14\" y1=\"-10\" x2=\"14\" y2=\"-22\""));
+    assert_eq!(svg.matches("class=\"slot-center-mark\"").count(), 3);
+    let mut width = slot.clone();
+    width.id = "slot-width".into();
+    width.kind = Kind::Width;
+    width.label_offset = [8., 0.];
+    width.value_mm = 6.;
+    let width_svg = cad_export::slot_dimensioned_sections_to_svg(
+        std::slice::from_ref(&section),
+        "width",
+        &[],
+        &[],
+        std::slice::from_ref(&width),
+    )
+    .unwrap();
+    let group = width_svg.split("class=\"slot-dimension\"").nth(1).unwrap();
+    let lines: Vec<_> = group
+        .lines()
+        .filter(|line| line.contains("<line "))
+        .collect();
+    assert_eq!(lines.len(), 3);
+    let dimension_line = lines[2];
+    let top = attribute(dimension_line, "y1")
+        .parse::<f64>()
+        .unwrap()
+        .min(attribute(dimension_line, "y2").parse::<f64>().unwrap());
+    let text = group.lines().find(|line| line.contains("<text ")).unwrap();
+    let baseline = attribute(text, "y").parse::<f64>().unwrap();
+    let font = attribute(text, "font-size").parse::<f64>().unwrap();
+    // SVG Y runs downward; the conservative label box extends 1.2 font
+    // below its baseline in native coordinates, or upward in SVG coordinates.
+    assert!(
+        baseline + font * 0.4 < top,
+        "width label must clear its dimension line"
+    );
+    let label_clears_lines = |svg: &str| {
+        let group = svg.split("class=\"slot-dimension\"").nth(1).unwrap();
+        let text = group.lines().find(|line| line.contains("<text ")).unwrap();
+        let x = attribute(text, "x").parse::<f64>().unwrap();
+        let y = attribute(text, "y").parse::<f64>().unwrap();
+        let font = attribute(text, "font-size").parse::<f64>().unwrap();
+        let width = attribute(text, "textLength").parse::<f64>().unwrap();
+        let bounds = [
+            x - width * 0.5,
+            y - font * 1.2,
+            x + width * 0.5,
+            y + font * 0.4,
+        ];
+        let lines: Vec<_> = group
+            .lines()
+            .filter(|line| line.contains("<line "))
+            .collect();
+        assert_eq!(lines.len(), 3);
+        for line in lines {
+            let x1 = attribute(line, "x1").parse::<f64>().unwrap();
+            let y1 = attribute(line, "y1").parse::<f64>().unwrap();
+            let x2 = attribute(line, "x2").parse::<f64>().unwrap();
+            let y2 = attribute(line, "y2").parse::<f64>().unwrap();
+            assert!(
+                x1.max(x2) < bounds[0]
+                    || x1.min(x2) > bounds[2]
+                    || y1.max(y2) < bounds[1]
+                    || y1.min(y2) > bounds[3],
+                "slot label box intersects an extension or dimension line: {line}"
+            );
+        }
+    };
+    label_clears_lines(&svg);
+    label_clears_lines(&width_svg);
+    let mut lower = slot.clone();
+    lower.label_offset = [0., -12.];
+    let lower_svg = cad_export::slot_dimensioned_sections_to_svg(
+        std::slice::from_ref(&section),
+        "lower",
+        &[],
+        &[],
+        std::slice::from_ref(&lower),
+    )
+    .unwrap();
+    label_clears_lines(&lower_svg);
+    let mut bad = slot.clone();
+    bad.value_mm = 11.;
+    assert!(cad_export::slot_dimensioned_sections_to_svg(
+        std::slice::from_ref(&section),
+        "bad",
+        &[],
+        &[],
+        &[bad]
+    )
+    .is_err());
+    let mut bad = slot.clone();
+    bad.axis = [0., 1.];
+    assert!(cad_export::slot_dimensioned_sections_to_svg(
+        std::slice::from_ref(&section),
+        "bad",
+        &[],
+        &[],
+        &[bad]
+    )
+    .is_err());
+    let mut bad = slot;
+    bad.centerline_endpoints[1] = [17., 10.];
+    assert!(
+        cad_export::slot_dimensioned_sections_to_svg(&[section], "bad", &[], &[], &[bad]).is_err()
+    );
+}
 #[test]
 fn native_section_svg_preserves_holes_scale_frame_and_escaped_labels() {
     let t = Tolerance::default();

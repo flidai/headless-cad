@@ -78,6 +78,7 @@ pub(super) fn publish(
                 sections: geometry.sections,
                 dimensions: geometry.dimensions,
                 circles: geometry.circles,
+                slots: geometry.slots,
             });
             evidence.push(json!({"view":viewport.view,"section_report":name,
                 "algorithm":"blake3","digest":digest,

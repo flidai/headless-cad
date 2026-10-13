@@ -3811,3 +3811,26 @@ certificate, not a contact solver or a claim about threads, preload, friction,
 torque capacity or rated loads. Unsupported trims and incoherent native supports
 are refused. Machine-readable seating failures identify the source check and
 output so a revision client can preserve its accepted head and repair the recipe.
+
+### Native through-slot dimensions in analytic sections
+
+Slot dimensions reuse `section_view` and the existing drawing pipeline. A
+`section_slot_dimension` selects a four-wall lineage role and measures width,
+centerline length or overall length from the complete capsule in the actual
+analytic section. The kernel admits a strictly reconstructed through-slot,
+checks its native supports and section segments, and returns section-frame
+centers, endpoints, axis, sizes, face/segment witnesses and a kernel arithmetic
+bound. Assembly reports separately retain placement and total arithmetic uncertainty.
+Missing, mixed, partial or inconsistent wall selections are refused.
+
+Slot declarations share dimension identity and work budgets with the other
+section dimensions, participate in selected-build obligations and tolerance
+stacks, and bind the source, target content and occurrence into their reports.
+Authored min/max bounds must contain the entire arithmetic measurement interval.
+Manufacturing size bands retain their existing authored nominal semantics.
+Section SVG and paper sheets start extension lines at the measured native
+endpoints, with arrowheads on the offset dimension line. Native values remain
+alongside optional short paper labels. Paper publication rejects slot lines
+crossing any annotation label as well as overlapping labels.
+These are section dimensions; they do not introduce general hidden-line
+projection, GD&T or manufactured-part conformance.

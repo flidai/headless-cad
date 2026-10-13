@@ -40,6 +40,7 @@ fn sheet() -> DrawingSheet {
                 sections: vec![rectangle],
                 dimensions: vec![],
                 circles: vec![],
+                slots: vec![],
             },
             DrawingSheetView {
                 id: "ring".into(),
@@ -55,6 +56,7 @@ fn sheet() -> DrawingSheet {
                 sections: vec![circle],
                 dimensions: vec![],
                 circles: vec![],
+                slots: vec![],
             },
         ],
         dimension_tables: vec![],
@@ -138,6 +140,78 @@ fn native_dimension_tables_render_rounded_values_and_reject_bad_layout() {
     assert!(
         drawing_sheet_to_svg(&bad).is_err(),
         "table row must not alias a generated section fragment"
+    );
+}
+
+#[test]
+fn styled_slot_tags_keep_native_id_and_refuse_overlapping_labels() {
+    use cad_export::{SectionSlotDimensionAnnotation as Slot, SectionSlotDimensionKind as Kind};
+    let mut drawing = sheet();
+    let slot = Slot {
+        tolerance: None,
+        id: "source_slot".into(),
+        kind: Kind::Width,
+        center: [10., 5.],
+        centerline_endpoints: [[7., 5.], [13., 5.]],
+        axis: [1., 0.],
+        radius_mm: 3.,
+        arithmetic_uncertainty_mm: 0.,
+        label_offset: [8., 0.],
+        value_mm: 6.,
+    };
+    drawing.views[0].slots = vec![slot.clone()];
+    drawing.views[0].paper_annotation_font_mm = Some(2.8);
+    drawing.views[0]
+        .annotation_labels
+        .insert("source_slot".into(), "W1".into());
+    let svg = drawing_sheet_to_svg(&drawing).unwrap();
+    assert!(svg.contains("data-dimension-id=\"source_slot\" data-kind=\"width\""));
+    assert!(svg.contains("W1:W6mm"));
+    let mut second = slot;
+    second.id = "same_place".into();
+    drawing.views[0].slots.push(second);
+    drawing.views[0]
+        .annotation_labels
+        .insert("same_place".into(), "W2".into());
+    assert!(drawing_sheet_to_svg(&drawing).is_err());
+}
+
+#[test]
+fn paper_slot_extensions_refuse_crossing_another_annotation_label() {
+    use cad_export::{SectionSlotDimensionAnnotation as Slot, SectionSlotDimensionKind as Kind};
+    let mut drawing = sheet();
+    drawing.views[0].paper_annotation_font_mm = Some(2.8);
+    let first = Slot {
+        tolerance: None,
+        id: "first".into(),
+        kind: Kind::OverallLength,
+        center: [10., 5.],
+        centerline_endpoints: [[7., 5.], [13., 5.]],
+        axis: [1., 0.],
+        radius_mm: 3.,
+        arithmetic_uncertainty_mm: 0.,
+        label_offset: [0., 12.],
+        value_mm: 12.,
+    };
+    drawing.views[0].slots.push(first.clone());
+    drawing.views[0]
+        .annotation_labels
+        .insert("first".into(), "A12345678901".into());
+    assert!(
+        drawing_sheet_to_svg(&drawing).is_ok(),
+        "first label clears its own lines"
+    );
+    let mut second = first;
+    second.id = "second".into();
+    second.label_offset = [0., 24.];
+    drawing.views[0].slots.push(second);
+    drawing.views[0]
+        .annotation_labels
+        .insert("second".into(), "B12345678901".into());
+    let error = drawing_sheet_to_svg(&drawing).unwrap_err().to_string();
+    assert!(
+        error.contains("slot line crosses an annotation label"),
+        "{error}"
     );
 }
 

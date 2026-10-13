@@ -433,6 +433,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
                     .iter()
                     .map(|d| d.id.as_str())
                     .chain(section.circle_dimensions.iter().map(|d| d.id.as_str()))
+                    .chain(section.slot_dimensions.iter().map(|d| d.id.as_str()))
                     .collect();
                 let actual: BTreeSet<_> = viewport
                     .annotation_labels

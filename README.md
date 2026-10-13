@@ -3200,7 +3200,7 @@ matches 147 artifact files and 27 manifest fields after an agent restart.
 The subsequent [native polygon-bore validation](docs/evidence/drive-polygon-bore-clearance-local.json)
 checks all thirteen named drive proofs across four configurations. Separate
 [plain and stepped shaft cases](docs/evidence/polygon-bore-clearance-local.json)
-include a common oblique placement and six publication-preserving refusals.
+include a common oblique placement and seven publication-preserving refusals.
 The [new accepted replay](docs/evidence/native-cover-clearance-replay-local.json)
 also confirms that the added proofs leave all 51 native B-rep/STEP/STL assets
 byte-identical to the prior drive, matched by output or part identity.
@@ -3289,3 +3289,26 @@ endpoint previews, native report links and exact captured source navigation.
 The [independent STEP oracle](docs/evidence/tightened-mounting-local.json) checks
 four endpoint configurations, eight seating disks and four slot gaps per
 configuration, all 435 part pairs, and five publication-preserving refusals.
+
+### Dimension the slotted base
+
+`examples/drive_module_slot_drawing.star` imports the drive and adds a native
+section drawing of its base. Each slot has measured width, overall length and
+centerline length, with source-selected wall witnesses. Width and overall length
+carry authored size limits; these do not certify manufactured parts.
+
+```sh
+cad build examples/drive_module_slot_drawing.star --out-dir out/drive_module_slot_drawing
+cad build examples/drive_module_slot_drawing.star --param base_slot_length=8 \
+  --out-dir out/drive_module_long_slots
+```
+
+Open `drawing-base_slot_machining.svg` for the paper sheet or
+`section-base_slot_plan.json` for native measurements, centers, face witnesses and
+arithmetic bounds. `slot_drawing_scale` controls the sheet scale; publication
+refuses overlapping labels, slot lines crossing annotation labels, or geometry
+that does not fit its allocated viewport.
+
+The [independent slot-dimension checks](docs/evidence/slot-dimensions-local.json)
+cover four geometry/paper configurations, actual STEP slot surfaces and SVG
+annotation coordinates, exact replay, and seven publication-preserving refusals.

@@ -28,9 +28,10 @@ pub use fidelity::{
 };
 pub use section::{
     annotated_section_to_svg, annotated_sections_to_svg, dimensioned_section_to_svg,
-    dimensioned_sections_to_svg, section_to_svg, sections_to_svg, DimensionToleranceAnnotation,
-    SectionArcWitnessAnnotation, SectionCircleDimensionAnnotation, SectionCircleDimensionKind,
-    SectionDimensionAnnotation,
+    dimensioned_sections_to_svg, section_to_svg, sections_to_svg, slot_dimensioned_sections_to_svg,
+    DimensionToleranceAnnotation, SectionArcWitnessAnnotation, SectionCircleDimensionAnnotation,
+    SectionCircleDimensionKind, SectionDimensionAnnotation, SectionSlotDimensionAnnotation,
+    SectionSlotDimensionKind,
 };
 use thiserror::Error;
 

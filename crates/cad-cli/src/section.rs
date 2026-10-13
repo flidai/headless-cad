@@ -112,6 +112,17 @@ pub(super) fn bind_view_report(
                 .to_hex()
                 .to_string());
     }
+    if !view.slot_dimensions.is_empty() {
+        report["section_view"]["slot_dimensions"] = serde_json::to_value(&view.slot_dimensions)?;
+        let context = json!({
+            "base_query_context_hash": report["snapshot"]["query_context_hash"],
+            "native_slot_dimensions": view.slot_dimensions,
+        });
+        report["snapshot"]["query_context_hash"] =
+            json!(blake3::hash(&serde_json::to_vec(&context)?)
+                .to_hex()
+                .to_string());
+    }
     Ok(report)
 }
 
@@ -149,6 +160,15 @@ pub(super) fn bind_report(
                 "radius":d.radius,"center":d.center,"target_content_hash":d.target_content_hash
             })).collect::<Vec<_>>());
         }
+        if !view.slot_dimensions.is_empty() {
+            check["slot_dimensions"] = json!(view.slot_dimensions.iter().map(|d| json!({
+                "id":d.declaration.id,"status":d.status,"value_mm":d.value_mm,
+                "center":d.measurement.center,"centerline_endpoints":d.measurement.centerline_endpoints,
+                "radius_mm":d.measurement.radius_mm,"target_content_hash":d.target_content_hash,
+                "placement_uncertainty_mm":d.placement_uncertainty_mm,
+                "total_arithmetic_uncertainty_mm":d.total_arithmetic_uncertainty_mm
+            })).collect::<Vec<_>>());
+        }
         (id, check)
     }).collect();
     let source_hash = blake3::hash(source).to_hex().to_string();
@@ -171,6 +191,7 @@ pub(super) struct DrawingGeometry {
     pub sections: Vec<PlanarSection>,
     pub dimensions: Vec<cad_export::SectionDimensionAnnotation>,
     pub circles: Vec<cad_export::SectionCircleDimensionAnnotation>,
+    pub slots: Vec<cad_export::SectionSlotDimensionAnnotation>,
 }
 
 fn dimension_tolerance(
@@ -345,21 +366,124 @@ pub(super) fn drawing_geometry(report: &Value) -> Result<DrawingGeometry, Box<dy
             })
         })
         .collect::<Result<_, Box<dyn Error>>>()?;
+    let slots: Vec<cad_export::SectionSlotDimensionAnnotation> = report["section_view"]
+        ["slot_dimensions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|d| {
+            let measurement: cad_kernel::SectionSlotMeasurement =
+                serde_json::from_value(d["measurement"].clone())?;
+            let section = if report["kind"] == "assembly" {
+                let instance_id = d["instance_id"]
+                    .as_str()
+                    .ok_or("slot dimension missing source occurrence")?;
+                let occurrences = report["occurrences"]
+                    .as_array()
+                    .ok_or("missing section occurrences")?;
+                let index = occurrences
+                    .iter()
+                    .position(|o| o["instance_id"] == instance_id)
+                    .ok_or("slot dimension source occurrence is absent")?;
+                if occurrences[index]["instance_path"] != d["instance_path"]
+                    || occurrences[index]["part_id"] != d["part_id"]
+                    || occurrences[index]["content_hash"] != d["target_content_hash"]
+                {
+                    return Err("slot dimension occurrence identity mismatch".into());
+                }
+                &sections[index]
+            } else {
+                if !d["instance_id"].is_null()
+                    || !d["instance_path"].is_null()
+                    || d["target_content_hash"] != report["snapshot"]["content_hash"]
+                {
+                    return Err("body slot dimension target identity mismatch".into());
+                }
+                &sections[0]
+            };
+            let boundary = section
+                .loops
+                .get(measurement.loop_index)
+                .ok_or("slot measurement loop is absent")?;
+            let mut selected = std::collections::BTreeSet::new();
+            let mut line_count = 0;
+            let mut arc_count = 0;
+            for witness in &measurement.segments {
+                let segment = boundary
+                    .segments
+                    .get(witness.segment_index)
+                    .ok_or("slot measurement segment is absent")?;
+                if witness.loop_index != measurement.loop_index
+                    || segment.face != witness.face
+                    || !selected.insert(witness.segment_index)
+                {
+                    return Err("slot measurement native face witness mismatch".into());
+                }
+                match segment.curve {
+                    cad_kernel::SectionCurve::Line { .. } => line_count += 1,
+                    cad_kernel::SectionCurve::Arc { .. } => arc_count += 1,
+                }
+            }
+            if line_count != 2 || arc_count != 2 {
+                return Err("slot measurement does not select two native lines and arcs".into());
+            }
+            let kind = match d["declaration"]["kind"].as_str() {
+                Some("width") => cad_export::SectionSlotDimensionKind::Width,
+                Some("centerline_length") => cad_export::SectionSlotDimensionKind::CenterlineLength,
+                Some("overall_length") => cad_export::SectionSlotDimensionKind::OverallLength,
+                _ => return Err("invalid slot dimension kind".into()),
+            };
+            let expected = match kind {
+                cad_export::SectionSlotDimensionKind::Width => measurement.width_mm,
+                cad_export::SectionSlotDimensionKind::CenterlineLength => {
+                    measurement.centerline_length_mm
+                }
+                cad_export::SectionSlotDimensionKind::OverallLength => {
+                    measurement.overall_length_mm
+                }
+            };
+            let value_mm = d["value_mm"]
+                .as_f64()
+                .ok_or("missing slot dimension value")?;
+            if value_mm != expected {
+                return Err("slot dimension value differs from native measurement".into());
+            }
+            Ok(cad_export::SectionSlotDimensionAnnotation {
+                id: d["declaration"]["id"]
+                    .as_str()
+                    .ok_or("missing slot dimension id")?
+                    .into(),
+                center: measurement.center,
+                centerline_endpoints: measurement.centerline_endpoints,
+                axis: measurement.axis,
+                radius_mm: measurement.radius_mm,
+                arithmetic_uncertainty_mm: d["total_arithmetic_uncertainty_mm"]
+                    .as_f64()
+                    .ok_or("missing total slot arithmetic uncertainty")?,
+                label_offset: serde_json::from_value(d["declaration"]["label_offset"].clone())?,
+                kind,
+                value_mm,
+                tolerance: dimension_tolerance(d)?,
+            })
+        })
+        .collect::<Result<_, Box<dyn Error>>>()?;
     Ok(DrawingGeometry {
         label,
         sections,
         dimensions,
         circles,
+        slots,
     })
 }
 
 pub(super) fn svg(report: &Value) -> Result<String, Box<dyn Error>> {
     let geometry = drawing_geometry(report)?;
-    let mut svg = cad_export::dimensioned_sections_to_svg(
+    let mut svg = cad_export::slot_dimensioned_sections_to_svg(
         &geometry.sections,
         &geometry.label,
         &geometry.dimensions,
         &geometry.circles,
+        &geometry.slots,
     )?;
     let metadata = serde_json::to_string(report)?
         .replace('&', "&amp;")

@@ -147,6 +147,30 @@ pub struct SectionArcWitnessAnnotation {
     pub arithmetic_uncertainty_mm: f64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SectionSlotDimensionKind {
+    Width,
+    CenterlineLength,
+    OverallLength,
+}
+
+/// A native capsule section measurement. All coordinates are in the section
+/// plane; the source report retains the selected native curve witnesses.
+#[derive(Debug, Clone)]
+pub struct SectionSlotDimensionAnnotation {
+    pub tolerance: Option<DimensionToleranceAnnotation>,
+    pub id: String,
+    pub kind: SectionSlotDimensionKind,
+    pub center: [f64; 2],
+    pub centerline_endpoints: [[f64; 2]; 2],
+    pub axis: [f64; 2],
+    pub radius_mm: f64,
+    /// Native projection plus placement arithmetic guard, not design tolerance.
+    pub arithmetic_uncertainty_mm: f64,
+    pub label_offset: [f64; 2],
+    pub value_mm: f64,
+}
+
 fn validate_arc_annotations(
     sections: &[PlanarSection],
     circles: &[SectionCircleDimensionAnnotation],
@@ -260,13 +284,14 @@ fn section_layout(
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
 ) -> Result<SectionLayout, ExportError> {
-    section_layout_with_style(section, label, dimensions, circles, None)
+    section_layout_with_style(section, label, dimensions, circles, &[], None)
 }
 fn section_layout_with_style(
     section: &PlanarSection,
     label: &str,
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
+    slots: &[SectionSlotDimensionAnnotation],
     style: Option<&PaperAnnotationStyle<'_>>,
 ) -> Result<SectionLayout, ExportError> {
     let mut ids = std::collections::BTreeSet::new();
@@ -274,6 +299,7 @@ fn section_layout_with_style(
         .iter()
         .map(|d| &d.id)
         .chain(circles.iter().map(|d| &d.id))
+        .chain(slots.iter().map(|d| &d.id))
         .any(|id| !ids.insert(id))
     {
         return Err(ExportError::InvalidModel(
@@ -384,6 +410,7 @@ fn section_layout_with_style(
             .iter()
             .map(|d| d.id.as_str())
             .chain(circles.iter().map(|d| d.id.as_str()))
+            .chain(slots.iter().map(|d| d.id.as_str()))
             .collect();
         let authored: std::collections::BTreeSet<_> =
             style.tags.keys().map(String::as_str).collect();
@@ -406,6 +433,7 @@ fn section_layout_with_style(
         }
     }
     let mut label_boxes = Vec::new();
+    let mut slot_segments = Vec::new();
     let mut annotations = dimension_svg(
         dimensions,
         font,
@@ -420,6 +448,14 @@ fn section_layout_with_style(
         style.map(|s| s.tags),
         &mut label_boxes,
     )?);
+    annotations.push_str(&slot_dimension_svg(
+        slots,
+        font,
+        &mut bounds,
+        style.map(|s| s.tags),
+        &mut label_boxes,
+        &mut slot_segments,
+    )?);
     if style.is_some() {
         for (i, a) in label_boxes.iter().enumerate() {
             if label_boxes[..i]
@@ -429,6 +465,21 @@ fn section_layout_with_style(
                 return Err(ExportError::InvalidModel(
                     "paper drawing annotation labels overlap".into(),
                 ));
+            }
+        }
+        for (from, to, half_stroke) in &slot_segments {
+            for label in &label_boxes {
+                let expanded = [
+                    label[0] - half_stroke,
+                    label[1] - half_stroke,
+                    label[2] + half_stroke,
+                    label[3] + half_stroke,
+                ];
+                if segment_intersects_box(*from, *to, expanded) {
+                    return Err(ExportError::InvalidModel(
+                        "paper drawing slot line crosses an annotation label".into(),
+                    ));
+                }
             }
         }
     }
@@ -472,7 +523,20 @@ fn section_layout_with_style(
         }
     }
     out.push_str("</svg>\n");
-    if dimensions.iter().any(|d| d.tolerance.is_some())
+    if !slots.is_empty() {
+        let detail = if dimensions.iter().any(|d| d.tolerance.is_some())
+            || circles.iter().any(|d| d.tolerance.is_some())
+            || slots.iter().any(|d| d.tolerance.is_some())
+        {
+            "Native nominal geometry with source-authored manufacturing size deviations in mm; independent of modeling tolerance. No GD&amp;T or manufactured-part conformance."
+        } else {
+            "Native nominal geometry; inspection only. No GD&amp;T or manufactured-part conformance."
+        };
+        out = out.replace(
+            "Inspection only; no manufacturing tolerances or GD&amp;T.",
+            detail,
+        );
+    } else if dimensions.iter().any(|d| d.tolerance.is_some())
         || circles.iter().any(|d| d.tolerance.is_some())
     {
         out = out.replace("Inspection only; no manufacturing tolerances or GD&amp;T.", "Source-authored manufacturing size deviations in mm; independent of modeling tolerance. No fit classes or GD&amp;T.");
@@ -505,21 +569,33 @@ pub fn dimensioned_sections_to_svg(
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
 ) -> Result<String, ExportError> {
-    Ok(sections_layout(sections, label, dimensions, circles)?.svg)
+    slot_dimensioned_sections_to_svg(sections, label, dimensions, circles, &[])
 }
-pub(crate) fn sections_layout(
+
+pub fn slot_dimensioned_sections_to_svg(
     sections: &[PlanarSection],
     label: &str,
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
+    slots: &[SectionSlotDimensionAnnotation],
+) -> Result<String, ExportError> {
+    Ok(sections_layout_with_slots(sections, label, dimensions, circles, slots)?.svg)
+}
+pub(crate) fn sections_layout_with_slots(
+    sections: &[PlanarSection],
+    label: &str,
+    dimensions: &[SectionDimensionAnnotation],
+    circles: &[SectionCircleDimensionAnnotation],
+    slots: &[SectionSlotDimensionAnnotation],
 ) -> Result<SectionLayout, ExportError> {
-    sections_layout_with_style(sections, label, dimensions, circles, None)
+    sections_layout_with_style(sections, label, dimensions, circles, slots, None)
 }
 pub(crate) fn sections_layout_with_style(
     sections: &[PlanarSection],
     label: &str,
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
+    slots: &[SectionSlotDimensionAnnotation],
     style: Option<&PaperAnnotationStyle<'_>>,
 ) -> Result<SectionLayout, ExportError> {
     let first = sections.first().ok_or_else(invalid)?;
@@ -549,7 +625,7 @@ pub(crate) fn sections_layout_with_style(
             }))
         },
     };
-    let layout = section_layout_with_style(&aggregate, label, dimensions, circles, style)?;
+    let layout = section_layout_with_style(&aggregate, label, dimensions, circles, slots, style)?;
     let base = layout.svg.replace(
         "Exact native section;",
         "Native occurrence sections; overlapping occurrence areas are summed;",
@@ -723,6 +799,248 @@ fn dimension_svg(
         } else {
             writeln!(out,"  <text x=\"{}\" y=\"{}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"{}\" textLength=\"{}\" lengthAdjust=\"spacingAndGlyphs\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_center),number(-text_baseline),number(font),number(text_width)).unwrap();
         }
+    }
+    Ok(out)
+}
+
+fn segment_intersects_box(from: [f64; 2], to: [f64; 2], bounds: [f64; 4]) -> bool {
+    let mut enter: f64 = 0.;
+    let mut leave: f64 = 1.;
+    for axis in 0..2 {
+        let delta = to[axis] - from[axis];
+        if delta == 0. {
+            if from[axis] < bounds[axis] || from[axis] > bounds[axis + 2] {
+                return false;
+            }
+            continue;
+        }
+        let a = (bounds[axis] - from[axis]) / delta;
+        let b = (bounds[axis + 2] - from[axis]) / delta;
+        enter = enter.max(a.min(b));
+        leave = leave.min(a.max(b));
+        if enter > leave {
+            return false;
+        }
+    }
+    true
+}
+
+fn slot_dimension_svg(
+    slots: &[SectionSlotDimensionAnnotation],
+    font: f64,
+    bounds: &mut [f64; 4],
+    tags: Option<&BTreeMap<String, String>>,
+    label_boxes: &mut Vec<[f64; 4]>,
+    slot_segments: &mut Vec<([f64; 2], [f64; 2], f64)>,
+) -> Result<String, ExportError> {
+    let mut out = String::new();
+    for slot in slots {
+        let SectionSlotDimensionAnnotation {
+            tolerance,
+            id,
+            kind,
+            center,
+            centerline_endpoints,
+            axis,
+            radius_mm,
+            arithmetic_uncertainty_mm,
+            label_offset,
+            value_mm,
+        } = slot;
+        let coordinates = center
+            .iter()
+            .chain(centerline_endpoints.iter().flatten())
+            .chain(axis)
+            .chain(label_offset)
+            .chain([radius_mm, value_mm, arithmetic_uncertainty_mm]);
+        if id.is_empty()
+            || coordinates.into_iter().any(|v| !v.is_finite())
+            || *radius_mm <= 0.
+            || *arithmetic_uncertainty_mm < 0.
+            || *value_mm <= 0.
+        {
+            return Err(invalid());
+        }
+        let length = (centerline_endpoints[1][0] - centerline_endpoints[0][0])
+            .hypot(centerline_endpoints[1][1] - centerline_endpoints[0][1]);
+        let unit = axis[0].hypot(axis[1]);
+        let scale = center
+            .iter()
+            .chain(centerline_endpoints.iter().flatten())
+            .chain([radius_mm, value_mm, &length])
+            .fold(1_f64, |a, b| a.max(b.abs()));
+        let error = 512. * f64::EPSILON * scale;
+        let middle = [
+            (centerline_endpoints[0][0] + centerline_endpoints[1][0]) * 0.5,
+            (centerline_endpoints[0][1] + centerline_endpoints[1][1]) * 0.5,
+        ];
+        if !length.is_finite()
+            || length <= error
+            || !unit.is_finite()
+            || (unit - 1.).abs() > 512. * f64::EPSILON
+            || (center[0] - middle[0]).hypot(center[1] - middle[1]) > error
+            || (centerline_endpoints[1][0] - centerline_endpoints[0][0] - axis[0] * length).abs()
+                > error
+            || (centerline_endpoints[1][1] - centerline_endpoints[0][1] - axis[1] * length).abs()
+                > error
+            || error / length.min(*radius_mm) >= 0.01
+        {
+            return Err(ExportError::InvalidModel(
+                "slot dimension does not match native capsule frame".into(),
+            ));
+        }
+        let normal = [-axis[1], axis[0]];
+        let (kind_name, expected, from, to, direction) = match kind {
+            SectionSlotDimensionKind::Width => (
+                "width",
+                2. * radius_mm,
+                [
+                    center[0] - normal[0] * radius_mm,
+                    center[1] - normal[1] * radius_mm,
+                ],
+                [
+                    center[0] + normal[0] * radius_mm,
+                    center[1] + normal[1] * radius_mm,
+                ],
+                normal,
+            ),
+            SectionSlotDimensionKind::CenterlineLength => (
+                "centerline_length",
+                length,
+                centerline_endpoints[0],
+                centerline_endpoints[1],
+                *axis,
+            ),
+            SectionSlotDimensionKind::OverallLength => (
+                "overall_length",
+                length + 2. * radius_mm,
+                [
+                    centerline_endpoints[0][0] - axis[0] * radius_mm,
+                    centerline_endpoints[0][1] - axis[1] * radius_mm,
+                ],
+                [
+                    centerline_endpoints[1][0] + axis[0] * radius_mm,
+                    centerline_endpoints[1][1] + axis[1] * radius_mm,
+                ],
+                *axis,
+            ),
+        };
+        if !expected.is_finite()
+            || (expected - value_mm).abs() > error
+            || label_offset[0].hypot(label_offset[1]) <= error
+        {
+            return Err(ExportError::InvalidModel(
+                "slot dimension value or label offset does not match native capsule".into(),
+            ));
+        }
+        let a = [from[0] + label_offset[0], from[1] + label_offset[1]];
+        let b = [to[0] + label_offset[0], to[1] + label_offset[1]];
+        let arrow = (font * 0.6).min(expected * 0.2);
+        let mut heads = [[a; 3], [b; 3]];
+        let across = [-direction[1], direction[0]];
+        for (index, points) in heads.iter_mut().enumerate() {
+            let inward = if index == 0 {
+                direction
+            } else {
+                [-direction[0], -direction[1]]
+            };
+            for (side, vertex) in [1, 2].into_iter().zip([-1., 1.]) {
+                points[side] = [
+                    points[0][0] + inward[0] * arrow + across[0] * arrow * 0.4 * vertex,
+                    points[0][1] + inward[1] * arrow + across[1] * arrow * 0.4 * vertex,
+                ];
+            }
+        }
+        let mut value = format!("{value_mm:.6}");
+        while value.ends_with('0') {
+            value.pop();
+        }
+        if value.ends_with('.') {
+            value.pop();
+        }
+        if value == "0" {
+            value = format!("{value_mm:.6e}");
+        }
+        if let Some(t) = tolerance {
+            value = tolerance_label(t)?;
+        }
+        let visible = tags
+            .and_then(|map| map.get(id))
+            .map_or(id.as_str(), String::as_str);
+        let prefix = match kind {
+            SectionSlotDimensionKind::Width => "W",
+            SectionSlotDimensionKind::CenterlineLength => "C",
+            SectionSlotDimensionKind::OverallLength => "L",
+        };
+        let label = if tags.is_some() {
+            format!("{visible}:{prefix}{value}mm")
+        } else {
+            format!("{visible}: {value} mm {kind_name}")
+        };
+        let text_width = label.len() as f64 * font * 0.7;
+        let center_line = [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5];
+        let text_center = center_line[0];
+        // Keep the full label beyond the dimension line, on the side away
+        // from the slot. Lower length annotations otherwise intersect their
+        // own extension lines between the slot and the offset line.
+        let text_baseline = if label_offset[1] < 0. {
+            a[1].min(b[1]) - 2. * font
+        } else {
+            a[1].max(b[1]) + font
+        };
+        let label_box = [
+            text_center - text_width * 0.5,
+            text_baseline - font * 0.4,
+            text_center + text_width * 0.5,
+            text_baseline + font * 1.2,
+        ];
+        label_boxes.push(label_box);
+        let cross = (font * 0.45).min(*radius_mm * 0.45);
+        let mark_centers = [*center, centerline_endpoints[0], centerline_endpoints[1]];
+        for p in [
+            from,
+            to,
+            a,
+            b,
+            [label_box[0], label_box[1]],
+            [label_box[2], label_box[3]],
+        ]
+        .into_iter()
+        .chain(heads.into_iter().flatten())
+        .chain(mark_centers)
+        {
+            if p.iter().any(|v| !v.is_finite()) {
+                return Err(invalid());
+            }
+            bounds[0] = bounds[0].min(p[0] - cross);
+            bounds[1] = bounds[1].min(p[1] - cross);
+            bounds[2] = bounds[2].max(p[0] + cross);
+            bounds[3] = bounds[3].max(p[1] + cross);
+        }
+        let escaped_id = escape(id)?
+            .replace('\n', "&#10;")
+            .replace('\r', "&#13;")
+            .replace('\t', "&#9;");
+        writeln!(out, "<g class=\"slot-dimension\" data-dimension-id=\"{escaped_id}\" data-kind=\"{kind_name}\" data-value-mm=\"{}\" data-center-x=\"{}\" data-center-y=\"{}\" data-native-from-x=\"{}\" data-native-from-y=\"{}\" data-native-to-x=\"{}\" data-native-to-y=\"{}\" data-radius-mm=\"{}\" data-arithmetic-uncertainty-mm=\"{}\" fill=\"#334155\" stroke=\"#334155\" stroke-width=\"{}\">", number(*value_mm),number(center[0]),number(center[1]),number(from[0]),number(from[1]),number(to[0]),number(to[1]),number(*radius_mm),number(*arithmetic_uncertainty_mm),number(font*0.05)).unwrap();
+        for (start, end) in [(from, a), (to, b), (a, b)] {
+            slot_segments.push((start, end, font * 0.025));
+            writeln!(
+                out,
+                "  <line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\"/>",
+                number(start[0]),
+                number(-start[1]),
+                number(end[0]),
+                number(-end[1])
+            )
+            .unwrap();
+        }
+        for head in heads {
+            writeln!(out, "  <polygon points=\"{}\"/>", head.map(point).join(" ")).unwrap();
+        }
+        for p in mark_centers {
+            writeln!(out,"  <path class=\"slot-center-mark\" d=\"M {} {} L {} {} M {} {} L {} {}\" fill=\"none\"/>",number(p[0]-cross),number(-p[1]),number(p[0]+cross),number(-p[1]),number(p[0]),number(-(p[1]-cross)),number(p[0]),number(-(p[1]+cross))).unwrap();
+        }
+        writeln!(out,"  <text x=\"{}\" y=\"{}\" text-anchor=\"middle\" font-family=\"{}\" font-size=\"{}\" textLength=\"{}\" lengthAdjust=\"spacingAndGlyphs\" stroke=\"none\">{}</text>\n</g>",number(text_center),number(-text_baseline),if tags.is_some(){"monospace"}else{"sans-serif"},number(font),number(text_width),escape(&label)?).unwrap();
     }
     Ok(out)
 }

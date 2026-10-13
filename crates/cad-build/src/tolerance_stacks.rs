@@ -221,6 +221,12 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
                             .find(|d| d.id == t.dimension)
                             .and_then(|d| d.tolerance.as_ref())
                     })
+                    .or_else(|| {
+                        v.slot_dimensions
+                            .iter()
+                            .find(|d| d.id == t.dimension)
+                            .and_then(|d| d.tolerance.as_ref())
+                    })
             });
             if tolerance.is_none() {
                 return Err(BuildError::InvalidToleranceStack {
@@ -314,6 +320,12 @@ pub(super) fn evaluate(
                     .map(|d| (d.value_mm, d.tolerance.as_ref()))
                     .or_else(|| {
                         view.circle_dimensions
+                            .iter()
+                            .find(|d| d.declaration.id == t.dimension)
+                            .map(|d| (d.value_mm, d.tolerance.as_ref()))
+                    })
+                    .or_else(|| {
+                        view.slot_dimensions
                             .iter()
                             .find(|d| d.declaration.id == t.dimension)
                             .map(|d| (d.value_mm, d.tolerance.as_ref()))
