@@ -852,14 +852,27 @@ pub(crate) fn recognize(
     m: &ModelSnapshot,
     tol: Tolerance,
 ) -> Result<ArcPrismGeometry, KernelError> {
+    recognize_bounded(m, tol, 4)
+}
+
+/// Private admission for a mixed through/blind surrogate. Callers must still
+/// reconstruct and compare the actual blind model before using this result.
+pub(crate) fn recognize_bounded(
+    m: &ModelSnapshot,
+    tol: Tolerance,
+    slot_limit: usize,
+) -> Result<ArcPrismGeometry, KernelError> {
     if !tol.is_valid() {
         return Err(KernelError::InvalidTolerance);
     }
+    if slot_limit > 8 {
+        return Err(bad());
+    }
     if m.faces.len() < 4
-        || m.faces.len() > MAX_POLYGON_POINTS + MAX_POLYGON_HOLES + 18
-        || m.vertices.len() > 2 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES) + 32
-        || m.edges.len() > 3 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES) + 48
-        || m.loops.len() > MAX_POLYGON_POINTS + 3 * MAX_POLYGON_HOLES + 26
+        || m.faces.len() > MAX_POLYGON_POINTS + MAX_POLYGON_HOLES + 2 + 4 * slot_limit
+        || m.vertices.len() > 2 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES) + 8 * slot_limit
+        || m.edges.len() > 3 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES) + 12 * slot_limit
+        || m.loops.len() > MAX_POLYGON_POINTS + 3 * MAX_POLYGON_HOLES + 2 + 6 * slot_limit
     {
         return Err(bad());
     }
@@ -1000,7 +1013,7 @@ pub(crate) fn recognize(
         }
     }
     validate_path(&path, &holes, tol)?;
-    crate::obround_slot::validate_slots(&path, &holes, &slots, tol)?;
+    crate::obround_slot::validate_slots_bounded(&path, &holes, &slots, slot_limit, tol)?;
     let g = ArcPrismGeometry {
         path,
         circular_holes: holes,

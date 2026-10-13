@@ -84,7 +84,13 @@ pub fn measure_section_slot(
     if selected.len() != 4 {
         return Err(bad());
     }
-    let g = crate::arc_prism::recognize(model, tolerance)?;
+    let mixed = crate::blind_slot_prism::through_slot_witness(model, tolerance).ok();
+    let g = if let Some((g, _)) = &mixed {
+        g.clone()
+    } else {
+        crate::arc_prism::recognize(model, tolerance)?
+    };
+    let support_model = mixed.as_ref().map_or(model, |(_, through)| through);
     if g.slot_holes.is_empty() {
         return Err(bad());
     }
@@ -124,7 +130,7 @@ pub fn measure_section_slot(
     if !error.is_normal() || error > tolerance.linear / 16. {
         return Err(KernelError::NumericRange);
     }
-    crate::convex_clearance::support::arc_consistency(model, &g, error, tolerance)?;
+    crate::convex_clearance::support::arc_consistency(support_model, &g, error, tolerance)?;
 
     let half = slot.centerline_length / 2.;
     let local_ends = [

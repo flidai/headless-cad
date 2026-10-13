@@ -79,10 +79,22 @@ pub(crate) fn validate_slots(
     slots: &[SlotHole],
     t: Tolerance,
 ) -> Result<(), KernelError> {
-    if slots.len() > 4 {
-        return Err(KernelError::ResourceLimit(
-            "at most four obround slots".into(),
-        ));
+    validate_slots_bounded(path, circles, slots, 4, t)
+}
+
+/// Internal eight-capsule allowance for the strictly reconstructed mixed
+/// through/blind surrogate. Public through-slot authoring retains its cap of 4.
+pub(crate) fn validate_slots_bounded(
+    path: &PlanarPath,
+    circles: &[CircleHole],
+    slots: &[SlotHole],
+    limit: usize,
+    t: Tolerance,
+) -> Result<(), KernelError> {
+    if limit > 8 || slots.len() > limit {
+        return Err(KernelError::ResourceLimit(format!(
+            "at most {limit} obround slots"
+        )));
     }
     if slots.is_empty() {
         return Ok(());

@@ -602,6 +602,44 @@ mod tests {
     }
 
     #[test]
+    fn mixed_pocket_must_not_inherit_an_unpocketed_seating_disk() {
+        let t = Tolerance::default();
+        let plate = slotted_plate(3., t);
+        let frame = blind_obround_slot_frame(&plate, t).unwrap();
+        let offset = sub([15., 25., 0.], frame.origin);
+        let pocket = ObroundSlot {
+            id: "under_pad".into(),
+            center: [
+                dot(offset, frame.x_direction),
+                dot(offset, frame.y_direction),
+            ],
+            direction: [frame.x_direction[0], frame.y_direction[0]],
+            centerline_length: 8.,
+            radius: 6.,
+        };
+        for opening in [FaceId(0), FaceId(1)] {
+            let pad = translate(
+                &extrude_annulus(2., 0.5, 2., t).unwrap().model,
+                [15., 25., if opening == FaceId(0) { -2. } else { 8. }],
+                t,
+            )
+            .unwrap()
+            .model;
+            let pad_face = FaceId(1 - opening.0);
+            let before = certify_planar_seating(&plate, opening, &pad, pad_face, 0.4, t).unwrap();
+            assert!(before.disk_radius_lower_mm > 0.4);
+            let mixed =
+                cut_blind_obround_slots(&plate, std::slice::from_ref(&pocket), opening, 3., t)
+                    .unwrap()
+                    .model;
+            // The complete pad footprint now lies over a real opening. A
+            // through-stock fallback would repeat the previously valid disk.
+            assert!(certify_planar_seating(&mixed, opening, &pad, pad_face, 0.4, t).is_err());
+            assert!(certify_planar_seating(&pad, pad_face, &mixed, opening, 0.4, t).is_err());
+        }
+    }
+
+    #[test]
     fn slotted_annular_seat_refuses_margin_intrusion_and_corrupt_support() {
         let t = Tolerance::default();
         let plate = slotted_plate(3., t);

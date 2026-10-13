@@ -3864,8 +3864,8 @@ cap selection and the depth participate in the feature identity.
 
 Admission requires enough material below the floor and strict separation from
 outer boundaries, through bores and other pockets. Existing through-slotted
-stock remains outside this domain; previously pocketed stock is admitted only
-under the same-cap composition contract below. Reconstruction must account for every raw
+stock is admitted under the mixed composition contract below; previously
+pocketed stock requires the same-cap composition contract. Reconstruction must account for every raw
 face, loop, edge and support before analytic properties or tessellation accept
 the solid. Section planes on the floor or opening are topology events and must
 be refused where the section contract cannot certify them.
@@ -3878,7 +3878,7 @@ A rendered cavity alone cannot establish that the exported solid is blind.
 
 ### Composing blind machining operations
 
-The next extension keeps the same canonical blind-pocket family and a maximum
+The serial extension keeps the same canonical blind-pocket family and a maximum
 of four accumulated disjoint capsules. Each operation may append pockets on the
 same opening cap with its own depth; reconstruction retains a depth for each
 pocket. Overlapping/deepening cuts and opposite-cap machining are outside this
@@ -3890,3 +3890,43 @@ The operation history must explicitly map those old floors to the rebuilt
 floors. New generated roles name only the newly authored pockets; earlier roles
 remain reachable through their source feature and input lineage. Analytic mass
 properties, face frames, sections and mesh floors must all use per-pocket depth.
+
+
+### Mixed through-slot and blind-pocket composition
+
+The mixed admission extension retains up to four actual through slots in the
+stock and up to four separately depth-resolved blind pockets. The canonical
+through topology precedes blind walls and floors; later pocket operations must
+preserve all through-wall IDs and explicitly remap earlier floor IDs.
+
+A private surrogate may contain eight capsules to reconstruct and tessellate
+this bounded class. Public through-slot authoring remains limited to four.
+All capsules must be separated from one another, circular bores and the outer
+boundary. Recognition must distinguish actual opposite-cap through loops from
+blind floors, restore only blind walls, and compare every raw native entity
+with the reconstructed solid. Loop cardinality alone is not geometric proof.
+
+Through-slot queries on a mixed part must first strictly recognize the complete
+mixed solid, then bind selected physical walls and caps to the original model.
+Section dimensions must use its actual section loops. Blind-pocket walls cannot
+satisfy a through-slot query. An unpocketed stock surrogate must never be passed
+to generic seating or clearance queries: it could invent material across a
+real pocket opening. Unsupported engineering checks must block publication.
+
+Acceptance requires independent maximum-count, both-cap and posed solids;
+exact moments and STEP difference checks; closed oriented meshes; section
+strata; floor and through-wall lineage; native slot centers and dimensions;
+source capture and exact replay; and publication-preserving invalid revisions.
+Applying this class to the drive module must retain its existing engineering
+obligations and update exact mass/volume expectations for removed material.
+
+
+Mixed-cap tessellation must preserve the original sampled rim points and native
+boundary identities. If projection roundoff produces an almost-collinear bridge
+triangle, a bounded same-face internal diagonal flip may repair it only when
+both replacement triangles have positive, well-conditioned area and agree with
+the native normal. It must not drop triangles or move rim points. Unrepaired
+uncertainty is an explicit refusal, not a successful STL export. Engineering
+queries likewise retain original through-wall supports when removing blind
+topology for consistency checks; regenerated clean supports cannot hide raw
+support departures.

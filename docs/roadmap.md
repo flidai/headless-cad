@@ -8,16 +8,17 @@ of completion dates or an assertion that the present implementation has parity.
 
 ## Current checkpoint
 
-The latest accepted kernel increment is native blind obround pockets with
-measured floor depths and remaining web. It follows associative slot centers
-and native slot-size drawings. Each has retained independent STEP, replay and
-browser receipts below. The viewer remains an inspector; Starlark and Git own
-modeling changes.
+The latest accepted kernel increment combines up to four native through slots
+with four blind pockets at distinct depths. Original through-slot dimensions
+and earlier floor references remain tied to the finished physical part. Its
+independent STEP, replay and browser receipts are recorded below. The viewer
+remains an inspector; Starlark and Git own modeling changes.
 
-The next modeling priority is **operation composability**: consecutive blind
-pocket operations at different depths on the same cap, with a four-pocket total
-limit and persistent references to earlier floors. Mixed through-slot/blind-pocket
-stock, general Booleans and arbitrary surfaces remain separate kernel work.
+The next modeling priority is applying this composition to the **actual drive
+module base**, retaining every existing engineering obligation and adding native
+pocket-depth measurements. Mixed-stock seating remains refused until its
+material-footprint proof accounts for real openings. General Booleans and
+arbitrary surfaces remain separate kernel work.
 
 The complete product is still experimental. All five commercial release gates
 remain open; accepted feature increments are evidence toward those gates, not
@@ -1087,3 +1088,15 @@ STEP bytes and its feature hash. Six invalid revisions preserve the previous
 publication. [Browser checks](evidence/serial-blind-slots-browser-local.json)
 verify the floor remap, three section states, 3/7/5 mm measurements and source
 inspection. Mixed through/blind stock and all commercial release gates remain open.
+
+
+The [mixed-machining oracle](evidence/mixed-slots-local.json) passes seven generated
+cases, two authored fixtures and eight rejected revisions. It covers four through
+slots plus four blind pockets, both caps, pre/post machining rigid poses and
+reversed blind operation order. Native moments and independent STEP solids agree;
+all bidirectional volume differences are zero. Closed oriented meshes, actual
+through-wall references, earlier floor remaps, depth strata, native dimensions,
+captured replay and preservation of the previous publication also pass.
+[Browser evidence](evidence/mixed-slots-browser-local.json) records the recessed
+part, five sections, two machining sheets, three floor/web measurements, three
+through-slot measurements and source inspection. All commercial gates stay open.

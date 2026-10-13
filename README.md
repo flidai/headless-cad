@@ -3384,3 +3384,37 @@ checks both operation orders, rigid poses, preserved floor lineage and
 first-stage geometry, exact native/STEP properties, replay and six refusal
 cases. [Browser evidence](docs/evidence/serial-blind-slots-browser-local.json)
 verifies the finished part's original-floor reference and measured drawing.
+
+
+### Combine through slots and pockets of different depths
+
+`examples/mixed_slot_fixture.star` machines four through mounting slots, then a
+shallow locating pocket and a deeper relief pocket. The finished part retains
+the first floor reference and the original mounting-slot walls. Its dimensions
+measure those native walls and slot centers after both pocket operations.
+
+```sh
+cad build examples/mixed_slot_fixture.star --out-dir out/mixed_slot_fixture
+cad build examples/mixed_slot_fixture.star --param pocket_side=0 --param second_depth=8 \
+  --out-dir out/mixed_slot_fixture_underside
+```
+
+Inspect `fixture.preview.html`, `drawing-mixed_fixture_machining.svg` and
+`drawing-mixed_mounting_references.svg`. Three section depths show both pockets,
+only the deeper pocket, and the remaining material containing the through slots.
+The two sheets report native pocket depths, remaining web, slot width/length
+and mounting pitch. Selecting the assembly part opens its captured Starlark.
+
+The admitted class has at most four through slots and four separated blind
+pockets on one cap. Each blind operation may use a different depth. Through-slot
+authoring still precedes the pockets; intersecting cuts, opposite-cap recuts,
+arbitrary pockets and general curved Booleans remain outside this domain.
+Existing seating queries refuse mixed stock until its actual pocket boundaries
+are supported by their material-footprint proof.
+
+
+[Independent mixed-machining evidence](docs/evidence/mixed-slots-local.json)
+covers seven generated cases, two fixture variants and eight refusal cases,
+including maximum capacity, posed inputs, unchanged through-wall references,
+closed STL and exact STEP comparisons. [Browser evidence](docs/evidence/mixed-slots-browser-local.json)
+checks both sheets, native measurements and captured-source navigation.

@@ -1,0 +1,21 @@
+{
+  "valid": true,
+  "pockets": 2,
+  "through_slots": 4,
+  "through_bores": 4,
+  "sections": 5,
+  "native_depth_rows": 3,
+  "through_reference_dimensions": 3,
+  "source_navigation": true,
+  "read_only": true,
+  "manifest_sha256": "3a0642e1870d85939d176223c0591f87df4ecce51fec1841e22922ef64658835",
+  "manifest_end_sha256": "3a0642e1870d85939d176223c0591f87df4ecce51fec1841e22922ef64658835",
+  "script_sha256": "2a7329808430fb39a97e4d34e5c231b8e19a5c981cde6a81e9c078441cac237c",
+  "recipe_context_hash": "deb97f04aca992100222e6377195c78e1248a25829384228c2b501f65204fa8a",
+  "source_provenance_sha256": "e0211ccbdf223eb50509d4fb0161a7b2a1a4b69abebb0c4cbc4faa966fe891c0",
+  "screenshots": [
+    "/tmp/cad-mixed-slots-references.png",
+    "/tmp/cad-mixed-slots-drawing.png",
+    "/tmp/cad-mixed-slots-body.png"
+  ]
+}

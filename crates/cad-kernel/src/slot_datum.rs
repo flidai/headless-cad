@@ -46,7 +46,13 @@ pub fn slot_center_frame(
     if selected.len() != 4 {
         return Err(bad());
     }
-    let g = crate::arc_prism::recognize(model, tolerance)?;
+    let mixed = crate::blind_slot_prism::through_slot_witness(model, tolerance).ok();
+    let g = if let Some((g, _)) = &mixed {
+        g.clone()
+    } else {
+        crate::arc_prism::recognize(model, tolerance)?
+    };
+    let support_model = mixed.as_ref().map_or(model, |(_, through)| through);
     let offset = g.path.segments.len() + 2 + g.circular_holes.len();
     let slot_index = (0..g.slot_holes.len())
         .find(|i| selected == (0..4).map(|j| FaceId(offset + 4 * *i + j)).collect())
@@ -81,7 +87,7 @@ pub fn slot_center_frame(
     if !error.is_normal() || error > tolerance.linear / 16. {
         return Err(KernelError::NumericRange);
     }
-    crate::convex_clearance::support::arc_consistency(model, &g, error, tolerance)?;
+    crate::convex_clearance::support::arc_consistency(support_model, &g, error, tolerance)?;
 
     let y_native = cross(g.axis, g.x_direction);
     let x_axis = std::array::from_fn(|i| {

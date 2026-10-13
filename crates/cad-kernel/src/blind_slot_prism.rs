@@ -28,7 +28,13 @@ fn shift(p: &mut [f64; 3], axis: [f64; 3], amount: f64) {
 fn sizes(g: &ArcPrismGeometry) -> (usize, usize, usize, usize) {
     let n = g.path.segments.len();
     let c = g.circular_holes.len();
-    (2 * n + 2 * c, 3 * n + 3 * c, 2 + n + 3 * c, 2 + n + c)
+    let s = g.slot_holes.len();
+    (
+        2 * n + 2 * c + 8 * s,
+        3 * n + 3 * c + 12 * s,
+        2 + n + 3 * c + 6 * s,
+        2 + n + c + 4 * s,
+    )
 }
 
 fn construct(g: &Geometry) -> Result<ModelSnapshot, KernelError> {
@@ -123,11 +129,16 @@ fn input_geometry(
     if cap.0 > 1 || slots.is_empty() || slots.len() > 4 {
         return Err(bad());
     }
-    let (mut stock, mut prior_slots, mut depths) = if let Ok(old) = recognize(body, t) {
+    let (stock, mut prior_slots, mut depths) = if let Ok(old) = recognize(body, t) {
         if old.opening != cap {
             return Err(bad());
         }
         (old.stock, old.slots, old.depths)
+    } else if let Ok(through) = crate::arc_prism::recognize(body, t) {
+        if through.slot_holes.is_empty() || through.slot_holes.len() > 4 {
+            return Err(bad());
+        }
+        (through, vec![], vec![])
     } else {
         let (stock, _) = crate::obround_slot::geometry(body, t)?;
         (stock, vec![], vec![])
@@ -174,11 +185,20 @@ fn input_geometry(
             radius: slot.radius,
         });
     }
-    crate::obround_slot::validate_slots(&stock.path, &stock.circular_holes, &prior_slots, t)?;
+    let mut all_slots = stock.slot_holes.clone();
+    all_slots.extend(prior_slots.iter().cloned());
+    crate::obround_slot::validate_slots_bounded(
+        &stock.path,
+        &stock.circular_holes,
+        &all_slots,
+        8,
+        t,
+    )?;
     depths.extend(std::iter::repeat_n(depth, slots.len()));
-    stock.slot_holes = prior_slots;
-    let surrogate = crate::arc_prism::construct(&stock, t)?;
-    let slots = std::mem::take(&mut stock.slot_holes);
+    let mut through = stock.clone();
+    through.slot_holes = all_slots;
+    let surrogate = crate::arc_prism::construct(&through, t)?;
+    let slots = prior_slots;
     Ok(Geometry {
         stock,
         slots,
@@ -276,9 +296,51 @@ pub fn blind_obround_slot_frame(
             y_direction: cross(g.stock.axis, g.stock.x_direction),
             height: g.stock.height,
         })
+    } else if let Ok(g) = crate::arc_prism::recognize(body, t) {
+        if g.slot_holes.is_empty() || g.slot_holes.len() > 4 {
+            return Err(bad());
+        }
+        Ok(SlotStockFrame {
+            origin: g.origin,
+            axis: g.axis,
+            x_direction: g.x_direction,
+            y_direction: cross(g.axis, g.x_direction),
+            height: g.height,
+        })
     } else {
         crate::obround_slot::obround_slot_frame(body, t)
     }
+}
+
+/// Resolve actual full-height slot witnesses only after the complete mixed
+/// model reconstructs. That strict comparison covers every support in the
+/// original raw model; the returned through-only model is only a redundant
+/// consistency reference, never a substitute for actual section evidence.
+/// Original through wall IDs form the prefix of the native face array, while
+/// blind walls and floors are outside this admitted prefix.
+pub(crate) fn through_slot_witness(
+    model: &ModelSnapshot,
+    t: Tolerance,
+) -> Result<(ArcPrismGeometry, ModelSnapshot), KernelError> {
+    let mixed = recognize(model, t)?;
+    if mixed.stock.slot_holes.is_empty() {
+        return Err(bad());
+    }
+    // Keep the original surviving supports: reconstructing canonical stock here
+    // would erase small raw direction departures before the stricter query
+    // consistency check. Only remove the already-recognized blind topology.
+    let (vertices, edges, loops, faces) = sizes(&mixed.stock);
+    let mut through = model.clone();
+    through.vertices.truncate(vertices);
+    through.edges.truncate(edges);
+    through.loops.truncate(loops);
+    through.faces.truncate(faces);
+    for cap in &mut through.faces[..2] {
+        cap.loops.retain(|id| id.0 < loops);
+    }
+    through.shells[0].faces = (0..faces).map(FaceId).collect();
+    crate::arc_prism::recognize(&through, t)?;
+    Ok((mixed.stock, through))
 }
 
 fn equivalent(a: &ModelSnapshot, b: &ModelSnapshot, error: f64) -> bool {
@@ -382,19 +444,33 @@ pub(crate) fn recognize(model: &ModelSnapshot, t: Tolerance) -> Result<Geometry,
         return Err(bad());
     }
     let base_f = model.faces.len() - 5 * count;
-    let circles = model.faces[1 - opening.0]
-        .loops
-        .len()
-        .checked_sub(1)
+    let opposite = &model.faces[1 - opening.0].loops;
+    if opposite.is_empty() {
+        return Err(bad());
+    }
+    let mut circles = 0;
+    let mut through_count = 0;
+    for &loop_id in opposite.iter().skip(1) {
+        let size = model.loops.get(loop_id.0).ok_or_else(bad)?.edges.len();
+        match size {
+            1 if through_count == 0 => circles += 1,
+            4 => through_count += 1,
+            _ => return Err(bad()),
+        }
+    }
+    if through_count > 4 || through_count + count > 8 {
+        return Err(bad());
+    }
+    let n = base_f
+        .checked_sub(2 + circles + 4 * through_count)
         .ok_or_else(bad)?;
-    let n = base_f.checked_sub(2 + circles).ok_or_else(bad)?;
     if n < 3 {
         return Err(bad());
     }
     let (base_v, base_e, base_l, _) = (
-        2 * n + 2 * circles,
-        3 * n + 3 * circles,
-        2 + n + 3 * circles,
+        2 * n + 2 * circles + 8 * through_count,
+        3 * n + 3 * circles + 12 * through_count,
+        2 + n + 3 * circles + 6 * through_count,
         base_f,
     );
     if model.vertices.len() != base_v + 8 * count
@@ -494,13 +570,12 @@ pub(crate) fn recognize(model: &ModelSnapshot, t: Tolerance) -> Result<Geometry,
             .collect();
         surrogate.faces[floor_layer].loops.push(loop_id);
     }
-    let through = crate::arc_prism::recognize(&surrogate, t)?;
-    if through.slot_holes.len() != count {
+    let mut through = crate::arc_prism::recognize_bounded(&surrogate, t, 8)?;
+    if through.slot_holes.len() != through_count + count {
         return Err(bad());
     }
-    let slots = through.slot_holes.clone();
-    let mut stock = through;
-    stock.slot_holes.clear();
+    let slots = through.slot_holes.split_off(through_count);
+    let stock = through;
     let g = Geometry {
         stock,
         slots,
@@ -652,8 +727,109 @@ pub(crate) fn tessellate(
     t: Tolerance,
     policy: TessellationPolicy,
 ) -> Result<CylinderMesh, KernelError> {
+    let mut mesh = tessellate_native(model, g, t, policy)?;
+    repair_cap_diagonals(&mut mesh)?;
+    Ok(mesh)
+}
+
+// Earcut may choose an almost collinear bridge among aligned holes. Repair
+// only internal diagonals between two triangles of the same native face;
+// retain every rim vertex and boundary-edge identity exactly.
+fn repair_cap_diagonals(mesh: &mut CylinderMesh) -> Result<(), KernelError> {
+    let quality = |p: &[[f64; 3]], normal: [f64; 3]| {
+        let a = sub(p[1], p[0]);
+        let b = sub(p[2], p[0]);
+        let c = cross(a, b);
+        let area = crate::math::norm(c);
+        let scale = dot(a, a)
+            .max(dot(b, b))
+            .max(dot(sub(p[2], p[1]), sub(p[2], p[1])));
+        if area > 256. * f64::EPSILON * scale
+            && (0..3).all(|i| (c[i] / area - normal[i]).abs() < 1e-9)
+        {
+            area
+        } else {
+            0.
+        }
+    };
+    for _ in 0..256 {
+        let Some(i) = mesh
+            .patches
+            .iter()
+            .position(|p| p.points.len() == 3 && quality(&p.points, p.normal) == 0.)
+        else {
+            return Ok(());
+        };
+        let a = mesh.patches[i].clone();
+        let mut replacement = None;
+        for j in 0..mesh.patches.len() {
+            let b = &mesh.patches[j];
+            if i == j || b.face != a.face || b.points.len() != 3 {
+                continue;
+            }
+            for e in 0..3 {
+                let u = a.points[e];
+                let v = a.points[(e + 1) % 3];
+                let c = a.points[(e + 2) % 3];
+                if a.boundary_edges[e].is_some() {
+                    continue;
+                }
+                let Some(f) = (0..3).find(|&f| {
+                    b.points[f] == v && b.points[(f + 1) % 3] == u && b.boundary_edges[f].is_none()
+                }) else {
+                    continue;
+                };
+                let d = b.points[(f + 2) % 3];
+                let points = [vec![c, d, v], vec![d, c, u]];
+                if points.iter().any(|p| quality(p, a.normal) == 0.) {
+                    continue;
+                }
+                let make = |points: Vec<[f64; 3]>| {
+                    let boundary_edges = (0..3)
+                        .map(|k| {
+                            [&a, b].into_iter().find_map(|old| {
+                                (0..3).find_map(|n| {
+                                    (old.points[n] == points[k]
+                                        && old.points[(n + 1) % 3] == points[(k + 1) % 3])
+                                        .then_some(old.boundary_edges[n])
+                                        .flatten()
+                                })
+                            })
+                        })
+                        .collect();
+                    MeshPatch {
+                        face: a.face,
+                        points,
+                        normal: a.normal,
+                        boundary_edges,
+                    }
+                };
+                replacement = Some((j, make(points[0].clone()), make(points[1].clone())));
+                break;
+            }
+            if replacement.is_some() {
+                break;
+            }
+        }
+        let Some((j, first, second)) = replacement else {
+            return Err(KernelError::NumericRange);
+        };
+        mesh.patches[i] = first;
+        mesh.patches[j] = second;
+    }
+    Err(KernelError::ResourceLimit(
+        "mixed cap diagonal repair exceeds 256 flips".into(),
+    ))
+}
+
+fn tessellate_native(
+    model: &ModelSnapshot,
+    g: &Geometry,
+    t: Tolerance,
+    policy: TessellationPolicy,
+) -> Result<CylinderMesh, KernelError> {
     let mut through = g.stock.clone();
-    through.slot_holes = g.slots.clone();
+    through.slot_holes.extend(g.slots.iter().cloned());
     let mut mesh = crate::arc_prism::tessellate(&g.surrogate, &through, policy)?;
     let (_, base_e, _, base_f) = sizes(&g.stock);
     let floor_layer = 1 - g.opening.0;
@@ -1035,6 +1211,305 @@ mod tests {
             }
             assert!(blind_obround_slot_frame(&corrupt, t).is_err());
             assert!(cut_blind_obround_slots(&corrupt, &pair[..1], cap, 3., t).is_err());
+        }
+    }
+
+    #[test]
+    fn preposed_mixed_caps_have_consistent_triangle_normals_and_shared_rims() {
+        let t = Tolerance::default();
+        let mut body = extrude_polygon_with_circular_holes(
+            &[[-25., -18.], [25., -18.], [25., 18.], [-25., 18.]],
+            &[],
+            &[CircleHole {
+                center: [0., 0.],
+                radius: 3.,
+            }],
+            8.,
+            t,
+        )
+        .unwrap()
+        .model;
+        let mut walls = [FaceId(2), FaceId(3), FaceId(4), FaceId(5)];
+        for pair in [[3, 0], [0, 1], [1, 2], [2, 3]] {
+            let op = fillet_longitudinal(&body, [walls[pair[0]], walls[pair[1]]], 4., t).unwrap();
+            walls = walls.map(|id| op.history.input_faces["body"][&id][0]);
+            body = op.model;
+        }
+        let q = [0.5, 0.5, 0., std::f64::consts::FRAC_1_SQRT_2];
+        let translation = [25., -12., 7.];
+        body = transform(&body, translation, q, t).unwrap().model;
+        let world_x = [0.5, 0.5, -std::f64::consts::FRAC_1_SQRT_2];
+        let world_y = [0.5, 0.5, std::f64::consts::FRAC_1_SQRT_2];
+        let map_slot = |frame: &SlotStockFrame, x: f64, y: f64, id: &str| {
+            let p = std::array::from_fn(|i| translation[i] + x * world_x[i] + y * world_y[i]);
+            let d = sub(p, frame.origin);
+            ObroundSlot {
+                id: id.into(),
+                center: [dot(d, frame.x_direction), dot(d, frame.y_direction)],
+                direction: [
+                    dot(world_x, frame.x_direction),
+                    dot(world_x, frame.y_direction),
+                ],
+                centerline_length: 6.,
+                radius: 2.,
+            }
+        };
+        let frame = obround_slot_frame(&body, t).unwrap();
+        body = cut_obround_slots(
+            &body,
+            &[
+                map_slot(&frame, -14., 8., "left"),
+                map_slot(&frame, 14., 8., "right"),
+            ],
+            t,
+        )
+        .unwrap()
+        .model;
+        for cap in [FaceId(0), FaceId(1)] {
+            let mut mixed = body.clone();
+            for (x, depth, id) in [(-14., 3., "first"), (14., 5., "second")] {
+                let frame = blind_obround_slot_frame(&mixed, t).unwrap();
+                mixed =
+                    cut_blind_obround_slots(&mixed, &[map_slot(&frame, x, -8., id)], cap, depth, t)
+                        .unwrap()
+                        .model;
+            }
+            let mesh = tessellate_analytic(&mixed, t, TessellationPolicy::default()).unwrap();
+            closed_mesh(&mesh);
+            for patch in &mesh.patches {
+                for i in 1..patch.points.len() - 1 {
+                    let cross_product = cross(
+                        sub(patch.points[i], patch.points[0]),
+                        sub(patch.points[i + 1], patch.points[0]),
+                    );
+                    let length = crate::math::norm(cross_product);
+                    assert!(length.is_normal());
+                    assert!(
+                        (0..3).all(|k| (cross_product[k] / length - patch.normal[k]).abs() < 1e-9),
+                        "face {:?}: {:?}",
+                        patch.face,
+                        patch.points
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mixed_through_queries_preserve_raw_support_direction_checks() {
+        let t = Tolerance::default();
+        let stock = extrude_rectangle(100., 80., 12., t).unwrap().model;
+        let slot = ObroundSlot {
+            id: "mount".into(),
+            center: [25., 20.],
+            direction: [1., 0.],
+            centerline_length: 8.,
+            radius: 3.,
+        };
+        let through = cut_obround_slots(&stock, &[slot], t).unwrap();
+        let walls: [FaceId; 4] = through.history.generated_faces["slot_mount_walls"]
+            .clone()
+            .try_into()
+            .unwrap();
+        let frame = blind_obround_slot_frame(&through.model, t).unwrap();
+        let offset = sub([70., 60., 0.], frame.origin);
+        let pocket = ObroundSlot {
+            id: "pocket".into(),
+            center: [
+                dot(offset, frame.x_direction),
+                dot(offset, frame.y_direction),
+            ],
+            direction: [frame.x_direction[0], frame.y_direction[0]],
+            centerline_length: 10.,
+            radius: 4.,
+        };
+        for cap in [FaceId(0), FaceId(1)] {
+            let mixed =
+                cut_blind_obround_slots(&through.model, std::slice::from_ref(&pocket), cap, 3., t)
+                    .unwrap()
+                    .model;
+            for body in [&through.model, &mixed] {
+                let section = body
+                    .section(
+                        SectionPlane {
+                            origin: [0., 0., 6.],
+                            normal: [0., 0., 1.],
+                            x_direction: [1., 0., 0.],
+                        },
+                        t,
+                    )
+                    .unwrap();
+                assert!(slot_center_frame(body, walls, cap, t).is_ok());
+                assert!(measure_section_slot(body, &section, walls, t).is_ok());
+                for cylinder in [false, true] {
+                    let mut corrupt = body.clone();
+                    if cylinder {
+                        let surface = walls
+                            .iter()
+                            .find_map(|id| {
+                                matches!(corrupt.faces[id.0].surface, Surface::Cylinder(_))
+                                    .then_some(*id)
+                            })
+                            .unwrap();
+                        if let Surface::Cylinder(c) = &mut corrupt.faces[surface.0].surface {
+                            c.axis[0] += 1e-13;
+                        }
+                    } else {
+                        let edge = walls
+                            .iter()
+                            .flat_map(|id| &corrupt.faces[id.0].loops)
+                            .flat_map(|id| &corrupt.loops[id.0].edges)
+                            .find(|e| matches!(corrupt.edges[e.edge.0].curve, Curve::Line(_)))
+                            .unwrap()
+                            .edge;
+                        if let Curve::Line(line) = &mut corrupt.edges[edge.0].curve {
+                            let component = if line.direction[0].abs() < 0.5 { 0 } else { 1 };
+                            line.direction[component] += 1e-13;
+                        }
+                    }
+                    // The bounded shape recognizer intentionally has a looser
+                    // reconstruction threshold than these engineering queries.
+                    if std::ptr::eq(body, &mixed) {
+                        assert!(recognize(&corrupt, t).is_ok());
+                    } else {
+                        assert!(crate::arc_prism::recognize(&corrupt, t).is_ok());
+                    }
+                    assert!(slot_center_frame(&corrupt, walls, cap, t).is_err());
+                    assert!(measure_section_slot(&corrupt, &section, walls, t).is_err());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn four_actual_through_slots_and_four_serial_blind_floors_reconstruct() {
+        let t = Tolerance::default();
+        let body = extrude_rectangle(160., 100., 12., t).unwrap().model;
+        let through_slots = [25., 60., 100., 135.].map(|x| ObroundSlot {
+            id: format!("through_{x}"),
+            center: [x, 20.],
+            direction: [1., 0.],
+            centerline_length: 8.,
+            radius: 3.,
+        });
+        let through = cut_obround_slots(&body, &through_slots, t).unwrap();
+        let first_wall: [FaceId; 4] = through.history.generated_faces["slot_through_25_walls"]
+            .clone()
+            .try_into()
+            .unwrap();
+        let frame = blind_obround_slot_frame(&through.model, t).unwrap();
+        let blind_slots = [25., 60., 100., 135.].map(|x| {
+            let shifted = sub([x, 70., 0.], frame.origin);
+            ObroundSlot {
+                id: format!("blind_{x}"),
+                center: [
+                    dot(shifted, frame.x_direction),
+                    dot(shifted, frame.y_direction),
+                ],
+                direction: [frame.x_direction[1], frame.y_direction[1]],
+                centerline_length: 12.,
+                radius: 4.,
+            }
+        });
+        let through_area = 2. * 3. * 8. + std::f64::consts::PI * 9.;
+        let blind_area = 2. * 4. * 12. + std::f64::consts::PI * 16.;
+        for cap in [FaceId(0), FaceId(1)] {
+            let first =
+                cut_blind_obround_slots(&through.model, &blind_slots[..2], cap, 3., t).unwrap();
+            let old_floor = first.history.generated_faces["slot_blind_25_floor"][0];
+            let final_op =
+                cut_blind_obround_slots(&first.model, &blind_slots[2..], cap, 7., t).unwrap();
+            let mixed = &final_op.model;
+            assert!(mixed.validate(t).valid);
+            let g = recognize(mixed, t).unwrap();
+            assert_eq!(g.stock.slot_holes.len(), 4);
+            assert_eq!(g.slots.len(), 4);
+            assert_eq!(g.depths, vec![3., 3., 7., 7.]);
+            for total in [7, 8] {
+                let mut private_surrogate = g.stock.clone();
+                private_surrogate
+                    .slot_holes
+                    .extend(g.slots[..total - 4].iter().cloned());
+                let raw = crate::arc_prism::construct(&private_surrogate, t).unwrap();
+                assert!(crate::arc_prism::recognize_bounded(&raw, t, 8).is_ok());
+                assert!(crate::arc_prism::recognize(&raw, t).is_err());
+                assert!(!raw.validate(t).valid);
+            }
+            assert_eq!(
+                final_op.history.input_faces["body"][&old_floor],
+                vec![FaceId(old_floor.0 + 8)]
+            );
+            assert_eq!(
+                final_op.history.input_faces["body"][&first_wall[0]],
+                vec![first_wall[0]]
+            );
+            let expected = body.volume() - 4. * through_area * 12. - 2. * blind_area * (3. + 7.);
+            assert!((mixed.mass_properties(t).unwrap().volume - expected).abs() < 1e-7);
+            assert!((mixed.volume() - expected).abs() < 1e-7);
+            closed_mesh(&tessellate_analytic(mixed, t, TessellationPolicy::default()).unwrap());
+            let through_datum = slot_center_frame(mixed, first_wall, cap, t).unwrap();
+            assert!((through_datum.frame.origin[0] - 25.).abs() < 1e-8);
+            let plane = SectionPlane {
+                origin: [0., 0., 6.],
+                normal: [0., 0., 1.],
+                x_direction: [1., 0., 0.],
+            };
+            let section = mixed.section(plane, t).unwrap();
+            let measured = measure_section_slot(mixed, &section, first_wall, t).unwrap();
+            assert!((measured.width_mm - 6.).abs() < 1e-8);
+            assert!((measured.overall_length_mm - 14.).abs() < 1e-8);
+            let blind_walls: [FaceId; 4] = final_op.history.generated_faces["slot_blind_100_walls"]
+                .clone()
+                .try_into()
+                .unwrap();
+            assert!(slot_center_frame(mixed, blind_walls, cap, t).is_err());
+            assert!(measure_section_slot(mixed, &section, blind_walls, t).is_err());
+            for (z, blind_count) in if cap == FaceId(0) {
+                [(1., 4.), (5., 2.), (10., 0.)]
+            } else {
+                [(11., 4.), (7., 2.), (2., 0.)]
+            } {
+                let area = mixed
+                    .section(
+                        SectionPlane {
+                            origin: [0., 0., z],
+                            normal: [0., 0., 1.],
+                            x_direction: [1., 0., 0.],
+                        },
+                        t,
+                    )
+                    .unwrap()
+                    .area;
+                assert!(
+                    (area - (160. * 100. - 4. * through_area - blind_count * blind_area)).abs()
+                        < 1e-7
+                );
+            }
+            let moved = transform(mixed, [17., -31., 9.], [0.2, 0.3, 0.4, 0.71_f64.sqrt()], t)
+                .unwrap()
+                .model;
+            assert!(recognize(&moved, t).is_ok());
+            assert!(slot_center_frame(&moved, first_wall, cap, t).is_ok());
+            let mut corrupt = mixed.clone();
+            if let Surface::Plane(p) =
+                &mut corrupt.faces[final_op.history.input_faces["body"][&old_floor][0].0].surface
+            {
+                p.origin[2] += 0.001;
+            }
+            assert!(recognize(&corrupt, t).is_err());
+            assert!(slot_center_frame(&corrupt, first_wall, cap, t).is_err());
+            let mut corrupt = mixed.clone();
+            corrupt.faces[cap.0].loops.pop();
+            assert!(recognize(&corrupt, t).is_err());
+            assert!(measure_section_slot(&corrupt, &section, first_wall, t).is_err());
+            let mut corrupt = mixed.clone();
+            if let Surface::Cylinder(c) = &mut corrupt.faces[first_wall[1].0].surface {
+                c.radius += 0.001;
+            }
+            assert!(through_slot_witness(&corrupt, t).is_err());
+            assert!(blind_obround_slot_frame(&corrupt, t).is_err());
+            assert!(cut_blind_obround_slots(mixed, &blind_slots[..1], cap, 2., t).is_err());
+            assert!(certify_planar_seating(mixed, cap, &body, FaceId(1 - cap.0), 0.5, t).is_err());
         }
     }
 }
