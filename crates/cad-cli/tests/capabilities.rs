@@ -120,6 +120,7 @@ fn advertised_examples_compile_and_exercise_every_feature_operation() {
         "chamfer",
         "chamfer_faces",
         "fillet",
+        "hole_pattern",
     ]
     .into_iter()
     .map(str::to_owned)

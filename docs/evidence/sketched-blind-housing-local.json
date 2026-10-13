@@ -1,0 +1,601 @@
+{
+  "valid": true,
+  "cases": [
+    {
+      "case": "top-default",
+      "parameters": {},
+      "volume_mm3": 19462.26560303485,
+      "centroid_mm": [
+        -7.184919435884306e-16,
+        8.680587904515388e-18,
+        5.9774012450311025
+      ],
+      "central_inertia_mm5": [
+        [
+          2494966.6347784176,
+          -1.0214377813259754e-11,
+          -1.4716424097273664e-10
+        ],
+        [
+          -1.0214377813259754e-11,
+          4582449.244430522,
+          5.8182187598253514e-11
+        ],
+        [
+          -1.4716424097273664e-10,
+          5.8182187598253514e-11,
+          6610927.814267898
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    },
+    {
+      "case": "bottom-default",
+      "parameters": {
+        "underside": 1
+      },
+      "volume_mm3": 19462.265603034855,
+      "centroid_mm": [
+        -3.504838749211856e-16,
+        3.825300544871135e-16,
+        6.022598754968895
+      ],
+      "central_inertia_mm5": [
+        [
+          2494966.634778418,
+          1.8889452643473947e-11,
+          1.575863364794107e-10
+        ],
+        [
+          1.8889452643473947e-11,
+          4582449.244430523,
+          4.38009146701145e-11
+        ],
+        [
+          1.575863364794107e-10,
+          4.38009146701145e-11,
+          6610927.814267898
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    },
+    {
+      "case": "top-posed",
+      "parameters": {
+        "pose": 1
+      },
+      "volume_mm3": 19462.26560303485,
+      "centroid_mm": [
+        18.977401245031096,
+        -7.0,
+        14.99999999999999
+      ],
+      "central_inertia_mm5": [
+        [
+          6610927.8142679045,
+          9.313225746154785e-10,
+          -4.6566128730773926e-09
+        ],
+        [
+          9.313225746154785e-10,
+          2494966.634778429,
+          1.6298145055770874e-09
+        ],
+        [
+          -4.6566128730773926e-09,
+          1.6298145055770874e-09,
+          4582449.244430525
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    },
+    {
+      "case": "bottom-posed",
+      "parameters": {
+        "underside": 1,
+        "pose": 1
+      },
+      "volume_mm3": 19462.265603034855,
+      "centroid_mm": [
+        19.02259875496889,
+        -6.999999999999999,
+        14.99999999999999
+      ],
+      "central_inertia_mm5": [
+        [
+          6610927.814267904,
+          9.313225746154785e-10,
+          -2.7939677238464355e-09
+        ],
+        [
+          9.313225746154785e-10,
+          2494966.6347784232,
+          1.3969838619232178e-09
+        ],
+        [
+          -2.7939677238464355e-09,
+          1.3969838619232178e-09,
+          4582449.244430523
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    },
+    {
+      "case": "top-oblique",
+      "parameters": {
+        "pose": 2,
+        "pattern_y": 3
+      },
+      "volume_mm3": 19462.265603034855,
+      "centroid_mm": [
+        13.585932810388234,
+        -9.406850914536188,
+        22.373744010324533
+      ],
+      "central_inertia_mm5": [
+        [
+          3814633.5628976934,
+          -978508.6516603485,
+          1266451.8758756295
+        ],
+        [
+          -978508.6516603485,
+          3848050.218882261,
+          268808.8097007894
+        ],
+        [
+          1266451.8758756295,
+          268808.8097007894,
+          6023383.360077895
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    },
+    {
+      "case": "bottom-oblique",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3
+      },
+      "volume_mm3": 19462.265603034855,
+      "centroid_mm": [
+        13.58540406744969,
+        -9.378817524382784,
+        22.42625598967545
+      ],
+      "central_inertia_mm5": [
+        [
+          3814633.562897701,
+          -978508.6516603483,
+          1266451.8758756286
+        ],
+        [
+          -978508.6516603483,
+          3848050.218882257,
+          268808.80970079126
+        ],
+        [
+          1266451.8758756286,
+          268808.80970079126,
+          6023383.360077893
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    },
+    {
+      "case": "top-different",
+      "parameters": {
+        "half_pitch": 15,
+        "hole_radius": 3,
+        "hole_depth": 7
+      },
+      "volume_mm3": 19192.088634826127,
+      "centroid_mm": [
+        -2.8877697703374493e-16,
+        3.9511009610419174e-16,
+        5.948436998978576
+      ],
+      "central_inertia_mm5": [
+        [
+          2491871.3957391744,
+          -6.522482296579679e-11,
+          8.981415888908878e-11
+        ],
+        [
+          -6.522482296579679e-11,
+          4522459.762434768,
+          4.349429391206428e-11
+        ],
+        [
+          8.981415888908878e-11,
+          4.349429391206428e-11,
+          6552503.6156890895
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    },
+    {
+      "case": "bottom-different",
+      "parameters": {
+        "half_pitch": 17,
+        "hole_radius": 1.5,
+        "hole_depth": 4,
+        "underside": 1,
+        "pose": 1
+      },
+      "volume_mm3": 19531.38064141383,
+      "centroid_mm": [
+        19.011581089694133,
+        -7.0,
+        14.999999999999998
+      ],
+      "central_inertia_mm5": [
+        [
+          6626942.868217735,
+          -9.313225746154785e-10,
+          1.862645149230957e-09
+        ],
+        [
+          -9.313225746154785e-10,
+          2495888.812609868,
+          -2.3283064365386963e-10
+        ],
+        [
+          1.862645149230957e-09,
+          -2.3283064365386963e-10,
+          4599198.766050758
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6",
+      "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3"
+    }
+  ],
+  "rejected": [
+    {
+      "case": "touch-central-bore",
+      "parameters": {
+        "half_pitch": 9
+      },
+      "error": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: expected a bounded simple CCW line/arc prism",
+        "error": "feature 'housing' failed: unsupported geometry: expected a bounded simple CCW line/arc prism",
+        "feature": "housing",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6"
+        }
+      }
+    },
+    {
+      "case": "touch-outer-wall",
+      "parameters": {
+        "half_pitch": 23
+      },
+      "error": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: expected a bounded simple CCW line/arc prism",
+        "error": "feature 'housing' failed: unsupported geometry: expected a bounded simple CCW line/arc prism",
+        "feature": "housing",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6"
+        }
+      }
+    },
+    {
+      "case": "floor-breakthrough",
+      "parameters": {
+        "hole_depth": 12
+      },
+      "error": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: blind hole 'clamp_left' leaves insufficient floor thickness",
+        "error": "feature 'housing' failed: unsupported geometry: blind hole 'clamp_left' leaves insufficient floor thickness",
+        "feature": "housing",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6"
+        }
+      }
+    },
+    {
+      "case": "underconstrained",
+      "parameters": {},
+      "error": {
+        "causes": [],
+        "code": "sketch_solve_failed",
+        "error": "sketch feature 'housing' did not solve completely",
+        "feature": "housing",
+        "sketch": {
+          "angular_tolerance_radians": 1e-09,
+          "condition_bound": null,
+          "constraint_residuals": [
+            {
+              "id": "center_pitch",
+              "residual_mm": 0.0
+            },
+            {
+              "id": "ground_left",
+              "residual_mm": 0.0
+            },
+            {
+              "id": "left_radius",
+              "residual_mm": 0.0
+            },
+            {
+              "id": "left_radius_axis",
+              "residual_mm": 0.0
+            },
+            {
+              "id": "right_radius",
+              "residual_mm": 4.718447854656915e-16
+            },
+            {
+              "id": "right_radius_axis",
+              "residual_mm": 0.0
+            }
+          ],
+          "degrees_of_freedom": 1,
+          "islands": [
+            {
+              "condition_bound": null,
+              "constraint_ids": [
+                "center_pitch",
+                "ground_left",
+                "left_radius",
+                "left_radius_axis",
+                "right_radius",
+                "right_radius_axis"
+              ],
+              "degrees_of_freedom": 1,
+              "id": "center_left",
+              "iterations": 0,
+              "max_angular_residual_radians": 0.0,
+              "max_residual_mm": 4.718447854656915e-16,
+              "message": "converged equations have a rank-deficient local Jacobian; degrees of freedom are a local linearization",
+              "point_ids": [
+                "center_left",
+                "center_right",
+                "rim_left",
+                "rim_right"
+              ],
+              "rank": 7,
+              "redundant_equations": 0,
+              "status": "underconstrained"
+            }
+          ],
+          "iterations": 0,
+          "max_angular_residual_radians": 0.0,
+          "max_residual_mm": 4.718447854656915e-16,
+          "message": "converged equations have a rank-deficient local Jacobian; degrees of freedom are a local linearization",
+          "points": {
+            "center_left": [
+              -16.0,
+              0.0
+            ],
+            "center_right": [
+              16.0,
+              0.0
+            ],
+            "rim_left": [
+              -14.0,
+              0.0
+            ],
+            "rim_right": [
+              18.0,
+              0.0
+            ]
+          },
+          "rank": 7,
+          "redundant_equations": 0,
+          "schema_version": 3,
+          "solver_build_id": "9f137bc49d9ed4051cc30ea22d0985d07e97c31f80a53783d6b99060e7d461b2",
+          "status": "underconstrained",
+          "tolerance_mm": 1e-07
+        },
+        "solver_build_id": "9f137bc49d9ed4051cc30ea22d0985d07e97c31f80a53783d6b99060e7d461b2",
+        "target_content_hash": "84cb03f63398a2c893e78fe696856bb56fbafd8f7bc58c7e869b6c571301f041"
+      }
+    },
+    {
+      "case": "overconstrained",
+      "parameters": {},
+      "error": {
+        "causes": [],
+        "code": "sketch_solve_failed",
+        "error": "sketch feature 'housing' did not solve completely",
+        "feature": "housing",
+        "sketch": {
+          "angular_tolerance_radians": 1e-09,
+          "condition_bound": 12.22020185321558,
+          "constraint_residuals": [
+            {
+              "id": "center_axis",
+              "residual_mm": 0.0
+            },
+            {
+              "id": "center_pitch",
+              "residual_mm": 0.33333333332368387
+            },
+            {
+              "id": "ground_left",
+              "residual_mm": 0.33333333316329217
+            },
+            {
+              "id": "left_radius",
+              "residual_mm": 9.662814992594804e-11
+            },
+            {
+              "id": "left_radius_axis",
+              "residual_mm": 0.0
+            },
+            {
+              "id": "right_radius",
+              "residual_mm": 1.1858355963845213e-10
+            },
+            {
+              "id": "right_radius_axis",
+              "residual_mm": 0.0
+            },
+            {
+              "id": "wrong_right",
+              "residual_mm": 0.33333333351302574
+            }
+          ],
+          "degrees_of_freedom": 0,
+          "islands": [
+            {
+              "condition_bound": 12.22020185321558,
+              "constraint_ids": [
+                "center_axis",
+                "center_pitch",
+                "ground_left",
+                "left_radius",
+                "left_radius_axis",
+                "right_radius",
+                "right_radius_axis",
+                "wrong_right"
+              ],
+              "degrees_of_freedom": 0,
+              "id": "center_left",
+              "iterations": 24,
+              "max_angular_residual_radians": 0.0,
+              "max_residual_mm": 0.33333333351302574,
+              "message": "local iteration stagnated; this does not establish global inconsistency",
+              "point_ids": [
+                "center_left",
+                "center_right",
+                "rim_left",
+                "rim_right"
+              ],
+              "rank": 8,
+              "redundant_equations": 2,
+              "status": "not_converged"
+            }
+          ],
+          "iterations": 24,
+          "max_angular_residual_radians": 0.0,
+          "max_residual_mm": 0.33333333351302574,
+          "message": "local iteration stagnated; this does not establish global inconsistency",
+          "points": {
+            "center_left": [
+              -15.666666666836708,
+              0.0
+            ],
+            "center_right": [
+              16.666666666486975,
+              0.0
+            ],
+            "rim_left": [
+              -13.666666666933336,
+              0.0
+            ],
+            "rim_right": [
+              18.666666666368393,
+              0.0
+            ]
+          },
+          "rank": 8,
+          "redundant_equations": 2,
+          "schema_version": 3,
+          "solver_build_id": "9f137bc49d9ed4051cc30ea22d0985d07e97c31f80a53783d6b99060e7d461b2",
+          "status": "not_converged",
+          "tolerance_mm": 1e-07
+        },
+        "solver_build_id": "9f137bc49d9ed4051cc30ea22d0985d07e97c31f80a53783d6b99060e7d461b2",
+        "target_content_hash": "2e2e8a263f54b6ae4891819d55b3942f67d7458b5c1f02e00d55866fea4d3ee7"
+      }
+    },
+    {
+      "case": "nonplanar-face",
+      "parameters": {},
+      "error": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "invalid planar face frame: curved faces do not have a unique planar face frame",
+        "error": "feature 'housing' failed: invalid planar face frame: curved faces do not have a unique planar face frame",
+        "feature": "housing",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6"
+        }
+      }
+    },
+    {
+      "case": "posed-parallel-hint",
+      "parameters": {
+        "pose": 1
+      },
+      "error": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "invalid planar face frame: X direction hint is parallel or ill-conditioned relative to the face normal",
+        "error": "feature 'housing' failed: invalid planar face frame: X direction hint is parallel or ill-conditioned relative to the face normal",
+        "feature": "housing",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6"
+        }
+      }
+    }
+  ],
+  "executable": {
+    "path": "/tmp/cad-sketched-blind-final",
+    "sha256": "90018fb35d8f16dcb1d18491af8cdcf6f888d57a0691af90fc9d71285c1d422d"
+  },
+  "source": {
+    "path": "/home/codex/headless-cad/examples/sketched_blind_housing.star",
+    "sha256": "bf6a27a0b56f21d90b30a76324ae5db1a22a40d814d32d28be9f5a8fd89f8169"
+  },
+  "oracle": {
+    "python": "3.13.15",
+    "python_executable": "/tmp/cad-export-oracle/bin/python",
+    "ocp_distribution": "cadquery-ocp",
+    "ocp_version": "8.0.1.1.0"
+  },
+  "scope": "One solved planar face-attached pattern of contained, disjoint, flat-bottom blind bores on a rounded right prism; OCCT is a test-only independent oracle. No threads, drill tips, arbitrary pockets, or load rating."
+}

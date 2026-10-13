@@ -107,7 +107,10 @@ pub(super) fn budget(recipe: &Recipe, wanted: &BTreeSet<&str>) -> Result<(), Bui
     if recipe
         .features
         .iter()
-        .filter(|f| wanted.contains(f.id()) && matches!(f, Feature::Sketch { .. }))
+        .filter(|f| {
+            wanted.contains(f.id())
+                && matches!(f, Feature::Sketch { .. } | Feature::HolePattern { .. })
+        })
         .count()
         > MAX_SOLVED_SKETCHES
     {

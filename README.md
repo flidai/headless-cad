@@ -2041,6 +2041,44 @@ seams. `npm run test:through-bore --prefix tools/preview-check` verifies twelve
 browser views and 1,190 visibility samples, including exposed jaw holes, sleeve
 bores and the exact captured recipe.
 
+### Constrained blind-hole patterns on named faces
+
+[sketched_blind_housing.star](examples/sketched_blind_housing.star) places two
+blind clamp holes in a rounded housing with a central through bore. The
+`hole_pattern` operation solves an inline sketch on a named cap face, derives
+radii from center/rim points, and cuts native circular walls and flat floors.
+Changing pitch, radius or depth regenerates the exact geometry, named face checks,
+section diameters, STEP and STL.
+
+```sh
+cargo run --release --locked -p cad-cli -- build examples/sketched_blind_housing.star \
+  --out-dir out/sketched_blind_housing --param half_pitch=16 --param hole_depth=5
+```
+
+With the viewer server running, open
+`http://localhost:8080/sketched_blind_housing/housing.preview.html`. The captured
+Starlark remains the model source. `underside=1` drills the opposite cap;
+`pose=1` or `pose=2` places the body before drilling and rotates the sketch frame
+with it. Generated roles `hole_clamp_left_floor` and `hole_clamp_right_floor`
+retain their identity after subsequent holes.
+
+This experimental operation accepts 1–16 separated, contained circular blind
+holes on one recognized prism cap, with a fully constrained sketch and positive
+remaining floor thickness. The frame is fixed before the first cut. It rejects
+unresolved constraints, contact with other bores, breakthrough and side drilling.
+The independent [OCCT check](tools/check-sketched-blind-housing.py) compares actual
+solids, volume and mass properties across cap, pose and parameter changes.
+The retained [local oracle report](docs/evidence/sketched-blind-housing-local.json)
+records eight top/bottom, identity/cyclic/oblique and parameter-change cases:
+both directed STEP solid differences were 0 mm³ in every case, with volume,
+centroid, inertia and captured-source replay checks passing. Seven invalid
+constraint, tangency, floor, face and frame edits were refused while preserving
+every previously published artifact byte. The focused
+[viewer check](tools/preview-check/sketched-blind-housing.cjs) picked both actual
+floors from each cap, displayed the captured recipe and two diameter labels,
+and observed GET-only inspection without exact-geometry downloads. These are
+nominal test results for the supported domain, not manufacturing certification.
+
 ### Tooling pallets with blind sockets
 
 [blind_bore.star](examples/blind_bore.star) isolates a flat-bottom cylindrical

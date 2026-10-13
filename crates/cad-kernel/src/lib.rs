@@ -32,6 +32,7 @@ mod analytic;
 mod arc_prism;
 mod bore_trim_clearance;
 mod bored_prism;
+mod cap_holes;
 mod circular_boolean;
 mod convex_clearance;
 mod convex_trim_clearance;
@@ -85,6 +86,7 @@ pub use analytic::{
 };
 pub use arc_prism::{extrude_path, validate_path, ArcPrismGeometry, PathSegment, PlanarPath};
 pub use bored_prism::{BoredPrismGeometry, PrismBore};
+pub use cap_holes::{drill_cap_pattern, CapBlindHole, MAX_CAP_BLIND_HOLES};
 pub use face_frame::FaceFrame;
 pub use mass_properties::MassProperties;
 pub use math::Tolerance;

@@ -3439,3 +3439,57 @@ Rust callers that reuse an engine across revisions. Current-build intermediates,
 external results, producer scratch space, disk-cache parsing and exports remain
 outside this cache policy. It is not exact-operation admission and does not close
 R1/R2 or the assembly-scale gate.
+
+### Face-attached constrained blind-hole patterns
+
+`hole_pattern` combines an inline constrained sketch with native blind drilling.
+One semantic face selector resolves exactly one existing prism cap before cache
+lookup. The cap's area-centroid frame, an authored X-direction hint and a
+tangent-only origin offset define the sketch plane. That frame is frozen before
+any cuts, so a changing cap centroid after the first hole cannot move later holes.
+Named center/rim points determine each solved radius; depth remains an explicit
+positive parameter. Underconstrained or contradictory sketches refuse.
+
+The initial domain is one to sixteen named, separated circular blind holes in a
+recognized straight or rounded right prism, including supported prior circular
+through/blind holes. Each disk must remain inside material, with a positive floor
+and no tangency or contact with another bore. The selected face must be an actual
+prism end cap. Both end caps and common rigid poses use the same native contract;
+the X hint must be transformed with the body when preserving the same local intent.
+Side drilling, breakthrough and general pockets are outside this operation.
+
+The kernel composes original-body face lineage through every cut and publishes
+`hole_<id>_wall` and `hole_<id>_floor` roles. Prior generated roles are mapped through
+later cuts rather than recovered by geometric proximity. The feature identity
+includes source intent, parent geometry, solver identity, resolved face and frame.
+Solver reports and semantic selection are evaluated on cache hits as well as misses.
+Whole-recipe structural checks and existing sketch/selection work limits still
+apply to selected-output builds.
+
+Acceptance uses a rounded housing with a central through bore and two constrained
+blind clamp holes. Parameter changes, both caps and a body transformed before
+drilling are checked against independently constructed OCCT solids, analytic volume
+and native engineering reports. Invalid constraints, tangent cuts and lost floor
+thickness must preserve the previous generation. This adds a bounded machining
+feature; broader feature editing and the commercial modeling gate remain open.
+
+The retained [local oracle report](evidence/sketched-blind-housing-local.json)
+pins the release executable and source SHA-256 plus Python/OCP versions. Eight
+cases include an oblique quaternion with a nonzero tangent-frame offset on both
+caps, so the opposite cap's Y handedness is exercised. OCCT constructs its own
+filleted prism and actual cylindrical cuts; both directed differences from the
+native STEP solid are 0 mm³ in every case. Closed-form volume, independent
+centroid/inertia, native role and section results, and captured-source STEP
+replays also agree. Seven invalid cases preserve the complete prior generation.
+The read-only browser check verifies both visible blind floors, captured Starlark
+and diameter labels. This evidence covers the stated bounded domain only.
+
+The separate [boundary sweep](evidence/sketched-blind-housing-boundaries.json),
+reproducible with [the CLI tool](../tools/check-sketched-blind-boundaries.py),
+exercises 32 additional builds across both caps and identity/oblique poses.
+Twelve safely separated cuts (0.25 mm radial margin or 0.5 mm floor) match
+closed-form volume and pass native verification. Twenty exact-tangent,
+overlapping, outer-crossing or floor-breakthrough builds refuse while preserving
+every byte of the previous verified generation. The central tangent pitch
+accounts for the oblique case's 3 mm face-frame Y offset; this is a bounded
+adversarial sweep, not a general tolerance or machining proof.

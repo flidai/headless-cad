@@ -1,0 +1,395 @@
+{
+  "valid": true,
+  "executable_sha256": "90018fb35d8f16dcb1d18491af8cdcf6f888d57a0691af90fc9d71285c1d422d",
+  "source_sha256": "bf6a27a0b56f21d90b30a76324ae5db1a22a40d814d32d28be9f5a8fd89f8169",
+  "domain": "rounded 50x36x12 R4 stock, existing central through bore R7, two blind R2 holes; identity and oblique pose, both caps",
+  "acceptance_rule": "safe-clearance offset 0.25 mm, positive floor 0.5 mm; exact tangent and overlapping/breakthrough cases refuse",
+  "cases": [
+    {
+      "case": "central-clearance-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 9.25
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303485,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "central-tangent",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 9.0
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "central-overlap-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 8.75
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "outer-clearance-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 22.75
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303485,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "outer-tangent",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 23
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "outer-breakthrough-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 23.25
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "floor-remains-0.5",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "hole_depth": 11.5
+      },
+      "accepted": true,
+      "volume_mm3": 19298.90278504818,
+      "expected_volume_mm3": 19298.90278504818
+    },
+    {
+      "case": "floor-breakthrough",
+      "parameters": {
+        "underside": 0,
+        "pose": 0,
+        "pattern_y": 0,
+        "hole_depth": 12
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "central-clearance-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 8.73528137423857
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303486,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "central-tangent",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 8.48528137423857
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "central-overlap-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 8.23528137423857
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "outer-clearance-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 22.75
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303486,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "outer-tangent",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 23
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "outer-breakthrough-0.25",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 23.25
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "floor-remains-0.5",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "hole_depth": 11.5
+      },
+      "accepted": true,
+      "volume_mm3": 19298.902785048187,
+      "expected_volume_mm3": 19298.90278504818
+    },
+    {
+      "case": "floor-breakthrough",
+      "parameters": {
+        "underside": 0,
+        "pose": 2,
+        "pattern_y": 3,
+        "hole_depth": 12
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "central-clearance-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 9.25
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303485,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "central-tangent",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 9.0
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "central-overlap-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 8.75
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "outer-clearance-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 22.75
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303485,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "outer-tangent",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 23
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "outer-breakthrough-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "half_pitch": 23.25
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "floor-remains-0.5",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "hole_depth": 11.5
+      },
+      "accepted": true,
+      "volume_mm3": 19298.90278504818,
+      "expected_volume_mm3": 19298.90278504818
+    },
+    {
+      "case": "floor-breakthrough",
+      "parameters": {
+        "underside": 1,
+        "pose": 0,
+        "pattern_y": 0,
+        "hole_depth": 12
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 11
+    },
+    {
+      "case": "central-clearance-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 8.73528137423857
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303486,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "central-tangent",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 8.48528137423857
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "central-overlap-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 8.23528137423857
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "outer-clearance-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 22.75
+      },
+      "accepted": true,
+      "volume_mm3": 19462.26560303486,
+      "expected_volume_mm3": 19462.26560303485
+    },
+    {
+      "case": "outer-tangent",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 23
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "outer-breakthrough-0.25",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "half_pitch": 23.25
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    },
+    {
+      "case": "floor-remains-0.5",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "hole_depth": 11.5
+      },
+      "accepted": true,
+      "volume_mm3": 19298.902785048187,
+      "expected_volume_mm3": 19298.90278504818
+    },
+    {
+      "case": "floor-breakthrough",
+      "parameters": {
+        "underside": 1,
+        "pose": 2,
+        "pattern_y": 3,
+        "hole_depth": 12
+      },
+      "accepted": false,
+      "error_code": "kernel_operation_failed",
+      "preserved_files": 9
+    }
+  ],
+  "accepted": 12,
+  "rejected": 20
+}

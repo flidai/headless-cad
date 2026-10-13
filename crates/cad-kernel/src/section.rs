@@ -29,8 +29,8 @@ pub struct SectionSegment {
     pub face: FaceId,
     pub curve: SectionCurve,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SectionCurve {
     Line {
         start: [f64; 2],
@@ -42,6 +42,120 @@ pub enum SectionCurve {
         start_angle: f64,
         sweep_angle: f64,
     },
+}
+// Deserialize numeric fields directly from the input map. Serde's derived
+// internally-tagged enum buffers fields as Content, which does not preserve
+// typed f64 decoding when serde_json/arbitrary_precision is enabled elsewhere
+// in the workspace.
+impl<'de> Deserialize<'de> for SectionCurve {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = SectionCurve;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a line or arc section curve")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut map: M,
+            ) -> Result<Self::Value, M::Error> {
+                use serde::de::Error;
+                let (mut kind, mut start, mut end, mut center) = (None, None, None, None);
+                let (mut radius, mut start_angle, mut sweep_angle) = (None, None, None);
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "kind" => {
+                            if kind.is_some() {
+                                return Err(M::Error::duplicate_field("kind"));
+                            }
+                            kind = Some(map.next_value::<String>()?);
+                        }
+                        "start" => {
+                            if start.is_some() {
+                                return Err(M::Error::duplicate_field("start"));
+                            }
+                            start = Some(map.next_value::<[f64; 2]>()?);
+                        }
+                        "end" => {
+                            if end.is_some() {
+                                return Err(M::Error::duplicate_field("end"));
+                            }
+                            end = Some(map.next_value::<[f64; 2]>()?);
+                        }
+                        "center" => {
+                            if center.is_some() {
+                                return Err(M::Error::duplicate_field("center"));
+                            }
+                            center = Some(map.next_value::<[f64; 2]>()?);
+                        }
+                        "radius" => {
+                            if radius.is_some() {
+                                return Err(M::Error::duplicate_field("radius"));
+                            }
+                            radius = Some(map.next_value::<f64>()?);
+                        }
+                        "start_angle" => {
+                            if start_angle.is_some() {
+                                return Err(M::Error::duplicate_field("start_angle"));
+                            }
+                            start_angle = Some(map.next_value::<f64>()?);
+                        }
+                        "sweep_angle" => {
+                            if sweep_angle.is_some() {
+                                return Err(M::Error::duplicate_field("sweep_angle"));
+                            }
+                            sweep_angle = Some(map.next_value::<f64>()?);
+                        }
+                        _ => {
+                            return Err(M::Error::unknown_field(
+                                &key,
+                                &[
+                                    "kind",
+                                    "start",
+                                    "end",
+                                    "center",
+                                    "radius",
+                                    "start_angle",
+                                    "sweep_angle",
+                                ],
+                            ));
+                        }
+                    }
+                }
+                let kind = kind.ok_or_else(|| M::Error::missing_field("kind"))?;
+                match kind.as_str() {
+                    "line" => {
+                        if center.is_some()
+                            || radius.is_some()
+                            || start_angle.is_some()
+                            || sweep_angle.is_some()
+                        {
+                            return Err(M::Error::custom("line section curve contains arc fields"));
+                        }
+                        Ok(SectionCurve::Line {
+                            start: start.ok_or_else(|| M::Error::missing_field("start"))?,
+                            end: end.ok_or_else(|| M::Error::missing_field("end"))?,
+                        })
+                    }
+                    "arc" => {
+                        if start.is_some() || end.is_some() {
+                            return Err(M::Error::custom("arc section curve contains line fields"));
+                        }
+                        Ok(SectionCurve::Arc {
+                            center: center.ok_or_else(|| M::Error::missing_field("center"))?,
+                            radius: radius.ok_or_else(|| M::Error::missing_field("radius"))?,
+                            start_angle: start_angle
+                                .ok_or_else(|| M::Error::missing_field("start_angle"))?,
+                            sweep_angle: sweep_angle
+                                .ok_or_else(|| M::Error::missing_field("sweep_angle"))?,
+                        })
+                    }
+                    _ => Err(M::Error::unknown_variant(&kind, &["line", "arc"])),
+                }
+            }
+        }
+        deserializer.deserialize_map(Visitor)
+    }
 }
 fn unsupported(reason: &str) -> KernelError {
     KernelError::Unsupported(format!("planar section: {reason}"))
@@ -446,6 +560,28 @@ mod tests {
     }
     fn close(a: f64, b: f64) {
         assert!((a - b).abs() < 1e-8, "{a} != {b}");
+    }
+    #[test]
+    fn typed_section_curves_round_trip_fractional_values_and_reject_extra_fields() {
+        for source in [
+            r#"{"kind":"line","start":[0.125,-2.75],"end":[3.625,4.5]}"#,
+            r#"{"kind":"arc","center":[1.125,-0.375],"radius":2.75,"start_angle":0.125,"sweep_angle":-1.625}"#,
+        ] {
+            let curve: SectionCurve = serde_json::from_str(source).unwrap();
+            let encoded = serde_json::to_string(&curve).unwrap();
+            assert_eq!(curve, serde_json::from_str(&encoded).unwrap());
+        }
+        for source in [
+            r#"{"kind":"line","start":[0,0],"end":[1,0],"radius":2}"#,
+            r#"{"kind":"arc","center":[0,0],"radius":2,"start_angle":0,"sweep_angle":1,"end":[1,0]}"#,
+            r#"{"kind":"line","start":[0,0],"start":[1,0],"end":[2,0]}"#,
+            r#"{"kind":"arc","center":[0,0],"radius":2,"start_angle":0,"sweep_angle":1,"extra":0}"#,
+        ] {
+            assert!(
+                serde_json::from_str::<SectionCurve>(source).is_err(),
+                "{source}"
+            );
+        }
     }
     #[test]
     fn planar_box_general_plane_and_empty_event_contract() {

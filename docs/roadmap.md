@@ -856,3 +856,13 @@ Repeated revisions in one Rust engine no longer accumulate unlimited cache-owned
 entries. Within-build sharing and disk reuse remain available. This is cache
 lifecycle control; producer admission, live intermediate residency and total-memory
 bounds remain open.
+
+Face-attached blind-hole patterns now connect a constrained sketch to a named
+native prism cap. The rounded housing fixture varies pitch, radius, depth, cap
+side and body pose, retains named wall/floor lineage, and regenerates native
+diameter annotations and open exports. Independent solid comparisons and
+publication-preserving failures establish this bounded domain; general pockets,
+broader face-attached features and the commercial modeling gate remain open.
+The [retained local oracle](evidence/sketched-blind-housing-local.json) has eight
+OCCT comparisons with zero directed STEP solid difference, including oblique
+top/bottom poses with tangent offsets, plus seven preserved-generation refusals.

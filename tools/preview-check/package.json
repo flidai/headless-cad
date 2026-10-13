@@ -42,7 +42,8 @@
     "test:blind-bore": "node blind-bore-check.cjs",
     "test:counterbore": "node counterbore-check.cjs",
     "test:round-stock": "node round-stock-check.cjs",
-    "test:countersink": "node countersink-check.cjs"
+    "test:countersink": "node countersink-check.cjs",
+    "test:sketched-blind-housing": "node sketched-blind-housing.cjs"
   },
   "devDependencies": {
     "playwright": "1.64.0"

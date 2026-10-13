@@ -352,6 +352,17 @@ pub struct SketchCircleHole {
     pub rim: String,
 }
 
+/// One named blind circular cut positioned by solved face-local sketch points.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BlindPatternHole {
+    pub id: String,
+    pub center: String,
+    pub rim: String,
+    pub depth: f64,
+}
+pub const MAX_BLIND_PATTERN_HOLES: usize = 16;
+
 /// A closed outer path whose coordinates come from solved sketch points.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -442,6 +453,17 @@ pub enum Feature {
         radius: f64,
         op_version: u32,
     },
+    HolePattern {
+        id: String,
+        body: String,
+        face: ChamferFace,
+        x_direction_hint: [f64; 3],
+        origin_offset: [f64; 2],
+        sketch: Sketch,
+        #[serde(rename = "pattern_holes")]
+        holes: Vec<BlindPatternHole>,
+        op_version: u32,
+    },
     ChamferFaces {
         id: String,
         body: String,
@@ -523,6 +545,10 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut height = None;
                 let mut body = None;
                 let mut face_normals = None;
+                let mut face = None;
+                let mut x_direction_hint = None;
+                let mut origin_offset = None;
+                let mut pattern_holes = None;
                 let mut faces = None;
                 let mut distance = None;
                 let mut offset = None;
@@ -562,6 +588,10 @@ impl<'de> Deserialize<'de> for Feature {
                         "body" => read_field!(body, String),
                         "faces" => read_field!(faces, [ChamferFace; 2]),
                         "face_normals" => read_field!(face_normals, [[f64; 3]; 2]),
+                        "face" => read_field!(face, ChamferFace),
+                        "x_direction_hint" => read_field!(x_direction_hint, [f64; 3]),
+                        "origin_offset" => read_field!(origin_offset, [f64; 2]),
+                        "pattern_holes" => read_field!(pattern_holes, Vec<BlindPatternHole>),
                         "distance" => read_field!(distance, f64),
                         "offset" => read_field!(offset, [f64; 3]),
                         "rotation" => read_field!(rotation, [f64; 4]),
@@ -591,6 +621,10 @@ impl<'de> Deserialize<'de> for Feature {
                                     "body",
                                     "faces",
                                     "face_normals",
+                                    "face",
+                                    "x_direction_hint",
+                                    "origin_offset",
+                                    "pattern_holes",
                                     "distance",
                                     "offset",
                                     "rotation",
@@ -636,6 +670,17 @@ impl<'de> Deserialize<'de> for Feature {
                     "revolve" => &["op", "id", "op_version", "profile"],
                     "extrude" => &["op", "id", "op_version", "profile", "height"],
                     "fillet" => &["op", "id", "op_version", "body", "faces", "radius"],
+                    "hole_pattern" => &[
+                        "op",
+                        "id",
+                        "op_version",
+                        "body",
+                        "face",
+                        "x_direction_hint",
+                        "origin_offset",
+                        "sketch",
+                        "pattern_holes",
+                    ],
                     "chamfer_faces" => &["op", "id", "op_version", "body", "faces", "distance"],
                     "chamfer" => &["op", "id", "op_version", "body", "face_normals", "distance"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
@@ -655,6 +700,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "extrude",
                                 "revolve",
                                 "fillet",
+                                "hole_pattern",
                                 "chamfer_faces",
                                 "chamfer",
                                 "translate",
@@ -743,6 +789,18 @@ impl<'de> Deserialize<'de> for Feature {
                         faces: faces.ok_or_else(|| M::Error::missing_field("faces"))?,
                         radius: radius.ok_or_else(|| M::Error::missing_field("radius"))?,
                     },
+                    "hole_pattern" => Feature::HolePattern {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        face: face.ok_or_else(|| M::Error::missing_field("face"))?,
+                        x_direction_hint: x_direction_hint
+                            .ok_or_else(|| M::Error::missing_field("x_direction_hint"))?,
+                        origin_offset: origin_offset.unwrap_or([0.; 2]),
+                        sketch: sketch.ok_or_else(|| M::Error::missing_field("sketch"))?,
+                        holes: pattern_holes
+                            .ok_or_else(|| M::Error::missing_field("pattern_holes"))?,
+                    },
                     "chamfer_faces" => Feature::ChamferFaces {
                         id,
                         op_version,
@@ -812,6 +870,7 @@ impl Feature {
             | Self::Extrude { id, .. }
             | Self::Revolve { id, .. }
             | Self::Fillet { id, .. }
+            | Self::HolePattern { id, .. }
             | Self::ChamferFaces { id, .. }
             | Self::Chamfer { id, .. }
             | Self::Translate { id, .. }
@@ -835,6 +894,13 @@ impl Feature {
                     if !dependencies.contains(&face.from_feature.as_str()) {
                         dependencies.push(&face.from_feature);
                     }
+                }
+                dependencies
+            }
+            Self::HolePattern { body, face, .. } => {
+                let mut dependencies = vec![body.as_str()];
+                if face.from_feature != *body {
+                    dependencies.push(&face.from_feature);
                 }
                 dependencies
             }
@@ -866,6 +932,7 @@ impl Feature {
             | Self::Extrude { op_version, .. }
             | Self::Revolve { op_version, .. }
             | Self::Fillet { op_version, .. }
+            | Self::HolePattern { op_version, .. }
             | Self::ChamferFaces { op_version, .. }
             | Self::Chamfer { op_version, .. }
             | Self::Translate { op_version, .. }
@@ -885,6 +952,7 @@ impl Feature {
             Self::Extrude { .. } => "extrude",
             Self::Revolve { .. } => "revolve",
             Self::Fillet { .. } => "fillet",
+            Self::HolePattern { .. } => "hole_pattern",
             Self::ChamferFaces { .. } => "chamfer_faces",
             Self::Chamfer { .. } => "chamfer",
             Self::Translate { .. } => "translate",
@@ -1044,6 +1112,8 @@ pub enum BuildError {
     InvalidExchangeRequirement { id: String, message: String },
     #[error("invalid sketch feature '{feature}': {message}")]
     Sketch { feature: String, message: String },
+    #[error("hole_pattern requires recipe schema version 2")]
+    HolePatternSchema,
     #[error("sketch feature '{feature}' did not solve completely")]
     SketchSolveFailed {
         feature: String,
@@ -1443,6 +1513,22 @@ fn hash_feature(
         } => {
             hash.update(&serde_json::to_vec(&(body, faces)).expect("face intent serializes"));
             hash.update(&radius.to_le_bytes());
+        }
+        Feature::HolePattern {
+            face,
+            x_direction_hint,
+            origin_offset,
+            sketch,
+            holes,
+            ..
+        } => {
+            hash.update(cad_sketch::SOLVER_BUILD_ID.as_bytes());
+            hash.update(
+                &serde_json::to_vec(&(face, sketch, holes)).expect("pattern intent serializes"),
+            );
+            for value in x_direction_hint.iter().chain(origin_offset.iter()) {
+                hash.update(&value.to_le_bytes());
+            }
         }
         Feature::ChamferFaces {
             body,
@@ -1886,6 +1972,78 @@ impl BuildEngine {
                         identifier("fillet role", &face.role)?;
                     }
                 }
+                Feature::HolePattern {
+                    id,
+                    face,
+                    x_direction_hint,
+                    origin_offset,
+                    sketch,
+                    holes,
+                    ..
+                } => {
+                    if recipe.schema_version != 2 {
+                        return Err(BuildError::HolePatternSchema);
+                    }
+                    identifier("hole pattern anchor", &face.from_feature)?;
+                    identifier("hole pattern face role", &face.role)?;
+                    if x_direction_hint
+                        .iter()
+                        .chain(origin_offset.iter())
+                        .any(|x| !x.is_finite())
+                    {
+                        return Err(BuildError::Sketch {
+                            feature: id.clone(),
+                            message: "hole pattern face frame must be finite".into(),
+                        });
+                    }
+                    if holes.is_empty() || holes.len() > MAX_BLIND_PATTERN_HOLES {
+                        return Err(BuildError::ResourceLimit {
+                            resource: "blind holes per pattern",
+                            limit: MAX_BLIND_PATTERN_HOLES,
+                        });
+                    }
+                    cad_sketch::validate(sketch).map_err(|e| BuildError::Sketch {
+                        feature: id.clone(),
+                        message: e.to_string(),
+                    })?;
+                    let points: BTreeSet<_> = sketch
+                        .points
+                        .iter()
+                        .map(|point| point.id.as_str())
+                        .collect();
+                    let mut names = BTreeSet::new();
+                    for hole in holes {
+                        if hole.id.is_empty()
+                            || hole.id.len() > 64
+                            || !hole
+                                .id
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                            || !names.insert(&hole.id)
+                        {
+                            return Err(BuildError::Sketch {
+                                feature: id.clone(),
+                                message: format!(
+                                    "invalid or duplicate blind hole ID '{}'",
+                                    hole.id
+                                ),
+                            });
+                        }
+                        if hole.center == hole.rim
+                            || !points.contains(hole.center.as_str())
+                            || !points.contains(hole.rim.as_str())
+                        {
+                            return Err(BuildError::Sketch {
+                                feature: id.clone(),
+                                message: format!(
+                                    "blind hole '{}' needs distinct defined center and rim points",
+                                    hole.id
+                                ),
+                            });
+                        }
+                        dimension(id, "blind hole depth", hole.depth)?;
+                    }
+                }
                 Feature::ChamferFaces {
                     id,
                     faces,
@@ -2085,6 +2243,88 @@ impl BuildEngine {
             } else {
                 None
             };
+            let mut pattern_cap = None;
+            let mut pattern_holes = None;
+            if let Feature::HolePattern {
+                id,
+                body,
+                face,
+                x_direction_hint,
+                origin_offset,
+                sketch,
+                holes,
+                ..
+            } = feature
+            {
+                let resolution = selection_graph.resolve_faces_with_remaining(
+                    &FaceSelector {
+                        anchor_feature: face.from_feature.clone(),
+                        role: face.role.clone(),
+                        target_feature: body.clone(),
+                        cardinality: FaceCardinality::Exactly { count: 1 },
+                    },
+                    &mut assertion_work_remaining,
+                );
+                if resolution.status != FaceResolutionStatus::Resolved
+                    || resolution.witnesses.len() != 1
+                {
+                    return Err(BuildError::Kernel {
+                        feature: id.clone(),
+                        message: format!(
+                            "hole pattern cap selection {:?}: {}",
+                            resolution.status, resolution.diagnostic
+                        ),
+                    });
+                }
+                let cap = resolution.witnesses[0].target_face;
+                let frame = evaluated[body]
+                    .model
+                    .face_frame(
+                        cap,
+                        *x_direction_hint,
+                        [origin_offset[0], origin_offset[1], 0.],
+                        tolerance,
+                    )
+                    .map_err(|e| BuildError::Kernel {
+                        feature: id.clone(),
+                        message: e.to_string(),
+                    })?;
+                let mut binding = blake3::Hasher::new();
+                binding.update(hash.as_bytes());
+                binding.update(
+                    &serde_json::to_vec(&(&resolution, &frame)).expect("face frame serializes"),
+                );
+                hash = binding.finalize().to_hex().to_string();
+                let report = cad_sketch::solve_refined(sketch, tolerance.linear).map_err(|e| {
+                    BuildError::Sketch {
+                        feature: id.clone(),
+                        message: e.to_string(),
+                    }
+                })?;
+                if !report.is_fully_constrained() {
+                    return Err(BuildError::SketchSolveFailed {
+                        feature: id.clone(),
+                        report: Box::new(report),
+                        content_hash: hash,
+                    });
+                }
+                let solved = holes
+                    .iter()
+                    .map(|hole| {
+                        let center = report.points[&hole.center];
+                        let rim = report.points[&hole.rim];
+                        cad_kernel::CapBlindHole {
+                            id: hole.id.clone(),
+                            center,
+                            radius: (rim[0] - center[0]).hypot(rim[1] - center[1]),
+                            depth: hole.depth,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                sketch_reports.insert(id.clone(), report);
+                pattern_cap = Some(cap);
+                pattern_holes = Some(solved);
+            }
             if let Feature::Sketch {
                 id,
                 sketch,
@@ -2186,6 +2426,21 @@ impl BuildEngine {
                             &evaluated[body].model,
                             fillet_faces.expect("semantic faces resolved before cache"),
                             *radius,
+                            tolerance,
+                        ),
+                        Feature::HolePattern {
+                            body,
+                            x_direction_hint,
+                            origin_offset,
+                            ..
+                        } => cad_kernel::drill_cap_pattern(
+                            &evaluated[body].model,
+                            pattern_cap.expect("hole pattern cap resolved before cache"),
+                            *x_direction_hint,
+                            *origin_offset,
+                            pattern_holes
+                                .as_deref()
+                                .expect("hole pattern solved before cache"),
                             tolerance,
                         ),
                         Feature::ChamferFaces { body, distance, .. } => cad_kernel::chamfer(
@@ -2396,5 +2651,49 @@ impl BuildEngine {
             .filter(|(name, _)| result.scope.requested_outputs.binary_search(name).is_ok())
             .collect();
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod hole_pattern_tests {
+    use super::*;
+
+    #[test]
+    fn same_geometry_unrelated_face_anchor_refuses_before_warm_cache_lookup() {
+        let recipe = |anchor: &str| -> Recipe {
+            serde_json::from_value(serde_json::json!({
+                "schema_version":2,"units":"mm",
+                "features":[
+                    {"op":"rectangle","id":"profile","width":40,"depth":30},
+                    {"op":"extrude","id":"a","profile":"profile","height":12},
+                    {"op":"extrude","id":"b","profile":"profile","height":12},
+                    {"op":"hole_pattern","id":"drilled","body":"b",
+                     "face":{"from_feature":anchor,"role":"end_cap"},
+                     "x_direction_hint":[1,0,0],"origin_offset":[0,0],
+                     "sketch":{"points":[{"id":"c","position":[0,0]},{"id":"r","position":[2,0]}],
+                         "constraints":[{"id":"fix_c","kind":"fixed","point":"c","position":[0,0]},
+                                        {"id":"fix_r","kind":"fixed","point":"r","position":[2,0]}]},
+                     "pattern_holes":[{"id":"pilot","center":"c","rim":"r","depth":5}]}
+                ],"outputs":[{"name":"drilled","feature":"drilled"}]
+            })).unwrap()
+        };
+        let mut engine = BuildEngine::default();
+        let valid = engine.build(&recipe("b")).unwrap();
+        assert!(valid.sketch_reports["drilled"].is_fully_constrained());
+        let error = engine.build(&recipe("a")).unwrap_err().to_string();
+        assert!(error.contains("hole pattern cap selection"), "{error}");
+        let mut wrong_body = serde_json::to_value(recipe("b")).unwrap();
+        wrong_body["features"][3]["body"] = serde_json::json!("profile");
+        let wrong_body: Recipe = serde_json::from_value(wrong_body).unwrap();
+        assert!(matches!(
+            engine.build(&wrong_body),
+            Err(BuildError::InputType { .. })
+        ));
+        let mut old_schema = recipe("b");
+        old_schema.schema_version = 1;
+        assert!(matches!(
+            engine.build(&old_schema),
+            Err(BuildError::HolePatternSchema)
+        ));
     }
 }

@@ -33,6 +33,29 @@ pub enum RecipeError {
     Graph(#[from] serde_json::Error),
 }
 
+#[cfg(test)]
+mod hole_pattern_tests {
+    use super::*;
+
+    #[test]
+    fn inline_sketch_pattern_uses_schema_two_and_round_trips_typed_ir() {
+        let source = "p=rectangle(id='p',width=40,depth=30)\nb=extrude(id='b',profile=p,height=12)\nh=hole_pattern(id='h',body=b,face={'from_feature':b,'role':'end_cap'},x_direction_hint=[1,0,0],points=[{'id':'c','position':[0,0]},{'id':'r','position':[2,0]}],constraints=[],holes=[{'id':'pilot','center':'c','rim':'r','depth':5}])\noutput(name='h',feature=h)";
+        let recipe = from_starlark("pattern.star", source).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        let value = serde_json::to_value(&recipe).unwrap();
+        assert_eq!(value["features"][2]["pattern_holes"][0]["id"], "pilot");
+        assert_eq!(
+            value["features"][2]["origin_offset"],
+            serde_json::json!([0.0, 0.0])
+        );
+        let replay: Recipe = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(serde_json::to_value(replay).unwrap(), value);
+        let mut wrong = value;
+        wrong["features"][2]["holes"] = serde_json::json!([]);
+        assert!(serde_json::from_value::<Recipe>(wrong).is_err());
+    }
+}
+
 #[derive(Default, Debug, ProvidesStaticType)]
 struct GraphStore {
     features: RefCell<Vec<serde_json::Value>>,
@@ -464,6 +487,56 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 )
             })?;
         store(eval)?.feature(serde_json::json!({"op":"fillet","id":id,"op_version":1,"body":body,"faces":faces,"radius":number(radius)?}))?;
+        Ok(id.to_owned())
+    }
+    /// Fully constrained, named blind bores on one semantic planar prism cap.
+    #[allow(clippy::too_many_arguments)]
+    fn hole_pattern(
+        id: &str,
+        body: &str,
+        face: Value,
+        x_direction_hint: Value,
+        points: Value,
+        constraints: Value,
+        holes: Value,
+        origin_offset: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let face: cad_build::ChamferFace = serde_json::from_str(&face.to_json()?)
+            .map_err(|e| anyhow::anyhow!("invalid hole pattern face selector: {e}"))?;
+        let x_direction_hint: [f64; 3] = serde_json::from_str(&x_direction_hint.to_json()?)
+            .map_err(|_| anyhow::anyhow!("x_direction_hint requires three finite numbers"))?;
+        let origin_offset: [f64; 2] = match origin_offset {
+            Some(value) => serde_json::from_str(&value.to_json()?).map_err(|_| {
+                anyhow::anyhow!("origin_offset requires two finite tangent lengths")
+            })?,
+            None => [0.; 2],
+        };
+        anyhow::ensure!(
+            x_direction_hint
+                .iter()
+                .chain(origin_offset.iter())
+                .all(|v| v.is_finite()),
+            "hole pattern frame values must be finite"
+        );
+        let sketch: cad_build::Sketch = serde_json::from_str(&format!(
+            "{{\"points\":{},\"constraints\":{}}}",
+            points.to_json()?,
+            constraints.to_json()?
+        ))
+        .map_err(|e| anyhow::anyhow!("invalid hole pattern sketch: {e}"))?;
+        let holes: Vec<cad_build::BlindPatternHole> = serde_json::from_str(&holes.to_json()?)
+            .map_err(|e| anyhow::anyhow!("invalid blind hole declarations: {e}"))?;
+        anyhow::ensure!(
+            !holes.is_empty() && holes.len() <= cad_build::MAX_BLIND_PATTERN_HOLES,
+            "hole pattern requires 1..={} blind holes",
+            cad_build::MAX_BLIND_PATTERN_HOLES
+        );
+        store(eval)?.feature(
+            serde_json::json!({"op":"hole_pattern","id":id,"op_version":1,
+            "body":body,"face":face,"x_direction_hint":x_direction_hint,
+            "origin_offset":origin_offset,"sketch":sketch,"pattern_holes":holes}),
+        )?;
         Ok(id.to_owned())
     }
     fn chamfer_faces(
@@ -1633,8 +1706,13 @@ pub fn from_starlark_with_modules(
     let mechanism_bindings = graph.mechanism_bindings.into_inner();
     let assembly_schema =
         !parts.is_empty() || !assemblies.is_empty() || !assembly_outputs.is_empty();
+    let hole_pattern_schema = graph
+        .features
+        .borrow()
+        .iter()
+        .any(|feature| feature["op"] == "hole_pattern");
     let mut value = serde_json::json!({
-        "schema_version": if !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !rigid_rotation_groups.is_empty() { 2 } else { 1 },
+        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !rigid_rotation_groups.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
