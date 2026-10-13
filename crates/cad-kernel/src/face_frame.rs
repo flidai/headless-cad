@@ -133,6 +133,8 @@ impl ModelSnapshot {
                 g.cap_centroid(face_id, tolerance)?
             } else if let Ok(g) = crate::blind_slot_prism::recognize(self, tolerance) {
                 g.face_centroid(self, face_id, tolerance)?
+            } else if let Ok(g) = crate::blind_profile_prism::recognize(self, tolerance) {
+                g.face_centroid(self, face_id, tolerance)?
             } else if let Some(g) = self.arc_prism_geometry(tolerance)? {
                 if face_id.0 < 2 {
                     g.cap_centroid(face_id, tolerance)?

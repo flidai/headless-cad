@@ -3587,3 +3587,41 @@ see its models and reports; direct artifact links remain available.
 new report, exact captured recipe selection, read-only inspection and stable
 artifact hashes. Open the [insert folder](http://localhost:8080/seated_pocket_inserts/)
 or [native fit report](http://localhost:8080/seated_pocket_inserts/pocket-fit-checks.html).
+
+### Machine pockets from line-and-arc profiles
+
+`blind_profile` accepts a hole-free path, polygon, rectangle or solved sketch
+profile and an exact semantic stock cap. It produces native planar floors and
+planar/cylindrical walls, with source-owned segment roles and independently
+controlled depths through serial cuts.
+
+```python
+recess = blind_profile(id = "motor_recess", body = mounting, profile = motor_profile,
+    from_feature = stock, cap = "end_cap", depth = 12, frame_origin = [0,0,24])
+```
+
+`examples/motor_mount_housing.star` combines a rounded rectangular motor recess,
+a deeper cable pocket, preserved mounting slots and a removable cover displayed
+beside the housing. Source measurements track both depths and the remaining web;
+its three section views and native dimension table follow parameter edits.
+
+```sh
+cad build examples/motor_mount_housing.star --out-dir out/motor_mount_housing
+cad build examples/motor_mount_housing.star --param recess_width=54 \
+  --param pocket_side=0 --out-dir out/motor_mount_housing_underside
+```
+
+The first domain admits four separated pockets from one cap, at most 32 segments
+per profile and 64 total, with positive remaining web. Existing separated through
+bores and slots remain. Touching/intersecting cuts, islands, undercuts, reflected
+profile frames and arbitrary-profile fit certificates remain unsupported. Generic
+profile cuts can follow legacy obround pockets; use `blind_profile` for subsequent
+cuts once a body contains a noncapsule pocket.
+
+[Independent acceptance](docs/evidence/profile-pockets-local.json) checks native
+topology, exact STEP geometry, meshes, depth sections, replay and rejected
+revisions. [Browser acceptance](docs/evidence/profile-pockets-browser-local.json)
+checks recipe selection and the native dimension drawing. Inspect the
+[motor housing](http://localhost:8080/motor_mount_housing/motor_mount_housing.gpu.html)
+with the development server running. This remains experimental, bounded modeling;
+general curved Booleans and arbitrary-profile fit are not implemented.

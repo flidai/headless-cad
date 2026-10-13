@@ -1,0 +1,22 @@
+{
+  "valid": true,
+  "instances": 2,
+  "native_dimensions": 3,
+  "section_strata": 3,
+  "property_checks": 2,
+  "drawing_rows": 3,
+  "source_navigation": true,
+  "read_only": true,
+  "manifest_sha256": "c8c99d8b4b10bc9143a7588cf46d0173d2b5f91107b5c114c801a8ec2ab400a0",
+  "source_sha256": "edf565409a6a183bf0700bd9eb63e0fcb9f7549cecd7eb965c3492e7d63c2ca2",
+  "assembly_sha256": "a0e51dc59f6c399943ba075c90f182878a3ffe79c9c979447325ca25335d311c",
+  "source_provenance_sha256": "f7942e9ec1607d22aba34e2c840971d79910d20024c9891e122609c123b1fa81",
+  "datum_dimensions_sha256": "c82b0d6ae0399fb2322138a7d3232987a79fee5ff571b5cfa55f460be36256d0",
+  "drawing_sha256": "5710bd908819ec3b70228a1703d6498ba92e55af7f9eb2ef8fc9091728bab930",
+  "script_sha256": "dacc43c6f7a447e3cdf3b37402b6b1c1c25ddc6e0e35081d42e59931f6e64f67",
+  "screenshots": [
+    "/tmp/cad-profile-pocket-dimensions.png",
+    "/tmp/cad-profile-pocket-drawing.png",
+    "/tmp/cad-profile-pocket-viewer.png"
+  ]
+}

@@ -124,6 +124,9 @@ impl ModelSnapshot {
         if let Ok(g) = crate::blind_slot_prism::recognize(self, tolerance) {
             return g.properties(tolerance);
         }
+        if let Ok(g) = crate::blind_profile_prism::recognize(self, tolerance) {
+            return g.properties(tolerance);
+        }
         if let Some(g) = self.arc_prism_geometry(tolerance)? {
             return g.properties(tolerance);
         }

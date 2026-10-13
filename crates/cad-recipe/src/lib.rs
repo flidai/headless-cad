@@ -729,6 +729,58 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         )?;
         Ok(id.to_owned())
     }
+    /// A partial-depth native line/arc profile pocket from one semantic cap.
+    #[allow(clippy::too_many_arguments)]
+    fn blind_profile(
+        id: &str,
+        body: &str,
+        profile: &str,
+        depth: Value,
+        frame_origin: Value,
+        from_feature: Option<&str>,
+        cap: Option<&str>,
+        frame_x_direction: Option<Value>,
+        frame_y_direction: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let depth = number(depth)?;
+        anyhow::ensure!(
+            depth.is_finite() && depth > 0.,
+            "profile pocket depth must be finite positive"
+        );
+        let from_feature = from_feature.unwrap_or(body);
+        let cap = cap.unwrap_or("end_cap");
+        anyhow::ensure!(
+            !from_feature.is_empty()
+                && from_feature.trim() == from_feature
+                && !cap.is_empty()
+                && cap.trim() == cap,
+            "profile pocket cap source and role must be nonempty identifiers"
+        );
+        let read_frame = |value: Value, label: &str| -> anyhow::Result<[f64; 3]> {
+            let xyz: [f64; 3] = serde_json::from_str(&value.to_json()?)
+                .map_err(|_| anyhow::anyhow!("{label} requires three finite numbers"))?;
+            anyhow::ensure!(xyz.iter().all(|v| v.is_finite()), "{label} must be finite");
+            Ok(xyz)
+        };
+        let frame_origin = read_frame(frame_origin, "frame_origin")?;
+        let frame_x_direction = match frame_x_direction {
+            Some(v) => read_frame(v, "frame_x_direction")?,
+            None => [1., 0., 0.],
+        };
+        let frame_y_direction = match frame_y_direction {
+            Some(v) => read_frame(v, "frame_y_direction")?,
+            None => [0., 1., 0.],
+        };
+        record_feature(
+            eval,
+            serde_json::json!({"op":"blind_profile","id":id,"op_version":1,
+                "body":body,"face":{"from_feature":from_feature,"role":cap},
+                "depth":depth,"profile":profile,"frame_origin":frame_origin,
+                "frame_x_direction":frame_x_direction,"frame_y_direction":frame_y_direction}),
+        )?;
+        Ok(id.to_owned())
+    }
     fn chamfer_faces(
         id: &str,
         body: &str,
@@ -2184,6 +2236,7 @@ pub fn from_starlark_with_modules_and_provenance(
         feature["op"] == "hole_pattern"
             || feature["op"] == "slot_pattern"
             || feature["op"] == "blind_slot_pattern"
+            || feature["op"] == "blind_profile"
     });
     let mut value = serde_json::json!({
         "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !slot_center_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !pocket_fit_checks.is_empty() || !rigid_rotation_groups.is_empty() || !rigid_translation_groups.is_empty() { 2 } else { 1 },

@@ -199,6 +199,9 @@ pub fn tessellate_analytic(
     if let Ok(g) = crate::blind_slot_prism::recognize(model, tolerance) {
         return crate::blind_slot_prism::tessellate(model, &g, tolerance, policy);
     }
+    if let Ok(g) = crate::blind_profile_prism::recognize(model, tolerance) {
+        return crate::blind_profile_prism::tessellate(model, &g, tolerance, policy);
+    }
     if let Some(g) = model.arc_prism_geometry(tolerance)? {
         return crate::arc_prism::tessellate(model, &g, policy);
     }

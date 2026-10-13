@@ -156,7 +156,7 @@ fn intersections(a: &Segment, b: &Segment, error: f64) -> Vec<[f64; 2]> {
         }
     }
 }
-fn pair_distance(a: &Segment, b: &Segment, error: f64) -> f64 {
+pub(super) fn pair_distance(a: &Segment, b: &Segment, error: f64) -> f64 {
     // Adaptive signs prevent a rounded intersection coordinate from hiding a
     // proper crossing of almost parallel line segments.
     if a.arc.is_none() && b.arc.is_none() {

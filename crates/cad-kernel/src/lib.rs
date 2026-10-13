@@ -30,7 +30,9 @@
 
 mod analytic;
 mod arc_prism;
+mod blind_profile_prism;
 mod blind_slot_prism;
+pub use blind_profile_prism::{blind_profile_frame, cut_blind_profile};
 mod bore_trim_clearance;
 mod bored_prism;
 mod cap_holes;
@@ -416,6 +418,9 @@ impl ModelSnapshot {
             return v;
         }
         if let Ok(v) = blind_slot_prism::volume(self) {
+            return v;
+        }
+        if let Ok(v) = blind_profile_prism::volume(self) {
             return v;
         }
         if self

@@ -89,6 +89,14 @@ fn triangulate_projected(
     lengths: &[usize],
     convex: bool,
 ) -> Result<Vec<[usize; 3]>, KernelError> {
+    triangulate_projected_with_indices(points, lengths, convex, None)
+}
+fn triangulate_projected_with_indices(
+    points: &[[f64; 2]],
+    lengths: &[usize],
+    convex: bool,
+    proposal: Option<Vec<usize>>,
+) -> Result<Vec<[usize; 3]>, KernelError> {
     let ids: Vec<_> = (0..points.len()).map(VertexId).collect();
     let mut offset = 0;
     let rings: Vec<Vec<VertexId>> = lengths
@@ -126,7 +134,9 @@ fn triangulate_projected(
         offset += ring.len();
     }
     let data: Vec<_> = points.iter().flatten().copied().collect();
-    let indices = if holes.is_empty() && convex {
+    let indices = if let Some(indices) = proposal {
+        indices
+    } else if holes.is_empty() && convex {
         (1..ids.len() - 1)
             .flat_map(|i| [0, i, i + 1])
             .collect::<Vec<_>>()
@@ -256,6 +266,69 @@ fn triangulate_projected(
         .into_iter()
         .map(|triangle| triangle.map(|id| id.0))
         .collect())
+}
+
+/// Bounded alternative candidates for obliquely placed analytic caps. Rotate
+/// only the candidate coordinates: retain every original world point and rerun
+/// the complete coverage verifier on the ORIGINAL projected coordinates.
+/// A candidate must also resolve actual world-space triangle normals/areas.
+/// At most eight candidates, 33 rings and 2048 original points are attempted.
+pub(crate) fn triangulate_rings_with_world(
+    rings: &[Vec<[f64; 2]>],
+    world: &[[f64; 3]],
+    normal: [f64; 3],
+) -> Result<Vec<[usize; 3]>, KernelError> {
+    let points: Vec<_> = rings.iter().flatten().copied().collect();
+    if points.len() != world.len()
+        || points.len() > 2048
+        || rings.is_empty()
+        || rings.len() > 33
+        || rings.iter().any(|r| r.len() < 3)
+    {
+        return Err(KernelError::ResourceLimit(
+            "bounded analytic cap triangulation".into(),
+        ));
+    }
+    let lengths: Vec<_> = rings.iter().map(Vec::len).collect();
+    let mut offset = 0;
+    let holes: Vec<_> = lengths
+        .iter()
+        .enumerate()
+        .filter_map(|(i, &n)| {
+            let start = offset;
+            offset += n;
+            (i > 0).then_some(start)
+        })
+        .collect();
+    for angle in [0f64, 0.271, 1.173, 2.137, 3.173, 4.217, 5.131, 5.817] {
+        let (sin, cos) = angle.sin_cos();
+        let data: Vec<_> = points
+            .iter()
+            .flat_map(|p| [cos * p[0] - sin * p[1], sin * p[0] + cos * p[1]])
+            .collect();
+        let Ok(proposal) = earcutr::earcut(&data, &holes, 2) else {
+            continue;
+        };
+        let Ok(triangles) =
+            triangulate_projected_with_indices(&points, &lengths, false, Some(proposal))
+        else {
+            continue;
+        };
+        let good = triangles.iter().all(|t| {
+            let [a, b, c] = t.map(|i| world[i]);
+            let u = sub(b, a);
+            let v = sub(c, a);
+            let cp = cross(u, v);
+            let area = norm(cp);
+            let scale = dot(u, u).max(dot(v, v)).max(dot(sub(c, b), sub(c, b)));
+            area > 256. * f64::EPSILON * scale
+                && (0..3).all(|k| (cp[k] / area - normal[k]).abs() < 1e-9)
+        });
+        if good {
+            return Ok(triangles);
+        }
+    }
+    Err(KernelError::NumericRange)
 }
 
 #[cfg(test)]

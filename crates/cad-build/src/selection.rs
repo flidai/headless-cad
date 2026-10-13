@@ -239,6 +239,7 @@ impl SelectionGraph {
                 | Feature::HolePattern { body, .. }
                 | Feature::SlotPattern { body, .. }
                 | Feature::BlindSlotPattern { body, .. }
+                | Feature::BlindProfile { body, .. }
                 | Feature::Chamfer { body, .. }
                 | Feature::ChamferFaces { body, .. } => {
                     vec![("body", body)]

@@ -1213,7 +1213,7 @@ rows, current source navigation, stable artifact hashes and zero writes/errors.
 Bounded catalog traversal now includes separate folder navigation, so earlier
 artifact-heavy subtrees cannot hide later examples from inspection.
 
-### Next reusable modeling increment: line/arc profile pockets
+### Line/arc profile pockets
 
 Generalize axial blind pockets beyond obrounds, beginning with a motor housing
 that combines mounting slots, a rounded rectangular recess and a separate deeper
@@ -1228,3 +1228,20 @@ oriented meshes with shared rim vertices, both opening directions, earlier-floor
 lineage through subsequent cuts, source replay and failed-generation preservation.
 This extends reusable operation composition toward the commercial modeling gate;
 it does not close that gate or general curved Boolean modeling.
+
+The implementation now has [independent geometry evidence](evidence/profile-pockets-local.json)
+for seven generated configurations, four housing configurations, both-cap pure
+rectangular pockets, and the four-pocket/64-segment boundary. Ten invalid revisions
+preserve publication. Checks include native edge incidence, exact STEP solid
+differences and moments, finite arc walls, closed meshes, section strata and
+byte-identical captured-source replay.
+[Browser evidence](evidence/profile-pockets-browser-local.json) binds two parts,
+three depth/web measurements and drawing rows to their captured source.
+
+Integration exposed and corrected a pre-existing capsule-floor loop orientation
+error that STEP's independent trim orientation had masked. Native edge uses now
+have opposite orientations across each shared floor boundary; reversed historical
+models fail validation. Face identities and physical geometry are preserved,
+while native model hashes and source-keyed caches correctly change. The corrected
+kernel passes 259 tests; profile, seating and mounting integration regressions
+and strict workspace Clippy pass. All five commercial gates remain open.

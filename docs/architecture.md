@@ -4050,3 +4050,44 @@ read-only HTML/JSON publication retain the declaration and native witnesses;
 failed checks preserve the prior complete generation. Independent STEP acceptance
 must exercise a safe lateral edit, a below-minimum gap and a true wall collision,
 with floor-seating positive controls to demonstrate independent coverage.
+
+### Native line/arc profile pocket composition
+
+`blind_profile` consumes a hole-free profile dependency and a separately selected
+native cap. The build layer checks solid/profile dependency roles independently,
+resolves the current cap lineage, maps the authored tangent frame into canonical
+stock coordinates and binds the converted contour before consulting the cache.
+Source frames must be orientation-preserving and numerically well conditioned;
+a stale cap elevation or unresolved face blocks the operation.
+
+The bounded kernel domain adds variable wall counts to axial pocket topology:
+no more than 32 segments per contour, four separated same-cap pockets and 64
+accumulated pocket segments. Each operation owns its depth and leaves a positive
+web. Stock outer walls and through-hole/slot walls survive; earlier pocket floors
+remap by the number of newly added walls. Generated `pocket_wall_i` roles follow
+authored contour order. Exact line/arc integrals drive volume and inertia, while
+render/export tessellation shares opening/floor rim vertices with pocket walls.
+
+General modeling admission is separate from capsule-specific engineering queries.
+Those queries retain their strict capsule-only recognizer. Generic profile cuts
+may follow legacy blind obround cuts; the legacy `blind_slot_pattern` operation
+continues to refuse bodies containing noncapsule pockets. A capsule contour can
+still be added through `blind_profile` in such a sequence. Unsupported profiles,
+intersecting/touching voids, islands and undercuts remain explicit failures.
+
+The motor housing scenario requires two real native cavities, preserved through
+mounting slots, a separate cover, native floor/web dimensions, material checks,
+section strata and source-bound drawings. Independent acceptance must compare
+STEP solids and full inertia, verify closed oriented meshes, exercise concave
+contours and posed inputs, preserve selected/warm-build obligations, and retain
+the previous generation after rejected edits. This expands operation composition;
+it does not imply general surface Booleans or a closed commercial release gate.
+
+Obliquely placed profiles with collinear arc joins need explicit display admission.
+Cap triangulation may try at most eight deterministic rotated 2D candidate
+projections, bounded to 33 rings and 2,048 points. Every candidate is rechecked
+against the original projected boundary and the original world-space triangle
+areas/normals. Native coordinates and rim vertices are never moved, welded or
+removed to make a candidate pass. The untouched opposite stock cap is triangulated
+from its actual stock loops, without artificial pocket-fill seams. Unresolved
+coverage or floating-point conditioning still refuses tessellation.

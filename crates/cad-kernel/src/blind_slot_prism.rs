@@ -87,15 +87,9 @@ fn construct(g: &Geometry) -> Result<ModelSnapshot, KernelError> {
             }
         }
         let loop_id = LoopId(l + floor_layer);
-        let old = &mut model.loops[loop_id.0].edges;
-        *old = old
-            .iter()
-            .rev()
-            .map(|edge| EdgeUse {
-                edge: edge.edge,
-                reversed: !edge.reversed,
-            })
-            .collect();
+        // The former opposite-cap inner loop already winds outward for
+        // the pocket floor and opposite to each adjacent cavity wall.
+        // Preserve its edge uses when moving it between face owners.
         model.faces[floor_layer].loops.retain(|id| *id != loop_id);
         model.faces.push(Face {
             surface: Surface::Plane(Plane {
@@ -343,7 +337,12 @@ pub(crate) fn through_slot_witness(
     Ok((mixed.stock, through))
 }
 
-fn equivalent(a: &ModelSnapshot, b: &ModelSnapshot, error: f64, direction_error: f64) -> bool {
+pub(crate) fn equivalent(
+    a: &ModelSnapshot,
+    b: &ModelSnapshot,
+    error: f64,
+    direction_error: f64,
+) -> bool {
     let near = |x: f64, y: f64, e: f64| x.is_finite() && y.is_finite() && (x - y).abs() <= e;
     let point = |x: [f64; 3], y: [f64; 3], e: f64| x.into_iter().zip(y).all(|(a, b)| near(a, b, e));
     let direction = |x: [f64; 3], y: [f64; 3]| point(x, y, direction_error);
@@ -559,15 +558,9 @@ pub(crate) fn recognize(model: &ModelSnapshot, t: Tolerance) -> Result<Geometry,
                 }
             }
         }
-        let old = &mut surrogate.loops[loop_id.0].edges;
-        *old = old
-            .iter()
-            .rev()
-            .map(|edge| EdgeUse {
-                edge: edge.edge,
-                reversed: !edge.reversed,
-            })
-            .collect();
+        // The former opposite-cap inner loop already winds outward for
+        // the pocket floor and opposite to each adjacent cavity wall.
+        // Preserve its edge uses when moving it between face owners.
         surrogate.faces[floor_layer].loops.push(loop_id);
     }
     let mut through = crate::arc_prism::recognize_bounded(&surrogate, t, 8)?;
@@ -811,7 +804,7 @@ pub(crate) fn tessellate(
 // Earcut may choose an almost collinear bridge among aligned holes. Repair
 // only internal diagonals between two triangles of the same native face;
 // retain every rim vertex and boundary-edge identity exactly.
-fn repair_cap_diagonals(mesh: &mut CylinderMesh) -> Result<(), KernelError> {
+pub(crate) fn repair_cap_diagonals(mesh: &mut CylinderMesh) -> Result<(), KernelError> {
     let quality = |p: &[[f64; 3]], normal: [f64; 3]| {
         let a = sub(p[1], p[0]);
         let b = sub(p[2], p[0]);

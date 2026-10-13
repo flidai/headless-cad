@@ -44,6 +44,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             .map(|_| ())
             .or_else(|_| crate::bored_prism::recognize(model, tolerance).map(|_| ()))
             .or_else(|_| crate::blind_slot_prism::recognize(model, tolerance).map(|_| ()))
+            .or_else(|_| crate::blind_profile_prism::recognize(model, tolerance).map(|_| ()))
             .or_else(|_| crate::stepped_bore::recognize(model, tolerance).map(|_| ()));
         return ValidationReport {
             valid: result.is_ok(),
@@ -65,6 +66,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
                 .or_else(|_| crate::revolve::recognize(model, tolerance).map(|_| ()))
                 .or_else(|_| crate::bored_prism::recognize(model, tolerance).map(|_| ()))
                 .or_else(|_| crate::blind_slot_prism::recognize(model, tolerance).map(|_| ()))
+                .or_else(|_| crate::blind_profile_prism::recognize(model, tolerance).map(|_| ()))
                 .or_else(|_| crate::stepped_bore::recognize(model, tolerance).map(|_| ()))
         } else {
             Err(crate::KernelError::InvalidTolerance)
@@ -555,7 +557,7 @@ pub(crate) fn validate(model: &ModelSnapshot, tolerance: Tolerance) -> Validatio
             "Oriented boundary must enclose positive volume in the normal f64 range".into(),
         );
     }
-    if issues.is_empty() {
+    if issues.is_empty() && crate::blind_profile_prism::recognize(model, tolerance).is_err() {
         issues.extend(geometry::validate(model, tolerance));
     }
     ValidationReport {

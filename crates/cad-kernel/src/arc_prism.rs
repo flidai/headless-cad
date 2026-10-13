@@ -58,7 +58,7 @@ impl SlotHole {
             ],
         )
     }
-    fn path(&self) -> PlanarPath {
+    pub(crate) fn path(&self) -> PlanarPath {
         let (a, b) = self.endpoints();
         let v = [
             -self.direction[1] * self.radius,
@@ -289,6 +289,14 @@ pub(crate) fn construct(
     g: &ArcPrismGeometry,
     tol: Tolerance,
 ) -> Result<ModelSnapshot, KernelError> {
+    construct_with_profiles(g, &[], tol)
+}
+/// Private full-height surrogate builder; never broadens public through-profile admission.
+pub(crate) fn construct_with_profiles(
+    g: &ArcPrismGeometry,
+    profiles: &[PlanarPath],
+    tol: Tolerance,
+) -> Result<ModelSnapshot, KernelError> {
     let seg = segments(&g.path, tol)?;
     let n = seg.len();
     let mut m = ModelSnapshot {
@@ -448,9 +456,14 @@ pub(crate) fn construct(
             loops: vec![LoopId(l + 2)],
         });
     }
-    for slot in &g.slot_holes {
-        let path = slot.path();
+    for path in g
+        .slot_holes
+        .iter()
+        .map(SlotHole::path)
+        .chain(profiles.iter().cloned())
+    {
         let parts = segments(&path, tol)?;
+        let count = parts.len();
         let v = m.vertices.len();
         let e = m.edges.len();
         let l = m.loops.len();
@@ -482,8 +495,8 @@ pub(crate) fn construct(
                 };
                 m.edges.push(Edge {
                     vertices: [
-                        VertexId(v + layer * 4 + i),
-                        VertexId(v + layer * 4 + (i + 1) % 4),
+                        VertexId(v + layer * count + i),
+                        VertexId(v + layer * count + (i + 1) % count),
                     ],
                     curve,
                 });
@@ -491,7 +504,7 @@ pub(crate) fn construct(
         }
         for (i, part) in parts.iter().enumerate() {
             m.edges.push(Edge {
-                vertices: [VertexId(v + i), VertexId(v + 4 + i)],
+                vertices: [VertexId(v + i), VertexId(v + count + i)],
                 curve: Curve::Line(Line {
                     origin: point(g, part.a, 0.),
                     direction: g.axis,
@@ -499,10 +512,10 @@ pub(crate) fn construct(
             });
         }
         m.loops.push(Loop {
-            edges: (0..4).map(|i| eu(e + i, false)).collect(),
+            edges: (0..count).map(|i| eu(e + i, false)).collect(),
         });
         m.loops.push(Loop {
-            edges: (0..4).rev().map(|i| eu(e + 4 + i, true)).collect(),
+            edges: (0..count).rev().map(|i| eu(e + count + i, true)).collect(),
         });
         m.faces[0].loops.push(LoopId(l));
         m.faces[1].loops.push(LoopId(l + 1));
@@ -510,9 +523,9 @@ pub(crate) fn construct(
             m.loops.push(Loop {
                 edges: vec![
                     eu(e + i, true),
-                    eu(e + 8 + i, false),
-                    eu(e + 4 + i, false),
-                    eu(e + 8 + (i + 1) % 4, true),
+                    eu(e + 2 * count + i, false),
+                    eu(e + count + i, false),
+                    eu(e + 2 * count + (i + 1) % count, true),
                 ],
             });
             let surface = if let Some((c, r, _, _)) = part.arc {
@@ -521,7 +534,7 @@ pub(crate) fn construct(
                     axis: g.axis,
                     x_direction: vector(g, sub2(part.a, c).map(|x| x / r)),
                     radius: r,
-                    inward: true,
+                    inward: part.arc.unwrap().3 > 0.,
                 })
             } else {
                 let d = sub2(part.b, part.a);
@@ -1153,6 +1166,23 @@ pub(crate) fn tessellate(
     g: &ArcPrismGeometry,
     policy: TessellationPolicy,
 ) -> Result<CylinderMesh, KernelError> {
+    tessellate_with_profiles(m, g, &[], policy)
+}
+pub(crate) fn tessellate_with_profiles(
+    m: &ModelSnapshot,
+    g: &ArcPrismGeometry,
+    profiles: &[PlanarPath],
+    policy: TessellationPolicy,
+) -> Result<CylinderMesh, KernelError> {
+    tessellate_profile_caps(m, g, profiles, policy, None)
+}
+pub(crate) fn tessellate_profile_caps(
+    m: &ModelSnapshot,
+    g: &ArcPrismGeometry,
+    profiles: &[PlanarPath],
+    policy: TessellationPolicy,
+    skip_cap: Option<FaceId>,
+) -> Result<CylinderMesh, KernelError> {
     let n = g.path.segments.len();
     let mut sampled = BTreeMap::<EdgeId, Vec<[f64; 3]>>::new();
     let mut bound = 0f64;
@@ -1209,14 +1239,22 @@ pub(crate) fn tessellate(
         counts[b] = count;
     }
     let slot_base = 3 * n + 3 * g.circular_holes.len();
-    for slot in 0..g.slot_holes.len() {
-        for edge in 0..4 {
-            let a = slot_base + 12 * slot + edge;
-            let b = a + 4;
+    let counts_per_profile: Vec<_> = g
+        .slot_holes
+        .iter()
+        .map(|_| 4)
+        .chain(profiles.iter().map(|p| p.segments.len()))
+        .collect();
+    let mut cursor = slot_base;
+    for &count in &counts_per_profile {
+        for edge in 0..count {
+            let a = cursor + edge;
+            let b = a + count;
             let count = counts[a].max(counts[b]);
             counts[a] = count;
             counts[b] = count;
         }
+        cursor += 3 * count;
     }
     for (i, e) in m.edges.iter().enumerate() {
         let (circle, sweep) = match &e.curve {
@@ -1286,10 +1324,12 @@ pub(crate) fn tessellate(
         }
     }
     let face_base = n + 2 + g.circular_holes.len();
-    for slot in 0..g.slot_holes.len() {
-        for edge in 0..4 {
-            let lower = slot_base + 12 * slot + edge;
-            let upper = lower + 4;
+    let mut cursor = slot_base;
+    let mut face_cursor = face_base;
+    for &count in &counts_per_profile {
+        for edge in 0..count {
+            let lower = cursor + edge;
+            let upper = lower + count;
             let bottom = &sampled[&EdgeId(lower)];
             let top = &sampled[&EdgeId(upper)];
             if bottom.len() != top.len() {
@@ -1304,15 +1344,20 @@ pub(crate) fn tessellate(
                     return Err(KernelError::NumericRange);
                 }
                 patches.push(MeshPatch {
-                    face: FaceId(face_base + 4 * slot + edge),
+                    face: FaceId(face_cursor + edge),
                     points,
                     normal: normal.map(|v| v / length),
                     boundary_edges: vec![Some(EdgeId(lower)), None, Some(EdgeId(upper)), None],
                 });
             }
         }
+        cursor += 3 * count;
+        face_cursor += count;
     }
     for id in 0..2 {
+        if skip_cap == Some(FaceId(id)) {
+            continue;
+        }
         let normal = m.faces[id].try_plane().unwrap().normal;
         let x = g.x_direction;
         let y = cross(normal, x);
@@ -1343,7 +1388,12 @@ pub(crate) fn tessellate(
             }
             rings.push(ring);
         }
-        for t in crate::triangulation::triangulate_rings_2d(&rings)? {
+        let triangles = if profiles.is_empty() {
+            crate::triangulation::triangulate_rings_2d(&rings)?
+        } else {
+            crate::triangulation::triangulate_rings_with_world(&rings, &world, normal)?
+        };
+        for t in triangles {
             patches.push(MeshPatch {
                 face: FaceId(id),
                 points: t.map(|i| world[i]).to_vec(),
@@ -1730,4 +1780,74 @@ mod acceptance {
         near(op.model.volume(), 240.);
         assert_eq!(op.history.generated_faces["segment_2"].len(), 1);
     }
+}
+
+/// Exact bounded line/arc boundary separation for private blind-profile regions.
+pub(crate) fn validate_profile_regions(
+    stock: &ArcPrismGeometry,
+    profiles: &[PlanarPath],
+    t: Tolerance,
+) -> Result<(), KernelError> {
+    let outer = segments(&stock.path, t)?;
+    let mut voids: Vec<Vec<Segment>> = stock
+        .slot_holes
+        .iter()
+        .map(|s| segments(&s.path(), t))
+        .collect::<Result<_, _>>()?;
+    for p in profiles {
+        validate_path(p, &[], t)?;
+        let seg = segments(p, t)?;
+        let scale = outer
+            .iter()
+            .chain(&seg)
+            .flat_map(|s| {
+                [s.a[0], s.a[1], s.b[0], s.b[1]]
+                    .into_iter()
+                    .chain(s.arc.into_iter().flat_map(|(c, r, _, _)| [c[0], c[1], r]))
+            })
+            .chain(
+                stock
+                    .circular_holes
+                    .iter()
+                    .flat_map(|h| [h.center[0], h.center[1], h.radius]),
+            )
+            .map(f64::abs)
+            .fold(1., f64::max);
+        let error = 8192. * f64::EPSILON * scale;
+        if error > t.linear / 16. {
+            return Err(KernelError::NumericRange);
+        }
+        if !path_validation::inside(&outer, p.start, error)?
+            || outer.iter().any(|a| {
+                seg.iter()
+                    .any(|b| path_validation::pair_distance(a, b, error) <= t.linear + error)
+            })
+        {
+            return Err(bad());
+        }
+        for hole in &stock.circular_holes {
+            if path_validation::inside(&seg, hole.center, error)?
+                || seg.iter().any(|s| {
+                    path_validation::distance(s, hole.center, error) - hole.radius
+                        <= t.linear + error
+                })
+            {
+                return Err(bad());
+            }
+        }
+        for other in &voids {
+            if path_validation::inside(other, p.start, error)?
+                || path_validation::inside(&seg, other[0].a, error)?
+                || seg.iter().any(|a| {
+                    other
+                        .iter()
+                        .any(|b| path_validation::pair_distance(a, b, error) <= t.linear + error)
+                })
+            {
+                return Err(bad());
+            }
+        }
+        voids.push(seg);
+    }
+    Ok(())
 }

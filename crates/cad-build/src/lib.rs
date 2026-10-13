@@ -17,6 +17,7 @@ use thiserror::Error;
 pub mod capabilities;
 pub use capabilities::{capability_catalog, CapabilityCatalog, CAPABILITY_SCHEMA_VERSION};
 
+mod profile_pockets;
 mod sketch_profiles;
 pub use cad_sketch::{
     Constraint, ConstraintKind, IslandReport, LineSide, Sketch, SketchPoint, SolveReport,
@@ -137,6 +138,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("lib.rs").as_slice(),
             include_bytes!("assembly.rs").as_slice(),
             include_bytes!("sketch_profiles.rs").as_slice(),
+            include_bytes!("profile_pockets.rs").as_slice(),
             include_bytes!("demand.rs").as_slice(),
             include_bytes!("selection.rs").as_slice(),
             include_bytes!("face_datums.rs").as_slice(),
@@ -563,6 +565,17 @@ pub enum Feature {
         slots: Vec<SlotPatternSlot>,
         op_version: u32,
     },
+    BlindProfile {
+        id: String,
+        body: String,
+        face: ChamferFace,
+        depth: f64,
+        frame_origin: [f64; 3],
+        frame_x_direction: [f64; 3],
+        frame_y_direction: [f64; 3],
+        profile: String,
+        op_version: u32,
+    },
     ChamferFaces {
         id: String,
         body: String,
@@ -814,6 +827,18 @@ impl<'de> Deserialize<'de> for Feature {
                         "frame_x_direction",
                         "frame_y_direction",
                     ],
+                    "blind_profile" => &[
+                        "op",
+                        "id",
+                        "op_version",
+                        "body",
+                        "face",
+                        "depth",
+                        "profile",
+                        "frame_origin",
+                        "frame_x_direction",
+                        "frame_y_direction",
+                    ],
                     "chamfer_faces" => &["op", "id", "op_version", "body", "faces", "distance"],
                     "chamfer" => &["op", "id", "op_version", "body", "face_normals", "distance"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
@@ -836,6 +861,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "hole_pattern",
                                 "slot_pattern",
                                 "blind_slot_pattern",
+                                "blind_profile",
                                 "chamfer_faces",
                                 "chamfer",
                                 "translate",
@@ -959,6 +985,18 @@ impl<'de> Deserialize<'de> for Feature {
                         slots: pattern_slots
                             .ok_or_else(|| M::Error::missing_field("pattern_slots"))?,
                     },
+                    "blind_profile" => Feature::BlindProfile {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        face: face.ok_or_else(|| M::Error::missing_field("face"))?,
+                        depth: depth.ok_or_else(|| M::Error::missing_field("depth"))?,
+                        frame_origin: frame_origin
+                            .ok_or_else(|| M::Error::missing_field("frame_origin"))?,
+                        frame_x_direction: frame_x_direction.unwrap_or([1., 0., 0.]),
+                        frame_y_direction: frame_y_direction.unwrap_or([0., 1., 0.]),
+                        profile: profile.ok_or_else(|| M::Error::missing_field("profile"))?,
+                    },
                     "chamfer_faces" => Feature::ChamferFaces {
                         id,
                         op_version,
@@ -1031,6 +1069,7 @@ impl Feature {
             | Self::HolePattern { id, .. }
             | Self::SlotPattern { id, .. }
             | Self::BlindSlotPattern { id, .. }
+            | Self::BlindProfile { id, .. }
             | Self::ChamferFaces { id, .. }
             | Self::Chamfer { id, .. }
             | Self::Translate { id, .. }
@@ -1054,6 +1093,18 @@ impl Feature {
                     if !dependencies.contains(&face.from_feature.as_str()) {
                         dependencies.push(&face.from_feature);
                     }
+                }
+                dependencies
+            }
+            Self::BlindProfile {
+                body,
+                profile,
+                face,
+                ..
+            } => {
+                let mut dependencies = vec![body.as_str(), profile.as_str()];
+                if !dependencies.contains(&face.from_feature.as_str()) {
+                    dependencies.push(&face.from_feature);
                 }
                 dependencies
             }
@@ -1096,6 +1147,7 @@ impl Feature {
             | Self::HolePattern { op_version, .. }
             | Self::SlotPattern { op_version, .. }
             | Self::BlindSlotPattern { op_version, .. }
+            | Self::BlindProfile { op_version, .. }
             | Self::ChamferFaces { op_version, .. }
             | Self::Chamfer { op_version, .. }
             | Self::Translate { op_version, .. }
@@ -1118,6 +1170,7 @@ impl Feature {
             Self::HolePattern { .. } => "hole_pattern",
             Self::SlotPattern { .. } => "slot_pattern",
             Self::BlindSlotPattern { .. } => "blind_slot_pattern",
+            Self::BlindProfile { .. } => "blind_profile",
             Self::ChamferFaces { .. } => "chamfer_faces",
             Self::Chamfer { .. } => "chamfer",
             Self::Translate { .. } => "translate",
@@ -1771,6 +1824,27 @@ fn hash_feature(
                 &serde_json::to_vec(&(
                     face,
                     slots,
+                    frame_origin,
+                    frame_x_direction,
+                    frame_y_direction,
+                ))
+                .expect("validated blind slot intent serializes"),
+            );
+            hash.update(&depth.to_le_bytes());
+        }
+        Feature::BlindProfile {
+            face,
+            depth,
+            profile,
+            frame_origin,
+            frame_x_direction,
+            frame_y_direction,
+            ..
+        } => {
+            hash.update(
+                &serde_json::to_vec(&(
+                    face,
+                    profile,
                     frame_origin,
                     frame_x_direction,
                     frame_y_direction,
@@ -2436,6 +2510,20 @@ impl BuildEngine {
                         }
                     }
                 }
+                Feature::BlindProfile { id, body, face, .. } => {
+                    profile_pockets::validate(feature, recipe.schema_version)?;
+                    // Body/cap roles stay solid even if an authored reference
+                    // also names the profile dependency.
+                    for dependency in [body, &face.from_feature] {
+                        if !recipe.features[indices[dependency.as_str()]].is_solid() {
+                            return Err(BuildError::InputType {
+                                feature: id.clone(),
+                                dependency: dependency.clone(),
+                                expected: "solid",
+                            });
+                        }
+                    }
+                }
                 Feature::Extrude { id, height, .. } => dimension(id, "height", *height)?,
                 Feature::Transform {
                     id,
@@ -2456,8 +2544,10 @@ impl BuildEngine {
                 _ => {}
             }
             for dependency in feature.dependencies() {
-                let needs_profile =
-                    matches!(feature, Feature::Extrude { .. } | Feature::Revolve { .. });
+                let needs_profile = matches!(
+                    feature,
+                    Feature::Extrude { .. } | Feature::Revolve { .. }
+                ) || matches!(feature, Feature::BlindProfile { profile, .. } if profile == dependency);
                 if recipe.features[indices[dependency]].is_solid() == needs_profile {
                     return Err(BuildError::InputType {
                         feature: feature.id().into(),
@@ -2698,7 +2788,9 @@ impl BuildEngine {
                 hash = binding.finalize().to_hex().to_string();
                 pattern_slots = Some(converted);
             }
-            if let Feature::BlindSlotPattern { id, body, face, .. } = feature {
+            if let Feature::BlindSlotPattern { id, body, face, .. }
+            | Feature::BlindProfile { id, body, face, .. } = feature
+            {
                 let resolution = selection_graph.resolve_faces_with_remaining(
                     &FaceSelector {
                         anchor_feature: face.from_feature.clone(),
@@ -2714,7 +2806,7 @@ impl BuildEngine {
                     return Err(BuildError::Kernel {
                         feature: id.clone(),
                         message: format!(
-                            "blind slot cap selection {:?}: {}",
+                            "blind pocket cap selection {:?}: {}",
                             resolution.status, resolution.diagnostic
                         ),
                     });
@@ -2724,11 +2816,37 @@ impl BuildEngine {
                 binding.update(hash.as_bytes());
                 binding.update(
                     &serde_json::to_vec(&(&resolution, cap))
-                        .expect("blind slot cap witness serializes"),
+                        .expect("blind pocket cap witness serializes"),
                 );
                 hash = binding.finalize().to_hex().to_string();
                 pattern_cap = Some(cap);
             }
+            let pocket_profile = if let Feature::BlindProfile {
+                id, body, profile, ..
+            } = feature
+            {
+                let cap = pattern_cap.expect("profile pocket semantic cap resolved");
+                let converted = profile_pockets::resolve(
+                    feature,
+                    &recipe.features[indices[profile.as_str()]],
+                    &solved_profiles,
+                    &evaluated[body].model,
+                    cap,
+                    tolerance,
+                )?;
+                let mut binding = blake3::Hasher::new();
+                binding.update(hash.as_bytes());
+                binding.update(&serde_json::to_vec(&converted).map_err(|e| {
+                    BuildError::Kernel {
+                        feature: id.clone(),
+                        message: e.to_string(),
+                    }
+                })?);
+                hash = binding.finalize().to_hex().to_string();
+                Some(converted)
+            } else {
+                None
+            };
             if let Feature::HolePattern {
                 id,
                 body,
@@ -2945,6 +3063,15 @@ impl BuildEngine {
                                 tolerance,
                             )
                         }
+                        Feature::BlindProfile { body, depth, .. } => cad_kernel::cut_blind_profile(
+                            &evaluated[body].model,
+                            pocket_profile
+                                .as_ref()
+                                .expect("profile pocket converted before cache"),
+                            pattern_cap.expect("profile pocket cap resolved before cache"),
+                            *depth,
+                            tolerance,
+                        ),
                         Feature::ChamferFaces { body, distance, .. } => cad_kernel::chamfer(
                             &evaluated[body].model,
                             chamfer_normals.expect("semantic faces resolved before cache"),
