@@ -3975,3 +3975,21 @@ and intact-opposite-cap seats, and whole-path travel with only two native endpoi
 queries. Selected-output and warm-cache builds retain all mounting obligations.
 Independent STEP checks corroborate contact disks and gaps; sampled assembly
 poses supplement, but do not replace, the native whole-path proof.
+
+
+### Durable pocketed mounting revisions
+
+Parameter overrides are part of the immutable evaluation request, accepted
+manifest and offline replay contract. A repeated request ID with a different
+pocket-depth override must fail without replacing its recorded job. Root-source
+endpoint revisions retain the same captured module and finished base geometry;
+only the 29 upper occurrences change placement.
+
+The local acceptance fixture binds delivered native base assets and floor
+measurements to the actual `base_deep_relief` content hash. It retains all
+inherited seating, clearance and dimension obligations. A failed nut-contact
+revision and a stale expected head must preserve the accepted revision; restart
+must recover all three job outcomes. Streamed delivery and offline rebuild use
+the accepted parameter override and compare engineering semantics as well as
+artifact bytes. This is a scripted protocol acceptance fixture, not a claim of
+autonomous design or a completed commercial release gate.

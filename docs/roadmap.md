@@ -8,18 +8,18 @@ of completion dates or an assertion that the present implementation has parity.
 
 ## Current checkpoint
 
-The latest accepted increment applies two optional relief operations to the
-actual drive-module base. Its original clearance, seating, retention, tolerance
-and mass obligations remain active. Native floor references produce depth/web
-measurements and a machining sheet; imported slot drawings also measure the
-finished part. Independent STEP, replay and live browser receipts are below.
+The latest accepted workflow mounts the actual pocketed drive base at both
+slot endpoints and certifies continuous adjustment. Its original clearance,
+seating, retention, tolerance and mass obligations remain active. Durable agent
+acceptance preserves the parameter override and all engineering checks through
+failed revisions, restart and offline replay. Retained receipts are below.
 
 Material-aware mounting certificates now account for actual pocket openings
 and bind through-slot travel to original physical walls. The tightened and
 adjustment recipes accept a pocketed base; blind-floor seats remain outside
-this scoped admission. The next workflow increment is durable agent acceptance
-and replay of these pocketed mounting revisions. General Booleans and arbitrary
-surfaces remain separate kernel work.
+this scoped admission. The next engineering increment is native seating on
+actual blind-pocket floors, with independently checked height-setting inserts.
+General Booleans and arbitrary surfaces remain separate kernel work.
 
 The complete product is still experimental. All five commercial release gates
 remain open; accepted feature increments are evidence toward those gates, not
@@ -83,8 +83,8 @@ The native full-height obround slot increment is implemented: the drive's
 four fixed base bores become source-owned adjustable mounting slots after its
 existing corner fillets. Acceptance covers independent capsule moments and STEP
 solids, transformed source frames, section/mesh topology, incremental rebuilding,
-strict boundary refusals and captured-source replay. General pockets, blind
-slots, curved Booleans and the commercial modeling gate remain open.
+strict boundary refusals and captured-source replay. General pockets, intersecting blind
+cuts, curved Booleans and the commercial modeling gate remain open.
 
 The [slot oracle](evidence/obround-slots-local.json) retains nine
 geometry cases and nine publication-preserving refusals, with independent
@@ -1135,3 +1135,17 @@ historical pocketed adjustment/tightened refusal in the earlier drive-base repor
 watched presets, captured source selection, 29 moving occurrences and read-only
 interaction. All 251 kernel tests, two selected-output/warm-cache recipe tests
 and strict workspace Clippy pass. Commercial release gates remain open.
+
+
+### Durable pocketed mounting acceptance
+
+The [local agent receipt](evidence/pocketed-mounting-replay-local.json) records
+three durable jobs and 771 protocol calls. It verifies actual pocketed-base
+assets, all 14 seating checks, 17 clearances and 29 dimensions. A dropped-nut
+revision, stale acceptance and a retry with changed parameters leave the accepted
+state intact. Restart recovers outcomes; offline replay matches 93 files and 29
+semantic fields with the captured pocket-depth override.
+[Browser acceptance](evidence/pocketed-mounting-accepted-browser-local.json)
+checks both source revisions, the same finished base, exact source navigation
+and immutable artifact hashes. This completes the local scripted workflow
+increment; it does not close the broader commercial R5 gate.

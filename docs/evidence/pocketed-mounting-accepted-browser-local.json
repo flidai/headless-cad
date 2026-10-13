@@ -1,0 +1,62 @@
+{
+  "valid": true,
+  "read_only": true,
+  "states": [
+    {
+      "phase": "before",
+      "endpoint": -1,
+      "occurrences": 30,
+      "seats": 8,
+      "gaps": 4,
+      "selected": [
+        {
+          "instance": "fixed_base",
+          "part": "base",
+          "feature": "base_deep_relief"
+        },
+        {
+          "instance": "tight_bolt_0",
+          "part": "clamp_bolt_envelope",
+          "feature": "bolt_body"
+        },
+        {
+          "instance": "tight_nut_0",
+          "part": "nut_envelope",
+          "feature": "nut_body"
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "endpoint": 1,
+      "occurrences": 30,
+      "seats": 8,
+      "gaps": 4,
+      "selected": [
+        {
+          "instance": "fixed_base",
+          "part": "base",
+          "feature": "base_deep_relief"
+        },
+        {
+          "instance": "tight_bolt_0",
+          "part": "clamp_bolt_envelope",
+          "feature": "bolt_body"
+        },
+        {
+          "instance": "tight_nut_0",
+          "part": "nut_envelope",
+          "feature": "nut_body"
+        }
+      ]
+    }
+  ],
+  "evidence_sha256": "c741306254586a250fca80620bef91d8609f2cb3d2b7ad6f06e875fba0ff9086",
+  "common_base_content_hash": "7c907c09b6b98414ce6417f1133656f0dfb0fb0467e801019052aa438d54449d",
+  "common_base_native_sha256": "ed53323b254d11d5987ed617d20c893df1115126e375cac2542895fee4f261eb",
+  "screenshots": [
+    "/tmp/cad-pocketed-mounting-accepted-before.png",
+    "/tmp/cad-pocketed-mounting-accepted-after.png"
+  ],
+  "browser_script_sha256": "4601ba9f50457fbc2722321811369ecaf2983395d669a7747e4802c9a7b0a09c"
+}

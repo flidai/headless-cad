@@ -3483,3 +3483,32 @@ separate native whole-path proofs. [Browser evidence](docs/evidence/pocketed-mou
 checks source selection and read-only motion. These scoped certificates supersede
 the mixed-stock refusal boundary recorded in earlier drive-base evidence; they
 do not certify blind-floor seating, fastener preload or rated assembly loads.
+
+
+### Replay an agent's pocketed mounting revision
+
+From a source checkout, run the local scripted client against the same headless
+protocol used by agents:
+
+```sh
+cargo build --release --locked -p cad-cli
+python3 scripts/agent_pocketed_mounting_demo.py --cad target/release/cad \
+  --state-dir /tmp/cad-pocketed-mounting-state \
+  --out-dir out/agent_pocketed_mounting_demo
+```
+
+Use fresh state and delivery directories. With the development server running,
+[open the accepted revision demo](http://localhost:8080/agent_pocketed_mounting_demo/index.html).
+It shows source revisions for the two slot endpoints on the same pocketed base.
+A dropped-nut revision is rejected; restart, retries and stale acceptance retain
+the correct accepted state. The pocket-depth override is part of request identity
+and is carried through offline replay.
+
+[Retained acceptance evidence](docs/evidence/pocketed-mounting-replay-local.json)
+records three durable jobs, 771 protocol calls, and an offline comparison of 93
+files and 29 semantic manifest fields. This is a scripted protocol fixture;
+geometry correctness is covered separately by the native tests and STEP oracle.
+
+[Browser acceptance](docs/evidence/pocketed-mounting-accepted-browser-local.json)
+verifies both delivered revisions, their exact source links, the same native
+pocketed base and read-only inspection.
