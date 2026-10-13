@@ -2,7 +2,7 @@
   "valid": true,
   "executable_sha256": "90018fb35d8f16dcb1d18491af8cdcf6f888d57a0691af90fc9d71285c1d422d",
   "source_sha256": "f52a27de3ee779db2ad9536ed1f54799829f7cca1be559f6bc539f84faaefba4",
-  "oracle_script_sha256": "48eb20f53db555d20ab4572331b261bfdfa1ab762298ba20b4679e9f5207f2b6",
+  "oracle_script_sha256": "18bcaf9a76be2011dcd5dcf3fc78e83224946aff55be9eac9703f87f8d0bed68",
   "python_version": "3.13.15",
   "ocp_distribution": "8.0.1.1.0",
   "cases": [
@@ -2283,10 +2283,14 @@
       "case": "pilot_breaks_outer_wall",
       "diagnostic": {
         "causes": [],
-        "code": "invalid_polygon_profile",
+        "code": "kernel_operation_failed",
         "diagnostic": "unsupported geometry: invalid polygon prism with circular through holes",
-        "error": "invalid polygon profile 'end_cover_profile': unsupported geometry: invalid polygon prism with circular through holes",
-        "feature": "end_cover_profile"
+        "error": "feature 'housing_left_pilots' failed: unsupported geometry: invalid polygon prism with circular through holes",
+        "feature": "housing_left_pilots",
+        "snapshot": {
+          "executor_build_id": "75fdb65ae8994c13e1dafe788a64dd742742d4dd509e9dc517e356d8337b81a3",
+          "kernel_build_id": "5d650fa8ca6ceebec8f67556b35b71eb593c0b05af58c8331c548b31cd5c04b6"
+        }
       }
     }
   ],
