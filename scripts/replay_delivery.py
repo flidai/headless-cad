@@ -148,6 +148,8 @@ def replay_accepted(cad: Path, delivery: Path, accepted: dict, job: dict,
             'exchange_requirements', 'exchange_policy_status', 'sketch_reports',
             'mechanism_reports', 'motion_studies', 'mechanism_bindings',
         )
+        if 'rigid_translation_groups' in manifest or 'rigid_translation_groups' in rebuilt:
+            semantic_fields += ('rigid_translation_groups',)
         for field in semantic_fields:
             require(field in manifest and rebuilt.get(field) == manifest[field],
                     f'offline engineering semantics differ: {field}')

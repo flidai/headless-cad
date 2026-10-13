@@ -519,6 +519,20 @@ fn gallery(directory: &Dir) -> String {
                 url(&rotation_report)
             ));
         }
+        let translation_report = if folder.is_empty() {
+            "rigid-translation-groups.html".to_owned()
+        } else {
+            format!("{folder}/rigid-translation-groups.html")
+        };
+        if directory
+            .metadata(&translation_report)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!(
+                "<a href=\"{}\">Rigid translation</a>",
+                url(&translation_report)
+            ));
+        }
         let datum_report = if folder.is_empty() {
             "datum-dimensions.html".to_owned()
         } else {

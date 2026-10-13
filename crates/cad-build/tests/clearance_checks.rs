@@ -550,7 +550,7 @@ fn translation_interior_collision_and_invalid_authored_vectors_fail_globally() {
     let mut r = parse(value());
     let mut check = r.clearance_checks[0].clone();
     check.right_translation = Some([0., 0., 1.]);
-    r.clearance_checks = (0..17)
+    r.clearance_checks = (0..25)
         .map(|i| {
             let mut c = check.clone();
             c.id = format!("sweep{i}");
@@ -561,7 +561,7 @@ fn translation_interior_collision_and_invalid_authored_vectors_fail_globally() {
         cad_build::build(&r),
         Err(BuildError::ResourceLimit {
             resource: "clearance motion sweeps",
-            limit: 16
+            limit: 24
         })
     ));
 }
@@ -743,7 +743,7 @@ fn rotation_interior_contact_and_strict_path_declarations_fail() {
     }
     let mut r = parse(value());
     let check = r.clearance_checks[0].clone();
-    r.clearance_checks = (0..17)
+    r.clearance_checks = (0..25)
         .map(|i| {
             let mut c = check.clone();
             c.id = format!("motion{i}");
@@ -759,7 +759,7 @@ fn rotation_interior_contact_and_strict_path_declarations_fail() {
         cad_build::build(&r),
         Err(BuildError::ResourceLimit {
             resource: "clearance motion sweeps",
-            limit: 16
+            limit: 24
         })
     ));
 }

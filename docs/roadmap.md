@@ -59,7 +59,7 @@ The [accepted offline replay](evidence/native-seating-replay-local.json)
 matches 150 artifacts and 28 manifest fields after restart. These receipts cover
 the bounded nominal planar seating domain; all five commercial gates remain open.
 
-The next modeling slice is now native full-height obround slots: the drive's
+The native full-height obround slot increment is implemented: the drive's
 four fixed base bores become source-owned adjustable mounting slots after its
 existing corner fillets. Acceptance covers independent capsule moments and STEP
 solids, transformed source frames, section/mesh topology, incremental rebuilding,
@@ -929,3 +929,22 @@ eleven, using explicit native surviving-witness/orbit certificates. Admission
 checks the raw surfaces and seams and refuses unsupported pockets, polygonal
 inner holes and nonconvex stock. Continue toward eccentric fasteners and broader
 contact geometry; thirteen named checks do not close the mechanical-intent gate.
+
+The next accepted workflow extends those slots into a separate mounting-adjustment
+study: 29 upper drive occurrences share a source-owned translation, with four
+native continuous bolt/slot certificates and a read-only motion inspector.
+Acceptance requires an independent capsule-distance oracle, actual STEP boundary
+witnesses, reversed/common-pose coverage, intrusion/path refusals preserving the
+prior publication, sampled full-assembly intersections, and source-bundle replay.
+The full assembly is not thereby certified for arbitrary contact or dynamics.
+
+The [retained adjustment oracle](evidence/slot-adjustment-local.json) now passes
+five isolated geometry cases, nine publication-preserving refusals and two full
+drive configurations. It independently checks exact STEP boundary witnesses and
+analytic path bounds, including reversed operands and a common oblique pose.
+Each drive configuration checks 435 part pairs at nine phases with zero positive
+intersection volume. Those samples corroborate the study; the four named native
+capsule certificates establish continuous coverage for their specific pairs.
+The [accepted source replay](evidence/slot-adjustment-replay-local.json) matches
+87 artifacts and 29 semantic fields after restart, including a rejected overshoot
+that preserves the previously accepted base. All five product gates remain open.

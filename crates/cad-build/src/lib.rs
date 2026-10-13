@@ -34,9 +34,14 @@ pub use tolerance_stacks::{
     MAX_TOLERANCE_STACKS, MAX_TOLERANCE_STACK_TERMS, MAX_TOLERANCE_STACK_TERMS_TOTAL,
 };
 mod rotation_groups;
+mod translation_groups;
 pub use rotation_groups::{
     RigidRotationGroup, RigidRotationGroupReport, MAX_ROTATION_GROUPS, MAX_ROTATION_GROUP_MEMBERS,
     MAX_ROTATION_GROUP_MEMBERS_TOTAL,
+};
+pub use translation_groups::{
+    RigidTranslationGroup, RigidTranslationGroupReport, MAX_TRANSLATION_GROUPS,
+    MAX_TRANSLATION_GROUP_MEMBERS, MAX_TRANSLATION_GROUP_MEMBERS_TOTAL,
 };
 mod datum_dimensions;
 mod nominal_seating;
@@ -140,6 +145,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("datum_dimensions.rs").as_slice(),
             include_bytes!("nominal_seating.rs").as_slice(),
             include_bytes!("rotation_groups.rs").as_slice(),
+            include_bytes!("translation_groups.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
             hash.update(&(source.len() as u64).to_le_bytes());
@@ -200,6 +206,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub rigid_rotation_groups: Vec<RigidRotationGroup>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub rigid_translation_groups: Vec<RigidTranslationGroup>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub mechanisms: Vec<MechanismDefinition>,
@@ -255,6 +263,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             rigid_rotation_groups: Option<Vec<RigidRotationGroup>>,
             #[serde(default, deserialize_with = "present_vec")]
+            rigid_translation_groups: Option<Vec<RigidTranslationGroup>>,
+            #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
             #[serde(default, deserialize_with = "present_vec")]
             mechanisms: Option<Vec<MechanismDefinition>>,
@@ -278,6 +288,11 @@ impl<'de> Deserialize<'de> for Recipe {
         if raw.schema_version == 1 && raw.rigid_rotation_groups.is_some() {
             return Err(serde::de::Error::custom(
                 "rigid rotation groups require schema2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.rigid_translation_groups.is_some() {
+            return Err(serde::de::Error::custom(
+                "rigid translation groups require schema2",
             ));
         }
         if raw.schema_version == 1 && raw.datum_dimensions.is_some() {
@@ -356,6 +371,7 @@ impl<'de> Deserialize<'de> for Recipe {
             datum_dimensions: raw.datum_dimensions.unwrap_or_default(),
             nominal_seating_checks: raw.nominal_seating_checks.unwrap_or_default(),
             rigid_rotation_groups: raw.rigid_rotation_groups.unwrap_or_default(),
+            rigid_translation_groups: raw.rigid_translation_groups.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
             mechanism_bindings: raw.mechanism_bindings.unwrap_or_default(),
@@ -1091,6 +1107,7 @@ pub struct BuildResult {
     pub datum_dimensions: BTreeMap<String, DatumDimensionReport>,
     pub nominal_seating_checks: BTreeMap<String, NominalSeatingCheckReport>,
     pub rigid_rotation_groups: BTreeMap<String, RigidRotationGroupReport>,
+    pub rigid_translation_groups: BTreeMap<String, RigidTranslationGroupReport>,
     pub face_datums: ResolvedFaceDatums,
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
     pub mechanism_bindings: Vec<MechanismBindingReport>,
@@ -1121,6 +1138,18 @@ pub enum BuildError {
     },
     #[error("rotation group '{id}' on '{output}' failed: {message}")]
     RotationGroupFailed {
+        id: String,
+        output: String,
+        message: String,
+    },
+    #[error("invalid translation group '{id}' on '{output}': {message}")]
+    InvalidTranslationGroup {
+        id: String,
+        output: String,
+        message: String,
+    },
+    #[error("translation group '{id}' on '{output}' failed: {message}")]
+    TranslationGroupFailed {
         id: String,
         output: String,
         message: String,
@@ -1925,6 +1954,7 @@ impl BuildEngine {
         tolerance_stacks::preflight(recipe)?;
         clearance_checks::preflight(recipe)?;
         rotation_groups::preflight(recipe)?;
+        translation_groups::preflight(recipe)?;
         face_datums::preflight(recipe)?;
         if recipe.schema_version == 1 && !recipe.face_assertions.is_empty() {
             return Err(BuildError::FaceAssertionSchema);
@@ -2830,6 +2860,7 @@ impl BuildEngine {
             datum_dimensions: BTreeMap::new(),
             nominal_seating_checks: BTreeMap::new(),
             rigid_rotation_groups: BTreeMap::new(),
+            rigid_translation_groups: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             motion_studies: mechanism_evaluation.motion_studies,
             mechanism_reports: mechanism_evaluation.reports,
@@ -2886,6 +2917,12 @@ impl BuildEngine {
                     .iter()
                     .map(|a| a.output.clone()),
             )
+            .chain(
+                recipe
+                    .rigid_translation_groups
+                    .iter()
+                    .map(|a| a.output.clone()),
+            )
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -2914,10 +2951,13 @@ impl BuildEngine {
         )?;
         result.rigid_rotation_groups =
             rotation_groups::evaluate(recipe, &assertion_assemblies, tolerance)?;
+        result.rigid_translation_groups =
+            translation_groups::evaluate(recipe, &assertion_assemblies, tolerance)?;
         result.clearance_checks = clearance_checks::evaluate(
             recipe,
             &assertion_assemblies,
             &result.rigid_rotation_groups,
+            &result.rigid_translation_groups,
             tolerance,
         )?;
         result.datum_dimensions = datum_dimensions::evaluate(

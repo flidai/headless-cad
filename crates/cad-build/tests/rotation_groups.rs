@@ -99,7 +99,7 @@ fn common_world_path_is_reference_resolved_and_motion_budget_is_global() {
     }
     assert!(built.clearance_checks["gap"].lower_bound_mm < 5.);
     let mut v = value();
-    let checks = (0..17)
+    let checks = (0..25)
         .map(|i| {
             let mut c = v["clearance_checks"][0].clone();
             c["id"] = json!(format!("c{i}"));

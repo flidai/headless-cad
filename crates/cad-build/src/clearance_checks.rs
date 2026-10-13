@@ -2,7 +2,7 @@
 use super::*;
 pub const MAX_CLEARANCE_CHECKS: usize = 64;
 pub const MAX_CLEARANCE_RESOLVE_WORK: usize = 10_000_000;
-pub const MAX_CLEARANCE_SWEEPS: usize = 16;
+pub const MAX_CLEARANCE_SWEEPS: usize = 24;
 pub const MAX_CLEARANCE_SWEEP_QUERIES: usize = 4096;
 pub const MAX_CLEARANCE_TRANSLATION_MM: f64 = 1_000_000.;
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -45,6 +45,8 @@ pub struct ClearanceCheck {
     pub right_rotation: Option<RotationPath>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotation_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub translation_group: Option<String>,
 }
 impl<'de> Deserialize<'de> for ClearanceCheck {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
@@ -62,6 +64,8 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             right_rotation: Option<RotationPath>,
             #[serde(default)]
             rotation_group: Option<String>,
+            #[serde(default)]
+            translation_group: Option<String>,
         }
         let v = serde_json::Value::deserialize(d)?;
         if !v.is_object() {
@@ -79,6 +83,7 @@ impl<'de> Deserialize<'de> for ClearanceCheck {
             right_translation: r.right_translation,
             right_rotation: r.right_rotation,
             rotation_group: r.rotation_group,
+            translation_group: r.translation_group,
         })
     }
 }
@@ -97,11 +102,15 @@ pub struct ClearanceCheckReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rotation_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub translation_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub motion_proof: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub moving_endpoint: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub group_rotation_world: Option<RotationPath>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_translation_world: Option<[f64; 3]>,
     pub status: String,
     pub assembly_content_hash: String,
     pub left: ClearanceOccurrenceWitness,
@@ -159,10 +168,11 @@ impl ClearanceCheck {
         if usize::from(self.right_translation.is_some())
             + usize::from(self.right_rotation.is_some())
             + usize::from(self.rotation_group.is_some())
+            + usize::from(self.translation_group.is_some())
             > 1
         {
             return Err(fail(
-                "right_translation, right_rotation and rotation_group are mutually exclusive",
+                "right_translation, right_rotation, rotation_group and translation_group are mutually exclusive",
             ));
         }
         if self.rotation_group.as_ref().is_some_and(|id| {
@@ -173,6 +183,15 @@ impl ClearanceCheck {
                     .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
         }) {
             return Err(fail("rotation_group requires a portable group ID"));
+        }
+        if self.translation_group.as_ref().is_some_and(|id| {
+            id.is_empty()
+                || id.len() > 128
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        }) {
+            return Err(fail("translation_group requires a portable group ID"));
         }
         if let Some(r) = &self.right_rotation {
             let norm = r.axis[0].hypot(r.axis[1]).hypot(r.axis[2]);
@@ -213,6 +232,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
             c.right_translation.is_some()
                 || c.right_rotation.is_some()
                 || c.rotation_group.is_some()
+                || c.translation_group.is_some()
         })
         .count()
         > MAX_CLEARANCE_SWEEPS
@@ -246,6 +266,7 @@ pub(super) fn evaluate(
     recipe: &Recipe,
     assemblies: &BTreeMap<String, cad_assembly::BuiltAssembly>,
     groups: &BTreeMap<String, RigidRotationGroupReport>,
+    translation_groups: &BTreeMap<String, RigidTranslationGroupReport>,
     tolerance: cad_kernel::Tolerance,
 ) -> Result<BTreeMap<String, ClearanceCheckReport>, BuildError> {
     let mut work = 0usize;
@@ -329,16 +350,31 @@ pub(super) fn evaluate(
                     .chain(bounds.max)
                     .map(f64::abs)
                     .fold(0., f64::max)
-                    .max((0..3).map(|i| bounds.max[i] - bounds.min[i]).sum());
+                    .max((0..3).map(|i| bounds.max[i] - bounds.min[i]).sum())
+                    .max(if c.translation_group.is_some() {
+                        crate::translation_groups::raw_support_scale(model)
+                    } else {
+                        0.
+                    });
                 let placement_scale = instance
                     .transform
                     .translation
                     .into_iter()
                     .map(f64::abs)
                     .fold(0., f64::max);
+                let ancestry_scale = if c.translation_group.is_some() {
+                    crate::translation_groups::ancestry_translation_scale(assembly, path)
+                        .map_err(|message| fail(message.into(), None, None))?
+                } else {
+                    0.
+                };
                 // Bound quaternion/matrix evaluation, rotation and translation from
-                // absolute operands, not potentially cancelled world coordinates.
-                let error = ((source_scale + placement_scale) * (1024. * f64::EPSILON)).next_up();
+                // absolute operands and every authored ancestor, not potentially
+                // cancelled flattened world coordinates.
+                let error = ((source_scale + placement_scale + ancestry_scale)
+                    * (1024. + 128. * path.len() as f64)
+                    * f64::EPSILON)
+                    .next_up();
                 if !error.is_finite() || error > tolerance.linear / 32. {
                     return Err(fail(
                         "native occurrence placement exceeds clearance precision budget".into(),
@@ -385,7 +421,111 @@ pub(super) fn evaluate(
         let mut motion_proof = None;
         let mut moving_endpoint = None;
         let mut group_rotation_world = None;
-        let (query, lower, upper) = if let Some(group_id) = &c.rotation_group {
+        let mut group_translation_world = None;
+        let (query, lower, upper) = if let Some(group_id) = &c.translation_group {
+            let group = translation_groups
+                .get(group_id)
+                .ok_or_else(|| fail("translation group was not resolved".into(), None, None))?;
+            let left_moves = group
+                .members
+                .iter()
+                .any(|m| m.instance_path == c.left_instance_path);
+            let right_moves = group
+                .members
+                .iter()
+                .any(|m| m.instance_path == c.right_instance_path);
+            group_translation_world = Some(group.translation_world);
+            if left_moves && right_moves {
+                if sweep_queries >= MAX_CLEARANCE_SWEEP_QUERIES {
+                    return Err(BuildError::ResourceLimit {
+                        resource: "clearance sweep queries",
+                        limit: MAX_CLEARANCE_SWEEP_QUERIES,
+                    });
+                }
+                let query = left_model
+                    .clearance(&right_model, tolerance)
+                    .map_err(|e| fail(e.to_string(), None, None))?;
+                sweep_queries += 1;
+                motion_proof = Some("common_rigid_motion".into());
+                moving_endpoint = Some("both".into());
+                let lo = (query.lower_bound_mm - uncertainty).next_down();
+                let hi = (query.upper_bound_mm + uncertainty).next_up();
+                if hi - lo > tolerance.linear {
+                    return Err(fail(
+                        "common rigid pair initial clearance unresolved".into(),
+                        Some(lo),
+                        Some(hi),
+                    ));
+                }
+                (query, lo, hi)
+            } else if left_moves || right_moves {
+                let (stationary, moving, world) = if right_moves {
+                    (&left_model, &right_model, group.translation_world)
+                } else {
+                    (&right_model, &left_model, group.translation_world)
+                };
+                let path_error = (uncertainty + group.translation_uncertainty_mm).next_up();
+                if !path_error.is_finite() || path_error > tolerance.linear / 8. {
+                    return Err(fail(
+                        "group translation path exceeds precision budget".into(),
+                        None,
+                        None,
+                    ));
+                }
+                let budget = cad_kernel::MAX_TRANSLATION_QUERIES
+                    .min(MAX_CLEARANCE_SWEEP_QUERIES - sweep_queries);
+                if budget < 3 {
+                    return Err(BuildError::ResourceLimit {
+                        resource: "clearance sweep queries",
+                        limit: MAX_CLEARANCE_SWEEP_QUERIES,
+                    });
+                }
+                let required = (c.min_clearance + path_error).next_up();
+                if !required.is_finite() {
+                    return Err(fail("group threshold overflow".into(), None, None));
+                }
+                let result = stationary
+                    .translation_clearance(moving, world, required, tolerance, budget)
+                    .map_err(|e| fail(e.to_string(), None, None))?;
+                sweep_queries += result.query_count;
+                let mut query = result
+                    .samples
+                    .iter()
+                    .find(|s| s.time == 0.)
+                    .ok_or_else(|| {
+                        fail("group translation missing initial query".into(), None, None)
+                    })?
+                    .query
+                    .clone();
+                if left_moves {
+                    std::mem::swap(&mut query.left_point, &mut query.right_point);
+                    query.axis = query.axis.map(|v| -v);
+                }
+                let lower = (result.lower_bound_mm - path_error).next_down();
+                let upper = (result.upper_bound_mm + path_error).next_up();
+                motion_proof = Some(
+                    if result.slot_motion_proof.is_some() {
+                        "slot_translation"
+                    } else {
+                        "continuous_translation"
+                    }
+                    .into(),
+                );
+                moving_endpoint = Some(if left_moves { "left" } else { "right" }.into());
+                if right_moves {
+                    right_translation_world = Some(world);
+                }
+                path_uncertainty_mm = Some(path_error);
+                sweep = Some(result);
+                (query, lower, upper)
+            } else {
+                return Err(fail(
+                    "clearance pair has no group member".into(),
+                    None,
+                    None,
+                ));
+            }
+        } else if let Some(group_id) = &c.rotation_group {
             let group = groups
                 .get(group_id)
                 .ok_or_else(|| fail("rotation group was not resolved".into(), None, None))?;
@@ -675,9 +815,11 @@ pub(super) fn evaluate(
             ClearanceCheckReport {
                 declaration: c.clone(),
                 rotation_group: c.rotation_group.clone(),
+                translation_group: c.translation_group.clone(),
                 motion_proof,
                 moving_endpoint,
                 group_rotation_world,
+                group_translation_world,
                 status: "passed".into(),
                 assembly_content_hash: assembly.content_hash.clone(),
                 left: left_witness,

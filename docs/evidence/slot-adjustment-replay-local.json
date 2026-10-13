@@ -1,0 +1,5419 @@
+{
+  "valid": true,
+  "scope": "Scripted local MCP acceptance of named nominal slot/shank clearances; no autonomous design, preload, all-contact collision, manufacturing release or hosted service claim",
+  "source_files_unchanged": true,
+  "source_files_sha256": {
+    "drive_module_adjustment.star": "b029060d6c60733db98427d0194431e43dc15979a06e498ea1bdde75cd14cb19",
+    "drive_module_rotation.star": "65a9dc0d96fec7634ced8c0e41d4eccd7443b0f24caa76120fb405205ae681e6",
+    "drive_module_adjustment.star.lock.json": "a77952722d35c4d7cb3650be3a2f1fb963d29a1c74cbc16d04993a3ef289273f"
+  },
+  "demo_script_sha256_start": "30fef666739df5facb40f53c829fb03b50adfa4a7f45afc0fde8610a3a45a63f",
+  "demo_script_sha256_end": "30fef666739df5facb40f53c829fb03b50adfa4a7f45afc0fde8610a3a45a63f",
+  "pinned_executable_sha256": "ff196eafbd0872c7e5f308c8769bdfe02f876c2d0f946722431c6b3c5f0c19cc",
+  "durable_jobs": 3,
+  "recovered_retry_results": 3,
+  "accepted_revisions": [
+    {
+      "accepted": true,
+      "revision": {
+        "build_executable_digest": "9bc0b2299aedc2dc98b1b27dcab3aeb9a4bd2b1990e03b0c71896ce3921cd583",
+        "expected_base_revision": null,
+        "job_id": "job_0000000000000001",
+        "manifest_digest": "a218354317e5613db7d32f6f02a5faab2a88cf3911286dfb539bbb0f4e8edfbd",
+        "request_id": "accept-adjustment-full",
+        "revision_id": "72888b99d05dca62b0bc165eb43c790f031474c64b88abb878c1fc7cbcd158d9",
+        "sequence": 1,
+        "snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc",
+        "verifier_executable_digest": "9bc0b2299aedc2dc98b1b27dcab3aeb9a4bd2b1990e03b0c71896ce3921cd583"
+      }
+    },
+    {
+      "accepted": true,
+      "revision": {
+        "build_executable_digest": "9bc0b2299aedc2dc98b1b27dcab3aeb9a4bd2b1990e03b0c71896ce3921cd583",
+        "expected_base_revision": "72888b99d05dca62b0bc165eb43c790f031474c64b88abb878c1fc7cbcd158d9",
+        "job_id": "job_0000000000000002",
+        "manifest_digest": "2ace2fd90b70918c832351acaeb139a95a16c4862e7ae32a39132cc37bcb1936",
+        "request_id": "accept-adjustment-half",
+        "revision_id": "a96a26661d6ed30d6af6551168e530c68c7b39622de521a59cd0c4733cd26841",
+        "sequence": 2,
+        "snapshot_id": "8e3ea883355e604a6369d196e06febc562c25abc7311aaa7348ba4b60ec309f3",
+        "verifier_executable_digest": "9bc0b2299aedc2dc98b1b27dcab3aeb9a4bd2b1990e03b0c71896ce3921cd583"
+      }
+    }
+  ],
+  "accepted_head_after_rejection": {
+    "revision": {
+      "build_executable_digest": "9bc0b2299aedc2dc98b1b27dcab3aeb9a4bd2b1990e03b0c71896ce3921cd583",
+      "expected_base_revision": null,
+      "job_id": "job_0000000000000001",
+      "manifest_digest": "a218354317e5613db7d32f6f02a5faab2a88cf3911286dfb539bbb0f4e8edfbd",
+      "request_id": "accept-adjustment-full",
+      "revision_id": "72888b99d05dca62b0bc165eb43c790f031474c64b88abb878c1fc7cbcd158d9",
+      "sequence": 1,
+      "snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc",
+      "verifier_executable_digest": "9bc0b2299aedc2dc98b1b27dcab3aeb9a4bd2b1990e03b0c71896ce3921cd583"
+    }
+  },
+  "stale_acceptance": {
+    "code": "agent_request_failed",
+    "error": "stale expected_base_revision"
+  },
+  "rejected_overshoot": {
+    "artifacts": [],
+    "job_id": "job_0000000000000003",
+    "manifest_hash": null,
+    "mode": "build",
+    "publication": "immutable_candidate_only",
+    "snapshot_id": "0db4f3d6bbd480abbd14fe867e9a4fdf7b2e567c0aeed59b6d3f4ae1b0434d0e",
+    "worker": {
+      "admission": {
+        "aggregate_disk_quota": false,
+        "effective_limits": {
+          "address_space_bytes": {
+            "hard": 2147483648,
+            "soft": 2147483648
+          },
+          "core_bytes": {
+            "hard": 0,
+            "soft": 0
+          },
+          "cpu_seconds": {
+            "hard": 46,
+            "soft": 45
+          },
+          "file_bytes": {
+            "hard": 134217728,
+            "soft": 134217728
+          },
+          "open_files": {
+            "hard": 128,
+            "soft": 128
+          }
+        },
+        "enforcement": "process_rlimits_before_recipe_evaluation",
+        "filesystem_sandbox": false,
+        "hard_rss_limit": false,
+        "parent_lifetime": "parent_death_sigkill_registered_before_admission",
+        "platform": "linux",
+        "schema_version": 1
+      },
+      "result": {
+        "causes": [],
+        "check_id": "mounting_slot_0_shank_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "error": "clearance check 'mounting_slot_0_shank_gap' on 'drive_module_adjustment' failed: unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "lower_bound_mm": null,
+        "output_name": "drive_module_adjustment",
+        "upper_bound_mm": null
+      },
+      "success": false
+    }
+  },
+  "conflicting_retry": {
+    "code": "agent_request_failed",
+    "error": "request_id conflicts with a different payload or executable identity"
+  },
+  "deliveries": [
+    {
+      "mode": "verified_generation_stream",
+      "seconds": 0.8370837710099295,
+      "read_calls": 369,
+      "bytes": 20527255,
+      "artifacts": 100
+    },
+    {
+      "mode": "verified_generation_stream",
+      "seconds": 0.8067580950446427,
+      "read_calls": 369,
+      "bytes": 20527220,
+      "artifacts": 100
+    }
+  ],
+  "offline_replay": {
+    "valid": true,
+    "accepted_revision_id": "a96a26661d6ed30d6af6551168e530c68c7b39622de521a59cd0c4733cd26841",
+    "accepted_job_id": "job_0000000000000002",
+    "accepted_manifest_digest": "2ace2fd90b70918c832351acaeb139a95a16c4862e7ae32a39132cc37bcb1936",
+    "accepted_build_executable_blake3": "9bc0b2299aedc2dc98b1b27dcab3aeb9a4bd2b1990e03b0c71896ce3921cd583",
+    "replay_executable_sha256": "ff196eafbd0872c7e5f308c8769bdfe02f876c2d0f946722431c6b3c5f0c19cc",
+    "source_kind": "captured_locked_bundle",
+    "source_name": "drive_module_adjustment.star",
+    "parameter_overrides": {},
+    "scope": {
+      "evaluated_features": [
+        "base_back_right",
+        "base_body",
+        "base_front_left",
+        "base_front_right",
+        "base_profile",
+        "base_slotted",
+        "base_stock",
+        "bolt_body",
+        "bolt_profile",
+        "clamp_body",
+        "clamp_profile",
+        "cover_screw_body",
+        "cover_screw_profile",
+        "disc_body",
+        "disc_profile",
+        "disc_stock",
+        "end_cover_body",
+        "end_cover_profile",
+        "housing_body",
+        "housing_left_pilots",
+        "housing_profile",
+        "housing_right_pilots",
+        "key_body",
+        "key_profile",
+        "keyway_box",
+        "keyway_profile",
+        "keyway_tool",
+        "nut_body",
+        "nut_profile",
+        "ring_body",
+        "ring_profile",
+        "seat_box",
+        "seat_profile",
+        "seat_tool",
+        "shaft_body",
+        "shaft_profile",
+        "shaft_stock",
+        "sleeve_body",
+        "sleeve_profile",
+        "washer_body",
+        "washer_profile"
+      ],
+      "mode": "selected",
+      "requested_outputs": [
+        "drive_module_adjustment"
+      ],
+      "skipped_features": [],
+      "validation_roots": [
+        "base_back_right",
+        "base_body",
+        "base_front_left",
+        "base_front_right",
+        "base_slotted",
+        "bolt_body",
+        "clamp_body",
+        "cover_screw_body",
+        "disc_body",
+        "end_cover_body",
+        "housing_body",
+        "housing_left_pilots",
+        "housing_right_pilots",
+        "key_body",
+        "nut_body",
+        "ring_body",
+        "shaft_body",
+        "shaft_stock",
+        "sleeve_body",
+        "washer_body"
+      ]
+    },
+    "generation_mode": "full",
+    "compared_files": [
+      {
+        "name": "clearance-checks.json",
+        "bytes": 81166,
+        "sha256": "82fc6f108b572fa888fcfc13373e92ed7099ee20b60e8c388c2fd2038f2e4c65"
+      },
+      {
+        "name": "datum-dimensions.json",
+        "bytes": 200966,
+        "sha256": "8338c1073e84440e295ff93912db689eaf6a9e2318e4d0d1c62a973f9989807a"
+      },
+      {
+        "name": "definition-01c3cdb05f4ce5415ca6d19b4b67fe1f3e695ed7b832b889274f86053ea4e181.brep.json",
+        "bytes": 15416,
+        "sha256": "3308d84b0bb820ac9dd77987066118d6c16c2b7c6e9138ac14db86f511230dc4"
+      },
+      {
+        "name": "definition-10b433a7feb7ec71c1ecb1deed55384cc7478f056ef3777ac3df12de13e55722.brep.json",
+        "bytes": 17559,
+        "sha256": "060a55063338f8c00b626f9c8055bb67c6bd34d72b9819d426dbb31a1bd9add1"
+      },
+      {
+        "name": "definition-360db0972821cc0b6ee2b651e7639844e23177023933a1a5f6c659dc7b7028b7.brep.json",
+        "bytes": 23976,
+        "sha256": "1fb3474f1729d61f1988dc469384ad361e282519b0fa060fa94e9526dc177296"
+      },
+      {
+        "name": "definition-3a63ab2f58a13182979dadec186ef042c9c634c041ca2f55ce0993b43db904d7.brep.json",
+        "bytes": 9956,
+        "sha256": "b42efeafd5f709879fc589a5591d8bf60f4adebf5cc14933c350aede29fa7810"
+      },
+      {
+        "name": "definition-608fa3ba7aff5b8d4f103494a8986496d500f41f69f1d80c1e0af8cfdbd06bd0.brep.json",
+        "bytes": 6428,
+        "sha256": "2f732cbeb89f3841d2f7829657db49df35fdd4657f9b1c8112a4e2940e2dc462"
+      },
+      {
+        "name": "definition-6b9511c67befad17fd1babb3aa7505b67ce23e42bca1571bd7e72a10bc93aa75.brep.json",
+        "bytes": 43305,
+        "sha256": "f3fff0e4c04baf1c7b170657ed30c9ca26c5af3df4206dcb7c2dd16817adc73d"
+      },
+      {
+        "name": "definition-6fa3e429a4ad09c3b18c8c2d5b52f8de977e260b71db6ca27a007ac8e59b9468.brep.json",
+        "bytes": 63384,
+        "sha256": "80474875fcfc04b2136b9996a630ba119ed97c3b7703b296404f325c2478c836"
+      },
+      {
+        "name": "definition-7d5d83c2a0dac107ef9ff250f8146906374b1c5a23e7fa237cb7c2e011ba8a34.brep.json",
+        "bytes": 7058,
+        "sha256": "9290d3ec03c859eabca22f568b5e98910f3ebb74f561fc344f699dc47c358d95"
+      },
+      {
+        "name": "definition-926d0091b13b36a68dd9172130cf75f22619ae589920f67bf00d4ee6d87f3a69.brep.json",
+        "bytes": 16779,
+        "sha256": "f26d092e7aa0c4c0566e3e5107eeca7f09bd04dbc8ff9f4a6898820dda6c74b5"
+      },
+      {
+        "name": "definition-92d49ad03e9af925185e63e11cc9eca64e2392490acd13d0f08d0aa8bc19e252.brep.json",
+        "bytes": 22764,
+        "sha256": "05e345894dab3e1f3ec5079377f3d9059731229f1b5dc9ceebaed93dcbf329ab"
+      },
+      {
+        "name": "definition-9ecd50f2ba9be4a8201f2634a3f64ce303009bb49b455d82802ad11696660d7a.brep.json",
+        "bytes": 9806,
+        "sha256": "aff4ef894c64caddc7f32ba2a39f0851876c7a11c60c1473ad53c63d3e5031b3"
+      },
+      {
+        "name": "definition-a35a7712dbd11751eb4673afcd9932119da3674da0a241d2f19b27caf1c700eb.brep.json",
+        "bytes": 6428,
+        "sha256": "1a0dba714240c9cb7fdc95326495f659d2309f677a7c74950e782f8f6aa3e27a"
+      },
+      {
+        "name": "definition-c08004aae07d2cebedc321791653f75046c64aef41719390a39feb4a79440680.brep.json",
+        "bytes": 23988,
+        "sha256": "38a8a5500fd7a78fa57885249e063832bf833c7beaa00ccac365e30415a1019d"
+      },
+      {
+        "name": "definition-dbe5531fcab7b11bf042494d27d6033d0e4692ccf3f63adf15fd0676553920b3.brep.json",
+        "bytes": 7057,
+        "sha256": "d786e31727c6df5ad63be5f63a4a7259d347cbdc620af158f971d165f56d6fac"
+      },
+      {
+        "name": "drawing-drive_module_sections.json",
+        "bytes": 4282,
+        "sha256": "77cb398e360214f4f5f449d50d1041c12b6f3658032cc0f018a9fe94a68cd15e"
+      },
+      {
+        "name": "drawing-drive_module_sections.svg",
+        "bytes": 17658,
+        "sha256": "ba7ee5b8cec15d343a2b16ae44e5572eaea6209752ee5558f52e5001858eb611"
+      },
+      {
+        "name": "drawing-end_cover_machining.json",
+        "bytes": 150213,
+        "sha256": "8bc839a02c8144cad26d49f180831840c46ff8ef68b0fcc1538e36b5e1b1a877"
+      },
+      {
+        "name": "drawing-end_cover_machining.svg",
+        "bytes": 16779,
+        "sha256": "cfa85f9945fd1e2718daa2db83b13698c776593208691f284d0df07aa4f94a6c"
+      },
+      {
+        "name": "drive_module_adjustment.assembly.json",
+        "bytes": 42509,
+        "sha256": "2b8926e56b1e56d5f3579772abbec62999dab596f5be4927549c4952841bf7c6"
+      },
+      {
+        "name": "drive_module_adjustment.bom.json",
+        "bytes": 9460,
+        "sha256": "8b8ecdf94fd88106b194d5366d3649b9804fded42bf9562052123a3dbcd110ae"
+      },
+      {
+        "name": "drive_module_adjustment.display.json",
+        "bytes": 4453742,
+        "sha256": "b65c9f34cc0a7a2e2d2ef0d42a8800225dee588ee8f6841679dcf420a37eed72"
+      },
+      {
+        "name": "drive_module_adjustment.exchange.json",
+        "bytes": 14564,
+        "sha256": "41720424361bef2f630b205ddf25d4dc922d6393de11d10b66e2f899e11cb532"
+      },
+      {
+        "name": "drive_module_adjustment.metadata.json",
+        "bytes": 874,
+        "sha256": "4f3e6a283cd8c19aa23ab51d75451c972400e8878c2c2cf2572db1495b6b7bcd"
+      },
+      {
+        "name": "drive_module_adjustment.preview.svg",
+        "bytes": 1348624,
+        "sha256": "00db9de70ac477f9400c7905b387272adc76192e8d71b70d5692e05ffb827141"
+      },
+      {
+        "name": "drive_module_adjustment.step",
+        "bytes": 198959,
+        "sha256": "83170603abad14aafb231ab4929fe9172ed078b2db1a39027822658f7f6d3baf"
+      },
+      {
+        "name": "drive_module_adjustment.stl",
+        "bytes": 3986198,
+        "sha256": "fbb845ad86df5aa17ce32fb373adff73c7fb95957dc53bdb9682b543a62af44b"
+      },
+      {
+        "name": "drive_module_adjustment.stream.json",
+        "bytes": 58221,
+        "sha256": "70b0bbe4b937c5ef1b35cf0ec7731c6334611fc939972f349eeb263e92ba0a8c"
+      },
+      {
+        "name": "mesh-03414d8512ab0b9df7de47fee1f05edc7b5b16c04e12de94ee3f657fc6f7af71.display.json",
+        "bytes": 121388,
+        "sha256": "03414d8512ab0b9df7de47fee1f05edc7b5b16c04e12de94ee3f657fc6f7af71"
+      },
+      {
+        "name": "mesh-049956ce045bbf06a52e45e8248003554a25d550a1d7f4f6b979e2268ed292c8.display.json",
+        "bytes": 15675,
+        "sha256": "049956ce045bbf06a52e45e8248003554a25d550a1d7f4f6b979e2268ed292c8"
+      },
+      {
+        "name": "mesh-054ad59cd81bf4b388eddfb6b750c98526af3aa0cb0f15610a83944672abc900.display.json",
+        "bytes": 69005,
+        "sha256": "054ad59cd81bf4b388eddfb6b750c98526af3aa0cb0f15610a83944672abc900"
+      },
+      {
+        "name": "mesh-066dae419946b7466e0da3253db3d7bb08e94c4e15b4b298f0bdfc7127c6e6a6.display.json",
+        "bytes": 18119,
+        "sha256": "066dae419946b7466e0da3253db3d7bb08e94c4e15b4b298f0bdfc7127c6e6a6"
+      },
+      {
+        "name": "mesh-07a7d7b8391fbfae406ea67fc2538da8182e2281e36702ed045ad810789bc3df.display.json",
+        "bytes": 153722,
+        "sha256": "07a7d7b8391fbfae406ea67fc2538da8182e2281e36702ed045ad810789bc3df"
+      },
+      {
+        "name": "mesh-07e70eccb2dbc000c62273ad4d9890b80ee91c2d49c15a428eaa8f3e23242f2a.display.json",
+        "bytes": 54884,
+        "sha256": "07e70eccb2dbc000c62273ad4d9890b80ee91c2d49c15a428eaa8f3e23242f2a"
+      },
+      {
+        "name": "mesh-154e0328a381752d2cfb097f0fb85125938fb4290e0543f95bcf88e8cc6455f7.display.json",
+        "bytes": 18664,
+        "sha256": "154e0328a381752d2cfb097f0fb85125938fb4290e0543f95bcf88e8cc6455f7"
+      },
+      {
+        "name": "mesh-2122beed0e67143098c6ec56b71f84436ac945a168a98f96d89670efb0dfdf04.display.json",
+        "bytes": 12464,
+        "sha256": "2122beed0e67143098c6ec56b71f84436ac945a168a98f96d89670efb0dfdf04"
+      },
+      {
+        "name": "mesh-218a1c5143723abd00e1b4ddbae78ebac8edc957539680a32de4e99f74da4f89.display.json",
+        "bytes": 16895,
+        "sha256": "218a1c5143723abd00e1b4ddbae78ebac8edc957539680a32de4e99f74da4f89"
+      },
+      {
+        "name": "mesh-234c4143cfd7342186c1d6bd183205e3313e33b75d5f9bc4400423d1dd504b0d.display.json",
+        "bytes": 121148,
+        "sha256": "234c4143cfd7342186c1d6bd183205e3313e33b75d5f9bc4400423d1dd504b0d"
+      },
+      {
+        "name": "mesh-2ee8f60851de6883d058b5d6e89d659f292fe526c0b5e78520085b975ab123ec.display.json",
+        "bytes": 69995,
+        "sha256": "2ee8f60851de6883d058b5d6e89d659f292fe526c0b5e78520085b975ab123ec"
+      },
+      {
+        "name": "mesh-3d81063461705e978cdbbcd6bc819270d2d72ed95c70efaad5c9a303d99f254f.display.json",
+        "bytes": 98181,
+        "sha256": "3d81063461705e978cdbbcd6bc819270d2d72ed95c70efaad5c9a303d99f254f"
+      },
+      {
+        "name": "mesh-431651d2c08768bcd20fcc5cc6850f9a93224da0c98b78c5475e52df72906f4b.display.json",
+        "bytes": 57745,
+        "sha256": "431651d2c08768bcd20fcc5cc6850f9a93224da0c98b78c5475e52df72906f4b"
+      },
+      {
+        "name": "mesh-4c8d3253e188a293bf43fb17f60bfbf17335d5bc0b084da34cf6e49168d5603a.display.json",
+        "bytes": 35041,
+        "sha256": "4c8d3253e188a293bf43fb17f60bfbf17335d5bc0b084da34cf6e49168d5603a"
+      },
+      {
+        "name": "mesh-5774e0551cd4283b994bd36cb4e3ea57fb07d5506b5986e1492453ed7865f31a.display.json",
+        "bytes": 24532,
+        "sha256": "5774e0551cd4283b994bd36cb4e3ea57fb07d5506b5986e1492453ed7865f31a"
+      },
+      {
+        "name": "mesh-59acc54fa1b50c03f78edeb80b65b0514c055f99a7499c12e467cc9b01a6e5b6.display.json",
+        "bytes": 13835,
+        "sha256": "59acc54fa1b50c03f78edeb80b65b0514c055f99a7499c12e467cc9b01a6e5b6"
+      },
+      {
+        "name": "mesh-64527457b1fe693cdc5c07031afe1e67efee06525f0445e8430e7bf79008a231.display.json",
+        "bytes": 37590,
+        "sha256": "64527457b1fe693cdc5c07031afe1e67efee06525f0445e8430e7bf79008a231"
+      },
+      {
+        "name": "mesh-6ccaeee2be8ef683d9380b0cacbe52ad3835586729873be2a23160c92d8390cf.display.json",
+        "bytes": 471269,
+        "sha256": "6ccaeee2be8ef683d9380b0cacbe52ad3835586729873be2a23160c92d8390cf"
+      },
+      {
+        "name": "mesh-726763d11e7c1616f2567aa29c8e17ff53c637c59d0fe180d3a8c88630a6e045.display.json",
+        "bytes": 19542,
+        "sha256": "726763d11e7c1616f2567aa29c8e17ff53c637c59d0fe180d3a8c88630a6e045"
+      },
+      {
+        "name": "mesh-80121b1cecf0881d740ed846d423241cce62148a03e3a0ccb80870778c6ba0c7.display.json",
+        "bytes": 37686,
+        "sha256": "80121b1cecf0881d740ed846d423241cce62148a03e3a0ccb80870778c6ba0c7"
+      },
+      {
+        "name": "mesh-84b4e476ea0aab35148a9d54e740e1a1c2a240b94f323b949198338fef516377.display.json",
+        "bytes": 12402,
+        "sha256": "84b4e476ea0aab35148a9d54e740e1a1c2a240b94f323b949198338fef516377"
+      },
+      {
+        "name": "mesh-871848173259c22aec0aad58ace55db0f96f832a417a5e306953a4d86253d1a4.display.json",
+        "bytes": 882,
+        "sha256": "871848173259c22aec0aad58ace55db0f96f832a417a5e306953a4d86253d1a4"
+      },
+      {
+        "name": "mesh-87d003944f38175f52b10a46db7da1b93cdd424993af38621f1aaf9f18553631.display.json",
+        "bytes": 21159,
+        "sha256": "87d003944f38175f52b10a46db7da1b93cdd424993af38621f1aaf9f18553631"
+      },
+      {
+        "name": "mesh-907f83d79d6dcfe023216d8937f897d0370950f3f56d375ee840f7b6885e452a.display.json",
+        "bytes": 45463,
+        "sha256": "907f83d79d6dcfe023216d8937f897d0370950f3f56d375ee840f7b6885e452a"
+      },
+      {
+        "name": "mesh-920dd87aa71df3e549b93b0fffce9c9dbbe19f2f090f16d10167e98c283226af.display.json",
+        "bytes": 55238,
+        "sha256": "920dd87aa71df3e549b93b0fffce9c9dbbe19f2f090f16d10167e98c283226af"
+      },
+      {
+        "name": "mesh-9db0d32867ebddc47738bdf743f85769593ca2656500195917784eadd2fca71c.display.json",
+        "bytes": 39910,
+        "sha256": "9db0d32867ebddc47738bdf743f85769593ca2656500195917784eadd2fca71c"
+      },
+      {
+        "name": "mesh-a1630a2b47f23d5469b8db2a262aad6b015e8cef1700efc576325dc6510ac905.display.json",
+        "bytes": 70622,
+        "sha256": "a1630a2b47f23d5469b8db2a262aad6b015e8cef1700efc576325dc6510ac905"
+      },
+      {
+        "name": "mesh-ac27a71e2ef2aa17523c295d43b4067fa5b06f7b1d9a863b1825b49107b9c24d.display.json",
+        "bytes": 127026,
+        "sha256": "ac27a71e2ef2aa17523c295d43b4067fa5b06f7b1d9a863b1825b49107b9c24d"
+      },
+      {
+        "name": "mesh-af1c36314a76bdacfa87111803228591c33de153a16969451bbee4dd20d3889e.display.json",
+        "bytes": 13945,
+        "sha256": "af1c36314a76bdacfa87111803228591c33de153a16969451bbee4dd20d3889e"
+      },
+      {
+        "name": "mesh-afa423688c898957ce63a494a2dfa9cccd46b85fe967b2e57ff9a222ccd1d204.display.json",
+        "bytes": 155199,
+        "sha256": "afa423688c898957ce63a494a2dfa9cccd46b85fe967b2e57ff9a222ccd1d204"
+      },
+      {
+        "name": "mesh-b232ec33942c6b67fd2b51c1085b9e511def80be805601bbefeb75344fb07e97.display.json",
+        "bytes": 40914,
+        "sha256": "b232ec33942c6b67fd2b51c1085b9e511def80be805601bbefeb75344fb07e97"
+      },
+      {
+        "name": "mesh-b28de3f75dfdf944472ca1ecbdb80b7c23e64f75441ff769d688d46a6af63aa3.display.json",
+        "bytes": 45559,
+        "sha256": "b28de3f75dfdf944472ca1ecbdb80b7c23e64f75441ff769d688d46a6af63aa3"
+      },
+      {
+        "name": "mesh-b5aaa9592e7c0020a98736e4b05ce3de29d9da976684908bad149680b6e1143b.display.json",
+        "bytes": 15752,
+        "sha256": "b5aaa9592e7c0020a98736e4b05ce3de29d9da976684908bad149680b6e1143b"
+      },
+      {
+        "name": "mesh-bc5f9bfe015d1fab2df7c3efe0a4bf9c4547b72bab0b0cf2d6f02ff1779f0d60.display.json",
+        "bytes": 39377,
+        "sha256": "bc5f9bfe015d1fab2df7c3efe0a4bf9c4547b72bab0b0cf2d6f02ff1779f0d60"
+      },
+      {
+        "name": "mesh-be466337f3be738da2ef44eb1b8b2db206f8b431c6717f4e2a61f889360ed214.display.json",
+        "bytes": 27081,
+        "sha256": "be466337f3be738da2ef44eb1b8b2db206f8b431c6717f4e2a61f889360ed214"
+      },
+      {
+        "name": "mesh-c8d784dc607813a1b0c8d885f6f7b0a7f7134183d1d177b21ed8a6810a3e5764.display.json",
+        "bytes": 47617,
+        "sha256": "c8d784dc607813a1b0c8d885f6f7b0a7f7134183d1d177b21ed8a6810a3e5764"
+      },
+      {
+        "name": "mesh-ce13fb521562e41429a7948d0f9429ee3620a4947e2efd843a49b8a7eeb74c0b.display.json",
+        "bytes": 21070,
+        "sha256": "ce13fb521562e41429a7948d0f9429ee3620a4947e2efd843a49b8a7eeb74c0b"
+      },
+      {
+        "name": "mesh-cf0dd56f11f545f6d0ca02191fb7b3aeaf65c0f9419337b4b8a5065a957f2e88.display.json",
+        "bytes": 13937,
+        "sha256": "cf0dd56f11f545f6d0ca02191fb7b3aeaf65c0f9419337b4b8a5065a957f2e88"
+      },
+      {
+        "name": "mesh-d328dde12658e61910d0334be3ac483f9211ac1a97387c01e6d2313567a2b24f.display.json",
+        "bytes": 58320,
+        "sha256": "d328dde12658e61910d0334be3ac483f9211ac1a97387c01e6d2313567a2b24f"
+      },
+      {
+        "name": "mesh-fbf5d012139a62a7e7d22cf755df34aa2a6c8e35ac0e8eb557ad2d6d9459f9ec.display.json",
+        "bytes": 118581,
+        "sha256": "fbf5d012139a62a7e7d22cf755df34aa2a6c8e35ac0e8eb557ad2d6d9459f9ec"
+      },
+      {
+        "name": "metadata-4f42dd9438d874705f55b6c4bf806e911d7b2ce957cbbe24dd574c56d1495a1c.display.json",
+        "bytes": 60438,
+        "sha256": "4f42dd9438d874705f55b6c4bf806e911d7b2ce957cbbe24dd574c56d1495a1c"
+      },
+      {
+        "name": "nominal-seating-checks.json",
+        "bytes": 48826,
+        "sha256": "1767253c288fad4e53d400ca0c4fb83c403c974c80ce2e035fd9ff7b7d2286c3"
+      },
+      {
+        "name": "recipe.bundle.json",
+        "bytes": 46089,
+        "sha256": "6364de49504b8cf34c6f7b95cb397fc4d7bde8aa3025e92c5cecab0070231e6c"
+      },
+      {
+        "name": "recipe.json",
+        "bytes": 97846,
+        "sha256": "11913b68c9ffdb5e682ca84895752f984064d62bb43ce3e971ceb4b3b24f4037"
+      },
+      {
+        "name": "recipe.star",
+        "bytes": 3000,
+        "sha256": "f1b467b6c288cc276c3e2fca9756d8c980d571a3df83ee266f6cc0deae383104"
+      },
+      {
+        "name": "rigid-rotation-groups.json",
+        "bytes": 8582,
+        "sha256": "7570656c30965b61f57cfe99b6212476c352203c137cb8b962ebed8872af05b0"
+      },
+      {
+        "name": "rigid-translation-groups.json",
+        "bytes": 22890,
+        "sha256": "34082b4c46ea6323b333a47ba118c5a7d900bd04d9c9ba6f4b0c7e2b0677b856"
+      },
+      {
+        "name": "section-bearing_section.json",
+        "bytes": 60168,
+        "sha256": "0fbc57e8c21999c515017bb86c8151cee43db26d2930c30030dfc6f3820d552e"
+      },
+      {
+        "name": "section-bearing_section.svg",
+        "bytes": 39597,
+        "sha256": "5afc04582e39c5315ca4003031cffd08372b6cfb4a309b0c1ed3ef903e51f213"
+      },
+      {
+        "name": "section-end_cover_section.json",
+        "bytes": 48456,
+        "sha256": "e28b6ab65731519ab82acf6a4235d0e006e9503b6c0d05500e9c98339d0fab73"
+      },
+      {
+        "name": "section-end_cover_section.svg",
+        "bytes": 32104,
+        "sha256": "1cf67f46c4f392c72b9c4f2dad5bdf0456b18242d7da2b59e2566b4c3649c3de"
+      },
+      {
+        "name": "section-left_cover_pilot_section.json",
+        "bytes": 46830,
+        "sha256": "ff25903e48df29cd012b4f206298eb3dc092a8e56e41721bdec3b4ce631957da"
+      },
+      {
+        "name": "section-left_cover_pilot_section.svg",
+        "bytes": 30634,
+        "sha256": "1852c1c7ba9e6cec9db1c5461c05091244f4205f05081b08cc9f512d4d4eda44"
+      },
+      {
+        "name": "section-mounting_plan.json",
+        "bytes": 87428,
+        "sha256": "b67e7b9fc255019c2058808d1b7aa396618a22dba7db2667beb25b74ebc89620"
+      },
+      {
+        "name": "section-mounting_plan.svg",
+        "bytes": 56029,
+        "sha256": "ec759dd374441fce91d3b2a86e14d40fc5d5bbaf147130d374956aeb9b0ef93a"
+      },
+      {
+        "name": "section-right_cover_pilot_section.json",
+        "bytes": 46860,
+        "sha256": "a87492fd52e6ca252ab5c1e6bb925132f8107b3cd5606cfb4eb283fd725eba92"
+      },
+      {
+        "name": "section-right_cover_pilot_section.svg",
+        "bytes": 30731,
+        "sha256": "0f780e91725133a39043d20a8ee74c1dc8006068e74404ee1a6e3bd45e37d9a6"
+      },
+      {
+        "name": "tolerance-stacks.json",
+        "bytes": 27834,
+        "sha256": "46b991e9a7895a1141e90f4316e4edb3b29347d0483f67e745cd93614db56662"
+      }
+    ],
+    "excluded_files": [
+      "clearance-checks.html",
+      "datum-dimensions.html",
+      "drive_module_adjustment.bom.csv",
+      "drive_module_adjustment.gpu.html",
+      "drive_module_adjustment.paged.html",
+      "drive_module_adjustment.preview.html",
+      "drive_module_adjustment.stream.html",
+      "manifest.json",
+      "nominal-seating-checks.html",
+      "rigid-rotation-groups.html",
+      "rigid-translation-groups.html",
+      "tolerance-stacks.html",
+      "translation-upper_slot_travel.html"
+    ],
+    "comparison": "SHA-256 exact bytes for native geometry, exchange, source and engineering JSON/SVG; manifest and HTML excluded",
+    "semantic_manifest_fields": [
+      "schema_version",
+      "manifest_schema_version",
+      "units",
+      "tolerance",
+      "kernel_version",
+      "kernel_build_id",
+      "executor_build_id",
+      "solver_build_id",
+      "recipe_source_hash",
+      "face_datums",
+      "mechanism_context_hash",
+      "feature_hashes",
+      "outputs",
+      "face_assertions",
+      "property_assertions",
+      "clearance_checks",
+      "datum_dimensions",
+      "tolerance_stacks",
+      "nominal_seating_checks",
+      "rigid_rotation_groups",
+      "section_views",
+      "drawing_sheets",
+      "exchange_requirements",
+      "exchange_policy_status",
+      "sketch_reports",
+      "mechanism_reports",
+      "motion_studies",
+      "mechanism_bindings",
+      "rigid_translation_groups"
+    ],
+    "delivery_verify": {
+      "algorithm": "blake3",
+      "manifest_hash": "2ace2fd90b70918c832351acaeb139a95a16c4862e7ae32a39132cc37bcb1936",
+      "schema_version": 1,
+      "valid": true,
+      "verified_bytes": 19911295,
+      "verified_files": 99
+    },
+    "replay_verify": {
+      "algorithm": "blake3",
+      "manifest_hash": "2ace2fd90b70918c832351acaeb139a95a16c4862e7ae32a39132cc37bcb1936",
+      "schema_version": 1,
+      "valid": true,
+      "verified_bytes": 19911295,
+      "verified_files": 99
+    }
+  },
+  "mechanical_fixture": {
+    "before": {
+      "occurrences": 30,
+      "definitions": 14,
+      "moving_members": 29,
+      "named_slot_pairs": 4,
+      "travel_mm": 6,
+      "checks": {
+        "mounting_slot_0_shank_gap": {
+          "lower_bound_mm": 0.499999984249598,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        },
+        "mounting_slot_1_shank_gap": {
+          "lower_bound_mm": 0.499999984249598,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        },
+        "mounting_slot_2_shank_gap": {
+          "lower_bound_mm": 0.4999999841600128,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        },
+        "mounting_slot_3_shank_gap": {
+          "lower_bound_mm": 0.4999999841600128,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        }
+      },
+      "scope": "Nominal unthreaded clamp envelopes; named slot/shank pairs only. Upper assembly sliding contact, threads, preload, tightening and rated loads are not certified."
+    },
+    "after": {
+      "occurrences": 30,
+      "definitions": 14,
+      "moving_members": 29,
+      "named_slot_pairs": 4,
+      "travel_mm": 3,
+      "checks": {
+        "mounting_slot_0_shank_gap": {
+          "lower_bound_mm": 0.49999998425590764,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        },
+        "mounting_slot_1_shank_gap": {
+          "lower_bound_mm": 0.49999998425590764,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        },
+        "mounting_slot_2_shank_gap": {
+          "lower_bound_mm": 0.4999999841663224,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        },
+        "mounting_slot_3_shank_gap": {
+          "lower_bound_mm": 0.4999999841663224,
+          "native_method": "slot_trim_witness",
+          "proof": "slot_translation",
+          "query_count": 2
+        }
+      },
+      "scope": "Nominal unthreaded clamp envelopes; named slot/shank pairs only. Upper assembly sliding contact, threads, preload, tightening and rated loads are not certified."
+    }
+  },
+  "snapshots": {
+    "parentage": "first_observed_parent",
+    "retention": "durable_state_directory",
+    "snapshots": [
+      {
+        "language": "starlark",
+        "parent_snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc",
+        "snapshot_id": "0db4f3d6bbd480abbd14fe867e9a4fdf7b2e567c0aeed59b6d3f4ae1b0434d0e",
+        "source_bytes": 3000,
+        "source_name": "drive_module_adjustment.star"
+      },
+      {
+        "language": "starlark",
+        "parent_snapshot_id": null,
+        "snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc",
+        "source_bytes": 2998,
+        "source_name": "drive_module_adjustment.star"
+      },
+      {
+        "language": "starlark",
+        "parent_snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc",
+        "snapshot_id": "8e3ea883355e604a6369d196e06febc562c25abc7311aaa7348ba4b60ec309f3",
+        "source_bytes": 3000,
+        "source_name": "drive_module_adjustment.star"
+      }
+    ]
+  },
+  "trace": [
+    {
+      "tool": "cad_snapshot",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc"
+    },
+    {
+      "tool": "cad_revise",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": "8e3ea883355e604a6369d196e06febc562c25abc7311aaa7348ba4b60ec309f3"
+    },
+    {
+      "tool": "cad_revise",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": "0db4f3d6bbd480abbd14fe867e9a4fdf7b2e567c0aeed59b6d3f4ae1b0434d0e"
+    },
+    {
+      "tool": "cad_evaluate",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc"
+    },
+    {
+      "tool": "cad_evaluate",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": "8e3ea883355e604a6369d196e06febc562c25abc7311aaa7348ba4b60ec309f3"
+    },
+    {
+      "tool": "cad_release",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_accept",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_release",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_evaluate",
+      "is_error": true,
+      "job_id": "job_0000000000000003",
+      "snapshot_id": "0db4f3d6bbd480abbd14fe867e9a4fdf7b2e567c0aeed59b6d3f4ae1b0434d0e"
+    },
+    {
+      "tool": "cad_release",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_accept",
+      "is_error": true,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_accept",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_release",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_snapshots",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_jobs",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_evaluate",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": "2d18c0a2070297445d39bed5ec3d62f1d2c92f0bffa01044d9d31b215652cfcc"
+    },
+    {
+      "tool": "cad_evaluate",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": "8e3ea883355e604a6369d196e06febc562c25abc7311aaa7348ba4b60ec309f3"
+    },
+    {
+      "tool": "cad_evaluate",
+      "is_error": true,
+      "job_id": "job_0000000000000003",
+      "snapshot_id": "0db4f3d6bbd480abbd14fe867e9a4fdf7b2e567c0aeed59b6d3f4ae1b0434d0e"
+    },
+    {
+      "tool": "cad_evaluate",
+      "is_error": true,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_jobs",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_accept",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_accept",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_release",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_verify",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_open_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_close_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000001",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_verify",
+      "is_error": false,
+      "job_id": null,
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_open_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_read_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    },
+    {
+      "tool": "cad_close_generation_stream",
+      "is_error": false,
+      "job_id": "job_0000000000000002",
+      "snapshot_id": null
+    }
+  ]
+}

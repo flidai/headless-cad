@@ -3206,3 +3206,40 @@ housing itself need not be rotationally symmetric. Three native queries retain
 sample evidence; the analytic certificate supplies continuous coverage. Run
 `tools/check-rounded-bearing-fit.py --rotation` for independent STEP checks of
 both running and stepped-shoulder gaps, including reversed motion and poses.
+
+### Inspect a mounting adjustment
+
+`examples/drive_module_adjustment.star` adds a separate loosened mounting study
+to the drive recipe: one fixed base and 29 upper occurrences moving together
+through its slots. Four native bolt/slot checks cover the entire declared travel.
+The smaller `examples/slotted_clamp_adjustment.star` isolates the same geometry.
+
+```sh
+cad build examples/drive_module_adjustment.star --out-dir out/drive_module_adjustment
+cad serve out --port 8080
+```
+
+Open `drive_module_adjustment/translation-upper_slot_travel.html` in the local
+viewer. The phase slider is inspection only; selecting a part exposes captured
+Starlark. Model changes belong in the recipes. The study uses nominal loose
+fastener envelopes and does not certify clamp preload or thread engagement.
+
+The [accepted adjustment replay](docs/evidence/slot-adjustment-replay-local.json)
+records full- and half-travel source revisions, a rejected overshoot that preserves
+the accepted base, verified delivery streams and recovery after an agent restart.
+Offline replay matches 87 native/engineering artifacts and 29 manifest fields.
+Generate a fresh local comparison with:
+
+```sh
+python scripts/agent_adjustment_demo.py --cad target/release/cad \
+  --state-dir /tmp/cad-adjustment-state --out-dir out/adjustment-demo
+```
+
+The client confines module loading to `examples/` and keeps its state directory
+outside the source workspace.
+
+The [independent slot-motion checks](docs/evidence/slot-adjustment-local.json)
+cover five isolated cases, nine rejected revisions and two drive configurations.
+They compare actual STEP boundaries and analytic full-path bounds, and sample
+all 435 part pairs at nine phases per drive configuration without positive-volume
+intersections. Continuous native proof remains scoped to the four named slot pairs.

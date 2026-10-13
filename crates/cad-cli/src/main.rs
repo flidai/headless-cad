@@ -27,6 +27,7 @@ mod integrity;
 mod nominal_seating;
 mod report_numbers;
 mod rigid_rotation;
+mod rigid_translation;
 mod section;
 mod server;
 mod tolerance_stacks;
@@ -253,7 +254,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
             "validation": { "valid": true, "scope": "individual definitions and rigid placements; interference not checked" },
         }));
     }
-    Ok(json!({
+    let mut summary = json!({
         "kernel_version": cad_kernel::KERNEL_VERSION,
         "kernel_build_id": cad_kernel::KERNEL_BUILD_ID,
         "executor_build_id": cad_build::executor_build_id(),
@@ -282,7 +283,11 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "mechanism_context_hash": build.mechanism_context_hash,
         "face_datums": build.face_datums,
         "outputs": outputs,
-    }))
+    });
+    if !build.rigid_translation_groups.is_empty() {
+        summary["rigid_translation_groups"] = json!(build.rigid_translation_groups);
+    }
+    Ok(summary)
 }
 
 fn motion_summary(build: &BuildResult) -> Value {
@@ -552,7 +557,7 @@ fn difference(before: &Value, after: &Value) -> Value {
         "before_bindings": before["mechanism_bindings"], "after_bindings": after["mechanism_bindings"],
         "before_context_hash": before["mechanism_context_hash"], "after_context_hash": after["mechanism_context_hash"],
     });
-    json!({"outputs":changes,"rigid_rotation_groups":{"before":before["rigid_rotation_groups"],"after":after["rigid_rotation_groups"]},"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"nominal_seating_checks":{"before":before["nominal_seating_checks"],"after":after["nominal_seating_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"rigid_translation_groups":{"before":before["rigid_translation_groups"],"after":after["rigid_translation_groups"]},"rigid_rotation_groups":{"before":before["rigid_rotation_groups"],"after":after["rigid_rotation_groups"]},"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"nominal_seating_checks":{"before":before["nominal_seating_checks"],"after":after["nominal_seating_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -1566,6 +1571,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         clearance::publish(&build, &summary, &mut artifacts)?;
         nominal_seating::publish(&build, &summary, &mut artifacts)?;
         rigid_rotation::publish(&build, &summary, &mut artifacts)?;
+        rigid_translation::publish(&build, &summary, &mut artifacts)?;
         summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
         let mut files: Vec<_> = artifacts
             .records()
@@ -1795,6 +1801,26 @@ fn main() {
                         message,
                     } => {
                         report["code"] = json!("rotation_group_failed");
+                        report["group_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::InvalidTranslationGroup {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("invalid_translation_group");
+                        report["group_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::TranslationGroupFailed {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("translation_group_failed");
                         report["group_id"] = json!(id);
                         report["output_name"] = json!(output);
                         report["diagnostic"] = json!(message);

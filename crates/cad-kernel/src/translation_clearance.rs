@@ -32,8 +32,11 @@ pub struct TranslationClearance {
     pub translation: [f64; 3],
     pub query_count: usize,
     pub samples: Vec<TranslationSample>,
-    /// Sorted disjoint interval interiors whose union is exactly [0,1].
+    /// Sorted disjoint interval interiors whose union is exactly [0,1] for
+    /// the generic Lipschitz proof. Empty only with `slot_motion_proof`.
     pub intervals: Vec<TranslationInterval>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slot_motion_proof: Option<crate::slot_trim_clearance::SlotTranslationProof>,
 }
 fn failed(message: &str) -> KernelError {
     KernelError::Unsupported(format!("continuous translation clearance: {message}"))
@@ -163,6 +166,92 @@ impl ModelSnapshot {
             source_scale,
             samples: vec![],
         };
+        if crate::slot_trim_clearance::is_candidate(self, other, tolerance) {
+            let binding = crate::slot_trim_clearance::bind(self, other, tolerance)?;
+            let relative = if binding.slot_on_left {
+                translation
+            } else {
+                translation.map(|x| -x)
+            };
+            let axial = crate::math::dot(relative, binding.slot.axis);
+            let motion_guard =
+                ((2048. * f64::EPSILON) * (source_scale + length + binding.slot.height)).next_up();
+            if axial.abs() <= motion_guard && motion_guard <= tolerance.linear / 128. {
+                let x = crate::math::dot(relative, binding.slot.x_direction);
+                let y = crate::math::dot(
+                    relative,
+                    crate::math::cross(binding.slot.axis, binding.slot.x_direction),
+                );
+                let next_center = [binding.center[0] + x, binding.center[1] + y];
+                let slot = &binding.slot.slot_holes[binding.slot_index];
+                let d0 = crate::slot_trim_clearance::distance_to_centerline(binding.center, slot).0;
+                let d1 = crate::slot_trim_clearance::distance_to_centerline(next_center, slot).0;
+                let guard = (32. * binding.error + 4. * motion_guard).next_up();
+                let lower = (slot.radius - binding.radius - d0.max(d1) - guard).next_down();
+                if lower >= required_min
+                    && lower > tolerance.linear
+                    && binding
+                        .other_gap
+                        .is_none_or(|gap| gap > slot.radius - binding.radius + guard)
+                {
+                    evaluator.sample(0.)?;
+                    evaluator.sample(1.)?;
+                    let upper = evaluator
+                        .samples
+                        .iter()
+                        .map(|s| s.upper_bound_mm)
+                        .fold(f64::INFINITY, f64::min);
+                    if lower <= upper && upper - lower <= tolerance.linear {
+                        let (a, b) = {
+                            let h = slot.centerline_length / 2.;
+                            let v = [slot.direction[0] * h, slot.direction[1] * h];
+                            (
+                                crate::slot_trim_clearance::point(
+                                    &binding.slot,
+                                    [slot.center[0] - v[0], slot.center[1] - v[1]],
+                                    0.,
+                                ),
+                                crate::slot_trim_clearance::point(
+                                    &binding.slot,
+                                    [slot.center[0] + v[0], slot.center[1] + v[1]],
+                                    0.,
+                                ),
+                            )
+                        };
+                        return Ok(TranslationClearance {
+                            lower_bound_mm: lower,
+                            upper_bound_mm: upper,
+                            required_minimum_mm: required_min,
+                            translation,
+                            query_count: evaluator.samples.len(),
+                            samples: evaluator.samples,
+                            intervals: vec![],
+                            slot_motion_proof: Some(
+                                crate::slot_trim_clearance::SlotTranslationProof {
+                                    stock_slot_wall_faces: crate::slot_trim_clearance::slot_faces(
+                                        &binding,
+                                    ),
+                                    stock_slab_cap_faces: [FaceId(0), FaceId(1)],
+                                    stock_slab_origin: binding.slot.origin,
+                                    stock_slab_axis: binding.slot.axis,
+                                    stock_slab_limits_mm: [0., binding.slot.height],
+                                    shank_wall_face: binding.shank_face,
+                                    capsule_endpoints: [a, b],
+                                    capsule_radius_mm: slot.radius,
+                                    shank_radius_mm: binding.radius,
+                                    endpoint_centerline_distances_mm: [d0, d1],
+                                    worst_endpoint_index: usize::from(d1 > d0),
+                                    other_section_axial_gap_mm: binding.other_gap,
+                                    arithmetic_guard_mm: guard,
+                                    complete_path_lower_bound_mm: lower,
+                                },
+                            ),
+                        });
+                    }
+                }
+            }
+            return Err(failed("slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum"));
+        }
         evaluator.sample(0.)?;
         evaluator.sample(1.)?;
         let mut pending = vec![(0., 1., 0usize)];
@@ -218,6 +307,7 @@ impl ModelSnapshot {
             query_count: evaluator.samples.len(),
             samples: evaluator.samples,
             intervals,
+            slot_motion_proof: None,
         })
     }
 }

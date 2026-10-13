@@ -101,6 +101,12 @@ pub(super) fn scope(
                 .iter()
                 .map(|a| a.output.as_str()),
         )
+        .chain(
+            recipe
+                .rigid_translation_groups
+                .iter()
+                .map(|a| a.output.as_str()),
+        )
         .collect();
     for output in recipe
         .outputs

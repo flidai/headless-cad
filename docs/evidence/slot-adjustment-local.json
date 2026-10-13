@@ -1,0 +1,1830 @@
+{
+  "valid": true,
+  "executable_sha256": "ff196eafbd0872c7e5f308c8769bdfe02f876c2d0f946722431c6b3c5f0c19cc",
+  "oracle_script_sha256": "df2336011e835a720b09bf37552b5268abd446760a0ccbead91d64a60d0a1084",
+  "cases": [
+    {
+      "case": "nominal",
+      "parameters": {},
+      "shank_length_mm": 8,
+      "source_sha256": "96ebaa21b896d6584a79636ea39d58f1bd64832af3f77a637fb237c688cfe660",
+      "recipe_context_hash": "6f9b9908300311b144b83c46494021727ae6d1fc42998d8b6f7f222ae6ca61c7",
+      "assembly_content_hash": "9dd8f3dfd1dc3ae18b83f1e81f01b8491144f8ac28d4bb7948d66c4061ee9626",
+      "native_check": {
+        "proof": {
+          "arithmetic_guard_mm": 5.381480150390418e-09,
+          "capsule_endpoints": [
+            [
+              22.0,
+              15.0,
+              0.0
+            ],
+            [
+              28.0,
+              15.0,
+              0.0
+            ]
+          ],
+          "capsule_radius_mm": 3.0,
+          "complete_path_lower_bound_mm": 0.4999999946185198,
+          "endpoint_centerline_distances_mm": [
+            0.0,
+            0.0
+          ],
+          "other_section_axial_gap_mm": 1.0,
+          "shank_radius_mm": 2.5,
+          "shank_wall_face": 1,
+          "stock_slab_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "stock_slab_cap_faces": [
+            0,
+            1
+          ],
+          "stock_slab_limits_mm": [
+            0.0,
+            6.0
+          ],
+          "stock_slab_origin": [
+            28.0,
+            15.0,
+            0.0
+          ],
+          "stock_slot_wall_faces": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "worst_endpoint_index": 0
+        },
+        "endpoint_step_queries": [
+          {
+            "time": 0.0,
+            "actual_step_distance_mm": 0.49999999999999856,
+            "native_witness_distance_mm": 0.5
+          },
+          {
+            "time": 1.0,
+            "actual_step_distance_mm": 0.4999999999999976,
+            "native_witness_distance_mm": 0.5
+          }
+        ]
+      },
+      "independent_complete_path_minimum_mm": 0.5,
+      "step_directed_differences_mm3": {
+        "plate": [
+          0.0,
+          0.0
+        ],
+        "bolt": [
+          0.0,
+          0.0
+        ]
+      },
+      "surface_inventory": {
+        "plate": {
+          "plane_faces": 8,
+          "cylinder_radii_mm": [
+            3.0,
+            3.0
+          ]
+        },
+        "bolt": {
+          "plane_faces": 3,
+          "cylinder_radii_mm": [
+            2.5,
+            4.5
+          ]
+        }
+      },
+      "sampled_phases": [
+        {
+          "time": 0,
+          "distance_mm": 0.49999999999999856,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.125,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.25,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.375,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.5,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.625,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.75,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.875,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 1,
+          "distance_mm": 0.4999999999999976,
+          "common_volume_mm3": 0.0
+        }
+      ],
+      "captured_replay": {
+        "replayed_exact_files": [
+          "recipe.star",
+          "rigid-translation-groups.json",
+          "clearance-checks.json",
+          "slotted_clamp_adjustment.step"
+        ],
+        "recipe_context_hash": "6f9b9908300311b144b83c46494021727ae6d1fc42998d8b6f7f222ae6ca61c7",
+        "clearance_report_digest": "c011058b4b724b26236f1ea472e99924df35421c061c407f3e4012ecdf394515"
+      }
+    },
+    {
+      "case": "wider_slot",
+      "parameters": {
+        "slot_length": 8,
+        "slot_radius": 3.5,
+        "bolt_radius": 2.5,
+        "slide_length": 8
+      },
+      "shank_length_mm": 9,
+      "source_sha256": "6cd358e88e2e60eb59f8f45c7759cb1917381fab3228375c910b0fdba73320bb",
+      "recipe_context_hash": "03214ddc8b9971707c0d919db8c696fa63a0f0f76e7adfffddc0f856412bcc8c",
+      "assembly_content_hash": "e65d586ead27bdd060615236f7e4f2546eea61f6f0234f0b037b6487f89f7239",
+      "native_check": {
+        "proof": {
+          "arithmetic_guard_mm": 5.419678927864881e-09,
+          "capsule_endpoints": [
+            [
+              21.0,
+              15.0,
+              0.0
+            ],
+            [
+              29.0,
+              15.0,
+              0.0
+            ]
+          ],
+          "capsule_radius_mm": 3.5,
+          "complete_path_lower_bound_mm": 0.999999994580321,
+          "endpoint_centerline_distances_mm": [
+            0.0,
+            0.0
+          ],
+          "other_section_axial_gap_mm": 2.0,
+          "shank_radius_mm": 2.5,
+          "shank_wall_face": 1,
+          "stock_slab_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "stock_slab_cap_faces": [
+            0,
+            1
+          ],
+          "stock_slab_limits_mm": [
+            0.0,
+            6.0
+          ],
+          "stock_slab_origin": [
+            29.0,
+            15.0,
+            0.0
+          ],
+          "stock_slot_wall_faces": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "worst_endpoint_index": 0
+        },
+        "endpoint_step_queries": [
+          {
+            "time": 0.0,
+            "actual_step_distance_mm": 0.9999999999999979,
+            "native_witness_distance_mm": 1.0
+          },
+          {
+            "time": 1.0,
+            "actual_step_distance_mm": 0.9999999999999983,
+            "native_witness_distance_mm": 1.0
+          }
+        ]
+      },
+      "independent_complete_path_minimum_mm": 1.0,
+      "step_directed_differences_mm3": {
+        "plate": [
+          0.0,
+          0.0
+        ],
+        "bolt": [
+          0.0,
+          0.0
+        ]
+      },
+      "surface_inventory": {
+        "plate": {
+          "plane_faces": 8,
+          "cylinder_radii_mm": [
+            3.5,
+            3.5
+          ]
+        },
+        "bolt": {
+          "plane_faces": 3,
+          "cylinder_radii_mm": [
+            2.5,
+            4.5
+          ]
+        }
+      },
+      "sampled_phases": [
+        {
+          "time": 0,
+          "distance_mm": 0.9999999999999979,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.125,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.25,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.375,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.5,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.625,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.75,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.875,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 1,
+          "distance_mm": 0.9999999999999983,
+          "common_volume_mm3": 0.0
+        }
+      ],
+      "captured_replay": {
+        "replayed_exact_files": [
+          "recipe.star",
+          "rigid-translation-groups.json",
+          "clearance-checks.json",
+          "slotted_clamp_adjustment.step"
+        ],
+        "recipe_context_hash": "03214ddc8b9971707c0d919db8c696fa63a0f0f76e7adfffddc0f856412bcc8c",
+        "clearance_report_digest": "a13859697f84b8d616bacf75a7af7902f2180c74a0087f0e59c63eba9cd3fa56"
+      }
+    },
+    {
+      "case": "narrow_bolt",
+      "parameters": {
+        "slot_length": 6,
+        "slot_radius": 3,
+        "bolt_radius": 2,
+        "slide_length": 4
+      },
+      "shank_length_mm": 9,
+      "source_sha256": "6cd358e88e2e60eb59f8f45c7759cb1917381fab3228375c910b0fdba73320bb",
+      "recipe_context_hash": "cab15b4da835c2d2a69c18a38ff108f5d0a169bdcd0617d9c3f2928565551d0b",
+      "assembly_content_hash": "3e667cf7011bd01460c059560acc30a177b561a75e082974b4c0911870ce967f",
+      "native_check": {
+        "proof": {
+          "arithmetic_guard_mm": 5.377842171583326e-09,
+          "capsule_endpoints": [
+            [
+              22.0,
+              15.0,
+              0.0
+            ],
+            [
+              28.0,
+              15.0,
+              0.0
+            ]
+          ],
+          "capsule_radius_mm": 3.0,
+          "complete_path_lower_bound_mm": 0.9999999946221577,
+          "endpoint_centerline_distances_mm": [
+            0.0,
+            0.0
+          ],
+          "other_section_axial_gap_mm": 2.0,
+          "shank_radius_mm": 2.0,
+          "shank_wall_face": 1,
+          "stock_slab_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "stock_slab_cap_faces": [
+            0,
+            1
+          ],
+          "stock_slab_limits_mm": [
+            0.0,
+            6.0
+          ],
+          "stock_slab_origin": [
+            28.0,
+            15.0,
+            0.0
+          ],
+          "stock_slot_wall_faces": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "worst_endpoint_index": 0
+        },
+        "endpoint_step_queries": [
+          {
+            "time": 0.0,
+            "actual_step_distance_mm": 1.0,
+            "native_witness_distance_mm": 1.0
+          },
+          {
+            "time": 1.0,
+            "actual_step_distance_mm": 1.0,
+            "native_witness_distance_mm": 1.0
+          }
+        ]
+      },
+      "independent_complete_path_minimum_mm": 1.0,
+      "step_directed_differences_mm3": {
+        "plate": [
+          0.0,
+          0.0
+        ],
+        "bolt": [
+          0.0,
+          0.0
+        ]
+      },
+      "surface_inventory": {
+        "plate": {
+          "plane_faces": 8,
+          "cylinder_radii_mm": [
+            3.0,
+            3.0
+          ]
+        },
+        "bolt": {
+          "plane_faces": 3,
+          "cylinder_radii_mm": [
+            2.0,
+            4.5
+          ]
+        }
+      },
+      "sampled_phases": [
+        {
+          "time": 0,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.125,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.25,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.375,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.5,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.625,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.75,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.875,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 1,
+          "distance_mm": 1.0,
+          "common_volume_mm3": 0.0
+        }
+      ],
+      "captured_replay": {
+        "replayed_exact_files": [
+          "recipe.star",
+          "rigid-translation-groups.json",
+          "clearance-checks.json",
+          "slotted_clamp_adjustment.step"
+        ],
+        "recipe_context_hash": "cab15b4da835c2d2a69c18a38ff108f5d0a169bdcd0617d9c3f2928565551d0b",
+        "clearance_report_digest": "874611ba65b38dfa8ba5f3912df70220d564162f06f30c7d649e8ae7de077fc2"
+      }
+    },
+    {
+      "case": "reversed_operands_case",
+      "parameters": {},
+      "shank_length_mm": 8,
+      "source_sha256": "781967378151d664b28ec1dcefc14ac0d2def3ed6cd329d095e1b68efc45c7f3",
+      "recipe_context_hash": "0e86ac7d70aeb659c64dbbdb719a7682f401863b40e4b7a738278ae66ca5bae8",
+      "assembly_content_hash": "9dd8f3dfd1dc3ae18b83f1e81f01b8491144f8ac28d4bb7948d66c4061ee9626",
+      "native_check": {
+        "proof": {
+          "arithmetic_guard_mm": 5.381480150390418e-09,
+          "capsule_endpoints": [
+            [
+              22.0,
+              15.0,
+              0.0
+            ],
+            [
+              28.0,
+              15.0,
+              0.0
+            ]
+          ],
+          "capsule_radius_mm": 3.0,
+          "complete_path_lower_bound_mm": 0.4999999946185198,
+          "endpoint_centerline_distances_mm": [
+            0.0,
+            0.0
+          ],
+          "other_section_axial_gap_mm": 1.0,
+          "shank_radius_mm": 2.5,
+          "shank_wall_face": 1,
+          "stock_slab_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "stock_slab_cap_faces": [
+            0,
+            1
+          ],
+          "stock_slab_limits_mm": [
+            0.0,
+            6.0
+          ],
+          "stock_slab_origin": [
+            28.0,
+            15.0,
+            0.0
+          ],
+          "stock_slot_wall_faces": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "worst_endpoint_index": 0
+        },
+        "endpoint_step_queries": [
+          {
+            "time": 0.0,
+            "actual_step_distance_mm": 0.49999999999999856,
+            "native_witness_distance_mm": 0.5
+          },
+          {
+            "time": 1.0,
+            "actual_step_distance_mm": 0.4999999999999976,
+            "native_witness_distance_mm": 0.5
+          }
+        ]
+      },
+      "independent_complete_path_minimum_mm": 0.5,
+      "step_directed_differences_mm3": {
+        "plate": [
+          0.0,
+          0.0
+        ],
+        "bolt": [
+          0.0,
+          0.0
+        ]
+      },
+      "surface_inventory": {
+        "plate": {
+          "plane_faces": 8,
+          "cylinder_radii_mm": [
+            3.0,
+            3.0
+          ]
+        },
+        "bolt": {
+          "plane_faces": 3,
+          "cylinder_radii_mm": [
+            2.5,
+            4.5
+          ]
+        }
+      },
+      "sampled_phases": [
+        {
+          "time": 0,
+          "distance_mm": 0.49999999999999856,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.125,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.25,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.375,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.5,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.625,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.75,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.875,
+          "distance_mm": 0.5,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 1,
+          "distance_mm": 0.4999999999999976,
+          "common_volume_mm3": 0.0
+        }
+      ],
+      "captured_replay": {
+        "replayed_exact_files": [
+          "recipe.star",
+          "rigid-translation-groups.json",
+          "clearance-checks.json",
+          "slotted_clamp_adjustment.step"
+        ],
+        "recipe_context_hash": "0e86ac7d70aeb659c64dbbdb719a7682f401863b40e4b7a738278ae66ca5bae8",
+        "clearance_report_digest": "3aba1d34a27833322a8acf41806a7697a4e990116cea0b8e39d0ca996eec6264"
+      }
+    },
+    {
+      "case": "oblique_case",
+      "parameters": {},
+      "shank_length_mm": 8,
+      "source_sha256": "5246164e69defca06f553a79e286f048a586b001cffcb2522c8ee5c4dfc6c7a4",
+      "recipe_context_hash": "a4ffae2e5fe0c0c433085434c507ff528899e0cbb04203224cd54f23b8ae6d4d",
+      "assembly_content_hash": "85cc30562765b54d9f2c88b5d9d1b1772354cdb275c4efde0535a8f6d4391841",
+      "native_check": {
+        "proof": {
+          "arithmetic_guard_mm": 5.539734648881924e-09,
+          "capsule_endpoints": [
+            [
+              14.94974746830583,
+              21.162950903902257,
+              3.0
+            ],
+            [
+              19.192388155425114,
+              25.40559159102154,
+              3.0
+            ]
+          ],
+          "capsule_radius_mm": 3.0,
+          "complete_path_lower_bound_mm": 0.49999999446026344,
+          "endpoint_centerline_distances_mm": [
+            0.0,
+            1.831026719408895e-15
+          ],
+          "other_section_axial_gap_mm": 1.0,
+          "shank_radius_mm": 2.5,
+          "shank_wall_face": 1,
+          "stock_slab_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "stock_slab_cap_faces": [
+            0,
+            1
+          ],
+          "stock_slab_limits_mm": [
+            0.0,
+            6.0
+          ],
+          "stock_slab_origin": [
+            19.192388155425114,
+            25.40559159102154,
+            3.0
+          ],
+          "stock_slot_wall_faces": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "worst_endpoint_index": 1
+        },
+        "endpoint_step_queries": [
+          {
+            "time": 0.0,
+            "actual_step_distance_mm": 0.499999999999994,
+            "native_witness_distance_mm": 0.499999999999999
+          },
+          {
+            "time": 1.0,
+            "actual_step_distance_mm": 0.4999999999999965,
+            "native_witness_distance_mm": 0.499999999999999
+          }
+        ]
+      },
+      "independent_complete_path_minimum_mm": 0.5,
+      "step_directed_differences_mm3": {
+        "plate": [
+          0.0,
+          0.0
+        ],
+        "bolt": [
+          0.0,
+          0.0
+        ]
+      },
+      "surface_inventory": {
+        "plate": {
+          "plane_faces": 8,
+          "cylinder_radii_mm": [
+            3.0,
+            3.0
+          ]
+        },
+        "bolt": {
+          "plane_faces": 3,
+          "cylinder_radii_mm": [
+            2.5,
+            4.5
+          ]
+        }
+      },
+      "sampled_phases": [
+        {
+          "time": 0,
+          "distance_mm": 0.499999999999994,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.125,
+          "distance_mm": 0.4999999999999965,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.25,
+          "distance_mm": 0.49999999999999395,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.375,
+          "distance_mm": 0.4999999999999965,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.5,
+          "distance_mm": 0.4999999999999965,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.625,
+          "distance_mm": 0.49999999999999395,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.75,
+          "distance_mm": 0.49999999999999395,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 0.875,
+          "distance_mm": 0.49999999999999395,
+          "common_volume_mm3": 0.0
+        },
+        {
+          "time": 1,
+          "distance_mm": 0.4999999999999965,
+          "common_volume_mm3": 0.0
+        }
+      ],
+      "captured_replay": {
+        "replayed_exact_files": [
+          "recipe.star",
+          "rigid-translation-groups.json",
+          "clearance-checks.json",
+          "slotted_clamp_adjustment.step"
+        ],
+        "recipe_context_hash": "a4ffae2e5fe0c0c433085434c507ff528899e0cbb04203224cd54f23b8ae6d4d",
+        "clearance_report_digest": "fb77b2fc73205a1187851c700b97bb4f2b16b7a3cbe32360f94352e10a1d235e"
+      }
+    }
+  ],
+  "drive_cases": [
+    {
+      "case": "drive_default",
+      "parameters": {},
+      "source_sha256": "b029060d6c60733db98427d0194431e43dc15979a06e498ea1bdde75cd14cb19",
+      "loaded_release_source_sha256": "65a9dc0d96fec7634ced8c0e41d4eccd7443b0f24caa76120fb405205ae681e6",
+      "captured_bundle_sha256": "79f4c4bd644954b5fff6376debb9a0aa657f4ca5072d91920572e6e82c7bb4b6",
+      "source_bundle_hash": "b3c0135230d3f28b4758b435733095d83a492fafed12693b8cd915df513ad61e",
+      "recipe_context_hash": "97c6e617e0edb7a3aa5920e2c65084c112321b10f29f1fefc29f707db887fc35",
+      "assembly_content_hash": "bf8821a7a17c079bea6746c386e4a92409ef4941b6761d7cc4ff88648a2bccaf",
+      "published_occurrences": 30,
+      "moving_occurrences": 29,
+      "fixed_occurrences": 1,
+      "directed_step_differences_mm3": {
+        "adjustment_base": [
+          0.0,
+          0.0
+        ],
+        "moving/left_clamp": [
+          0.0,
+          0.0
+        ],
+        "moving/right_clamp": [
+          0.0,
+          0.0
+        ],
+        "moving/shaft": [
+          0.0,
+          0.0
+        ],
+        "moving/drive_disc": [
+          0.0,
+          0.0
+        ],
+        "moving/parallel_key": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_left_washer": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_left_ring": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_right_washer": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_right_ring": [
+          0.0,
+          0.0
+        ],
+        "moving/shaft_washer": [
+          0.0,
+          0.0
+        ],
+        "moving/shaft_ring": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_0": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_1": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_2": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_3": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_0": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_1": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_2": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_3": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/housing": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/sleeve": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/left_cover": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/left_cover_screw_minus": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/left_cover_screw_plus": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_housing": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_sleeve": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_cover": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_cover_screw_minus": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_cover_screw_plus": [
+          0.0,
+          0.0
+        ]
+      },
+      "bolt_path_certificates": {
+        "mounting_slot_0_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.563603291288019e-08,
+            "capsule_endpoints": [
+              [
+                30.0,
+                -28.0,
+                0.0
+              ],
+              [
+                36.0,
+                -28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.49999998436396703,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              10,
+              11,
+              12,
+              13
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999986,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.49999999999999983,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        },
+        "mounting_slot_1_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.563603291288019e-08,
+            "capsule_endpoints": [
+              [
+                30.0,
+                28.0,
+                0.0
+              ],
+              [
+                36.0,
+                28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.49999998436396703,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              14,
+              15,
+              16,
+              17
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999986,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.49999999999999983,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        },
+        "mounting_slot_2_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.5691512089688338e-08,
+            "capsule_endpoints": [
+              [
+                90.0,
+                -28.0,
+                0.0
+              ],
+              [
+                96.0,
+                -28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.49999998430848785,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              18,
+              19,
+              20,
+              21
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999934,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.4999999999999956,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        },
+        "mounting_slot_3_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.5691512089688338e-08,
+            "capsule_endpoints": [
+              [
+                90.0,
+                28.0,
+                0.0
+              ],
+              [
+                96.0,
+                28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.49999998430848785,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              22,
+              23,
+              24,
+              25
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999934,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.4999999999999956,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        }
+      },
+      "sampled_all_pair_phases": [
+        {
+          "time": 0,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.125,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.25,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.375,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.5,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.625,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.75,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.875,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 1,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        }
+      ],
+      "bundle_replay": {
+        "replayed_exact_files": [
+          "recipe.bundle.json",
+          "rigid-translation-groups.json",
+          "clearance-checks.json",
+          "drive_module_adjustment.step"
+        ],
+        "recipe_context_hash": "97c6e617e0edb7a3aa5920e2c65084c112321b10f29f1fefc29f707db887fc35",
+        "clearance_report_digest": "2128b937172f680bbefa9b700a1ddeddbd58903e8b577fe602c889380ac52f54"
+      },
+      "captured_bundle_module_count": 1
+    },
+    {
+      "case": "drive_long_pitch",
+      "parameters": {
+        "mounting_pitch": 90,
+        "base_slot_length": 8
+      },
+      "source_sha256": "b029060d6c60733db98427d0194431e43dc15979a06e498ea1bdde75cd14cb19",
+      "loaded_release_source_sha256": "65a9dc0d96fec7634ced8c0e41d4eccd7443b0f24caa76120fb405205ae681e6",
+      "captured_bundle_sha256": "79f4c4bd644954b5fff6376debb9a0aa657f4ca5072d91920572e6e82c7bb4b6",
+      "source_bundle_hash": "b3c0135230d3f28b4758b435733095d83a492fafed12693b8cd915df513ad61e",
+      "recipe_context_hash": "34bd893b07f0006a5a55209af67983351821e1951a11948d1ca69a58b7b91648",
+      "assembly_content_hash": "103574f45b69a7c579e8f40586c15790077dcefd350c26fe8bf18ae00a48cf51",
+      "published_occurrences": 30,
+      "moving_occurrences": 29,
+      "fixed_occurrences": 1,
+      "directed_step_differences_mm3": {
+        "adjustment_base": [
+          0.0,
+          0.0
+        ],
+        "moving/left_clamp": [
+          0.0,
+          0.0
+        ],
+        "moving/right_clamp": [
+          0.0,
+          0.0
+        ],
+        "moving/shaft": [
+          0.0,
+          0.0
+        ],
+        "moving/drive_disc": [
+          0.0,
+          0.0
+        ],
+        "moving/parallel_key": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_left_washer": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_left_ring": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_right_washer": [
+          0.0,
+          0.0
+        ],
+        "moving/hub_right_ring": [
+          0.0,
+          0.0
+        ],
+        "moving/shaft_washer": [
+          0.0,
+          0.0
+        ],
+        "moving/shaft_ring": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_0": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_1": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_2": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_bolt_3": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_0": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_1": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_2": [
+          0.0,
+          0.0
+        ],
+        "moving/adjustment_nut_3": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/housing": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/sleeve": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/left_cover": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/left_cover_screw_minus": [
+          0.0,
+          0.0
+        ],
+        "moving/left_support/left_cover_screw_plus": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_housing": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_sleeve": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_cover": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_cover_screw_minus": [
+          0.0,
+          0.0
+        ],
+        "moving/right_support/right_cover_screw_plus": [
+          0.0,
+          0.0
+        ]
+      },
+      "bolt_path_certificates": {
+        "mounting_slot_0_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.8724676920101053e-08,
+            "capsule_endpoints": [
+              [
+                29.0,
+                -28.0,
+                0.0
+              ],
+              [
+                37.0,
+                -28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.499999981275323,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              10,
+              11,
+              12,
+              13
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999986,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.49999999999999983,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        },
+        "mounting_slot_1_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.8724676920101053e-08,
+            "capsule_endpoints": [
+              [
+                29.0,
+                28.0,
+                0.0
+              ],
+              [
+                37.0,
+                28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.499999981275323,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              14,
+              15,
+              16,
+              17
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999986,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.49999999999999983,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        },
+        "mounting_slot_2_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.883290678961203e-08,
+            "capsule_endpoints": [
+              [
+                119.0,
+                -28.0,
+                0.0
+              ],
+              [
+                127.0,
+                -28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.49999998116709315,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              18,
+              19,
+              20,
+              21
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999934,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.4999999999999878,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        },
+        "mounting_slot_3_shank_gap": {
+          "proof": {
+            "arithmetic_guard_mm": 1.883290678961203e-08,
+            "capsule_endpoints": [
+              [
+                119.0,
+                28.0,
+                0.0
+              ],
+              [
+                127.0,
+                28.0,
+                0.0
+              ]
+            ],
+            "capsule_radius_mm": 3.0,
+            "complete_path_lower_bound_mm": 0.49999998116709315,
+            "endpoint_centerline_distances_mm": [
+              0.0,
+              0.0
+            ],
+            "other_section_axial_gap_mm": 55.0,
+            "shank_radius_mm": 2.5,
+            "shank_wall_face": 1,
+            "stock_slab_axis": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "stock_slab_cap_faces": [
+              0,
+              1
+            ],
+            "stock_slab_limits_mm": [
+              0.0,
+              6.0
+            ],
+            "stock_slab_origin": [
+              6.0,
+              -34.0,
+              0.0
+            ],
+            "stock_slot_wall_faces": [
+              22,
+              23,
+              24,
+              25
+            ],
+            "worst_endpoint_index": 0
+          },
+          "endpoint_step_queries": [
+            {
+              "time": 0.0,
+              "actual_step_distance_mm": 0.4999999999999934,
+              "native_witness_distance_mm": 0.5
+            },
+            {
+              "time": 1.0,
+              "actual_step_distance_mm": 0.4999999999999878,
+              "native_witness_distance_mm": 0.5
+            }
+          ]
+        }
+      },
+      "sampled_all_pair_phases": [
+        {
+          "time": 0,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.125,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.25,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.375,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.5,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.625,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.75,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 0.875,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        },
+        {
+          "time": 1,
+          "pairs": 435,
+          "maximum_common_volume_mm3": 0,
+          "contact_pairs": 21
+        }
+      ],
+      "bundle_replay": {
+        "replayed_exact_files": [
+          "recipe.bundle.json",
+          "rigid-translation-groups.json",
+          "clearance-checks.json",
+          "drive_module_adjustment.step"
+        ],
+        "recipe_context_hash": "34bd893b07f0006a5a55209af67983351821e1951a11948d1ca69a58b7b91648",
+        "clearance_report_digest": "e93cdf2c88bc6daba6afbe64cfa5c18d27cdea82035a5ff21f362be430daef7e"
+      },
+      "captured_bundle_module_count": 1
+    }
+  ],
+  "rejections": [
+    {
+      "case": "endpoint_unsafe",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "slot_shank_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "error": "clearance check 'slot_shank_running_gap' on 'slotted_clamp_adjustment' failed: unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "lower_bound_mm": null,
+        "output_name": "slotted_clamp_adjustment",
+        "upper_bound_mm": null
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "lateral_offset",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "slot_shank_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "error": "clearance check 'slot_shank_running_gap' on 'slotted_clamp_adjustment' failed: unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "lower_bound_mm": null,
+        "output_name": "slotted_clamp_adjustment",
+        "upper_bound_mm": null
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "tilted_shank",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "slot_shank_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: slot clearance requires one containing canonical capsule, an arithmetic-parallel constant-radius shank spanning the slab, and axially separated larger bolt sections",
+        "error": "clearance check 'slot_shank_running_gap' on 'slotted_clamp_adjustment' failed: unsupported geometry: slot clearance requires one containing canonical capsule, an arithmetic-parallel constant-radius shank spanning the slab, and axially separated larger bolt sections",
+        "lower_bound_mm": null,
+        "output_name": "slotted_clamp_adjustment",
+        "upper_bound_mm": null
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "short_shank",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "slot_shank_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: slot clearance requires one containing canonical capsule, an arithmetic-parallel constant-radius shank spanning the slab, and axially separated larger bolt sections",
+        "error": "clearance check 'slot_shank_running_gap' on 'slotted_clamp_adjustment' failed: unsupported geometry: slot clearance requires one containing canonical capsule, an arithmetic-parallel constant-radius shank spanning the slab, and axially separated larger bolt sections",
+        "lower_bound_mm": null,
+        "output_name": "slotted_clamp_adjustment",
+        "upper_bound_mm": null
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "head_enters_stock",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "slot_shank_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: slot clearance requires one containing canonical capsule, an arithmetic-parallel constant-radius shank spanning the slab, and axially separated larger bolt sections",
+        "error": "clearance check 'slot_shank_running_gap' on 'slotted_clamp_adjustment' failed: unsupported geometry: slot clearance requires one containing canonical capsule, an arithmetic-parallel constant-radius shank spanning the slab, and axially separated larger bolt sections",
+        "lower_bound_mm": null,
+        "output_name": "slotted_clamp_adjustment",
+        "upper_bound_mm": null
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "excessive_minimum",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "slot_shank_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "error": "clearance check 'slot_shank_running_gap' on 'slotted_clamp_adjustment' failed: unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "lower_bound_mm": null,
+        "output_name": "slotted_clamp_adjustment",
+        "upper_bound_mm": null
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "bad_reference",
+      "diagnostic": {
+        "causes": [],
+        "code": "recipe_failed",
+        "error": "Traceback (most recent call last):\n  * refusal.star:35, in <module>\n      rigid_translation_group(id = \"adjustment\", output = \"slotted_clamp_adjustment\",\nerror: invalid translation group 'adjustment' on 'slotted_clamp_adjustment': members must be unique and include the reference occurrence\n  --> refusal.star:35:1\n   |\n35 | / rigid_translation_group(id = \"adjustment\", output = \"slotted_clamp_adjustment\",\n36 | |     instance_paths = [[\"bolt\"]], reference_instance_path = [\"missing\"],\n37 | |     translation = [slide_length,0,0])\n   | |_____________________________________^\n   |\n"
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "narrow_radial_band",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "slot_shank_running_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "error": "clearance check 'slot_shank_running_gap' on 'slotted_clamp_adjustment' failed: unsupported geometry: continuous translation clearance: slot travel needs a planar affine path wholly inside one capsule, a separated head, and an endpoint bound above the required minimum",
+        "lower_bound_mm": null,
+        "output_name": "slotted_clamp_adjustment",
+        "upper_bound_mm": null
+      },
+      "preserved_files": 43
+    },
+    {
+      "case": "group_budget",
+      "diagnostic": {
+        "causes": [],
+        "code": "recipe_failed",
+        "error": "Traceback (most recent call last):\n  * refusal.star:46, in <module>\n      over_budget()\n  * refusal.star:45, in over_budget\n      rigid_translation_group(id = \"extra_\"+str(i), output = \"slotted_clamp_adjustm...\nerror: too many rigid translation groups\n  --> refusal.star:45:9\n   |\n45 |         rigid_translation_group(id = \"extra_\"+str(i), output = \"slotted_clamp_adjustment\", instance_paths = [[\"bolt\"]], reference_instance_path = [\"bolt\"], translation = [1,0,0])\n   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n"
+      },
+      "preserved_files": 43
+    }
+  ],
+  "python": "3.13.15",
+  "ocp": "8.0.1.1.0",
+  "scope": "Native continuous certificates cover the named bolt shank/slot pairs only: a canonical through capsule, parallel stepped shank, axially relieved head, and complete planar rigid translation by convex endpoint distance. Independent OCCT confirms exact STEP solids, path endpoints and nine sampled phases of every drive pair; sampled all-pair nonintersection does not certify unsampled positions, retention, preload, installation or load."
+}

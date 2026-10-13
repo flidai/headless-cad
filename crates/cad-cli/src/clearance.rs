@@ -19,7 +19,7 @@ pub(super) fn publish(
         "recipe_context_hash":summary["recipe_context_hash"],"recipe_source":summary["recipe_source"],
         "kernel_build_id":cad_kernel::KERNEL_BUILD_ID,"executor_build_id":cad_build::executor_build_id(),
         "checks":build.clearance_checks,
-        "semantics":"Each check covers either its initial pose or the entire declared right-local translation or fixed-axis rotation over time 0..1. Top-level bounds enclose the minimum distance over that scope; sweep intervals provide continuous Lipschitz certificates; rotation symmetry certificates instead cover the complete path explicitly. A common rigid rotation of both named endpoints preserves the initial distance. These are not sample-only claims. Query retains initial-pose witnesses; sweep samples have their own times, native methods and motion uncertainty. Bounds include native, placement and path arithmetic. Witness axes need not be global separating planes. Only declared pairs and motions are checked; no manufacturing tolerance inflation."});
+        "semantics":"Each check covers either its initial pose or the entire declared right-local translation or fixed-axis rotation over time 0..1. Top-level bounds enclose the minimum distance over that scope; sweep intervals provide continuous Lipschitz certificates; rotation symmetry and slot capsule certificates instead cover the complete path explicitly. A common rigid motion of both named endpoints preserves the initial distance. These are not sample-only claims. Query retains initial-pose witnesses; sweep samples have their own times, native methods and motion uncertainty. Bounds include native, placement and path arithmetic. Witness axes need not be global separating planes. Only declared pairs and motions are checked; no manufacturing tolerance inflation."});
     let data = serde_json::to_string_pretty(&report)?;
     let source_artifact = if artifacts.contains("recipe.bundle.json") {
         "recipe.bundle.json"
@@ -35,6 +35,7 @@ pub(super) fn publish(
     );
     for (id, check) in &build.clearance_checks {
         let method = match check.query.method {
+            cad_kernel::ClearanceMethod::SlotTrimWitness => "Shank in native slot",
             cad_kernel::ClearanceMethod::ConvexSupport => "Convex",
             cad_kernel::ClearanceMethod::CoaxialMeridian => "Coaxial",
             cad_kernel::ClearanceMethod::ParallelAnnular => "Parallel annuli",
@@ -53,12 +54,12 @@ pub(super) fn publish(
             check.declaration.min_clearance,
             method,
             if check.motion_proof.as_deref() == Some("common_rigid_motion") {
-                "Common rigid rotation — invariant distance"
+                "Common rigid motion — invariant distance"
             } else if check.rotation_sweep.as_ref().is_some_and(|r| r.proof_kind == cad_kernel::RotationProofKind::RotationalSymmetry) {
                 "Continuous rotation — native symmetry"
             } else if check.rotation_sweep.as_ref().is_some_and(|r| r.proof_kind == cad_kernel::RotationProofKind::BoreWitnessOrbit) {
                 "Continuous rotation — bore witness orbit"
-            } else if check.rotation_sweep.is_some() { "Continuous rotation — subdivision" } else if check.sweep.is_some() { "Continuous translation" } else { "Initial pose" }
+            } else if check.rotation_sweep.is_some() { "Continuous rotation — subdivision" } else if check.sweep.as_ref().is_some_and(|s| s.slot_motion_proof.is_some()) { "Continuous translation — native slot proof" } else if check.sweep.is_some() { "Continuous translation" } else { "Initial pose" }
         ));
     }
     html.push_str("</tbody></table></section><nav>");

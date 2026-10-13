@@ -2454,7 +2454,7 @@ Clearance publication schema 3 distinguishes initial-pose and whole-path scope.
 The initial `query` remains bound to the original occurrence; `sweep` records timed
 native samples and interval certificates. Top-level bounds enclose the minimum
 across the whole path and need not have static-query tolerance width. Work is
-bounded by 1,025 native queries per sweep, depth 32, 16 sweeps per recipe and 4,096
+bounded by 1,025 native queries per sweep, depth 32, 24 sweeps per recipe and 4,096
 aggregate queries. A finite nonzero source vector has norm at most 1e6 mm.
 Unsupported poses, threshold uncertainty and resource exhaustion fail explicitly
 without replacing a valid generation, including cached or selected-output builds.
@@ -2489,7 +2489,7 @@ unresolved bounds reject the check.
 The optional `rotation_sweep` report contains timed native queries, covering
 intervals, radius/speed bounds and numerical allowances. Clearance schema 3 retains
 whole-path top-level bounds and labels the scope `Continuous rotation`. Rotation
-and translation share the 16-sweep and 4,096-query aggregate budgets, with 1,025
+and translation share the 24-sweep and 4,096-query aggregate budgets, with 1,025
 queries and depth 32 per path. `rotation_clearance.star` requires independent
 signed-orbit minima and imported STEP checks under common rigid poses, plus an
 interior collision with clear endpoints and midpoint. This extends prescribed
@@ -3705,3 +3705,60 @@ restart and offline rebuild. Across the previous and new release, 37 same-named
 geometry exports and fourteen definition BReps matched by part ID are byte
 identical. Versioned definition asset names change with kernel build identity;
 this comparison does not require those filenames to remain stable.
+
+### Prescribed mounting adjustment and capsule clearance
+
+A source-owned `rigid_translation_group` names exact leaf occurrence paths,
+its reference occurrence and a local translation vector. The build resolves one
+world vector, binds all members to native part and assembly identities, and
+checks every explicitly declared crossing pair over the complete path. Two
+members in the same group retain their initial distance. Overlapping motion
+group authority on one output is refused. Selected builds retain the global
+engineering obligations.
+
+The first analytic translation domain is a circular shank spanning a canonical
+obround slot through a prism. Strict reconstruction reconciles the native
+supports and topology. The shank must span the stock slab; larger bolt sections
+must remain sufficiently far from it axially. The clearance to the capsule wall
+is `slot_radius - shank_radius - distance(shank_center, centerline_segment)`.
+Distance to a convex segment is convex along an affine path, so the maximum of
+the two endpoint distances bounds the whole path. Native endpoint witnesses,
+explicit arithmetic guards and a typed `slot_motion_proof` accompany the
+certificate. Empty subdivision intervals are permitted only for this explicit
+analytic proof. Unsupported alignment, intrusion, insufficient gap and exhausted
+work budgets fail closed.
+
+`examples/drive_module_adjustment.star` loads the released drive recipe and adds
+a separate study output. Its base remains fixed while 29 upper occurrences
+translate together through the declared slot length. Bolt heads and nuts have
+1 mm nominal axial relief; four shank/base pairs receive native path checks.
+Housing/base sliding contact remains nominal. This study does not establish
+preload, thread engagement, friction, loads or all-pair continuous separation.
+Independent sampled STEP intersection checks complement the named native path
+certificates without broadening their coverage.
+
+The CLI publishes source-bound group evidence and a read-only translation
+inspector. Its phase slider moves display points only, preserves normals and
+source selection, and performs no modeling calls. Native exports and engineering
+reports retain the authored initial pose. The source bundle, motion report and
+clearance evidence travel together through publication and offline replay.
+
+The [retained local adjustment delivery](evidence/slot-adjustment-replay-local.json)
+exercises three durable jobs and 767 protocol calls. A rejected overshoot leaves
+an already accepted full-travel revision unchanged; a half-travel source revision
+then advances the head using its expected base. Restart, retry, sealed artifact
+streams and offline source-bundle replay match 87 engineering artifacts and 29
+semantic manifest fields, including translation groups. Script, executable,
+root source, imported source and dependency lock identities are pinned. This
+receipt establishes local reproducibility for the bounded study, not external
+release authorization or general mechanical correctness.
+
+The [independent adjustment oracle](evidence/slot-adjustment-local.json) covers
+five isolated cases, reversed operands and a shared oblique pose, nine refused
+revisions preserving complete publications, and two 30-leaf drive configurations.
+It compares native witnesses to STEP boundaries, the full-path interval to an
+independent analytic capsule formula, and every adjusted STEP leaf to its
+independently placed reference. Each drive checks 435 pairs at nine sampled
+phases with zero positive common volume. Exact report/source-bundle replay is
+bound to a frozen executable and oracle script. Sampled all-pair checks do not
+expand the four native continuous certificates into a general collision proof.

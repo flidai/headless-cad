@@ -40,6 +40,7 @@ mod hub_keyway;
 mod keyseat;
 mod planar_seating;
 mod rotation_clearance;
+mod slot_trim_clearance;
 mod solid_clearance;
 mod stepped_keyseat;
 mod trim_clearance;
@@ -48,6 +49,7 @@ pub use rotation_clearance::{
     RotationSample, RotationalSymmetryCertificate, MAX_ROTATION_DEPTH, MAX_ROTATION_QUERIES,
 };
 mod translation_clearance;
+pub use slot_trim_clearance::SlotTranslationProof;
 pub use solid_clearance::{ClearanceMethod, SolidClearance};
 pub use translation_clearance::{
     TranslationClearance, TranslationInterval, TranslationSample, MAX_TRANSLATION_DEPTH,

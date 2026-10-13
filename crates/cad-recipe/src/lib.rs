@@ -100,6 +100,7 @@ struct GraphStore {
     datum_dimensions: RefCell<Vec<serde_json::Value>>,
     nominal_seating_checks: RefCell<Vec<serde_json::Value>>,
     rigid_rotation_groups: RefCell<Vec<serde_json::Value>>,
+    rigid_translation_groups: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     mechanisms: RefCell<Vec<serde_json::Value>>,
     motion_studies: RefCell<Vec<serde_json::Value>>,
@@ -813,10 +814,12 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         right_translation: Option<Value>,
         right_rotation: Option<Value>,
         rotation_group: Option<&str>,
+        translation_group: Option<&str>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         let check = cad_build::ClearanceCheck {
             rotation_group: rotation_group.map(str::to_string),
+            translation_group: translation_group.map(str::to_string),
             id: id.into(),
             output: output.into(),
             left_instance_path: occurrence_path(left_instance_path, "left_instance_path")?,
@@ -885,6 +888,42 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 .as_str()
                 .is_some_and(|v| v.eq_ignore_ascii_case(id))),
             "duplicate rotation group ID"
+        );
+        groups.push(serde_json::to_value(g)?);
+        Ok(NoneType)
+    }
+
+    /// Declare one common translation in a reference occurrence's initial body frame.
+    fn rigid_translation_group(
+        id: &str,
+        output: &str,
+        instance_paths: Value,
+        reference_instance_path: Value,
+        translation: Value,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let g = cad_build::RigidTranslationGroup {
+            id: id.into(),
+            output: output.into(),
+            instance_paths: serde_json::from_str(&instance_paths.to_json()?)?,
+            reference_instance_path: occurrence_path(
+                reference_instance_path,
+                "reference_instance_path",
+            )?,
+            translation: serde_json::from_str(&translation.to_json()?)?,
+        };
+        g.validate()?;
+        let graph = store(eval)?;
+        let mut groups = graph.rigid_translation_groups.borrow_mut();
+        anyhow::ensure!(
+            groups.len() < cad_build::MAX_TRANSLATION_GROUPS,
+            "too many rigid translation groups"
+        );
+        anyhow::ensure!(
+            !groups.iter().any(|old| old["id"]
+                .as_str()
+                .is_some_and(|v| v.eq_ignore_ascii_case(id))),
+            "duplicate translation group ID"
         );
         groups.push(serde_json::to_value(g)?);
         Ok(NoneType)
@@ -1808,6 +1847,7 @@ pub fn from_starlark_with_modules(
     let datum_dimensions = graph.datum_dimensions.into_inner();
     let nominal_seating_checks = graph.nominal_seating_checks.into_inner();
     let rigid_rotation_groups = graph.rigid_rotation_groups.into_inner();
+    let rigid_translation_groups = graph.rigid_translation_groups.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let mechanisms = graph.mechanisms.into_inner();
     let motion_studies = graph.motion_studies.into_inner();
@@ -1820,7 +1860,7 @@ pub fn from_starlark_with_modules(
         .iter()
         .any(|feature| feature["op"] == "hole_pattern" || feature["op"] == "slot_pattern");
     let mut value = serde_json::json!({
-        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() { 2 } else { 1 },
+        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() || !rigid_translation_groups.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -1841,6 +1881,9 @@ pub fn from_starlark_with_modules(
     }
     if !rigid_rotation_groups.is_empty() {
         value["rigid_rotation_groups"] = serde_json::json!(rigid_rotation_groups);
+    }
+    if !rigid_translation_groups.is_empty() {
+        value["rigid_translation_groups"] = serde_json::json!(rigid_translation_groups);
     }
     if !datum_dimensions.is_empty() {
         value["datum_dimensions"] = serde_json::json!(datum_dimensions);

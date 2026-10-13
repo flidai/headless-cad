@@ -13,6 +13,7 @@ pub enum ClearanceMethod {
     CoaxialMeridian,
     ParallelAnnular,
     NativeTrimWitness,
+    SlotTrimWitness,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -238,6 +239,9 @@ impl ModelSnapshot {
     /// keyed circular extrusion. Pair alignment,
     /// native support consistency and separation still require `clearance`.
     pub fn validate_clearance_operand(&self, t: Tolerance) -> Result<(), KernelError> {
+        if crate::slot_trim_clearance::admit_slot(self, t).is_ok() {
+            return Ok(());
+        }
         if self.validate_convex_clearance_operand(t).is_ok()
             || crate::convex_trim_clearance::admit(self, t).is_ok()
         {
@@ -252,6 +256,9 @@ impl ModelSnapshot {
     }
     /// Certified positive material clearance. Unsupported/contact cases fail closed.
     pub fn clearance(&self, other: &Self, t: Tolerance) -> Result<SolidClearance, KernelError> {
+        if crate::slot_trim_clearance::is_candidate(self, other, t) {
+            return crate::slot_trim_clearance::query(self, other, t);
+        }
         if crate::bore_trim_clearance::is_candidate(self, other, t) {
             if let Ok(q) = crate::bore_trim_clearance::query(self, other, t) {
                 return Ok(q);
