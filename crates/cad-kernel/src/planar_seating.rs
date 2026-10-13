@@ -161,6 +161,31 @@ fn admit(model: &ModelSnapshot, id: FaceId, t: Tolerance) -> Result<SeatFace, Ke
             inner: g.inner_radius,
             outer: g.radius,
         }
+    } else if let Ok(g) = crate::blind_slot_prism::recognize(model, t) {
+        if id.0 > 1 {
+            return Err(unsupported());
+        }
+        let points = chord_polygon(&g.stock.path, t)?;
+        let extent = points
+            .iter()
+            .map(|p| p[0].hypot(p[1]))
+            .fold(g.stock.height, f64::max);
+        let raw_error = support_error(model, g.stock.origin, extent, t)?;
+        crate::blind_slot_prism::consistency(model, &g, raw_error, t)?;
+        let mut slots = g.stock.slot_holes;
+        // The opposite cap retains intact material under every blind floor.
+        // Only the opening cap excludes their actual capsule footprints.
+        if id == g.opening {
+            slots.extend(g.slots);
+        }
+        Trim::Polygon {
+            origin: g.stock.origin,
+            axis: g.stock.axis,
+            x: g.stock.x_direction,
+            points,
+            holes: g.stock.circular_holes,
+            slots,
+        }
     } else if let Ok(g) = crate::arc_prism::recognize(model, t) {
         if id != FaceId(0) && id != FaceId(1) {
             return Err(unsupported());
@@ -636,6 +661,66 @@ mod tests {
             // through-stock fallback would repeat the previously valid disk.
             assert!(certify_planar_seating(&mixed, opening, &pad, pad_face, 0.4, t).is_err());
             assert!(certify_planar_seating(&pad, pad_face, &mixed, opening, 0.4, t).is_err());
+        }
+    }
+
+    #[test]
+    fn mixed_cap_seating_uses_opening_specific_material_and_raw_supports() {
+        let t = Tolerance::default();
+        let plate = slotted_plate(3., t);
+        let frame = blind_obround_slot_frame(&plate, t).unwrap();
+        let offset = sub([15., 25., 0.], frame.origin);
+        let pocket = ObroundSlot {
+            id: "relief".into(),
+            center: [
+                dot(offset, frame.x_direction),
+                dot(offset, frame.y_direction),
+            ],
+            direction: [frame.x_direction[0], frame.y_direction[0]],
+            centerline_length: 8.,
+            radius: 6.,
+        };
+        for opening in [FaceId(0), FaceId(1)] {
+            let op = cut_blind_obround_slots(&plate, std::slice::from_ref(&pocket), opening, 3., t)
+                .unwrap();
+            for (cap, x) in [(opening, 65.), (FaceId(1 - opening.0), 15.)] {
+                let pad = translate(
+                    &extrude_annulus(2., 0.5, 2., t).unwrap().model,
+                    [x, 25., if cap == FaceId(0) { -2. } else { 8. }],
+                    t,
+                )
+                .unwrap()
+                .model;
+                let other = FaceId(1 - cap.0);
+                for posed in [false, true] {
+                    let (body, pad) = if posed {
+                        let q = [0.5, 0.5, 0., std::f64::consts::FRAC_1_SQRT_2];
+                        (
+                            transform(&op.model, [20., -7., 4.], q, t).unwrap().model,
+                            transform(&pad, [20., -7., 4.], q, t).unwrap().model,
+                        )
+                    } else {
+                        (op.model.clone(), pad.clone())
+                    };
+                    for (a, fa, b, fb) in [(&body, cap, &pad, other), (&pad, other, &body, cap)] {
+                        assert!(
+                            certify_planar_seating(a, fa, b, fb, 0.4, t)
+                                .unwrap()
+                                .disk_radius_lower_mm
+                                > 0.4
+                        );
+                    }
+                }
+                let mut corrupt = op.model.clone();
+                let curved = op.history.generated_faces["slot_relief_wall_1"][0];
+                if let Surface::Cylinder(c) = &mut corrupt.faces[curved.0].surface {
+                    c.axis[0] += 1e-13;
+                }
+                assert!(crate::blind_slot_prism::recognize(&corrupt, t).is_ok());
+                assert!(certify_planar_seating(&corrupt, cap, &pad, other, 0.4, t).is_err());
+                let floor = op.history.generated_faces["slot_relief_floor"][0];
+                assert!(certify_planar_seating(&op.model, floor, &pad, other, 0.4, t).is_err());
+            }
         }
     }
 

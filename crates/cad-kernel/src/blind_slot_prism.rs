@@ -343,10 +343,10 @@ pub(crate) fn through_slot_witness(
     Ok((mixed.stock, through))
 }
 
-fn equivalent(a: &ModelSnapshot, b: &ModelSnapshot, error: f64) -> bool {
+fn equivalent(a: &ModelSnapshot, b: &ModelSnapshot, error: f64, direction_error: f64) -> bool {
     let near = |x: f64, y: f64, e: f64| x.is_finite() && y.is_finite() && (x - y).abs() <= e;
     let point = |x: [f64; 3], y: [f64; 3], e: f64| x.into_iter().zip(y).all(|(a, b)| near(a, b, e));
-    let direction = |x: [f64; 3], y: [f64; 3]| point(x, y, 4096. * f64::EPSILON);
+    let direction = |x: [f64; 3], y: [f64; 3]| point(x, y, direction_error);
     if a.loops != b.loops
         || a.shells != b.shells
         || a.solids != b.solids
@@ -376,7 +376,7 @@ fn equivalent(a: &ModelSnapshot, b: &ModelSnapshot, error: f64) -> bool {
                     && direction(a.circle.axis, b.circle.axis)
                     && direction(a.circle.x_direction, b.circle.x_direction)
                     && near(a.circle.radius, b.circle.radius, error)
-                    && near(a.sweep_radians, b.sweep_radians, 4096. * f64::EPSILON)
+                    && near(a.sweep_radians, b.sweep_radians, direction_error)
             }
             (Curve::Circle(a), Curve::Circle(b)) => {
                 point(a.origin, b.origin, error)
@@ -584,10 +584,48 @@ pub(crate) fn recognize(model: &ModelSnapshot, t: Tolerance) -> Result<Geometry,
         surrogate,
     };
     let expected = construct(&g)?;
-    if !equivalent(model, &expected, error) {
+    if !equivalent(model, &expected, error, 4096. * f64::EPSILON) {
         return Err(bad());
     }
     Ok(g)
+}
+
+/// Reconcile every actual mixed support to canonical geometry at a query's
+/// own arithmetic budget; broad recognition alone is not a certificate.
+pub(crate) fn consistency(
+    model: &ModelSnapshot,
+    g: &Geometry,
+    error: f64,
+    t: Tolerance,
+) -> Result<(), KernelError> {
+    if (crate::math::norm(g.stock.axis) - 1.).abs() > 64. * f64::EPSILON
+        || (crate::math::norm(g.stock.x_direction) - 1.).abs() > 64. * f64::EPSILON
+        || dot(g.stock.axis, g.stock.x_direction).abs() > 64. * f64::EPSILON
+    {
+        return Err(KernelError::NumericRange);
+    }
+    let mut canonical = g.clone();
+    let mut through = g.stock.clone();
+    through.slot_holes.extend(g.slots.iter().cloned());
+    canonical.surrogate = crate::arc_prism::construct(&through, t)?;
+    let expected = construct(&canonical)?;
+    let extent = expected
+        .vertices
+        .iter()
+        .map(|v| crate::math::norm(sub(v.position, g.stock.origin)))
+        .fold(g.stock.height, f64::max);
+    if !error.is_normal()
+        || !extent.is_normal()
+        || !equivalent(
+            model,
+            &expected,
+            error / 3f64.sqrt(),
+            (128. * f64::EPSILON).min(error / extent) / 3f64.sqrt(),
+        )
+    {
+        return Err(KernelError::NumericRange);
+    }
+    Ok(())
 }
 
 pub(crate) fn volume(model: &ModelSnapshot) -> Result<f64, KernelError> {

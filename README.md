@@ -3414,8 +3414,8 @@ The admitted class has at most four through slots and four separated blind
 pockets on one cap. Each blind operation may use a different depth. Through-slot
 authoring still precedes the pockets; intersecting cuts, opposite-cap recuts,
 arbitrary pockets and general curved Booleans remain outside this domain.
-Existing seating queries refuse mixed stock until its actual pocket boundaries
-are supported by their material-footprint proof.
+Cap seating now accounts for actual pocket openings; through-slot clearance
+retains the original full-height walls. Blind-floor seats remain unsupported.
 
 
 [Independent mixed-machining evidence](docs/evidence/mixed-slots-local.json)
@@ -3448,8 +3448,9 @@ same authoritative `drive_module_rotation.star` recipe and its final operation.
 
 The slot-size and slot-position drawing recipes also accept this override and
 measure the finished pocketed base. The adjustment and tightened-mounting recipes
-currently refuse it because their travel/seating certificates do not admit mixed
-stock. Pocket geometry and nominal dimensions do not establish base stiffness,
+also accept the override: seating checks use actual cap material, and travel
+checks retain the original physical through-slot walls. Pocket geometry and
+nominal dimensions do not establish base stiffness,
 fatigue life, preload or load capacity.
 
 
@@ -3459,3 +3460,26 @@ seating and rotor obligations, captured replay and seven publication-preserving
 refusals. [Browser evidence](docs/evidence/pocketed-drive-browser-local.json)
 verifies the actual assembled base, its source, the two section contours and
 native 1/2/4 mm depth/web table in the live preset.
+
+
+### Inspect mounting on a pocketed base
+
+The original mounting recipes now accept `--param base_pocket_depth=1`.
+`./scripts/dev.sh` serves watched presets for
+[tightened mounting](http://localhost:8080/drive_module_pocketed_tightened/drive_module_tightened.preview.html)
+and [continuous adjustment](http://localhost:8080/drive_module_pocketed_adjustment/translation-upper_slot_travel.html).
+Picking a part reveals its captured Starlark declaration or body operation.
+
+The tightened configuration checks eight head/nut seats and four shank gaps.
+The adjustment configuration certifies four named pairs across the entire slot
+travel. Opening-cap contact disks exclude blind openings; opposite-cap disks
+use intact material beneath the pockets. A pad over a pocket is refused.
+
+[Independent STEP evidence](docs/evidence/pocketed-mounting-local.json) covers
+four tightened configurations, two travel configurations, two positive seat
+controls and five publication-preserving refusals. It checks all 435 body pairs
+at each tightened configuration; nine sampled travel phases corroborate the
+separate native whole-path proofs. [Browser evidence](docs/evidence/pocketed-mounting-browser-local.json)
+checks source selection and read-only motion. These scoped certificates supersede
+the mixed-stock refusal boundary recorded in earlier drive-base evidence; they
+do not certify blind-floor seating, fastener preload or rated assembly loads.

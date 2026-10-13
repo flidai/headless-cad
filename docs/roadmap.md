@@ -14,11 +14,12 @@ and mass obligations remain active. Native floor references produce depth/web
 measurements and a machining sheet; imported slot drawings also measure the
 finished part. Independent STEP, replay and live browser receipts are below.
 
-The next engineering priority is **material-aware mounting certificates** on
-mixed stock: seating must account for real pocket openings, and through-slot
-travel must bind original physical walls. Current adjustment and tightened
-studies refuse a pocketed base until those native proofs are implemented.
-General Booleans and arbitrary surfaces remain separate kernel work.
+Material-aware mounting certificates now account for actual pocket openings
+and bind through-slot travel to original physical walls. The tightened and
+adjustment recipes accept a pocketed base; blind-floor seats remain outside
+this scoped admission. The next workflow increment is durable agent acceptance
+and replay of these pocketed mounting revisions. General Booleans and arbitrary
+surfaces remain separate kernel work.
 
 The complete product is still experimental. All five commercial release gates
 remain open; accepted feature increments are evidence toward those gates, not
@@ -1114,3 +1115,23 @@ published output, including unsupported pocketed adjustment/tightened studies.
 source selection on the actual assembled base, floor lineage, two section
 states and measured 1/2/4 mm depths/web. The launcher watches this parameter
 preset alongside ordinary examples. All five commercial release gates stay open.
+
+
+### Material-aware pocketed mounting
+
+The native kernel admits cap seating and original through-slot clearance on
+strictly reconstructed mixed stock. Opening-cap disks exclude blind footprints;
+opposite-cap disks preserve intact material. Raw support residuals must fit the
+query arithmetic budget. Blind floors and shortened walls cannot masquerade as
+cap seats or through-slot witnesses.
+
+The [independent mounting oracle](evidence/pocketed-mounting-local.json) passes
+four tightened configurations with eight actual STEP contact disks, four gaps
+and 435 nonpenetrating body pairs each. Two travel configurations retain four
+complete native path proofs and nine-phase independent corroboration. Two valid
+seat controls and five publication-preserving refusals pass. This supersedes the
+historical pocketed adjustment/tightened refusal in the earlier drive-base report.
+[Browser acceptance](evidence/pocketed-mounting-browser-local.json) verifies both
+watched presets, captured source selection, 29 moving occurrences and read-only
+interaction. All 251 kernel tests, two selected-output/warm-cache recipe tests
+and strict workspace Clippy pass. Commercial release gates remain open.

@@ -3952,3 +3952,26 @@ publishes ordinary artifacts. The HTTP inspector remains read-only. Imported
 machining references must use the finished body, while preserving earlier
 features as semantic anchors. Imported adjustment or seating studies that do
 not admit mixed stock must refuse, retaining their previous publication.
+
+
+### Material-aware mounting certificates
+
+Mixed-stock cap seating must reconcile every raw support at the query's own
+arithmetic budget after strict whole-body recognition. The opening cap excludes
+both through holes and blind capsule footprints; the opposite cap excludes only
+through holes. A certified contact disk must lie entirely within actual material
+on both faces. Blind floors are outside this seating admission.
+
+Static and continuous slot clearance may use the original through-stock domain
+as a conservative material superset for the lower bound. The upper witness must
+remain on one of the actual, preserved full-height through walls. Native wall
+IDs, support directions and trims are checked against the original mixed body;
+shortened blind walls cannot satisfy this contract. Recognition tolerance alone
+is insufficient: support residuals must fit the narrower query error budget.
+
+Acceptance includes both opening directions, common rigid poses, corrupted raw
+supports, a formerly valid seat removed by a pocket, positive distant-opening
+and intact-opposite-cap seats, and whole-path travel with only two native endpoint
+queries. Selected-output and warm-cache builds retain all mounting obligations.
+Independent STEP checks corroborate contact disks and gaps; sampled assembly
+poses supplement, but do not replace, the native whole-path proof.

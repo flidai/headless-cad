@@ -107,7 +107,11 @@ pub(crate) fn distance_to_centerline(q: [f64; 2], slot: &SlotHole) -> (f64, [f64
     (length2(sub2(q, nearest)), nearest, u)
 }
 pub(crate) fn admit_slot(m: &ModelSnapshot, t: Tolerance) -> Result<ArcPrismGeometry, KernelError> {
-    let g = crate::arc_prism::recognize(m, t)?;
+    let g = if let Ok((g, _)) = crate::blind_slot_prism::through_slot_witness(m, t) {
+        g
+    } else {
+        crate::arc_prism::recognize(m, t)?
+    };
     if g.slot_holes.is_empty() {
         return Err(bad());
     }
@@ -138,6 +142,16 @@ fn oriented(
     let error = ((12288. * world + 2048. * extent) * f64::EPSILON).next_up();
     if !error.is_normal() || error > t.linear / 64. {
         return Err(KernelError::NumericRange);
+    }
+    // Recognition's mixed-family allowance is deliberately larger than the
+    // query budget. Reconcile actual supports here instead of assuming that
+    // allowance is already covered by the existing certificate padding.
+    if let Ok(mixed) = crate::blind_slot_prism::recognize(slot_model, t) {
+        crate::blind_slot_prism::consistency(slot_model, &mixed, error, t)?;
+        let (_, raw_through) = crate::blind_slot_prism::through_slot_witness(slot_model, t)?;
+        crate::convex_clearance::support::arc_consistency(&raw_through, &g, error, t)?;
+    } else {
+        crate::convex_clearance::support::arc_consistency(slot_model, &g, error, t)?;
     }
     let (origin, axis, radius, shank_face, profile): (_, _, _, _, Option<Vec<[f64; 2]>>) =
         if let Ok(Some(c)) = bolt.cylinder_geometry(t) {
@@ -447,6 +461,78 @@ mod tests {
             ClearanceMethod::SlotTrimWitness
         );
     }
+    #[test]
+    fn mixed_slot_clearance_and_motion_keep_actual_through_wall_witnesses() {
+        let t = Tolerance::default();
+        let (plate, bolt) = fixture();
+        let frame = blind_obround_slot_frame(&plate, t).unwrap();
+        let offset = sub([5., 5., 0.], frame.origin);
+        let pocket = ObroundSlot {
+            id: "relief".into(),
+            center: [
+                dot(offset, frame.x_direction),
+                dot(offset, frame.y_direction),
+            ],
+            direction: [frame.x_direction[0], frame.y_direction[0]],
+            centerline_length: 2.,
+            radius: 1.,
+        };
+        for cap in [FaceId(0), FaceId(1)] {
+            let op =
+                cut_blind_obround_slots(&plate, std::slice::from_ref(&pocket), cap, 2., t).unwrap();
+            for posed in [false, true] {
+                let (mixed, bolt, movement) = if posed {
+                    let q = [0.5, 0.5, 0., std::f64::consts::FRAC_1_SQRT_2];
+                    (
+                        transform(&op.model, [20., -7., 4.], q, t).unwrap().model,
+                        transform(&bolt, [20., -7., 4.], q, t).unwrap().model,
+                        [1., 1., -2. * std::f64::consts::FRAC_1_SQRT_2],
+                    )
+                } else {
+                    (op.model.clone(), bolt.clone(), [2., 0., 0.])
+                };
+                for (a, b, motion) in [
+                    (&mixed, &bolt, movement),
+                    (&bolt, &mixed, movement.map(|x| -x)),
+                ] {
+                    let query = a.clearance(b, t).unwrap();
+                    assert_eq!(query.method, ClearanceMethod::SlotTrimWitness);
+                    assert!(query.lower_bound_mm <= 0.5 && query.upper_bound_mm >= 0.5);
+                    let sweep = a.translation_clearance(b, motion, 0.4, t, 3).unwrap();
+                    assert_eq!(sweep.query_count, 2);
+                    let proof = sweep.slot_motion_proof.unwrap();
+                    assert!(proof
+                        .stock_slot_wall_faces
+                        .iter()
+                        .all(|id| id.0 < op.history.generated_faces["slot_relief_walls"][0].0));
+                    assert!(sweep.lower_bound_mm >= 0.4);
+                }
+            }
+            for face in [
+                FaceId(7),
+                op.history.generated_faces["slot_relief_wall_1"][0],
+            ] {
+                let mut corrupt = op.model.clone();
+                if let Surface::Cylinder(c) = &mut corrupt.faces[face.0].surface {
+                    c.axis[0] += 1e-13;
+                } else {
+                    panic!("expected curved wall");
+                }
+                assert!(crate::blind_slot_prism::recognize(&corrupt, t).is_ok());
+                assert!(corrupt.clearance(&bolt, t).is_err());
+            }
+            // A shank at the blind opening cannot select a shortened wall as a through slot.
+            let false_shank = translate(
+                &extrude_circle(0.5, 10., t).unwrap().model,
+                [5., 5., -2.],
+                t,
+            )
+            .unwrap()
+            .model;
+            assert!(op.model.clearance(&false_shank, t).is_err());
+        }
+    }
+
     #[test]
     fn head_slit_tilt_corruption_and_budget_refuse() {
         let t = Tolerance::default();

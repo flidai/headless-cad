@@ -30,12 +30,17 @@ for recipe in examples/*.star; do
   "$cad_binary" watch "$recipe" --out-dir "out/$name" --cache-dir .cad-cache &
   children+=("$!")
 done
-# A parameter preset of the authoritative drive recipe, with captured overrides.
-# The server still serves artifacts only; the watcher owns recipe evaluation.
-"$cad_binary" build examples/drive_module_rotation.star --param base_pocket_depth=1 \
-  --out-dir out/drive_module_pocketed --cache-dir .cad-cache >/dev/null
-"$cad_binary" watch examples/drive_module_rotation.star --param base_pocket_depth=1 \
-  --out-dir out/drive_module_pocketed --cache-dir .cad-cache &
-children+=("$!")
+# Parameter presets keep their authoritative recipes and captured overrides.
+# The server serves artifacts only; watchers own recipe evaluation.
+watch_preset() {
+  local name="$1" recipe="$2"
+  shift 2
+  "$cad_binary" build "$recipe" "$@" --out-dir "out/$name" --cache-dir .cad-cache >/dev/null
+  "$cad_binary" watch "$recipe" "$@" --out-dir "out/$name" --cache-dir .cad-cache &
+  children+=("$!")
+}
+watch_preset drive_module_pocketed examples/drive_module_rotation.star --param base_pocket_depth=1
+watch_preset drive_module_pocketed_tightened examples/drive_module_tightened.star --param base_pocket_depth=1
+watch_preset drive_module_pocketed_adjustment examples/drive_module_adjustment.star --param base_pocket_depth=1
 # Stop the complete development session if any long-lived child exits.
 wait -n "${children[@]}"

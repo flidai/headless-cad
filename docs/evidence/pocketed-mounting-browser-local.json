@@ -1,0 +1,66 @@
+{
+  "valid": true,
+  "read_only": true,
+  "script_sha256": "5f11b922c0017ad544f32a510ce2eaf21d1fa7a81529ce1ea6994ec85c1edb44",
+  "results": [
+    {
+      "mode": "tightened",
+      "recipe_context_hash": "157976206156467213c9159bcfd36747d1f6e2927b32fa333267678d008a7d28",
+      "source_bundle_hash": "099237e0b6bcfa79eac7bbcd191c36de71c5a8aae59337b5d8a69dd5a448b069",
+      "selected": [
+        {
+          "instance": "fixed_base",
+          "part": "base",
+          "feature": "base_deep_relief"
+        },
+        {
+          "instance": "tight_bolt_0",
+          "part": "clamp_bolt_envelope",
+          "feature": "bolt_body"
+        }
+      ],
+      "artifacts_sha256": {
+        "manifest.json": "fa0d3666def1fc2c8608e6f80a1365d22f363dcae6b0c3105652dc3a1bcb9a44",
+        "recipe.bundle.json": "09e209475d63504ec8630f3f412965ceabf9b1c630da5ffcba8a58fd4aeffeb0",
+        "source-provenance.json": "6d462cc941f47d8d1ba4ec00166237f34fe8b5723d9b3e8c553d9bcd10b93ff4",
+        "clearance-checks.json": "98e9498032aff7091b4c5ab034d4a967f5f9c97d5ff2a7a624717d45fea0922f",
+        "nominal-seating-checks.json": "5665a83d00f547eea9ea81e7922cce06d66ce3284635b227d01c138be2a1df11"
+      },
+      "additional_seats": 8,
+      "slot_gap_checks": 4,
+      "continuous_proofs": 0
+    },
+    {
+      "mode": "adjustment",
+      "recipe_context_hash": "9c056360f3a1b50a4e50580e120bb7fe420b395b061997599988439b26de1715",
+      "source_bundle_hash": "2105a022b4b87472d61164bc0206b7b84ebdc9c48e89ebe5bd201851cb076078",
+      "selected": [
+        {
+          "instance": "adjustment_base",
+          "part": "base",
+          "feature": "base_deep_relief"
+        },
+        {
+          "instance": "adjustment_bolt_0",
+          "part": "clamp_bolt_envelope",
+          "feature": "bolt_body"
+        }
+      ],
+      "artifacts_sha256": {
+        "manifest.json": "fb3311084c21b7197fa7b08612ac7a6a3968f5391682f31d47068ae412737a40",
+        "recipe.bundle.json": "559f2adfc16d073a4d3409be8050eec9d660aa224863446c00c564547dd1dcf8",
+        "source-provenance.json": "fbfc9f4ab0fc86740b4c88c36df2633b81fbfdc3852ffb63fa8ab44da15a2b3e",
+        "clearance-checks.json": "616dcc061657916d7a9f4a41943fa62283df33a37460f3748fc4017669b7d33f",
+        "rigid-translation-groups.json": "5a9beeaa57548f1b72411c11b2894bb97230176a589bf228277ca260b66b0574"
+      },
+      "additional_seats": 0,
+      "slot_gap_checks": 4,
+      "continuous_proofs": 4
+    }
+  ],
+  "screenshots": [
+    "/tmp/cad-pocketed-mounting-seats.png",
+    "/tmp/cad-pocketed-mounting-tightened.png",
+    "/tmp/cad-pocketed-mounting-adjustment.png"
+  ]
+}
