@@ -428,10 +428,12 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
     nominal_seating.obligations.extend([
         "schema 2; at most 32 checks with unique portable IDs, an assembly output, distinct exact leaf paths and zero-offset native planar face datums",
         "Starlark nominal_seating_check(id,output,left_instance_path,left_datum,right_instance_path,right_datum,min_shared_disk_radius_mm)",
-        "world-transformed canonical full-turn revolution annulus or convex polygon prism cap with separated circular throughbores; opposed supports coincident within bounded arithmetic error and a positive material disk common to their projected trims",
+        "world-transformed canonical circular/revolution annuli, bounded convex line/arc prism caps with separated circular or capsule through holes, and strictly reconstructed blind/mixed prism caps or native capsule floors; opposed supports coincident within bounded arithmetic error and a positive material disk common to their projected trims",
         "kernel arithmetic gap and normal guards, plus separate occurrence-placement gap and disk-radius uncertainty; full disk-radius lower bound must meet the declared minimum",
         "global selected-output and warm-cache obligation; reports bind source paths, native face IDs, part hashes and placement frames",
-        "local nominal planar boundary coincidence only; attached occurrence paths unsupported; no exact three-dimensional face contact, full-body nonpenetration, preload, threaded engagement, manufacturing tolerance, force or rated contact claim",
+        "opening-cap material excludes actual blind openings; native floor material uses the exact capsule interior; bounded candidate search may refuse a valid contact but cannot replace the full-disk material bound",
+        "direct authored hierarchy frames, or an identity authored source mount attached to the exact opposite seating endpoint as a directly placed sibling with a current zero-offset native planar face datum; target direction hint and complete raw placement operands must satisfy bounded conditioning and precision; other attachment chains, nested targets and joints remain unsupported",
+        "local nominal planar boundary coincidence only; no full-face contact coverage, full-body nonpenetration, preload, threaded engagement, manufacturing tolerance, force or rated contact claim",
     ]);
     let mut stack_term = object_spec(
         "tolerance_stack_term",

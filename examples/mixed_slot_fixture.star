@@ -97,14 +97,18 @@ drawing_sheet(id = "mixed_fixture_machining", title = "Mixed through and blind m
 # These dimensions measure the surviving through walls on the finished part.
 # The measured native loops belong to full-height through slots, even where
 # this section also intersects a deeper blind pocket.
-section_view(id = "through_sizes", output = "fixture", origin = [0,0,height/2])
+# Stay strictly between the two floors throughout the supported depth range.
+# A fixed mid-height plane would touch the deeper floor at second_depth=6.
+reference_depth = (first_depth+second_depth)/2
+reference_z = height-reference_depth if pocket_side == 1 else reference_depth
+section_view(id = "through_sizes", output = "fixture", origin = [0,0,reference_z])
 section_slot_dimension(view = "through_sizes", id = "mounting_width",
     from_feature = through_cut, role = "slot_front_lower_walls", kind = "width",
     label_offset = [-35,0], min = 5.999999, max = 6.000001)
 section_slot_dimension(view = "through_sizes", id = "mounting_length",
     from_feature = through_cut, role = "slot_front_lower_walls", kind = "overall_length",
     label_offset = [0,-30], min = 13.999999, max = 14.000001)
-section_view(id = "through_positions", output = "mixed_fixture_layout", origin = [0,0,height/2])
+section_view(id = "through_positions", output = "mixed_fixture_layout", origin = [0,0,reference_z])
 section_dimension(view = "through_positions", id = "mounting_pitch",
     from_instance_path = ["fixture_leaf"], from_datum = "front_lower",
     to_instance_path = ["fixture_leaf"], to_datum = "rear_lower",

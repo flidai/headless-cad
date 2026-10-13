@@ -3415,7 +3415,8 @@ pockets on one cap. Each blind operation may use a different depth. Through-slot
 authoring still precedes the pockets; intersecting cuts, opposite-cap recuts,
 arbitrary pockets and general curved Booleans remain outside this domain.
 Cap seating now accounts for actual pocket openings; through-slot clearance
-retains the original full-height walls. Blind-floor seats remain unsupported.
+retains the original full-height walls. Native capsule-floor seating is covered
+by the height-setting insert workflow below.
 
 
 [Independent mixed-machining evidence](docs/evidence/mixed-slots-local.json)
@@ -3512,3 +3513,37 @@ geometry correctness is covered separately by the native tests and STEP oracle.
 [Browser acceptance](docs/evidence/pocketed-mounting-accepted-browser-local.json)
 verifies both delivered revisions, their exact source links, the same native
 pocketed base and read-only inspection.
+
+
+### Seat inserts on machined pocket floors
+
+`examples/seated_pocket_inserts.star` imports the mixed-machining fixture and
+adds two removable steel inserts. Each attaches to its actual native pocket
+floor; its thickness follows that pocket's depth so both tops remain 2 mm proud.
+The first floor retains its semantic identity through the second pocket cut.
+
+```sh
+cad build examples/seated_pocket_inserts.star --out-dir out/seated_pocket_inserts
+cad build examples/seated_pocket_inserts.star --param pocket_side=0 \
+  --param first_depth=2 --param second_depth=9 --out-dir out/seated_inserts_underside
+```
+
+The assembly preview and native two-row protrusion drawing show the result.
+Picking the fixture opens its imported machining recipe; picking an insert
+opens its source declaration and body helper. Both floor-contact checks and
+height measurements remain required during selected-output builds.
+
+The current seating attachment contract supports an identity mount attached to
+a directly placed sibling's native face, with that same face named as the
+opposite seating endpoint. Complex attachment chains remain unsupported.
+A local contact disk does not prove the complete insert clears every wall;
+centered profiles use positive nominal clearance, and the independent export
+checks validate whole-body nonpenetration for the accepted configurations.
+No insert retention, preload or rated-load model is implied.
+
+[Independent insert evidence](docs/evidence/pocketed-inserts-local.json) covers
+four configurations and seven publication-preserving refusals.
+[Browser evidence](docs/evidence/pocketed-inserts-browser-local.json) checks the
+source links, contact reports and native drawing. With `./scripts/dev.sh`, open
+[the seated fixture](http://localhost:8080/seated_pocket_inserts/seated_pocket_inserts.gpu.html)
+or [its height drawing](http://localhost:8080/seated_pocket_inserts/drawing-seated_insert_heights.svg).

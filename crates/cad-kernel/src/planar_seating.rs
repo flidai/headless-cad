@@ -22,6 +22,13 @@ pub struct PlanarSeating {
 }
 
 enum Trim {
+    Capsule {
+        center: [f64; 3],
+        axis: [f64; 3],
+        along: [f64; 3],
+        half_length: f64,
+        radius: f64,
+    },
     Annulus {
         center: [f64; 3],
         axis: [f64; 3],
@@ -47,7 +54,7 @@ struct SeatFace {
 
 fn unsupported() -> KernelError {
     KernelError::Unsupported(
-        "planar seating requires opposed canonical annular or convex prism caps with a shared positive-area material disk".into(),
+        "planar seating requires opposed canonical caps or native capsule floors with a shared positive-area material disk".into(),
     )
 }
 
@@ -162,7 +169,8 @@ fn admit(model: &ModelSnapshot, id: FaceId, t: Tolerance) -> Result<SeatFace, Ke
             outer: g.radius,
         }
     } else if let Ok(g) = crate::blind_slot_prism::recognize(model, t) {
-        if id.0 > 1 {
+        let floor_start = model.faces.len() - g.slots.len();
+        if id.0 > 1 && id.0 < floor_start {
             return Err(unsupported());
         }
         let points = chord_polygon(&g.stock.path, t)?;
@@ -172,19 +180,50 @@ fn admit(model: &ModelSnapshot, id: FaceId, t: Tolerance) -> Result<SeatFace, Ke
             .fold(g.stock.height, f64::max);
         let raw_error = support_error(model, g.stock.origin, extent, t)?;
         crate::blind_slot_prism::consistency(model, &g, raw_error, t)?;
-        let mut slots = g.stock.slot_holes;
-        // The opposite cap retains intact material under every blind floor.
-        // Only the opening cap excludes their actual capsule footprints.
-        if id == g.opening {
-            slots.extend(g.slots);
-        }
-        Trim::Polygon {
-            origin: g.stock.origin,
-            axis: g.stock.axis,
-            x: g.stock.x_direction,
-            points,
-            holes: g.stock.circular_holes,
-            slots,
+        if id.0 >= floor_start {
+            let index = id.0 - floor_start;
+            let slot = g.slots.get(index).ok_or_else(unsupported)?;
+            let z = if g.opening == FaceId(0) {
+                g.depths[index]
+            } else {
+                g.stock.height - g.depths[index]
+            };
+            let y = cross(g.stock.axis, g.stock.x_direction);
+            let center = add(
+                g.stock.origin,
+                add(
+                    mul(g.stock.axis, z),
+                    add(
+                        mul(g.stock.x_direction, slot.center[0]),
+                        mul(y, slot.center[1]),
+                    ),
+                ),
+            );
+            Trim::Capsule {
+                center,
+                axis: g.stock.axis,
+                along: add(
+                    mul(g.stock.x_direction, slot.direction[0]),
+                    mul(y, slot.direction[1]),
+                ),
+                half_length: slot.centerline_length / 2.,
+                radius: slot.radius,
+            }
+        } else {
+            let mut slots = g.stock.slot_holes;
+            // The opposite cap retains intact material under every blind floor.
+            // Only the opening cap excludes their actual capsule footprints.
+            if id == g.opening {
+                slots.extend(g.slots);
+            }
+            Trim::Polygon {
+                origin: g.stock.origin,
+                axis: g.stock.axis,
+                x: g.stock.x_direction,
+                points,
+                holes: g.stock.circular_holes,
+                slots,
+            }
         }
     } else if let Ok(g) = crate::arc_prism::recognize(model, t) {
         if id != FaceId(0) && id != FaceId(1) {
@@ -242,6 +281,18 @@ fn admit(model: &ModelSnapshot, id: FaceId, t: Tolerance) -> Result<SeatFace, Ke
 
 fn margin(face: &SeatFace, point: [f64; 3]) -> f64 {
     match &face.trim {
+        Trim::Capsule {
+            center,
+            axis,
+            along,
+            half_length,
+            radius,
+        } => {
+            let delta = sub(point, *center);
+            let planar = sub(delta, mul(*axis, dot(delta, *axis)));
+            let parameter = dot(planar, *along).clamp(-half_length, *half_length);
+            radius - norm(sub(planar, mul(*along, parameter)))
+        }
         Trim::Annulus {
             center,
             axis,
@@ -294,6 +345,17 @@ fn margin(face: &SeatFace, point: [f64; 3]) -> f64 {
 }
 
 fn candidates(face: &SeatFace) -> Vec<[f64; 3]> {
+    if let Trim::Capsule {
+        center,
+        along,
+        half_length,
+        ..
+    } = &face.trim
+    {
+        return [-1., -0.5, 0., 0.5, 1.]
+            .map(|f| add(*center, mul(*along, f * half_length)))
+            .to_vec();
+    }
     let Trim::Annulus {
         center,
         axis,
@@ -323,10 +385,14 @@ fn candidates(face: &SeatFace) -> Vec<[f64; 3]> {
 }
 
 /// Certify local nominal seating from two already placed native snapshots.
-/// Both selected faces must be opposed planar boundaries. At least one must be
-/// an admitted planar annulus; the other may be an annulus or a convex prism
-/// cap with circular or capsule through bores. The protected disk lies strictly
-/// in both trimmed face interiors.
+/// Both selected faces must be opposed canonical planar caps or strictly
+/// recognized blind capsule floors. Cap material excludes its actual openings;
+/// a floor contains its actual filled capsule. At least one face must provide
+/// bounded candidate centers: up to 161 on an annulus/disk or five along a
+/// capsule floor centerline. These seeds only locate potential witnesses; an
+/// analytic material margin certifies the complete disk in both face interiors.
+/// An unfound disk refuses, even if another placement could seat. This is not
+/// a proof of whole-body noninterference, containment, preload or retention.
 pub fn certify_planar_seating(
     left: &ModelSnapshot,
     left_face: FaceId,
@@ -664,6 +730,159 @@ mod tests {
         }
     }
 
+    fn capsule_insert(radius: f64, length: f64, height: f64, t: Tolerance) -> ModelSnapshot {
+        extrude_path(
+            &PlanarPath {
+                start: [radius, -length / 2.],
+                segments: vec![
+                    PathSegment::LineTo {
+                        end: [radius, length / 2.],
+                    },
+                    PathSegment::ArcTo {
+                        center: [0., length / 2.],
+                        end: [-radius, length / 2.],
+                        clockwise: false,
+                    },
+                    PathSegment::LineTo {
+                        end: [-radius, -length / 2.],
+                    },
+                    PathSegment::ArcTo {
+                        center: [0., -length / 2.],
+                        end: [radius, -length / 2.],
+                        clockwise: false,
+                    },
+                ],
+            },
+            &[],
+            height,
+            t,
+        )
+        .unwrap()
+        .model
+    }
+
+    #[test]
+    fn serial_mixed_native_floors_seat_real_capsule_inserts() {
+        let t = Tolerance::default();
+        let blank = extrude_rectangle(120., 80., 12., t).unwrap().model;
+        let through = cut_obround_slots(
+            &blank,
+            &[ObroundSlot {
+                id: "mount".into(),
+                center: [20., 15.],
+                direction: [0., 1.],
+                centerline_length: 8.,
+                radius: 3.,
+            }],
+            t,
+        )
+        .unwrap()
+        .model;
+        for cap in [FaceId(0), FaceId(1)] {
+            let mut plate = through.clone();
+            let mut floors = Vec::new();
+            for (i, x, r, l, depth) in [(0, 40., 5., 20., 3.), (1, 80., 6., 22., 7.)] {
+                let frame = blind_obround_slot_frame(&plate, t).unwrap();
+                let d = sub([x, 40., 0.], frame.origin);
+                let slot = ObroundSlot {
+                    id: format!("p{i}"),
+                    center: [dot(d, frame.x_direction), dot(d, frame.y_direction)],
+                    direction: [frame.x_direction[1], frame.y_direction[1]],
+                    centerline_length: l,
+                    radius: r,
+                };
+                let op = cut_blind_obround_slots(&plate, &[slot], cap, depth, t).unwrap();
+                floors = floors
+                    .into_iter()
+                    .map(|id| op.history.input_faces["body"][&id][0])
+                    .collect();
+                floors.push(op.history.generated_faces[&format!("slot_p{i}_floor")][0]);
+                plate = op.model;
+            }
+            for (i, x, r, l, depth) in [(0, 40., 5., 20., 3.), (1, 80., 6., 22., 7.)] {
+                let floor = floors[i];
+                let floor_z = if cap == FaceId(0) { depth } else { 12. - depth };
+                let insert = translate(
+                    &capsule_insert(r - 0.2, l, depth + 2., t),
+                    [x, 40., if cap == FaceId(0) { -2. } else { floor_z }],
+                    t,
+                )
+                .unwrap()
+                .model;
+                let seated_cap = FaceId(1 - cap.0);
+                for posed in [false, true] {
+                    let (body, insert) = if posed {
+                        let q = [0.5, 0.5, 0., std::f64::consts::FRAC_1_SQRT_2];
+                        (
+                            transform(&plate, [20., -7., 4.], q, t).unwrap().model,
+                            transform(&insert, [20., -7., 4.], q, t).unwrap().model,
+                        )
+                    } else {
+                        (plate.clone(), insert.clone())
+                    };
+                    for (a, fa, b, fb) in [
+                        (&body, floor, &insert, seated_cap),
+                        (&insert, seated_cap, &body, floor),
+                    ] {
+                        let proof = certify_planar_seating(a, fa, b, fb, 4., t).unwrap();
+                        assert!(proof.disk_radius_lower_mm >= 4.);
+                        assert!(proof.signed_gap_lower_mm <= 0. && proof.signed_gap_upper_mm >= 0.);
+                    }
+                }
+                let shifted = translate(&insert, [0., 0., 0.01], t).unwrap().model;
+                assert!(
+                    certify_planar_seating(&plate, floor, &shifted, seated_cap, 0.4, t).is_err()
+                );
+                assert!(certify_planar_seating(&plate, cap, &insert, seated_cap, 0.4, t).is_err());
+                assert!(
+                    certify_planar_seating(&plate, floors[1 - i], &insert, seated_cap, 0.4, t)
+                        .is_err()
+                );
+                assert!(certify_planar_seating(&plate, floor, &insert, cap, 0.4, t).is_err());
+                for (dx, dy, passes) in [(0., l / 2. + r - 1.5, true), (r + 0.75, 0., false)] {
+                    let pad = translate(
+                        &extrude_circle(1., 2., t).unwrap().model,
+                        [
+                            x + dx,
+                            40. + dy,
+                            if cap == FaceId(0) {
+                                floor_z - 2.
+                            } else {
+                                floor_z
+                            },
+                        ],
+                        t,
+                    )
+                    .unwrap()
+                    .model;
+                    assert_eq!(
+                        certify_planar_seating(&plate, floor, &pad, seated_cap, 0.4, t).is_ok(),
+                        passes
+                    );
+                }
+                let mut corrupt = plate.clone();
+                if let Surface::Plane(p) = &mut corrupt.faces[floor.0].surface {
+                    p.origin[2] += 0.001;
+                }
+                assert!(
+                    certify_planar_seating(&corrupt, floor, &insert, seated_cap, 0.4, t).is_err()
+                );
+                let g = crate::blind_slot_prism::recognize(&plate, t).unwrap();
+                let wall = plate.faces.len() - g.slots.len() - 4 * g.slots.len() + 4 * i + 1;
+                let mut corrupt = plate.clone();
+                if let Surface::Cylinder(c) = &mut corrupt.faces[wall].surface {
+                    c.axis[0] += 1e-13;
+                } else {
+                    panic!("expected capsule wall");
+                }
+                assert!(crate::blind_slot_prism::recognize(&corrupt, t).is_ok());
+                assert!(
+                    certify_planar_seating(&corrupt, floor, &insert, seated_cap, 0.4, t).is_err()
+                );
+            }
+        }
+    }
+
     #[test]
     fn mixed_cap_seating_uses_opening_specific_material_and_raw_supports() {
         let t = Tolerance::default();
@@ -718,6 +937,8 @@ mod tests {
                 }
                 assert!(crate::blind_slot_prism::recognize(&corrupt, t).is_ok());
                 assert!(certify_planar_seating(&corrupt, cap, &pad, other, 0.4, t).is_err());
+                // This pad stays at the exterior cap elevation, not the
+                // pocket floor: admitting floor seats must not bridge that gap.
                 let floor = op.history.generated_faces["slot_relief_floor"][0];
                 assert!(certify_planar_seating(&op.model, floor, &pad, other, 0.4, t).is_err());
             }

@@ -16,10 +16,10 @@ failed revisions, restart and offline replay. Retained receipts are below.
 
 Material-aware mounting certificates now account for actual pocket openings
 and bind through-slot travel to original physical walls. The tightened and
-adjustment recipes accept a pocketed base; blind-floor seats remain outside
-this scoped admission. The next engineering increment is native seating on
-actual blind-pocket floors, with independently checked height-setting inserts.
-General Booleans and arbitrary surfaces remain separate kernel work.
+adjustment recipes accept a pocketed base. Native capsule-floor seating now
+supports actual height-setting inserts through bounded datum attachments.
+General Booleans, arbitrary surfaces, complex attached contact chains and rated
+mechanical loading remain separate work.
 
 The complete product is still experimental. All five commercial release gates
 remain open; accepted feature increments are evidence toward those gates, not
@@ -1149,3 +1149,33 @@ semantic fields with the captured pocket-depth override.
 checks both source revisions, the same finished base, exact source navigation
 and immutable artifact hashes. This completes the local scripted workflow
 increment; it does not close the broader commercial R5 gate.
+
+
+### Native floor-seated height-setting inserts
+
+The new `seated_pocket_inserts.star` imports the mixed fixture and places two
+smaller capsule inserts on actual serially machined floors. Their thicknesses
+follow pocket depth; both tops remain 2 mm proud on either side of the plate.
+The first floor retains its remapped native identity through the later cut.
+
+Floor seating uses an analytic capsule-interior disk bound. A narrow attachment
+contract supports an identity source mount on the exact opposite seating face
+of a directly placed sibling, with guarded hint conditioning and raw-operand
+placement budgets. Complex attachment chains and unrelated target datums refuse.
+The agent capability catalog describes this domain and its limitations.
+
+The [independent insert oracle](evidence/pocketed-inserts-local.json) compares
+four configurations with independently constructed plate/insert STEP solids,
+full moments, trimmed-face contact disks, whole-body nonpenetration and native
+protrusion heights. Seven invalid revisions preserve publication, including a
+lift with height bounds relaxed specifically to isolate the native seat check.
+[Browser acceptance](evidence/pocketed-inserts-browser-local.json) checks three
+occurrences, imported/root source selection, two contact reports and the native
+two-row drawing. Kernel, attachment, selected-output/cache and prior seating
+regressions pass, as does strict workspace Clippy.
+
+The mixed fixture's through-slot reference sections now follow the midpoint
+between its floors. This removes a topology-event refusal at the valid 6 mm
+second-pocket depth; both opening directions are covered by regression tests.
+These local support interfaces do not establish insert retention, preload,
+full-contact constraints or rated load capacity. Commercial gates remain open.

@@ -190,13 +190,15 @@ pub(super) fn evaluate(
                 // The flattened occurrence frame was composed through the authored
                 // hierarchy. Account for every quaternion, rotation and translation
                 // stage, including cancellation that may make the final offset small.
-                // Attached datums introduce additional frame operations and are not
-                // admitted by this first local seating certificate.
+                // The narrow sibling attachment branch also charges every raw datum
+                // operand before cancellation; attached ancestors remain unsupported.
                 let mut definition = assembly
                     .hierarchy
                     .get(&assembly.assembly_id)
                     .ok_or_else(|| fail("seating hierarchy root absent".into()))?;
                 let mut path_translation_scale = 0.;
+                let mut attachment_scale = 0.;
+                let mut expected_frame = RigidTransform::default();
                 for (index, component) in end.instance_path.iter().enumerate() {
                     let last = index + 1 == end.instance_path.len();
                     let frame = if last {
@@ -207,12 +209,108 @@ pub(super) fn evaluate(
                             .ok_or_else(|| {
                                 fail("seating leaf absent from authored hierarchy".into())
                             })?;
-                        if child.attachment.is_some() {
-                            return Err(fail(
-                                "seating does not admit attached occurrence frames".into(),
-                            ));
+                        if let Some(a) = &child.attachment {
+                            if !a.target_path.is_empty() || a.joint.is_some() {
+                                return Err(fail("seating attachment requires a direct sibling target without a joint".into()));
+                            }
+                            let opposite = if end.instance_path == check.left.instance_path {
+                                &check.right
+                            } else {
+                                &check.left
+                            };
+                            let mut target_path =
+                                end.instance_path[..end.instance_path.len() - 1].to_vec();
+                            target_path.push(a.instance.clone());
+                            if opposite.instance_path != target_path
+                                || opposite.datum != a.target_datum
+                            {
+                                return Err(fail("seating attachment target must be the opposite certified seating endpoint".into()));
+                            }
+                            let own = &assembly.parts[&child.part];
+                            if own.datums.get(&a.datum) != Some(&RigidTransform::default())
+                                || datums
+                                    .get(&child.part)
+                                    .is_some_and(|d| d.contains_key(&a.datum))
+                            {
+                                return Err(fail(
+                                    "seating attachment requires an authored identity source datum"
+                                        .into(),
+                                ));
+                            }
+                            let target = definition
+                                .instances
+                                .iter()
+                                .find(|v| v.id == a.instance)
+                                .ok_or_else(|| {
+                                fail("seating attachment target must be a sibling part".into())
+                            })?;
+                            if target.attachment.is_some() {
+                                return Err(fail(
+                                    "seating attachment chains are unsupported".into(),
+                                ));
+                            }
+                            let part = &assembly.parts[&target.part];
+                            let semantic = datums.get(&target.part).and_then(|d| d.get(&a.target_datum))
+                                .ok_or_else(|| fail("seating attachment target requires a native semantic face datum".into()))?;
+                            if semantic.target_content_hash != part.content_hash
+                                || semantic.definition.offset != [0.; 3]
+                                || semantic.selection.status != FaceResolutionStatus::Resolved
+                                || semantic.selection.witnesses.len() != 1
+                                || part.datums.get(&a.target_datum) != Some(&semantic.frame)
+                            {
+                                return Err(fail("seating attachment requires one current native face with zero datum offset".into()));
+                            }
+                            let plane = part
+                                .result
+                                .model
+                                .faces
+                                .get(semantic.selection.witnesses[0].target_face.0)
+                                .and_then(|f| f.try_plane())
+                                .ok_or_else(|| {
+                                    fail("seating attachment target must be planar".into())
+                                })?;
+                            let hint = semantic.definition.x_direction;
+                            let hint_norm = hint.into_iter().map(|v| v * v).sum::<f64>().sqrt();
+                            let cosine = hint
+                                .iter()
+                                .zip(plane.normal)
+                                .map(|(a, b)| a * b)
+                                .sum::<f64>()
+                                / hint_norm;
+                            if !hint_norm.is_finite()
+                                || hint_norm <= 0.
+                                || !cosine.is_finite()
+                                || cosine.abs() > 0.5
+                            {
+                                return Err(fail("seating attachment target datum hint must be well conditioned to the native plane".into()));
+                            }
+                            work = work
+                                .saturating_add(part.result.model.vertices.len())
+                                .saturating_add(part.result.model.edges.len())
+                                .saturating_add(part.result.model.faces.len());
+                            if work > MAX_NOMINAL_SEATING_WORK {
+                                return Err(fail("native seating geometry work exhausted".into()));
+                            }
+                            let b = part.result.model.bounds();
+                            attachment_scale = b
+                                .min
+                                .into_iter()
+                                .chain(b.max)
+                                .chain(plane.origin)
+                                .chain(semantic.frame.translation)
+                                .chain(target.transform.translation)
+                                .chain(child.transform.translation)
+                                .map(f64::abs)
+                                .sum::<f64>()
+                                + 1.;
+                            target
+                                .transform
+                                .compose(&semantic.frame, t)
+                                .and_then(|v| v.compose(&child.transform, t))
+                                .map_err(|e| fail(e.to_string()))?
+                        } else {
+                            child.transform
                         }
-                        child.transform
                     } else {
                         let child = definition
                             .assemblies
@@ -235,9 +333,30 @@ pub(super) fn evaluate(
                     };
                     path_translation_scale +=
                         frame.translation.into_iter().map(f64::abs).sum::<f64>();
+                    expected_frame = expected_frame
+                        .compose(&frame, t)
+                        .map_err(|e| fail(e.to_string()))?;
+                }
+                // Bind the certificate to the actual flattened occurrence, not merely
+                // a plausible attachment declaration with different derived placement.
+                if expected_frame != instance.transform {
+                    return Err(fail(
+                        "seating occurrence frame differs from reconstructed authored placement"
+                            .into(),
+                    ));
                 }
                 let depth = end.instance_path.len() as f64;
+                // With an identity own datum there is no inverse-frame conditioning.
+                // Each attachment stage uses a bounded number (<128) of scalar
+                // operations for normalization, projection and rigid composition.
+                // The hint guard bounds projected-basis normalization by 2; 2048 eps
+                // per stage reserves >8 times that amplified operation count. Raw
+                // operand sums cover cancellation; four extra stages cover native
+                // datum evaluation and the two local compositions. The target is
+                // itself the other kernel-certified seating body, not an arbitrary
+                // unchecked face-centroid construction.
                 let error = (((source_scale + placement_scale) * 1024.
+                    + attachment_scale * (depth + 4.) * 2048.
                     + (source_scale + path_translation_scale + placement_scale + 1.)
                         * depth
                         * 4096.)

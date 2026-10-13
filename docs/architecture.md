@@ -3960,7 +3960,8 @@ Mixed-stock cap seating must reconcile every raw support at the query's own
 arithmetic budget after strict whole-body recognition. The opening cap excludes
 both through holes and blind capsule footprints; the opposite cap excludes only
 through holes. A certified contact disk must lie entirely within actual material
-on both faces. Blind floors are outside this seating admission.
+on both faces. Blind floors use the separate capsule-floor admission described
+below; they cannot be treated as uncut stock caps.
 
 Static and continuous slot clearance may use the original through-stock domain
 as a conservative material superset for the lower bound. The upper witness must
@@ -3993,3 +3994,31 @@ must recover all three job outcomes. Streamed delivery and offline rebuild use
 the accepted parameter override and compare engineering semantics as well as
 artifact bytes. This is a scripted protocol acceptance fixture, not a claim of
 autonomous design or a completed commercial release gate.
+
+
+### Blind-floor support interfaces
+
+A strictly reconstructed blind or mixed prism may expose a native capsule floor
+as a seating support. Its identity comes from the actual per-pocket floor layer,
+including remapping through subsequent operations. The protected disk uses the
+analytic capsule interior: radius minus distance to the finite centerline.
+Bounded candidate points discover a possible witness; they do not approximate
+or sample the guarantee over that disk. Opening caps still subtract the pocket
+footprint. Arbitrary planar faces and shortened side walls are not floor seats.
+
+Datum-driven placement requires its own arithmetic budget. The first attached
+seating domain is an identity authored mount frame attached directly to an
+unattached sibling's current, zero-offset native planar face datum, which must
+be the opposite endpoint of the same seating check. Account for
+all source and target operands before cancellation, target-frame conditioning,
+and ancestor transforms; reconcile the flattened placement with those inputs.
+Nested targets, attached ancestors, joints and nonidentity source mount frames
+remain outside this admission. Insufficient precision blocks publication.
+
+A local floor contact disk does not certify the full insert against side walls.
+The height-setting insert fixture uses centered smaller capsule profiles with
+bounded positive nominal clearance, and independent STEP checks must establish
+whole-body nonpenetration for accepted configurations. Native floor seating and
+protrusion dimensions remain global obligations for selected-output and warm
+builds. Tests must isolate these obligations so an earlier dimension failure
+cannot conceal a missing contact check.

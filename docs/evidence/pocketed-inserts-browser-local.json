@@ -1,0 +1,18 @@
+{
+  "valid": true,
+  "instances": 3,
+  "native_floor_seats": 2,
+  "native_protrusion_dimensions": 2,
+  "section_loops": 2,
+  "source_navigation": true,
+  "read_only": true,
+  "manifest_sha256": "494181a8d9bd70ea46c61ce88fe260da63a1544219bacda357c76ed71b67f427",
+  "manifest_end_sha256": "494181a8d9bd70ea46c61ce88fe260da63a1544219bacda357c76ed71b67f427",
+  "source_provenance_sha256": "4ed8b566a70981651934542554e8de98525e3202962629702c5fb2bc995d684f",
+  "bundle_sha256": "303655e7f212601b77665c887ae17964036703f33dd809df8cd05b6b4695403f",
+  "script_sha256": "deec9972bffc0f94863d0555b4a34c9a2baaf4e6376676bba60c00357989d094",
+  "screenshots": [
+    "/tmp/cad-pocketed-inserts-drawing.png",
+    "/tmp/cad-pocketed-inserts-assembly.png"
+  ]
+}
