@@ -1,7 +1,10 @@
 //! Source-authored paper layout of native sections; no projected HLR or GD&T.
 use crate::{ExportError, SectionCircleDimensionAnnotation, SectionDimensionAnnotation};
 use cad_kernel::PlanarSection;
-use std::{collections::BTreeSet, fmt::Write};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Write,
+};
 #[derive(Debug, Clone)]
 pub struct DrawingSheet {
     pub title: String,
@@ -41,6 +44,12 @@ pub struct DrawingSheetView {
     pub width: f64,
     pub height: f64,
     pub scale: f64,
+    /// Fixed printed annotation size. Native model-space size is paper/scale.
+    pub paper_annotation_font_mm: Option<f64>,
+    /// Complete source-ID to short printable tag map for a styled view.
+    pub annotation_labels: BTreeMap<String, String>,
+    /// Printed caption. Defaults to the section view ID when styled.
+    pub paper_caption: Option<String>,
     pub sections: Vec<PlanarSection>,
     pub dimensions: Vec<SectionDimensionAnnotation>,
     pub circles: Vec<SectionCircleDimensionAnnotation>,
@@ -123,27 +132,56 @@ pub fn drawing_sheet_to_svg(sheet: &DrawingSheet) -> Result<String, ExportError>
         }) {
             return Err(invalid("drawing viewports overlap"));
         }
-        let layout = crate::section::sections_layout(
+        let paper_font = view.paper_annotation_font_mm;
+        if paper_font.is_none()
+            && (!view.annotation_labels.is_empty() || view.paper_caption.is_some())
+        {
+            return Err(invalid(
+                "paper annotation labels or caption require a paper font",
+            ));
+        }
+        let caption = view.paper_caption.as_deref().unwrap_or(&view.id);
+        if let Some(paper_font) = paper_font {
+            if !(2.5..=4.).contains(&paper_font)
+                || !printable_text(caption, 64)
+                || text_width_mm(caption, 2.8) > view.width - 6.
+            {
+                return Err(invalid("invalid paper annotation font or caption fit"));
+            }
+        }
+        let style = paper_font.map(|font| crate::section::PaperAnnotationStyle {
+            font_model_mm: font / view.scale,
+            tags: &view.annotation_labels,
+        });
+        let layout = crate::section::sections_layout_with_style(
             &view.sections,
             &view.label,
             &view.dimensions,
             &view.circles,
+            style.as_ref(),
         )?;
         let [left, top, width, height] = layout.view_box;
         let w = width * view.scale;
         let h = height * view.scale;
+        let caption_height = if paper_font.is_some() { 8. } else { 0. };
         if !w.is_finite()
             || !h.is_finite()
             || w <= 0.
             || h <= 0.
             || w > view.width
-            || h > view.height
+            || h > view.height - caption_height
         {
             return Err(invalid(&format!("drawing view {} geometry and annotations exceed allocated viewport at declared scale",view.id)));
         }
         let x = view.x + (view.width - w) / 2.;
-        let y = view.y + (view.height - h) / 2.;
-        writeln!(out,"<svg id=\"drawing-view-{}\" x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"{h}\" viewBox=\"{left} {top} {width} {height}\" data-scale=\"{}\" overflow=\"visible\">",view.id,view.scale).unwrap();
+        let y = view.y + caption_height + (view.height - caption_height - h) / 2.;
+        if paper_font.is_some() {
+            writeln!(out, "<text id=\"drawing-caption-{}\" x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"2.8\">{}</text>", view.id, view.x + 3., view.y + 5., escape(caption)?).unwrap();
+        }
+        let paper_attr = paper_font.map_or_else(String::new, |font| {
+            format!(" data-paper-annotation-font-mm=\"{font}\"")
+        });
+        writeln!(out,"<svg id=\"drawing-view-{}\" x=\"{x}\" y=\"{y}\" width=\"{w}\" height=\"{h}\" viewBox=\"{left} {top} {width} {height}\" data-scale=\"{}\"{paper_attr} overflow=\"visible\">",view.id,view.scale).unwrap();
         // Only internally generated SVG enters this extraction. Bounds travel as
         // typed numbers from the same renderer; never parse caller SVG geometry.
         for line in layout.svg.lines().skip(1) {

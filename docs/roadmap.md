@@ -39,9 +39,12 @@ complete manufacturing-release gate remain open.
 Retained [STEP and table evidence](evidence/machining-tables-local.json) covers
 five configurations and ten publication-preserving refusals; the
 [accepted offline replay](evidence/machining-tables-replay-local.json) matches
-149 artifacts and 27 manifest fields. Paper-sized annotation readability is the
-next drawing increment, followed by authored size bands and an axial allowance
-stack; these are distinct from nominal measurement correctness.
+149 artifacts and 27 manifest fields. Paper-sized annotations now have
+[independent scale/edit evidence](evidence/paper-annotations-local.json): native
+labels retain a 2.8 mm print size at two model scales and annotation-only edits
+preserve compared solid artifacts. Authored size bands and an axial allowance
+stack are the next drawing increment; these are distinct from nominal
+measurement correctness.
 
 M3's large-assembly gate also includes the architecture's
 [exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):

@@ -1,7 +1,7 @@
 //! Deterministic, true-scale millimetre SVG for exact native section curves.
 use crate::ExportError;
 use cad_kernel::{FaceId, PlanarSection, SectionCurve};
-use std::fmt::Write;
+use std::{collections::BTreeMap, fmt::Write};
 
 fn number(v: f64) -> String {
     if v == 0. {
@@ -248,11 +248,26 @@ pub(crate) struct SectionLayout {
     pub svg: String,
     pub view_box: [f64; 4],
 }
+/// Paper drawing presentation only. Native dimension IDs and values are kept
+/// in the generated groups; tags replace visible long source identifiers.
+pub(crate) struct PaperAnnotationStyle<'a> {
+    pub font_model_mm: f64,
+    pub tags: &'a BTreeMap<String, String>,
+}
 fn section_layout(
     section: &PlanarSection,
     label: &str,
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
+) -> Result<SectionLayout, ExportError> {
+    section_layout_with_style(section, label, dimensions, circles, None)
+}
+fn section_layout_with_style(
+    section: &PlanarSection,
+    label: &str,
+    dimensions: &[SectionDimensionAnnotation],
+    circles: &[SectionCircleDimensionAnnotation],
+    style: Option<&PaperAnnotationStyle<'_>>,
 ) -> Result<SectionLayout, ExportError> {
     let mut ids = std::collections::BTreeSet::new();
     if dimensions
@@ -360,12 +375,66 @@ fn section_layout(
         bounds = [-1., -1., 1., 1.];
     }
     let span = (bounds[2] - bounds[0]).max(bounds[3] - bounds[1]).max(1.);
-    let font = span * 0.025;
-    let mut annotations = dimension_svg(dimensions, font, &mut bounds)?;
-    annotations.push_str(&circle_dimension_svg(circles, font, &mut bounds)?);
+    let font = style.map_or(span * 0.025, |s| s.font_model_mm);
+    if !font.is_finite() || font <= 0. {
+        return Err(invalid());
+    }
+    if let Some(style) = style {
+        let actual: std::collections::BTreeSet<_> = dimensions
+            .iter()
+            .map(|d| d.id.as_str())
+            .chain(circles.iter().map(|d| d.id.as_str()))
+            .collect();
+        let authored: std::collections::BTreeSet<_> =
+            style.tags.keys().map(String::as_str).collect();
+        let unique_tags: std::collections::BTreeSet<_> =
+            style.tags.values().map(String::as_str).collect();
+        if actual != authored
+            || unique_tags.len() != style.tags.len()
+            || style.tags.values().any(|tag| {
+                tag.is_empty()
+                    || tag.len() > 12
+                    || !tag.as_bytes()[0].is_ascii_alphabetic()
+                    || !tag.as_bytes()[1..]
+                        .iter()
+                        .all(|c| c.is_ascii_alphanumeric() || *c == b'_' || *c == b'-')
+            })
+        {
+            return Err(ExportError::InvalidModel(
+                "paper drawing tags must cover every native section annotation".into(),
+            ));
+        }
+    }
+    let mut label_boxes = Vec::new();
+    let mut annotations = dimension_svg(
+        dimensions,
+        font,
+        &mut bounds,
+        style.map(|s| s.tags),
+        &mut label_boxes,
+    )?;
+    annotations.push_str(&circle_dimension_svg(
+        circles,
+        font,
+        &mut bounds,
+        style.map(|s| s.tags),
+        &mut label_boxes,
+    )?);
+    if style.is_some() {
+        for (i, a) in label_boxes.iter().enumerate() {
+            if label_boxes[..i]
+                .iter()
+                .any(|b| a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3])
+            {
+                return Err(ExportError::InvalidModel(
+                    "paper drawing annotation labels overlap".into(),
+                ));
+            }
+        }
+    }
     let margin = span * 0.06;
     let width = bounds[2] - bounds[0] + 2. * margin;
-    let height = bounds[3] - bounds[1] + 2. * margin + font * 6.;
+    let height = bounds[3] - bounds[1] + 2. * margin + if style.is_some() { 0. } else { font * 6. };
     let left = bounds[0] - margin;
     let top = -bounds[3] - margin;
     if [span, margin, font, width, height, left, top]
@@ -384,21 +453,23 @@ fn section_layout(
     let mut out=format!("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}mm\" height=\"{}mm\" viewBox=\"{} {} {} {}\" role=\"img\">\n<title>{label}</title>\n<desc>Exact native section; coordinates in millimetres, X right, Y up. {}. Inspection only; no manufacturing tolerances or GD&amp;T.</desc>\n",number(width),number(height),number(left),number(top),number(width),number(height),escape(&frame)?);
     writeln!(out,"<path id=\"section-contours\" d=\"{}\" fill=\"#cbd5e1\" fill-rule=\"evenodd\" stroke=\"#0f172a\" stroke-width=\"{}\" stroke-linejoin=\"round\"/>",path.trim(),number(span*0.0015)).unwrap();
     out.push_str(&annotations);
-    let y = -bounds[1] + margin + font;
-    for (row, text) in [
-        format!("{label} — section, mm; area {} mm²", number(section.area)),
-        format!("Origin: ({}) mm", vector(section.plane.origin)),
-        format!(
-            "Normal: ({}); X axis: ({})",
-            vector(section.plane.normal),
-            vector(section.plane.x_direction)
-        ),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        // The first row already contains the escaped caller label; numeric frame rows are trusted.
-        writeln!(out,"<text x=\"{}\" y=\"{}\" font-family=\"sans-serif\" font-size=\"{}\" fill=\"#0f172a\">{text}</text>",number(bounds[0]),number(y+row as f64*font*1.5),number(font.min(width / (text.chars().count().max(1) as f64 * 0.65)))).unwrap();
+    if style.is_none() {
+        let y = -bounds[1] + margin + font;
+        for (row, text) in [
+            format!("{label} — section, mm; area {} mm²", number(section.area)),
+            format!("Origin: ({}) mm", vector(section.plane.origin)),
+            format!(
+                "Normal: ({}); X axis: ({})",
+                vector(section.plane.normal),
+                vector(section.plane.x_direction)
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            // The first row already contains the escaped caller label; numeric frame rows are trusted.
+            writeln!(out,"<text x=\"{}\" y=\"{}\" font-family=\"sans-serif\" font-size=\"{}\" fill=\"#0f172a\">{text}</text>",number(bounds[0]),number(y+row as f64*font*1.5),number(font.min(width / (text.chars().count().max(1) as f64 * 0.65)))).unwrap();
+        }
     }
     out.push_str("</svg>\n");
     if dimensions.iter().any(|d| d.tolerance.is_some())
@@ -442,6 +513,15 @@ pub(crate) fn sections_layout(
     dimensions: &[SectionDimensionAnnotation],
     circles: &[SectionCircleDimensionAnnotation],
 ) -> Result<SectionLayout, ExportError> {
+    sections_layout_with_style(sections, label, dimensions, circles, None)
+}
+pub(crate) fn sections_layout_with_style(
+    sections: &[PlanarSection],
+    label: &str,
+    dimensions: &[SectionDimensionAnnotation],
+    circles: &[SectionCircleDimensionAnnotation],
+    style: Option<&PaperAnnotationStyle<'_>>,
+) -> Result<SectionLayout, ExportError> {
     let first = sections.first().ok_or_else(invalid)?;
     validate_arc_annotations(sections, circles)?;
     if sections.iter().any(|section| section.plane != first.plane) {
@@ -469,7 +549,7 @@ pub(crate) fn sections_layout(
             }))
         },
     };
-    let layout = section_layout(&aggregate, label, dimensions, circles)?;
+    let layout = section_layout_with_style(&aggregate, label, dimensions, circles, style)?;
     let base = layout.svg.replace(
         "Exact native section;",
         "Native occurrence sections; overlapping occurrence areas are summed;",
@@ -509,6 +589,8 @@ fn dimension_svg(
     dimensions: &[SectionDimensionAnnotation],
     font: f64,
     bounds: &mut [f64; 4],
+    tags: Option<&BTreeMap<String, String>>,
+    label_boxes: &mut Vec<[f64; 4]>,
 ) -> Result<String, ExportError> {
     let mut out = String::new();
     let mut ids = std::collections::BTreeSet::new();
@@ -568,9 +650,16 @@ fn dimension_svg(
         if let Some(t) = manufacturing_tolerance {
             value = tolerance_label(t)?;
         }
-        let label = format!("{id}: {value} mm");
+        let visible = tags
+            .and_then(|map| map.get(id))
+            .map_or(id.as_str(), String::as_str);
+        let label = format!("{visible}: {value} mm");
         let escaped_label = escape(&label)?;
-        let text_width = label.chars().count() as f64 * font * 0.7;
+        let text_width = if tags.is_some() {
+            label.len() as f64 * font * 0.7
+        } else {
+            label.chars().count() as f64 * font * 0.7
+        };
         let mut a = *from;
         let mut b = *to;
         a[1 - *axis] = *offset;
@@ -596,6 +685,7 @@ fn dimension_svg(
         // including escaped IDs and fonts supplied by different SVG consumers.
         let label_min = [text_center - text_width * 0.5, text_baseline - font * 0.4];
         let label_max = [text_center + text_width * 0.5, text_baseline + font * 1.2];
+        label_boxes.push([label_min[0], label_min[1], label_max[0], label_max[1]]);
         for p in [*from, *to, a, b, label_min, label_max]
             .into_iter()
             .chain(arrows.into_iter().flatten())
@@ -628,7 +718,11 @@ fn dimension_svg(
             )
             .unwrap();
         }
-        writeln!(out,"  <text x=\"{}\" y=\"{}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"{}\" textLength=\"{}\" lengthAdjust=\"spacingAndGlyphs\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_center),number(-text_baseline),number(font),number(text_width)).unwrap();
+        if tags.is_some() {
+            writeln!(out,"  <text x=\"{}\" y=\"{}\" text-anchor=\"middle\" font-family=\"monospace\" font-size=\"{}\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_center),number(-text_baseline),number(font)).unwrap();
+        } else {
+            writeln!(out,"  <text x=\"{}\" y=\"{}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"{}\" textLength=\"{}\" lengthAdjust=\"spacingAndGlyphs\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_center),number(-text_baseline),number(font),number(text_width)).unwrap();
+        }
     }
     Ok(out)
 }
@@ -637,6 +731,8 @@ fn circle_dimension_svg(
     circles: &[SectionCircleDimensionAnnotation],
     font: f64,
     bounds: &mut [f64; 4],
+    tags: Option<&BTreeMap<String, String>>,
+    label_boxes: &mut Vec<[f64; 4]>,
 ) -> Result<String, ExportError> {
     let mut out = String::new();
     for circle in circles {
@@ -749,16 +845,39 @@ fn circle_dimension_svg(
         if let Some(t) = manufacturing_tolerance {
             value = tolerance_label(t)?;
         }
-        let label = format!("{id}: {value} mm {kind_name}");
+        let visible = tags
+            .and_then(|map| map.get(id))
+            .map_or(id.as_str(), String::as_str);
+        let label = if tags.is_some() {
+            let symbol = match kind {
+                SectionCircleDimensionKind::Radius => "R",
+                SectionCircleDimensionKind::Diameter => "⌀",
+            };
+            format!("{visible}:{symbol}{value}mm")
+        } else {
+            format!("{visible}: {value} mm {kind_name}")
+        };
         let escaped_label = escape(&label)?;
         let escaped_id = escape(id)?
             .replace('\n', "&#10;")
             .replace('\r', "&#13;")
             .replace('\t', "&#9;");
-        let width = font * 0.7 * label.chars().count() as f64;
+        let width = font
+            * 0.7
+            * if tags.is_some() {
+                label.len()
+            } else {
+                label.chars().count()
+            } as f64;
         let right = label_direction[0] >= 0.;
         let text_x = leader[0] + if right { font } else { -font - width };
         let baseline = leader[1] + font;
+        label_boxes.push([
+            text_x,
+            baseline - font * 0.4,
+            text_x + width,
+            baseline + font * 1.2,
+        ]);
         for p in [
             start,
             near,
@@ -803,7 +922,11 @@ fn circle_dimension_svg(
             )
             .unwrap();
         }
-        writeln!(out,"  <text x=\"{}\" y=\"{}\" font-family=\"sans-serif\" font-size=\"{}\" textLength=\"{}\" lengthAdjust=\"spacingAndGlyphs\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_x),number(-baseline),number(font),number(width)).unwrap();
+        if tags.is_some() {
+            writeln!(out,"  <text x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"{}\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_x),number(-baseline),number(font)).unwrap();
+        } else {
+            writeln!(out,"  <text x=\"{}\" y=\"{}\" font-family=\"sans-serif\" font-size=\"{}\" textLength=\"{}\" lengthAdjust=\"spacingAndGlyphs\" stroke=\"none\">{escaped_label}</text>\n</g>",number(text_x),number(-baseline),number(font),number(width)).unwrap();
+        }
     }
     Ok(out)
 }

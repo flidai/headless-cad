@@ -169,6 +169,9 @@ fn sheet_and_total_viewport_limits_are_preflight_obligations() {
             width: 40.,
             height: 40.,
             scale: 1.,
+            paper_annotation_font_mm: None,
+            paper_caption: None,
+            annotation_labels: Vec::new(),
         })
         .collect();
     recipe.drawing_sheets = (0..9)
@@ -290,4 +293,60 @@ fn generated_svg_table_and_row_ids_cannot_alias() {
         cad_build::build(&parse(v)),
         Err(BuildError::InvalidDrawingSheet { message, .. }) if message.contains("generated drawing table")
     ));
+}
+
+fn paper_annotated_value() -> Value {
+    json!({"schema_version":2,"units":"mm","features":[
+        {"op":"circle","id":"profile","radius":3},
+        {"op":"extrude","id":"body","profile":"profile","height":8}],
+        "outputs":[{"name":"part","feature":"body"}],
+        "section_views":[{"id":"plan","output":"part","origin":[0,0,4],
+            "circle_dimensions":[{"id":"diameter","anchor_feature":"body","role":"wall","kind":"diameter","label_offset":[10,10]}]}],
+        "drawing_sheets":[{"id":"drawing","title":"Round stock","revision":"A","width":210,"height":297,
+            "views":[{"view":"plan","x":10,"y":10,"width":190,"height":150,"scale":0.8,
+                "paper_annotation_font_mm":2.8,"paper_caption":"STOCK SECTION",
+                "annotation_labels":[{"dimension":"diameter","tag":"D1"}]}]}]})
+}
+
+#[test]
+fn styled_paper_annotation_binds_every_native_view_dimension() {
+    let recipe = parse(paper_annotated_value());
+    let result = cad_build::build(&recipe).unwrap();
+    assert_eq!(
+        result.section_views["plan"].circle_dimensions[0].value_mm,
+        6.
+    );
+    let view = &result.drawing_sheets["drawing"].declaration.views[0];
+    assert_eq!(view.paper_annotation_font_mm, Some(2.8));
+    assert_eq!(view.paper_caption.as_deref(), Some("STOCK SECTION"));
+    assert_eq!(view.annotation_labels[0].tag, "D1");
+}
+
+#[test]
+fn styled_paper_annotation_preflight_rejects_missing_or_wrong_binding() {
+    for case in 0..8 {
+        let mut v = paper_annotated_value();
+        let view = &mut v["drawing_sheets"][0]["views"][0];
+        match case {
+            0 => view["paper_annotation_font_mm"] = json!(1.9),
+            1 => view["paper_annotation_font_mm"] = Value::Null,
+            2 => view["paper_caption"] = json!("  BAD"),
+            3 => view["paper_caption"] = json!("X".repeat(100)),
+            4 => view["annotation_labels"] = json!([]),
+            5 => view["annotation_labels"][0]["dimension"] = json!("other"),
+            6 => view["annotation_labels"][0]["tag"] = json!("123"),
+            _ => view["annotation_labels"][0]["tag"] = json!("D".repeat(20)),
+        }
+        v["features"][0]["radius"] = json!(-1);
+        assert!(
+            matches!(
+                cad_build::build(&parse(v)),
+                Err(BuildError::InvalidDrawingSheet { .. })
+            ),
+            "case {case}"
+        );
+    }
+    let mut v = paper_annotated_value();
+    v["drawing_sheets"][0]["views"][0]["annotation_labels"][0]["arbitrary_value_mm"] = json!(6);
+    assert!(serde_json::from_value::<Recipe>(v).is_err());
 }

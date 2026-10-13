@@ -68,6 +68,13 @@ pub(super) fn publish(
                 width: viewport.width,
                 height: viewport.height,
                 scale: viewport.scale,
+                paper_annotation_font_mm: viewport.paper_annotation_font_mm,
+                annotation_labels: viewport
+                    .annotation_labels
+                    .iter()
+                    .map(|label| (label.dimension.clone(), label.tag.clone()))
+                    .collect(),
+                paper_caption: viewport.paper_caption.clone(),
                 sections: geometry.sections,
                 dimensions: geometry.dimensions,
                 circles: geometry.circles,

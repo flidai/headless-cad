@@ -54,10 +54,12 @@ pub use dimension_tolerance::{DimensionTolerance, DimensionToleranceReport};
 mod drawing_sheets;
 mod exchange_requirements;
 pub use drawing_sheets::{
-    DrawingDimensionRow, DrawingDimensionTable, DrawingSheet, DrawingSheetReport, DrawingViewport,
-    DRAWING_MARGIN_MM, DRAWING_TITLE_BLOCK_MM, MAX_DRAWING_DIMENSION_ROWS,
-    MAX_DRAWING_DIMENSION_ROWS_PER_TABLE, MAX_DRAWING_DIMENSION_TABLES_PER_SHEET,
-    MAX_DRAWING_SHEETS, MAX_DRAWING_VIEWPORTS, MAX_DRAWING_VIEWPORTS_PER_SHEET,
+    DrawingAnnotationLabel, DrawingDimensionRow, DrawingDimensionTable, DrawingSheet,
+    DrawingSheetReport, DrawingViewport, DRAWING_MARGIN_MM, DRAWING_TITLE_BLOCK_MM,
+    MAX_DRAWING_ANNOTATION_LABELS, MAX_DRAWING_ANNOTATION_LABELS_PER_VIEW,
+    MAX_DRAWING_DIMENSION_ROWS, MAX_DRAWING_DIMENSION_ROWS_PER_TABLE,
+    MAX_DRAWING_DIMENSION_TABLES_PER_SHEET, MAX_DRAWING_SHEETS, MAX_DRAWING_VIEWPORTS,
+    MAX_DRAWING_VIEWPORTS_PER_SHEET,
 };
 mod section_views;
 pub use section_views::{

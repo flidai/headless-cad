@@ -2414,8 +2414,25 @@ match exported face planes, and all four screw-tip gaps measure 0.5 mm. Ten
 invalid edits preserve the preceding generation.
 The [accepted revision replay](docs/evidence/machining-tables-replay-local.json)
 matches 149 artifact files and 27 manifest fields after restart and an offline
-rebuild. The existing section labels remain small at this layout scale; paper-unit
-annotation sizing is a separate drawing improvement.
+rebuild.
+
+A viewport can opt into paper-sized annotations with
+`paper_annotation_font_mm` (2.5–4 mm), an optional `paper_caption`, and
+`annotation_labels = [{"dimension":"native_dimension_id", "tag":"P1"}]`.
+Every native section annotation requires exactly one short tag in a styled
+view. Tags replace only the visible name; measured values and native IDs remain
+bound to the section report. Text size is independent of the model's drawing
+scale. Captions replace the small coordinate metadata rows on styled sheets;
+full provenance remains in JSON. Labels that overlap or exceed their allocated
+viewport reject publication. Standalone section exports keep their existing
+presentation.
+
+The [paper-annotation checks](docs/evidence/paper-annotations-local.json) verify
+2.8 mm text at 0.5 and 0.8 model scales, native numeric values and short-tag
+binding, and twelve publication-preserving refusals. Scale-only and tag-only
+source revisions leave all 38 compared STEP/B-rep files unchanged. A fresh
+[accepted drawing replay](docs/evidence/paper-annotations-replay-local.json)
+matches 149 artifacts and 27 manifest fields.
 
 
 ### Authored dimensional tolerances

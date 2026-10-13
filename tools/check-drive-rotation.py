@@ -12,6 +12,7 @@ import json
 import math
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -328,6 +329,112 @@ def machining_sheet_binding(out,manifest,native_dimensions):
               'visible native scope, revision and source context')
     return rows
 
+def section_svg_geometry(path):
+    """Standalone native curves/annotations, excluding source-context metadata."""
+    root=ET.fromstring(path.read_text())
+    tags={'path','line','polygon','circle','ellipse','text'}
+    return [(element.tag.rsplit('}',1)[-1],sorted(element.attrib.items()),element.text)
+            for element in root.iter() if element.tag.rsplit('}',1)[-1] in tags]
+
+def drawing_annotation_style(out,expected_scale):
+    """Check paper font, short tag, original ID and native value from SVG + reports."""
+    sheet=json.loads((out/'drawing-end_cover_machining.json').read_text())
+    root=ET.fromstring((out/'drawing-end_cover_machining.svg').read_text())
+    ids={element.attrib.get('id'):element for element in root.iter() if element.attrib.get('id')}
+    evidence={}
+    for view in sheet['views']:
+        viewport=view['viewport'];view_id=viewport['view'];scale=viewport['scale']
+        d.close(scale,expected_scale[view_id],'authored paper view scale '+view_id)
+        d.close(viewport['paper_annotation_font_mm'],2.8,'authored printed font '+view_id)
+        nested=ids['drawing-view-'+view_id]
+        d.close(float(nested.attrib['data-scale']),scale,'SVG view scale '+view_id)
+        d.close(float(nested.attrib['data-paper-annotation-font-mm']),2.8,
+                'SVG paper font provenance '+view_id)
+        caption=ids['drawing-caption-'+view_id]
+        d.require(caption.text==viewport['paper_caption'],'source caption '+view_id)
+        d.close(float(caption.attrib['font-size']),2.8,'caption printed font '+view_id)
+        report=json.loads((out/view['section_report']).read_text())
+        native={r['declaration']['id']:r for r in report['section_view']['circle_dimensions']}
+        source_tags={entry['dimension']:entry['tag'] for entry in viewport['annotation_labels']}
+        found={}
+        for group in nested.iter():
+            if group.attrib.get('class') not in {'section-dimension','section-circle-dimension'}:
+                continue
+            name=group.attrib['data-id'];d.require(name in source_tags and name in native,
+                                                   'styled native dimension ID '+name)
+            value=float(group.attrib['data-value-mm'])
+            d.close(value,native[name]['value_mm'],'styled native value '+name,absolute=1e-8)
+            labels=[element for element in group.iter() if element.tag.rsplit('}',1)[-1]=='text']
+            d.require(len(labels)==1,'one printed label '+name)
+            label=labels[0]
+            printed=re.fullmatch(r'([A-Za-z][A-Za-z0-9]*):⌀([0-9.eE+-]+)mm',label.text or '')
+            d.require(printed is not None and printed.group(1)==source_tags[name],
+                      'short source diameter tag with original ID '+name)
+            d.close(float(printed.group(2)),native[name]['value_mm'],
+                    'printed native diameter '+name,absolute=1e-5)
+            d.require('textLength' not in label.attrib and label.attrib.get('font-family')=='monospace',
+                      'uncompressed native paper text '+name)
+            d.close(float(label.attrib['font-size'])*scale,2.8,
+                    'physical printed label height '+name,absolute=1e-9)
+            found[name]={'tag':source_tags[name],'value_mm':value,
+                         'paper_font_mm':float(label.attrib['font-size'])*scale}
+        d.require(set(found)==set(source_tags),'every and only native dimensions styled '+view_id)
+        evidence[view_id]={'scale':scale,'caption':caption.text,'dimensions':found}
+    d.require(sum(len(v['dimensions']) for v in evidence.values())==7,
+              'seven native short labels across three views')
+    return evidence
+
+def annotation_style_variants(cad,directory,baseline):
+    """Source-only sheet edits retain exact solids and standalone native curves."""
+    original=(d.ROOT/'examples/drive_module_rotation.star').read_text()
+    params=dict(shaft_diameter=12,mounting_pitch=60,turn_radians=math.tau,
+                base_corner_radius=6,pilot_depth=5,cover_thickness=2)
+    expected_scale={'left_cover_pilot_section':.8,'right_cover_pilot_section':.8,
+                    'end_cover_section':.8}
+    baseline_manifest=json.loads((baseline/'manifest.json').read_text())
+    baseline_style=drawing_annotation_style(baseline,expected_scale)
+    results={}
+    for label,before,after in [
+            ('half_scale','"scale":0.8','"scale":0.5'),
+            ('short_tag_edit','"tag":"L1"','"tag":"L3"')]:
+        d.require(original.count(before)>=1,'source annotation edit target '+label)
+        source=directory/(label+'.star');source.write_text(original.replace(before,after,1))
+        out=directory/(label+'-generation')
+        result=c.run(cad,source,out,params);d.require(result.returncode==0,result.stderr)
+        verified=k.command(cad,'verify',out);d.require(verified.returncode==0,verified.stderr)
+        manifest=json.loads((out/'manifest.json').read_text())
+        d.require(manifest['recipe_source_hash']!=baseline_manifest['recipe_source_hash'] and
+                  manifest['recipe_context_hash']!=baseline_manifest['recipe_context_hash'],
+                  'annotation edit changes captured source revision '+label)
+        d.require(manifest['feature_hashes']==baseline_manifest['feature_hashes'],
+                  'annotation edit does not alter feature graph '+label)
+        for output,record in baseline_manifest['outputs'].items():
+            d.require(manifest['outputs'][output]['content_hash']==record['content_hash'],
+                      'identical native output content '+output+' '+label)
+        geometry_files=[path.name for path in baseline.iterdir()
+                        if path.name.endswith(('.step','.brep.json'))]
+        for name in geometry_files:
+            d.require(digest(out/name)==digest(baseline/name),
+                      'byte-identical STEP/BRep '+name+' '+label)
+        for name in ['left_cover_pilot_section','right_cover_pilot_section','end_cover_section']:
+            d.require(section_svg_geometry(out/('section-'+name+'.svg'))==
+                      section_svg_geometry(baseline/('section-'+name+'.svg')),
+                      'standalone native section curves/labels unchanged '+name+' '+label)
+        scales=dict(expected_scale)
+        if label=='half_scale':scales['left_cover_pilot_section']=.5
+        style=drawing_annotation_style(out,scales)
+        if label=='short_tag_edit':
+            d.require(style['left_cover_pilot_section']['dimensions']['left_cover_minus_diameter']['tag']=='L3' and
+                      baseline_style['left_cover_pilot_section']['dimensions']['left_cover_minus_diameter']['tag']=='L1',
+                      'short tag source edit visible without measurement drift')
+        d.require(digest(out/'drawing-end_cover_machining.svg')!=
+                  digest(baseline/'drawing-end_cover_machining.svg'),
+                  'drawing revision digest changes with annotation '+label)
+        results[label]={'source_sha256':digest(source),'drawing_sha256':digest(out/'drawing-end_cover_machining.svg'),
+                        'source_context_hash':manifest['recipe_context_hash'],
+                        'unchanged_geometry_file_count':len(geometry_files),'style':style}
+    return results
+
 def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
     tag=f'd{diameter}-p{pitch}-turn{sign}-r{radius}-depth{depth}-cover{thickness}';out=directory/tag
     parameters=dict(shaft_diameter=diameter,mounting_pitch=pitch,
@@ -532,7 +639,8 @@ def rejected_edits(cad,directory):
     first=build();d.require(first.returncode==0,first.stderr);baseline=c.inventory(out);failures=[]
     for label in ['offset_axis','missing_reference','excessive_gap',
                   'unknown_table_dimension','wrong_table_output','table_overflow',
-                  'stale_floor_datum','pilot_reaches_opposite_cap']:
+                  'stale_floor_datum','pilot_reaches_opposite_cap',
+                  'unknown_paper_annotation','impossible_paper_annotation_layout']:
         changed=json.loads(json.dumps(original))
         if label=='offset_axis':changed['rigid_rotation_groups'][0]['pivot']=[1,0,0]
         elif label=='missing_reference':changed['rigid_rotation_groups'][0]['reference_instance_path']=['base']
@@ -549,16 +657,23 @@ def rejected_edits(cad,directory):
         elif label=='stale_floor_datum':
             datum=next(x for x in changed['datum_dimensions'] if x['id']=='left_cover_minus_depth')
             datum['to']['datum']='axis'
-        else:
+        elif label=='pilot_reaches_opposite_cap':
             feature=next(x for x in changed['features'] if x['id']=='housing_left_pilots')
             feature['pattern_holes'][0]['depth']=16
+        elif label=='unknown_paper_annotation':
+            sheet=next(x for x in changed['drawing_sheets'] if x['id']=='end_cover_machining')
+            sheet['views'][0]['annotation_labels'][0]['dimension']='missing_native_dimension'
+        else:
+            sheet=next(x for x in changed['drawing_sheets'] if x['id']=='end_cover_machining')
+            sheet['views'][0]['width']=20
         path.write_text(json.dumps(changed));result=build(['--output','sleeve'])
         d.require(result.returncode!=0,'invalid source must fail '+label)
         diagnostic=json.loads(result.stderr)
         d.require(diagnostic.get('code') in ['invalid_rotation_group','rotation_group_failed',
                   'clearance_check_failed','invalid_drawing_sheet','invalid_graph',
                   'datum_dimension_failed'] or
-                  label=='pilot_reaches_opposite_cap' and isinstance(diagnostic.get('code'),str),
+                  label in {'pilot_reaches_opposite_cap','impossible_paper_annotation_layout'}
+                  and isinstance(diagnostic.get('code'),str),
                   'structured failure '+label)
         d.require(c.inventory(out)==baseline,'invalid source preserves every published byte')
         failures.append(dict(case=label,diagnostic=diagnostic))
@@ -589,6 +704,8 @@ def main():
             (10,90,1,10,5,2.5),
             (16,90,1,10,4,1.5),
             (16,90,-1,10,6,3)]]
+    annotation_variants=annotation_style_variants(cad,args.out_dir,
+                                                   args.out_dir/cases[0]['case'])
     failures=rejected_edits(cad,args.out_dir)
     d.require(digest(cad)==executable_sha256 and digest(source)==source_sha256
               and digest(__file__)==script_sha256,
@@ -597,7 +714,7 @@ def main():
                 source_sha256=source_sha256,oracle_script_sha256=script_sha256,
                 python_version=platform.python_version(),
                 ocp_distribution=importlib.metadata.version('cadquery-ocp'),
-                cases=cases,rejected_edits=failures,
+                cases=cases,annotation_variants=annotation_variants,rejected_edits=failures,
                 scope='Native continuous named-pair proofs, conservative full-turn bounds for 54 new fixed/rotor pairs, independent sampled STEP checks of all pairs, and actual STEP face/tip measurements bound to ten source-revision native drawing rows. No general assembly collision, installation or load certification')
     (args.out_dir/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 

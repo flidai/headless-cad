@@ -34,6 +34,9 @@ fn sheet() -> DrawingSheet {
                 width: 90.,
                 height: 80.,
                 scale: 2.,
+                paper_annotation_font_mm: None,
+                annotation_labels: Default::default(),
+                paper_caption: None,
                 sections: vec![rectangle],
                 dimensions: vec![],
                 circles: vec![],
@@ -46,6 +49,9 @@ fn sheet() -> DrawingSheet {
                 width: 90.,
                 height: 80.,
                 scale: 1.,
+                paper_annotation_font_mm: None,
+                annotation_labels: Default::default(),
+                paper_caption: None,
                 sections: vec![circle],
                 dimensions: vec![],
                 circles: vec![],
@@ -130,6 +136,80 @@ fn native_dimension_tables_render_rounded_values_and_reject_bad_layout() {
     assert!(
         drawing_sheet_to_svg(&bad).is_err(),
         "table row must not alias a generated section fragment"
+    );
+}
+
+#[test]
+fn paper_view_annotations_use_declared_print_size_and_short_native_tags() {
+    let mut s = sheet();
+    let view = &mut s.views[0];
+    view.scale = 0.8;
+    view.paper_annotation_font_mm = Some(2.8);
+    view.paper_caption = Some("Plate section".into());
+    view.annotation_labels
+        .insert("plate_width".into(), "P1".into());
+    view.dimensions.push(SectionDimensionAnnotation {
+        tolerance: None,
+        id: "plate_width".into(),
+        from: [0., 0.],
+        to: [20., 0.],
+        axis: 0,
+        offset: -5.,
+        value_mm: 20.,
+    });
+    let svg = drawing_sheet_to_svg(&s).unwrap();
+    assert!(svg.contains("id=\"drawing-caption-plate\""));
+    assert!(svg.contains("Plate section"));
+    assert!(svg.contains("data-paper-annotation-font-mm=\"2.8\""));
+    assert!(svg.contains("data-id=\"plate_width\""));
+    assert!(svg.contains("P1: 20 mm"));
+    let annotation = svg.split("data-id=\"plate_width\"").nth(1).unwrap();
+    let native_font: f64 = annotation
+        .split("font-size=\"")
+        .nth(1)
+        .unwrap()
+        .split('"')
+        .next()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert!((native_font * 0.8 - 2.8).abs() < 1e-12);
+    let styled_view = svg
+        .split("<svg id=\"drawing-view-plate\"")
+        .nth(1)
+        .unwrap()
+        .split("</svg>")
+        .next()
+        .unwrap();
+    assert!(
+        !styled_view.contains(">Origin:"),
+        "styled paper view omits tiny metadata rows"
+    );
+    let mut bad = s.clone();
+    bad.views[0].annotation_labels.clear();
+    assert!(drawing_sheet_to_svg(&bad).is_err(), "missing native tag");
+    let mut bad = s.clone();
+    bad.views[0].paper_annotation_font_mm = Some(2.);
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "font below print floor"
+    );
+    let mut bad = s.clone();
+    bad.views[0].paper_caption = Some("Caption exceeds available paper width".repeat(8));
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "caption cannot shrink to fit"
+    );
+    let mut bad = s.clone();
+    let mut duplicate_placement = bad.views[0].dimensions[0].clone();
+    duplicate_placement.id = "second_width".into();
+    bad.views[0].dimensions.push(duplicate_placement);
+    bad.views[0]
+        .annotation_labels
+        .insert("second_width".into(), "P2".into());
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "paper labels cannot overlap"
     );
 }
 #[test]

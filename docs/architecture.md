@@ -2076,6 +2076,17 @@ The drive's second A3 sheet measures ten pilot and cover dimensions. Its
 parameterized screw envelopes maintain a nominal 0.5 mm tip gap; threads,
 preload, load capacity and manufactured-part conformance remain outside scope.
 
+Styled drawing viewports specify annotation text size in paper millimetres,
+independently of their model scale. A complete source-owned map assigns short
+tags to the existing native linear/circular dimension IDs. The exporter converts
+the paper size into local model units before calculating annotation bounds;
+numeric values and `data-id` provenance remain native. Fixed-size captions occupy
+a separate paper band, while detailed coordinate metadata remains in JSON.
+Conservative label bounds reject overlaps and viewport overflow without silently
+shrinking text. Unstyled viewports and standalone section exports retain their
+existing presentation. This is bounded section annotation layout, not projected
+hidden-line drafting or general automatic label placement.
+
 `cad section` implements the first authoritative planar-section query. It
 returns oriented native lines/circular arcs with face provenance, plane frame,
 units, area and centroid, bound to captured source, overrides, output content and

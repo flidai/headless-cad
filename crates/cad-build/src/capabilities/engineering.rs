@@ -442,6 +442,11 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         ],
     );
     section.obligations.extend(["recipe-level declaration in recipe.section_views, authored by Starlark section_view; not a feature operation", "native query domain query.planar_section; examples/countersink.star and examples/countersunk_bearing_cover.star", "schema 2; at most 128 declarations; IDs are case-insensitive unique ASCII letters/digits/underscore/hyphen, length 1..128", "finite unit orthogonal section frame; origin in mm; area bounds in mm2 finite nonnegative and ordered", "global native validation even on selected builds and cache hits; all declared targets demanded; failed section or bound blocks publication", "10,000,000 aggregate topology visits across all views, charging every occurrence; assembly area is a sum, not union"]);
+    let mut paper_annotation_label = object_spec(
+        "drawing_annotation_label",
+        vec![arg("dimension", T::String), arg("tag", T::String)],
+    );
+    paper_annotation_label.obligations.extend(["exact section dimension or circle dimension ID on the referenced view", "tag is 1..12 ASCII letters/digits/underscore/hyphen, starts with a letter; unique case-insensitively per styled viewport", "tag is a short identifier only; renderer appends native measured value and kind"]);
     let mut viewport = object_spec(
         "drawing_viewport",
         vec![
@@ -456,13 +461,23 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             arg("width", T::Number),
             arg("height", T::Number),
             arg("scale", T::Number),
+            optional_null("paper_annotation_font_mm", T::Number),
+            optional_null("paper_caption", T::String),
+            optional(
+                arg(
+                    "annotation_labels",
+                    array(object("drawing_annotation_label"), None),
+                ),
+                json!([]),
+            ),
         ],
     );
     for field in &mut viewport.arguments[1..5] {
         field.units = Some("paper mm");
     }
     viewport.arguments[5].units = Some("paper mm / model mm");
-    viewport.obligations.extend(["top-left paper origin; X right, Y down; finite coordinates and strictly positive sizes and explicit scale", "viewport wholly within sheet's 10 mm margins, additionally reserving 25 mm at bottom for title block; touching boundaries allowed, overlapping interiors rejected", "exact section_view ID, unique within sheet; repeated section across different sheets allowed"]);
+    viewport.arguments[6].units = Some("paper mm");
+    viewport.obligations.extend(["optional styled view fixes paper annotation font at 2.5..4 mm; all native section dimensions require one short tag, and optional caption is ≤64 UTF-8 bytes", "without style the legacy section SVG rendering is preserved; styled font/caption cannot silently auto-shrink or clip", "top-left paper origin; X right, Y down; finite coordinates and strictly positive sizes and explicit scale", "viewport wholly within sheet's 10 mm margins, additionally reserving 25 mm at bottom for title block; touching boundaries allowed, overlapping interiors rejected", "exact section_view ID, unique within sheet; repeated section across different sheets allowed"]);
     let mut dimension_row = object_spec(
         "drawing_dimension_row",
         vec![arg("dimension", T::String), arg("label", T::String)],
@@ -509,6 +524,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
     vec![
         sheet,
         viewport,
+        paper_annotation_label,
         dimension_table,
         dimension_row,
         dimensional_tolerance,

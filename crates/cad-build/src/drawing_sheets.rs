@@ -8,8 +8,17 @@ pub const MAX_DRAWING_VIEWPORTS: usize = 256;
 pub const MAX_DRAWING_DIMENSION_TABLES_PER_SHEET: usize = 8;
 pub const MAX_DRAWING_DIMENSION_ROWS_PER_TABLE: usize = 16;
 pub const MAX_DRAWING_DIMENSION_ROWS: usize = 128;
+pub const MAX_DRAWING_ANNOTATION_LABELS_PER_VIEW: usize = 32;
+pub const MAX_DRAWING_ANNOTATION_LABELS: usize = 1024;
 pub const DRAWING_MARGIN_MM: f64 = 10.;
 pub const DRAWING_TITLE_BLOCK_MM: f64 = 25.;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DrawingAnnotationLabel {
+    pub dimension: String,
+    pub tag: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -20,6 +29,12 @@ pub struct DrawingViewport {
     pub width: f64,
     pub height: f64,
     pub scale: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paper_annotation_font_mm: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paper_caption: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub annotation_labels: Vec<DrawingAnnotationLabel>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -153,6 +168,46 @@ impl DrawingSheet {
                     "viewport coordinates must be finite, size and scale strictly positive",
                 ));
             }
+            if let Some(font) = view.paper_annotation_font_mm {
+                if !font.is_finite() || !(2.5..=4.).contains(&font) {
+                    return Err(fail("paper annotation font must be finite 2.5..4 mm"));
+                }
+            }
+            if let Some(caption) = &view.paper_caption {
+                if view.paper_annotation_font_mm.is_none() || !text(caption, 64) {
+                    return Err(fail("paper caption requires styled viewport and nonempty trimmed text at most 64 bytes"));
+                }
+            }
+            if view.paper_annotation_font_mm.is_some() {
+                let caption = view.paper_caption.as_deref().unwrap_or(&view.view);
+                if caption.len() as f64 * 2.8 * 0.7 > view.width - 6. {
+                    return Err(fail("paper caption does not fit viewport width"));
+                }
+            }
+            if view.annotation_labels.len() > MAX_DRAWING_ANNOTATION_LABELS_PER_VIEW
+                || (view.paper_annotation_font_mm.is_none() && !view.annotation_labels.is_empty())
+            {
+                return Err(fail(
+                    "annotation labels require paper font and at most 32 per viewport",
+                ));
+            }
+            let mut dimension_ids = BTreeSet::new();
+            let mut tags = BTreeSet::new();
+            for annotation in &view.annotation_labels {
+                if !native_dimension_id(&annotation.dimension)
+                    || annotation.tag.is_empty()
+                    || annotation.tag.len() > 12
+                    || !annotation.tag.as_bytes()[0].is_ascii_alphabetic()
+                    || !annotation
+                        .tag
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+                    || !dimension_ids.insert(annotation.dimension.to_ascii_lowercase())
+                    || !tags.insert(annotation.tag.to_ascii_lowercase())
+                {
+                    return Err(fail("paper annotation requires unique native dimension IDs and unique 1..12 character letter-led tags"));
+                }
+            }
             if view.x < DRAWING_MARGIN_MM
                 || view.y < DRAWING_MARGIN_MM
                 || view.width > self.width - DRAWING_MARGIN_MM - view.x
@@ -274,6 +329,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     }
     let mut count = 0;
     let mut row_count = 0;
+    let mut annotation_count = 0;
     let mut ids = BTreeSet::new();
     let sections: BTreeSet<_> = recipe
         .section_views
@@ -335,6 +391,35 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
             });
         }
         for viewport in &sheet.views {
+            annotation_count += viewport.annotation_labels.len();
+            if annotation_count > MAX_DRAWING_ANNOTATION_LABELS {
+                return Err(BuildError::ResourceLimit {
+                    resource: "drawing annotation labels",
+                    limit: MAX_DRAWING_ANNOTATION_LABELS,
+                });
+            }
+            let section = recipe.section_views.iter().find(|v| v.id == viewport.view);
+            if viewport.paper_annotation_font_mm.is_some() {
+                let section = section.ok_or_else(|| BuildError::InvalidDrawingSheet {
+                    id: sheet.id.clone(),
+                    message: format!("unknown styled section view '{}'", viewport.view),
+                })?;
+                let expected: BTreeSet<_> = section
+                    .dimensions
+                    .iter()
+                    .map(|d| d.id.as_str())
+                    .chain(section.circle_dimensions.iter().map(|d| d.id.as_str()))
+                    .collect();
+                let actual: BTreeSet<_> = viewport
+                    .annotation_labels
+                    .iter()
+                    .map(|a| a.dimension.as_str())
+                    .collect();
+                if expected != actual {
+                    return Err(BuildError::InvalidDrawingSheet { id: sheet.id.clone(),
+                        message: format!("styled viewport '{}' requires exactly one tag for every native section dimension", viewport.view) });
+                }
+            }
             if !sections.contains(viewport.view.as_str()) {
                 return Err(BuildError::InvalidDrawingSheet {
                     id: sheet.id.clone(),

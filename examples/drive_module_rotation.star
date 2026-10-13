@@ -365,9 +365,9 @@ def machining_rows(side):
     ]
 drawing_sheet(id = "end_cover_machining", title = "End-cover pilot machining and retainer dimensions", revision = design_revision, width = 420, height = 297,
     views = [
-        {"view":"left_cover_pilot_section","x":10,"y":10,"width":130,"height":170,"scale":0.8},
-        {"view":"right_cover_pilot_section","x":150,"y":10,"width":130,"height":170,"scale":0.8},
-        {"view":"end_cover_section","x":290,"y":10,"width":120,"height":170,"scale":0.8},
+        {"view":"left_cover_pilot_section","x":10,"y":10,"width":130,"height":170,"scale":0.8,"paper_annotation_font_mm":2.8,"paper_caption":"LEFT PILOTS","annotation_labels":[{"dimension":"left_cover_minus_diameter","tag":"L1"},{"dimension":"left_cover_plus_diameter","tag":"L2"}]},
+        {"view":"right_cover_pilot_section","x":150,"y":10,"width":130,"height":170,"scale":0.8,"paper_annotation_font_mm":2.8,"paper_caption":"RIGHT PILOTS","annotation_labels":[{"dimension":"right_cover_minus_diameter","tag":"R1"},{"dimension":"right_cover_plus_diameter","tag":"R2"}]},
+        {"view":"end_cover_section","x":290,"y":10,"width":120,"height":170,"scale":0.8,"paper_annotation_font_mm":2.8,"paper_caption":"END COVER","annotation_labels":[{"dimension":"cover_sleeve_aperture","tag":"B"},{"dimension":"cover_minus_clearance","tag":"C1"},{"dimension":"cover_plus_clearance","tag":"C2"}]},
     ],
     dimension_tables = [
         {"id":"left_pilots","title":"LEFT HOUSING / COVER","output":"drive_module_release","x":10,"y":190,"width":195,"height":64,"rows":machining_rows("left")},

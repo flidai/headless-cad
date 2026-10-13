@@ -49,3 +49,20 @@ fn starlark_dimension_table_is_typed_and_references_native_report() {
         serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
     assert_eq!(roundtrip.drawing_sheets, recipe.drawing_sheets);
 }
+
+#[test]
+fn starlark_paper_annotation_style_keeps_native_dimension_identity() {
+    let source = "b=extrude(id='body',profile=circle(id='profile',radius=3),height=8)\noutput(name='part',feature=b)\nsection_view(id='plan',output='part',origin=[0,0,4])\nsection_circle_dimension(view='plan',id='diameter',from_feature=b,role='wall',kind='diameter',label_offset=[10,10])\ndrawing_sheet(id='drawing',title='Round stock',revision='A',width=210,height=297,views=[{'view':'plan','x':10,'y':10,'width':190,'height':150,'scale':0.8,'paper_annotation_font_mm':2.8,'paper_caption':'STOCK SECTION','annotation_labels':[{'dimension':'diameter','tag':'D1'}]}])";
+    let recipe = cad_recipe::from_starlark("paper.star", source).unwrap();
+    assert_eq!(
+        recipe.drawing_sheets[0].views[0].annotation_labels[0].dimension,
+        "diameter"
+    );
+    assert_eq!(
+        cad_build::build(&recipe).unwrap().section_views["plan"].circle_dimensions[0].value_mm,
+        6.
+    );
+    let roundtrip: cad_build::Recipe =
+        serde_json::from_str(&serde_json::to_string(&recipe).unwrap()).unwrap();
+    assert_eq!(roundtrip.drawing_sheets, recipe.drawing_sheets);
+}
