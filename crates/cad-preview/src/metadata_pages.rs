@@ -222,6 +222,7 @@ mod tests {
             source_name: "empty.star".into(),
             modules: BTreeMap::new(),
             source_bundle_hash: Some("bundle".into()),
+            source_provenance: None,
             output_name: "empty".into(),
             feature_id: "root".into(),
             parameters: BTreeMap::new(),

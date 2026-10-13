@@ -8,6 +8,7 @@ mod agent_store;
 #[path = "agent_store_portable.rs"]
 mod agent_store;
 mod source;
+mod source_provenance;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fs;
@@ -1061,8 +1062,8 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         Command::Diff { before, after } => {
             let before_source = source::Snapshot::read(before)?;
             let after_source = source::Snapshot::read(after)?;
-            let a = before_source.recipe(&parameters)?;
-            let b = after_source.recipe(&parameters)?;
+            let (a, before_provenance) = before_source.evaluate(&parameters)?;
+            let (b, after_provenance) = after_source.evaluate(&parameters)?;
             let mut engine = engine(&cli.cache_dir);
             let mut result = difference(
                 &report(&a, &engine.build(&a)?)?,
@@ -1070,6 +1071,12 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             );
             if before_source.bundle_hash().is_some() || after_source.bundle_hash().is_some() {
                 result["source_bundles"] = json!({"before":before_source.bundle_hash(),"after":after_source.bundle_hash()});
+            }
+            if before_provenance.is_some() || after_provenance.is_some() {
+                result["source_provenance"] = json!({
+                    "before": before_provenance.as_ref().map(|p| source_provenance::diff_report(&before_source, &a, p)).transpose()?,
+                    "after": after_provenance.as_ref().map(|p| source_provenance::diff_report(&after_source, &b, p)).transpose()?,
+                });
             }
             return Ok(result);
         }
@@ -1092,7 +1099,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
     };
     let source_bytes = snapshot.source.as_bytes();
     let source_text = snapshot.source.as_str();
-    let recipe = snapshot.recipe(&parameters)?;
+    let (recipe, provenance) = snapshot.evaluate(&parameters)?;
     if matches!(cli.command, Command::Compile { .. }) {
         return Ok(serde_json::to_value(recipe)?);
     }
@@ -1243,6 +1250,23 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         }))?)
         .to_hex()
         .to_string());
+        let source_provenance = if let Some(provenance) = &provenance {
+            let report = source_provenance::report(
+                &snapshot,
+                &recipe,
+                provenance,
+                summary["recipe_context_hash"].as_str().unwrap(),
+            )?;
+            let text = serde_json::to_string_pretty(&report)?;
+            let digest = blake3::hash(text.as_bytes()).to_hex().to_string();
+            artifacts.push(("source-provenance.json".into(), text))?;
+            summary["source_provenance"] = json!({
+                "artifact":"source-provenance.json", "algorithm":"blake3", "digest":digest,
+            });
+            Some(report)
+        } else {
+            None
+        };
         let property_assertions: BTreeMap<String, cad_preview::EngineeringCheck> =
             serde_json::from_value(summary["property_assertions"].clone())?;
         let mut mesh_cache = cad_mesh::GenerationMeshCache::default();
@@ -1292,6 +1316,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 ))?;
             }
             let context = cad_preview::RecipeContext {
+                source_provenance: source_provenance.clone(),
                 modules: snapshot.modules.clone(),
                 source_bundle_hash: snapshot.bundle_hash(),
                 language: language.to_owned(),
@@ -1427,6 +1452,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
                 ))?;
             }
             let context = cad_preview::RecipeContext {
+                source_provenance: source_provenance.clone(),
                 modules: snapshot.modules.clone(),
                 source_bundle_hash: snapshot.bundle_hash(),
                 language: language.to_owned(),
@@ -1501,6 +1527,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
             filename(&format!("motion-{id}"))?;
             let mechanism = &build.mechanism_reports[&study.definition.mechanism].definition;
             let context = cad_preview::RecipeContext {
+                source_provenance: source_provenance.clone(),
                 modules: snapshot.modules.clone(),
                 source_bundle_hash: snapshot.bundle_hash(),
                 language: language.to_owned(),

@@ -13,6 +13,7 @@ fn context(hash: &str) -> RecipeContext {
         source_name: "pair.star".into(),
         modules: Default::default(),
         source_bundle_hash: None,
+        source_provenance: None,
         output_name: "pair".into(),
         feature_id: "pair".into(),
         parameters: Default::default(),

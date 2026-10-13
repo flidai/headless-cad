@@ -1,0 +1,58 @@
+{
+  "drive": {
+    "loaded_source_sha256": "65a9dc0d96fec7634ced8c0e41d4eccd7443b0f24caa76120fb405205ae681e6",
+    "sidecar_sha256": "a0d668c88579b02a6a4448c05f245eefc60d86ce32d209f06f49c98ba2391de8",
+    "source_bundle_hash": "b3c0135230d3f28b4758b435733095d83a492fafed12693b8cd915df513ad61e",
+    "source_sha256": "b029060d6c60733db98427d0194431e43dc15979a06e498ea1bdde75cd14cb19"
+  },
+  "executable_sha256": "88bce2d28aaedab14b9a8cd2fb02fa5552765cf1e7c999c370201d18f832714c",
+  "fixture": {
+    "comment_revision": {
+      "captured_source_sha256": {
+        "lib/parts.star": "c0c2733dc92bf6df19b9aee01d5ec9b733533c1704b27ea9f48358da9d4b76e7",
+        "root.star": "518848c8c0a3ae572227ef1186c5c65d5d66ea8795e7cfb8624e21ed1c5dc7f8"
+      },
+      "features": 4,
+      "modules": [
+        "lib/parts.star"
+      ],
+      "parts": 2,
+      "recipe_context_hash": "03b4b5d8372b466a6c7db85bfbe9567d624b28a7eaa96dcbd0e2ee7923d98c05",
+      "root": "root.star",
+      "sidecar_sha256": "eab3e1e0830395d7838283b70fe2d3ad7d0efcde05cd5b506480fc75163e8f3a",
+      "source_bundle_hash": "03e61138c5c56a5874be69975ff167685155054dbc14ad76138784519ef65dba"
+    },
+    "initial": {
+      "captured_source_sha256": {
+        "lib/parts.star": "4d13f75aa9a7d90aa62fb5e5e68f387275ec6e9b8ca536f86bcd346903992a6f",
+        "root.star": "518848c8c0a3ae572227ef1186c5c65d5d66ea8795e7cfb8624e21ed1c5dc7f8"
+      },
+      "features": 4,
+      "modules": [
+        "lib/parts.star"
+      ],
+      "parts": 2,
+      "recipe_context_hash": "6ad4ff1f135890b715f0594d3ef3c935a9e6ce8866e5eb2f15db30f8f2656bed",
+      "root": "root.star",
+      "sidecar_sha256": "970292af3b8a8036b1d6042db762957b8a538d3ad354dcf1a94186aa6fcb1283",
+      "source_bundle_hash": "f570ea8491f08077c8b026a78b39a02862234e32281b20fd13ff5ece35a6a6bb"
+    },
+    "replay": {
+      "captured_source_sha256": {
+        "lib/parts.star": "4d13f75aa9a7d90aa62fb5e5e68f387275ec6e9b8ca536f86bcd346903992a6f",
+        "root.star": "518848c8c0a3ae572227ef1186c5c65d5d66ea8795e7cfb8624e21ed1c5dc7f8"
+      },
+      "features": 4,
+      "modules": [
+        "lib/parts.star"
+      ],
+      "parts": 2,
+      "recipe_context_hash": "6ad4ff1f135890b715f0594d3ef3c935a9e6ce8866e5eb2f15db30f8f2656bed",
+      "root": "root.star",
+      "sidecar_sha256": "970292af3b8a8036b1d6042db762957b8a538d3ad354dcf1a94186aa6fcb1283",
+      "source_bundle_hash": "f570ea8491f08077c8b026a78b39a02862234e32281b20fd13ff5ece35a6a6bb"
+    }
+  },
+  "oracle_script_sha256": "978d738560ac6eaed8c5f883f2c3f3b6f78de357434d939946157a3d4ca59532",
+  "valid": true
+}

@@ -78,6 +78,7 @@ assembly_output(name="assembly",assembly=s)
         source_name: "concave.star".into(),
         modules: Default::default(),
         source_bundle_hash: None,
+        source_provenance: None,
         output_name: "assembly".into(),
         feature_id: assembly.assembly_id.clone(),
         parameters: Default::default(),

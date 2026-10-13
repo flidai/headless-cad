@@ -326,6 +326,20 @@ it is not a reconstructed recipe inferred from geometry. Starlark builds also
 export `recipe.star`; `recipe.json` remains the resolved graph. Source-only edits
 refresh the recipe panel even when the geometry is unchanged.
 
+Selecting an occurrence in a new Starlark build opens its exact **Part declaration**,
+including declarations in locked modules. **Body feature** jumps to the geometry
+call; helper-call buttons show the corresponding invocation chain. The highlighted
+range comes from evaluated Starlark AST spans, never a text search or a recipe
+reconstructed from the mesh. The source-file selector still exposes every complete
+captured file. `source-provenance.json` binds those locations to source digests and
+the build context; the viewer verifies the captured bytes before enabling jumps.
+Source navigation works in the portable, GPU and progressive inspectors and does
+not run modeling calls. Older artifacts and JSON recipes retain whole-source
+inspection. Comment-only edits update locations while preserving native geometry
+and cache identities. [Retained checks](docs/evidence/source-provenance-local.json)
+cover exact spans and replay; [browser checks](docs/evidence/source-provenance-browser-local.json)
+cover all three inspectors and source verification races.
+
 The **Engineering checks** panel shows captured native property assertions,
 including measured values, inclusive bounds and the output each check applies
 to. Expand a check for its target content hash. Checks on other build outputs

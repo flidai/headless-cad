@@ -3762,3 +3762,33 @@ independently placed reference. Each drive checks 435 pairs at nine sampled
 phases with zero positive common volume. Exact report/source-bundle replay is
 bound to a frozen executable and oracle script. Sampled all-pair checks do not
 expand the four native continuous certificates into a general collision proof.
+
+
+### Exact source declarations as a separate build artifact
+
+Starlark evaluation records the native declaration call for every feature and
+part, indexed by the runtime graph ID. Its parsed AST provides the exact call
+range; its evaluator supplies the executed helper-call chain. A loop can emit
+many IDs from one call site without guessing from identifier text. Locations use
+captured module labels, half-open UTF-8 byte ranges and one-based Unicode
+character line/column coordinates. Call chains are bounded to 64 frames and
+feature/part counts retain the existing recipe budgets.
+
+`RecipeEvaluation` carries this provenance beside the geometry recipe. It does
+not enter the recipe IR or native geometry cache keys. The CLI evaluates its
+immutable snapshot once, validates complete feature/part coverage and coordinates,
+and publishes `source-provenance.json`. Its source inventory includes lengths,
+BLAKE3 and SHA-256 digests; its report carries context, root source, locked bundle
+and lock identities. The manifest binds the report digest. Source context and
+offline replay include provenance, so a comment edit updates navigation without
+pretending the geometry changed.
+
+Portable, GPU and paged inspectors share the same read-only source navigator.
+Selecting a part opens its declaration; a separate body-feature link and the
+selected declaration's helper-call chain expose the modeling code. Whole captured
+files remain available. Publication validates source hashes, UTF-8 boundaries and
+coordinates; the browser verifies SHA-256 before enabling jumps. Asynchronous
+verification preserves a later part selection or manual source-file choice.
+Highlighting uses text nodes, with explicit UTF-8 to JavaScript string conversion.
+Missing provenance falls back to complete source; mismatched provenance refuses
+navigation. None of these actions invokes geometry or modifies a recipe.

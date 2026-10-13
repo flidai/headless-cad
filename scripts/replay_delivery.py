@@ -150,6 +150,8 @@ def replay_accepted(cad: Path, delivery: Path, accepted: dict, job: dict,
         )
         if 'rigid_translation_groups' in manifest or 'rigid_translation_groups' in rebuilt:
             semantic_fields += ('rigid_translation_groups',)
+        if 'source_provenance' in manifest or 'source_provenance' in rebuilt:
+            semantic_fields += ('source_provenance',)
         for field in semantic_fields:
             require(field in manifest and rebuilt.get(field) == manifest[field],
                     f'offline engineering semantics differ: {field}')

@@ -481,6 +481,7 @@ pub fn to_assembly_stream_bundle_with_cache(
     )?;
     Ok(StreamBundle {
         paged_html: include_str!("paged-viewer.html")
+            .replace("<script>/*SOURCE_NAVIGATION*/</script>", &format!("<script>{}</script>", include_str!("source-navigation.js")))
             .replacen("__CAD_METADATA_STREAM__", include_str!("metadata-stream.js"), 1)
             .replace(
                 "<script id=\"cad-metadata-data\" type=\"application/json\">__CAD_METADATA_INDEX__</script>",
@@ -714,6 +715,7 @@ mod tests {
             source_name: "parts.star".into(),
             modules: Default::default(),
             source_bundle_hash: None,
+            source_provenance: None,
             output_name: "parts".into(),
             feature_id: "pair".into(),
             parameters: BTreeMap::new(),
@@ -822,6 +824,7 @@ mod tests {
                 source_name: "lod.star".into(),
                 modules: Default::default(),
                 source_bundle_hash: None,
+                source_provenance: None,
                 output_name: "pair".into(),
                 feature_id: "pair".into(),
                 parameters: BTreeMap::new(),
@@ -1034,6 +1037,7 @@ mod tests {
             source_name: "pair.star".into(),
             modules: Default::default(),
             source_bundle_hash: None,
+            source_provenance: None,
             output_name: "pair".into(),
             feature_id: "pair".into(),
             parameters: BTreeMap::new(),

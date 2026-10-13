@@ -1,0 +1,15 @@
+{
+  "valid": true,
+  "part_declarations_checked": 3,
+  "feature_jump": "shaft_body",
+  "imported_module": "drive_module_rotation.star",
+  "motion_phase_preserved": 0.5,
+  "equal_length_source_tamper_refused": true,
+  "manual_selection_race_preserved": true,
+  "gpu_part_navigation": true,
+  "progressive_part_navigation": true,
+  "source_bundle_hash": "b3c0135230d3f28b4758b435733095d83a492fafed12693b8cd915df513ad61e",
+  "read_only": true,
+  "source_provenance_sha256": "a0d668c88579b02a6a4448c05f245eefc60d86ce32d209f06f49c98ba2391de8",
+  "browser_script_sha256": "11229321adafe7501acf984362c86ab378a7ae7224417dc7007cfde24e3044f9"
+}

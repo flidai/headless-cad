@@ -15,11 +15,13 @@ use cad_build::{
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 mod modules;
+mod provenance;
 pub use modules::{
     starlark_loads, validate_module_label, MAX_MODULE_HEAP_BYTES, MAX_MODULE_SOURCE_BYTES,
     MAX_MODULE_TICKS, MAX_RECIPE_HEAP_BYTES, MAX_RECIPE_MODULES, MAX_RECIPE_SOURCE_BYTES,
     MAX_RECIPE_TICKS,
 };
+pub use provenance::{DeclarationSource, RecipeEvaluation, SourceProvenance, SourceSpan};
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::{none::NoneType, Heap, Value};
@@ -108,6 +110,8 @@ struct GraphStore {
     embedded_instances: RefCell<usize>,
     overrides: BTreeMap<String, f64>,
     parameters: RefCell<BTreeMap<String, f64>>,
+    provenance: RefCell<Vec<provenance::RawDeclaration>>,
+    call_spans: RefCell<BTreeMap<String, Vec<starlark::codemap::Span>>>,
 }
 
 const MAX_PARAMETERS: usize = 1_000;
@@ -138,6 +142,21 @@ fn store<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a GraphStore> 
     eval.extra
         .and_then(|extra| extra.downcast_ref::<GraphStore>())
         .ok_or_else(|| anyhow::anyhow!("missing graph construction context"))
+}
+
+fn record_feature(eval: &Evaluator<'_, '_, '_>, feature: serde_json::Value) -> anyhow::Result<()> {
+    let id = feature["id"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("feature must have an ID"))?
+        .to_owned();
+    let graph = store(eval)?;
+    graph.feature(feature)?;
+    graph.provenance.borrow_mut().push(provenance::capture(
+        provenance::DeclarationKind::Feature,
+        id,
+        eval,
+    )?);
+    Ok(())
 }
 
 fn number(value: Value<'_>) -> anyhow::Result<f64> {
@@ -316,7 +335,7 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             );
             feature["curve_outline"] = serde_json::to_value(path)?;
         }
-        store(eval)?.feature(feature)?;
+        record_feature(eval, feature)?;
         Ok(id.to_owned())
     }
 
@@ -368,7 +387,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 .all(|h| h.radius.is_finite() && h.center.iter().all(|v| v.is_finite())),
             "circular hole values must be finite"
         );
-        store(eval)?.feature(serde_json::json!({"op":"path","id":id,"start":start,"segments":segments,"circular_holes":circular_holes,"op_version":1}))?;
+        record_feature(
+            eval,
+            serde_json::json!({"op":"path","id":id,"start":start,"segments":segments,"circular_holes":circular_holes,"op_version":1}),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -428,7 +450,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 .all(|h| h.radius.is_finite() && h.center.iter().all(|v| v.is_finite())),
             "circular hole values must be finite"
         );
-        store(eval)?.feature(serde_json::json!({"op":"polygon","id":id,"points":points,"holes":holes,"circular_holes":circular_holes,"op_version":1}))?;
+        record_feature(
+            eval,
+            serde_json::json!({"op":"polygon","id":id,"points":points,"holes":holes,"circular_holes":circular_holes,"op_version":1}),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -463,7 +488,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         inner_radius: Option<Value>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        store(eval)?.feature(serde_json::json!({"op": "circle", "id": id, "op_version": 1, "radius": number(radius)?, "inner_radius": inner_radius.map(number).transpose()?.unwrap_or(0.)}))?;
+        record_feature(
+            eval,
+            serde_json::json!({"op": "circle", "id": id, "op_version": 1, "radius": number(radius)?, "inner_radius": inner_radius.map(number).transpose()?.unwrap_or(0.)}),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -473,17 +501,23 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         depth: Value,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        store(eval)?.feature(serde_json::json!({
-            "op": "rectangle", "id": id, "op_version": 1,
-            "width": number(width)?, "depth": number(depth)?,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op": "rectangle", "id": id, "op_version": 1,
+                "width": number(width)?, "depth": number(depth)?,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
     fn revolve(id: &str, profile: &str, eval: &mut Evaluator) -> anyhow::Result<String> {
-        store(eval)?.feature(serde_json::json!({
-            "op": "revolve", "id": id, "op_version": 1, "profile": profile,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op": "revolve", "id": id, "op_version": 1, "profile": profile,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -493,10 +527,13 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         height: Value,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        store(eval)?.feature(serde_json::json!({
-            "op": "extrude", "id": id, "op_version": 1,
-            "profile": profile, "height": number(height)?,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op": "extrude", "id": id, "op_version": 1,
+                "profile": profile, "height": number(height)?,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -513,7 +550,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                     "faces must contain exactly two objects with from_feature and role strings"
                 )
             })?;
-        store(eval)?.feature(serde_json::json!({"op":"fillet","id":id,"op_version":1,"body":body,"faces":faces,"radius":number(radius)?}))?;
+        record_feature(
+            eval,
+            serde_json::json!({"op":"fillet","id":id,"op_version":1,"body":body,"faces":faces,"radius":number(radius)?}),
+        )?;
         Ok(id.to_owned())
     }
     /// Fully constrained, named blind bores on one semantic planar prism cap.
@@ -559,7 +599,8 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "hole pattern requires 1..={} blind holes",
             cad_build::MAX_BLIND_PATTERN_HOLES
         );
-        store(eval)?.feature(
+        record_feature(
+            eval,
             serde_json::json!({"op":"hole_pattern","id":id,"op_version":1,
             "body":body,"face":face,"x_direction_hint":x_direction_hint,
             "origin_offset":origin_offset,"sketch":sketch,"pattern_holes":holes}),
@@ -594,10 +635,13 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         let frame_origin = read_frame(frame_origin, [0., 0., 0.], "frame_origin")?;
         let frame_x_direction = read_frame(frame_x_direction, [1., 0., 0.], "frame_x_direction")?;
         let frame_y_direction = read_frame(frame_y_direction, [0., 1., 0.], "frame_y_direction")?;
-        store(eval)?.feature(serde_json::json!({"op":"slot_pattern","id":id,
+        record_feature(
+            eval,
+            serde_json::json!({"op":"slot_pattern","id":id,
             "op_version":1,"body":body,"pattern_slots":slots,
             "frame_origin":frame_origin,"frame_x_direction":frame_x_direction,
-            "frame_y_direction":frame_y_direction}))?;
+            "frame_y_direction":frame_y_direction}),
+        )?;
         Ok(id.to_owned())
     }
     fn chamfer_faces(
@@ -613,7 +657,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                     "faces must contain exactly two objects with from_feature and role strings"
                 )
             })?;
-        store(eval)?.feature(serde_json::json!({"op":"chamfer_faces","id":id,"op_version":1,"body":body,"faces":faces,"distance":number(distance)?}))?;
+        record_feature(
+            eval,
+            serde_json::json!({"op":"chamfer_faces","id":id,"op_version":1,"body":body,"faces":faces,"distance":number(distance)?}),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -633,7 +680,10 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
                 && (n.iter().map(|v| v * v).sum::<f64>().sqrt() - 1.).abs() <= 128. * f64::EPSILON),
             "face_normals must contain exactly two finite unit 3D vectors"
         );
-        store(eval)?.feature(serde_json::json!({"op":"chamfer","id":id,"op_version":1,"body":body,"face_normals":face_normals,"distance":number(distance)?}))?;
+        record_feature(
+            eval,
+            serde_json::json!({"op":"chamfer","id":id,"op_version":1,"body":body,"face_normals":face_normals,"distance":number(distance)?}),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -664,9 +714,12 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             offset.iter().all(|x| x.is_finite()),
             "offset must contain exactly three finite lengths"
         );
-        store(eval)?.feature(serde_json::json!({
-            "op":"translate", "id":id, "op_version":1, "body":body, "offset":offset,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op":"translate", "id":id, "op_version":1, "body":body, "offset":offset,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -679,24 +732,33 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
         let frame = frame(offset, rotation)?;
-        store(eval)?.feature(serde_json::json!({
-            "op":"transform", "id":id, "op_version":1, "body":body,
-            "offset":frame.translation, "rotation":frame.rotation,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op":"transform", "id":id, "op_version":1, "body":body,
+                "offset":frame.translation, "rotation":frame.rotation,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
     fn union(id: &str, left: &str, right: &str, eval: &mut Evaluator) -> anyhow::Result<String> {
-        store(eval)?.feature(serde_json::json!({
-            "op":"union", "id":id, "op_version":1, "left":left, "right":right,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op":"union", "id":id, "op_version":1, "left":left, "right":right,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
     fn cut(id: &str, left: &str, right: &str, eval: &mut Evaluator) -> anyhow::Result<String> {
-        store(eval)?.feature(serde_json::json!({
-            "op":"cut", "id":id, "op_version":1, "left":left, "right":right,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op":"cut", "id":id, "op_version":1, "left":left, "right":right,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -706,9 +768,12 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         right: &str,
         eval: &mut Evaluator,
     ) -> anyhow::Result<String> {
-        store(eval)?.feature(serde_json::json!({
-            "op":"intersect", "id":id, "op_version":1, "left":left, "right":right,
-        }))?;
+        record_feature(
+            eval,
+            serde_json::json!({
+                "op":"intersect", "id":id, "op_version":1, "left":left, "right":right,
+            }),
+        )?;
         Ok(id.to_owned())
     }
 
@@ -1609,6 +1674,11 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             definition["datums"] = serde_json::to_value(datums)?;
         }
         parts.push(definition);
+        graph.provenance.borrow_mut().push(provenance::capture(
+            provenance::DeclarationKind::Part,
+            id.to_owned(),
+            eval,
+        )?);
         Ok(id.to_owned())
     }
 
@@ -1795,6 +1865,17 @@ pub fn from_starlark_with_modules(
     overrides: &BTreeMap<String, f64>,
     modules: &BTreeMap<String, String>,
 ) -> Result<Recipe, RecipeError> {
+    Ok(from_starlark_with_modules_and_provenance(filename, source, overrides, modules)?.recipe)
+}
+
+/// Evaluate a recipe and return exact source locations as a separate sidecar.
+/// Only the recipe participates in geometry hashes and cache keys.
+pub fn from_starlark_with_modules_and_provenance(
+    filename: &str,
+    source: &str,
+    overrides: &BTreeMap<String, f64>,
+    modules: &BTreeMap<String, String>,
+) -> Result<RecipeEvaluation, RecipeError> {
     for (name, value) in overrides {
         if name.is_empty() || name.trim() != name || !value.is_finite() {
             return Err(RecipeError::Evaluation(format!(
@@ -1835,6 +1916,8 @@ pub fn from_starlark_with_modules(
         )));
     }
     let parts = graph.parts.into_inner();
+    let raw_provenance = graph.provenance.into_inner();
+    let call_spans = graph.call_spans.into_inner();
     let assemblies = graph.assemblies.into_inner();
     let assembly_outputs = graph.assembly_outputs.into_inner();
     let face_assertions = graph.face_assertions.into_inner();
@@ -1915,7 +1998,9 @@ pub fn from_starlark_with_modules(
     if !face_datums.is_empty() {
         value["face_datums"] = serde_json::json!(face_datums);
     }
-    Ok(serde_json::from_value(value)?)
+    let recipe = serde_json::from_value(value)?;
+    let provenance = provenance::finish(raw_provenance, filename, source, modules, &call_spans)?;
+    Ok(RecipeEvaluation { recipe, provenance })
 }
 
 #[cfg(test)]

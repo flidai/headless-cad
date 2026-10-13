@@ -948,3 +948,21 @@ capsule certificates establish continuous coverage for their specific pairs.
 The [accepted source replay](evidence/slot-adjustment-replay-local.json) matches
 87 artifacts and 29 semantic fields after restart, including a rejected overshoot
 that preserves the previously accepted base. All five product gates remain open.
+
+
+The source-inspection increment now records exact evaluated Starlark declaration
+spans beside the geometry recipe. Part selection should open the defining call in
+its captured module, with body-feature and helper-call navigation across all
+inspectors. Acceptance requires Unicode/multiline/helper/loop cases, complete
+source-bound report replay, comment-only geometry stability, asynchronous picker
+race checks and refusal of altered same-length source. This advances inspectable
+human/AI revisions; it does not close a commercial release gate.
+
+The [source provenance oracle](evidence/source-provenance-local.json) now passes
+exact Unicode, multiline, helper and loop declaration checks, captured-source
+replay and comment-only geometry stability. [Browser evidence](evidence/source-provenance-browser-local.json)
+checks portable, GPU and progressive inspection, same-length source tamper refusal
+and preservation of manual source selection during asynchronous verification.
+The [accepted revision replay](evidence/source-provenance-replay-local.json)
+matches 88 artifacts and 30 semantic manifest fields after restart. These receipts
+pin the tested executable and scripts; all five commercial gates remain open.

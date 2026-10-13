@@ -82,6 +82,7 @@ fn fixture() -> (BuiltAssembly, RecipeContext) {
         source_name: "metadata_fixture.star".into(),
         modules: Default::default(),
         source_bundle_hash: Some("pinned-source-bundle".into()),
+        source_provenance: None,
         output_name: "fixture".into(),
         feature_id: "metadata_fixture".into(),
         parameters: BTreeMap::new(),

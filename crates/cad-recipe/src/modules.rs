@@ -126,6 +126,10 @@ pub(super) fn evaluate(
     order.push(filename.to_owned());
     for label in order {
         let ast = asts.remove(&label).expect("preflighted module");
+        graph
+            .call_spans
+            .borrow_mut()
+            .insert(label.clone(), provenance::calls(&ast));
         let loader_modules: HashMap<_, _> = frozen.iter().map(|(k, v)| (k.as_str(), v)).collect();
         let loader = ReturnFileLoader {
             modules: &loader_modules,

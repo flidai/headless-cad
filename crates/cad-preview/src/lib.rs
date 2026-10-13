@@ -10,6 +10,7 @@ use thiserror::Error;
 
 pub mod metadata_pages;
 mod motion;
+mod provenance;
 pub use motion::to_motion_study_html;
 
 mod assembly;
@@ -49,6 +50,9 @@ pub struct RecipeContext {
     pub modules: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_bundle_hash: Option<String>,
+    /// Source-bound exact declaration spans supplied by the recipe evaluator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_provenance: Option<serde_json::Value>,
     pub output_name: String,
     pub feature_id: String,
     pub parameters: BTreeMap<String, f64>,
@@ -424,6 +428,7 @@ fn render_html_template(
     template: &str,
 ) -> Result<String, PreviewError> {
     if let Some(recipe) = recipe {
+        provenance::validate(recipe)?;
         if !matches!(recipe.language.as_str(), "starlark" | "json") {
             return Err(PreviewError::Recipe("language must be starlark or json"));
         }
@@ -495,6 +500,10 @@ fn render_html_template(
     // Match complete template elements. Embedded JSON escapes '<', so an
     // arbitrary label/source containing marker text cannot trigger substitution.
     Ok(template
+        .replace(
+            "<script>/*SOURCE_NAVIGATION*/</script>",
+            &format!("<script>{}</script>", include_str!("source-navigation.js")),
+        )
         .replace(
             "<script id=\"cad-scene-data\" type=\"application/json\">/*SCENE_DATA*/null</script>",
             &format!("<script id=\"{scene_id}\" type=\"application/json\">{data}</script>"),
@@ -758,6 +767,7 @@ mod tests {
             source_name: "<recipe>.star".into(),
             modules: BTreeMap::from([("lib/unsafe.star".into(), "# </script><script>globalThis.moduleInjected=true</script>\ndef make():\n    return 1\n".into())]),
             source_bundle_hash: Some("bundle-test".into()),
+            source_provenance: None,
             output_name: "part".into(),
             feature_id: "body".into(),
             parameters: BTreeMap::from([("width".into(), 12.5)]),
@@ -766,8 +776,8 @@ mod tests {
             property_assertions: Default::default(),
         };
         let html = to_html_with_recipe(&model, &recipe).unwrap();
-        assert_eq!(html.matches("<script>").count(), 1);
-        assert_eq!(html.matches("</script>").count(), 3);
+        assert_eq!(html.matches("<script>").count(), 2);
+        assert_eq!(html.matches("</script>").count(), 4);
         assert!(!html.contains("<img src=x"));
         let embedded = html
             .lines()
@@ -797,6 +807,7 @@ mod tests {
             source_name: "part.star".into(),
             modules: Default::default(),
             source_bundle_hash: None,
+            source_provenance: None,
             output_name: "part".into(),
             feature_id: "body".into(),
             parameters: BTreeMap::from([("width".into(), f64::NAN)]),
@@ -821,6 +832,7 @@ mod tests {
             source_name: "part.star".into(),
             modules: Default::default(),
             source_bundle_hash: None,
+            source_provenance: None,
             output_name: "part".into(),
             feature_id: "body".into(),
             parameters: BTreeMap::new(),

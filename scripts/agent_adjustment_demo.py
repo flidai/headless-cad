@@ -208,9 +208,10 @@ def main():
                 raise ValueError(f'source workspace changed: {name}')
         replay = replay_accepted(pinned_cad, stage / 'after', accepted_after,
                                  after, executable_sha256)
-        if (len(replay['semantic_manifest_fields']) != 29
-                or 'rigid_translation_groups' not in replay['semantic_manifest_fields']):
-            raise ValueError('offline replay omitted translation engineering semantics')
+        semantic_fields = replay['semantic_manifest_fields']
+        if ('rigid_translation_groups' not in semantic_fields
+                or ('source_provenance' in manifests['after'] and 'source_provenance' not in semantic_fields)):
+            raise ValueError('offline replay omitted translation or source engineering semantics')
         if sha256(pinned_cad) != executable_sha256:
             raise ValueError('pinned executable changed')
         script_sha256_end = sha256(script_path)
@@ -243,7 +244,7 @@ def main():
 <p>The captured Starlark recipe loads the released drive and prescribes one common translation of 29 upper occurrences. A half-travel source revision was accepted after the full-travel base. A one-millimetre overshoot failed a native whole-path slot check and left the accepted state intact.</p>
 <div class="cards"><section><h2>Full travel · 6 mm</h2><p>Four mounting slot/shank pairs have typed native full-path proofs.</p><a href="before/translation-upper_slot_travel.html">Inspect original travel and source →</a></section>
 <section><h2>Half travel · 3 mm</h2><p>The same native parts follow a shorter source-authored path.</p><a href="after/translation-upper_slot_travel.html">Inspect accepted revision and source →</a></section></div>
-<ul><li>30 occurrences from 14 part definitions; 29 move together in the adjustment study.</li><li>Four named slot/shank pairs have a certified minimum above the 0.49 mm requirement over their entire path.</li><li>The rejected 7 mm overshoot and stale acceptance changed neither the accepted head nor source files.</li><li>Three durable jobs, verified generation streams, recovery after process restart and offline replay of 29 semantic manifest fields are recorded.</li></ul>
+<ul><li>30 occurrences from 14 part definitions; 29 move together in the adjustment study.</li><li>Four named slot/shank pairs have a certified minimum above the 0.49 mm requirement over their entire path.</li><li>The rejected 7 mm overshoot and stale acceptance changed neither the accepted head nor source files.</li><li>Three durable jobs, verified generation streams, recovery after process restart and offline replay of {len(semantic_fields)} semantic manifest fields are recorded.</li></ul>
 <p><a href="evidence.json">Protocol, acceptance and replay evidence</a> · <a href="after/rigid-translation-groups.html">Translation group evidence</a> · <a href="after/clearance-checks.html">Native clearance checks</a> · <a href="after/drive_module_adjustment.step">Download STEP</a></p>
 <small>Nominal unthreaded fastener envelopes and named clearances only. Slider motion is visual inspection of a source-prescribed path. Sliding contact, threads, preload, tightening, every assembly contact and rated loads remain unverified.</small></html>''')
         publish_new(stage, destination)

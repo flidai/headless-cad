@@ -236,15 +236,22 @@ impl Snapshot {
         Ok(())
     }
     pub fn recipe(&self, parameters: &BTreeMap<String, f64>) -> Result<Recipe, Box<dyn Error>> {
+        Ok(self.evaluate(parameters)?.0)
+    }
+    pub fn evaluate(
+        &self,
+        parameters: &BTreeMap<String, f64>,
+    ) -> Result<(Recipe, Option<cad_recipe::SourceProvenance>), Box<dyn Error>> {
         if self.language == "starlark" {
-            Ok(cad_recipe::from_starlark_with_modules(
+            let evaluated = cad_recipe::from_starlark_with_modules_and_provenance(
                 &self.source_name,
                 &self.source,
                 parameters,
                 &self.modules,
-            )?)
+            )?;
+            Ok((evaluated.recipe, Some(evaluated.provenance)))
         } else if parameters.is_empty() {
-            Ok(serde_json::from_str(&self.source)?)
+            Ok((serde_json::from_str(&self.source)?, None))
         } else {
             Err("parameter overrides require a .star recipe; compiled JSON already contains resolved values".into())
         }

@@ -13,7 +13,7 @@ main.recipe-open{grid-template-columns:minmax(0,1fr) minmax(340px,440px)}#recipe
 <main><div class="viewport"><canvas id="view" tabindex="0" aria-label="Interactive 3D model. Drag to orbit, scroll to zoom, click a face to inspect. Use view buttons for keyboard access."></canvas><div class="toolbar"><button data-view="iso">Isometric</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Right</button><button id="fit">Fit</button><button id="edges" aria-pressed="true">Edges</button><button id="recipe-toggle" aria-expanded="false" aria-controls="recipe-panel">Recipe</button></div><div class="hint">Drag to orbit · Scroll to zoom · Click to inspect a face</div></div><aside><h1>Model overview</h1><div class="muted">Boundary representation<br>All dimensions in millimetres</div><section id="recipe-panel" class="section" aria-labelledby="recipe-heading" hidden><h2 id="recipe-heading">Recipe source</h2><div id="recipe-summary" class="muted"></div><dl id="recipe-parameters"></dl><p id="recipe-module-row" hidden><label for="recipe-module">Source file </label><select id="recipe-module" aria-label="Captured recipe source file" style="width:100%;padding:8px;margin-top:6px"></select></p><pre id="recipe-source" tabindex="0" aria-label="Read-only recipe source"></pre></section><section class="section" aria-labelledby="engineering-checks-heading"><h2 id="engineering-checks-heading">Engineering checks</h2><p id="engineering-checks-summary" class="muted"></p><div id="engineering-checks"></div></section><div id="occurrences-section" class="section" hidden><h2>Assembly occurrences</h2><select id="occurrence-select" aria-label="Select assembly occurrence" style="width:100%;padding:8px;border:1px solid #d7dfd8;border-radius:6px;background:white"></select><p class="muted">Material volume sums occurrences, including overlaps. Bounds conservatively enclose transformed local bounds. Software display expands shared meshes only while drawing.</p></div><div class="section"><h2>Geometry</h2><dl id="geometry"></dl></div><div class="section"><h2>Dimensions</h2><dl id="dimensions"></dl></div><div class="section"><h2>Face inspector</h2><div id="selection" aria-live="polite">Select a face in the viewport.</div></div><footer>This preview is generated from the model's face boundaries. Use the build manifest for validation results and STEP for CAD interchange.</footer></aside></main>
 <script id="cad-scene-data" type="application/json">/*SCENE_DATA*/null</script>
 <script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
-<script>
+<script>/*SOURCE_NAVIGATION*/</script><script>
 'use strict';
 let scene = JSON.parse((document.getElementById('cad-scene-data-v3')||document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
 let recipeContext = JSON.parse(document.getElementById('cad-recipe-data').textContent);
@@ -116,19 +116,10 @@ function renderEngineeringChecks(context) {
  }
 }
 
-function renderRecipeSources(context){
- const picker=document.getElementById('recipe-module'),row=document.getElementById('recipe-module-row'),source=document.getElementById('recipe-source');
- const previous=picker.value,modules=context?.modules||{},labels=Object.keys(modules).sort();
- picker.replaceChildren();
- const root=document.createElement('option');root.value='';root.textContent=context?.source_name||'Root recipe';picker.append(root);
- for(const label of labels){const option=document.createElement('option');option.value=label;option.textContent=label;picker.append(option)}
- picker.value=labels.includes(previous)?previous:'';
- row.hidden=labels.length===0;
- const show=()=>{source.textContent=picker.value?modules[picker.value]:(context?.source||'No recipe source embedded.')};
- picker.onchange=show;show();
-}
+const sourceNavigator=new CadSourceNavigation({picker:document.getElementById('recipe-module'),source:document.getElementById('recipe-source'),row:document.getElementById('recipe-module-row')});
+function renderRecipeSources(context,selection=null){sourceNavigator.render(context,selection)}
 function recipeOverview(){
- renderRecipeSources(recipeContext);
+ renderRecipeSources(recipeContext,selectionContext);
  renderEngineeringChecks(recipeContext);
  const context=recipeContext,summary=document.getElementById('recipe-summary'),source=document.getElementById('recipe-source'),parameters=document.getElementById('recipe-parameters');
  parameters.replaceChildren();

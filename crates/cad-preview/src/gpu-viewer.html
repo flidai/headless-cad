@@ -5,7 +5,7 @@
 </style></head><body><header><strong>CAD / GPU inspection</strong><span>Read-only · approximate display · millimetres</span></header><main><div class="viewport"><canvas id="view" tabindex="0" aria-label="GPU assembly preview. Drag to orbit, shift-drag to pan, scroll to zoom, click an occurrence to inspect."></canvas><div class="toolbar"><button data-view="iso">Isometric</button><button data-view="top">Top</button><button data-view="front">Front</button><button data-view="right">Right</button><button id="fit">Fit</button><button id="recipe-toggle" aria-expanded="false" aria-controls="recipe-panel">Recipe</button></div><div class="hint">Drag to orbit · Shift-drag to pan · Scroll to zoom · Click to inspect</div><div id="error" role="alert" hidden></div></div><aside><h1 id="title">Assembly</h1><p class="muted">Shared meshes with WebGL2 instancing. Display geometry is approximate; engineering checks below come from the native build.</p><a id="portable" hidden>Open portable preview</a><section><h2>Display</h2><div id="statistics"></div><p id="display-policy" class="muted"></p><p id="stream-status" class="muted" aria-live="polite" hidden></p></section><section class="section" aria-labelledby="engineering-checks-heading"><h2 id="engineering-checks-heading">Engineering checks</h2><p id="engineering-checks-summary" class="muted"></p><div id="engineering-checks"></div></section><section><h2>Occurrence inspector</h2><div id="selection" aria-live="polite">Click a visible surface to inspect its occurrence and local face.</div><p><label for="occurrence-index">Occurrence index </label><input id="occurrence-index" type="number" min="0" step="1" placeholder="0"><button id="inspect-index">Inspect</button></p><pre id="part-datums" hidden></pre></section><section id="recipe-panel" hidden><h2>Recipe source</h2><div id="recipe-summary"></div><p id="recipe-parameters" class="muted"></p><p id="recipe-module-row" hidden><label for="recipe-module">Source file </label><select id="recipe-module" aria-label="Captured recipe source file" style="width:100%;padding:8px;margin-top:6px"></select></p><pre id="recipe-source" tabindex="0" aria-label="Read-only recipe source"></pre></section><footer>GPU picking uses the same depth-tested triangles as the display. Face IDs refer to this snapshot. Use native validation and STEP for engineering geometry.</footer></aside></main>
 <script id="cad-scene-data" type="application/json">/*SCENE_DATA*/null</script>
 <script id="cad-recipe-data" type="application/json">/*RECIPE_DATA*/null</script>
-<script>
+<script>/*SOURCE_NAVIGATION*/</script><script>
 'use strict';
 const compactScene = JSON.parse((document.getElementById('cad-scene-data-v3')||document.getElementById('cad-scene-data-v2')||document.getElementById('cad-scene-data')).textContent);
 const recipeContext = JSON.parse(document.getElementById('cad-recipe-data').textContent);
@@ -74,17 +74,8 @@ function renderEngineeringChecks(context) {
 }
 renderEngineeringChecks(recipeContext);
 
-function renderRecipeSources(context){
- const picker=document.getElementById('recipe-module'),row=document.getElementById('recipe-module-row'),source=document.getElementById('recipe-source');
- const previous=picker.value,modules=context?.modules||{},labels=Object.keys(modules).sort();
- picker.replaceChildren();
- const root=document.createElement('option');root.value='';root.textContent=context?.source_name||'Root recipe';picker.append(root);
- for(const label of labels){const option=document.createElement('option');option.value=label;option.textContent=label;picker.append(option)}
- picker.value=labels.includes(previous)?previous:'';
- row.hidden=labels.length===0;
- const show=()=>{source.textContent=picker.value?modules[picker.value]:(context?.source||'No recipe source embedded.')};
- picker.onchange=show;show();
-}
+const sourceNavigator=new CadSourceNavigation({picker:document.getElementById('recipe-module'),source:document.getElementById('recipe-source'),row:document.getElementById('recipe-module-row')});
+function renderRecipeSources(context,selection=null){sourceNavigator.render(context,selection)}
 renderRecipeSources(recipeContext);
 document.getElementById('recipe-summary').textContent = recipeContext
   ? `${recipeContext.source_name} · ${recipeContext.language} · output ${recipeContext.output_name}\nComplete shared recipe; read-only.`
@@ -638,8 +629,9 @@ function nextFacePoint(face,i){const starts=face.loop_starts??[0],end=starts.fin
   function select(index,face=-1){
     selected=index;selectedFace=face;stats.selectedInstance=index;stats.selectedFace=face;
     const panel=document.getElementById('selection'),datums=document.getElementById('part-datums');
-    if(index<0||index>=instances.length){panel.textContent='No visible occurrence selected.';datums.hidden=true;render();return null;}
+    if(index<0||index>=instances.length){renderRecipeSources(recipeContext);panel.textContent='No visible occurrence selected.';datums.hidden=true;render();return null;}
     const instance=instances[index],definition=definitions[instance.part],path=compactScene.instance_paths&&compactScene.instance_paths[instance.id]||[instance.id];
+    renderRecipeSources(recipeContext,{instance_id:instance.id,part_id:instance.part,feature_id:definition.feature_id});
     const faceText=face<0?'Occurrence / bounds proxy only; no exact face selected':String(face);
     panel.textContent=`Occurrence ${index}: ${path.map(v=>JSON.stringify(v)).join(' / ')}\nPart: ${instance.part}\nFeature: ${definition.feature_id}\nLocal face: ${faceText}\nMetadata: ${JSON.stringify(definition.metadata||{})}`;
     panel.style.whiteSpace='pre-wrap';datums.textContent='Local datums (mm, quaternion xyzw)\n'+JSON.stringify(definition.datums||{},null,2);datums.hidden=false;
