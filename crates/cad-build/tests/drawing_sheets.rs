@@ -350,3 +350,35 @@ fn styled_paper_annotation_preflight_rejects_missing_or_wrong_binding() {
     v["drawing_sheets"][0]["views"][0]["annotation_labels"][0]["arbitrary_value_mm"] = json!(6);
     assert!(serde_json::from_value::<Recipe>(v).is_err());
 }
+
+#[test]
+fn authored_size_band_requires_three_column_table_fit_before_geometry() {
+    let mut v = native_table_value();
+    v["drawing_sheets"][0]["width"] = json!(220);
+    v["datum_dimensions"][0]["tolerance"] = json!({"nominal":8,"lower":-0.1,"upper":0.1});
+    v["drawing_sheets"][0]["dimension_tables"][0]["show_size_limits"] = json!(true);
+    v["features"][0]["width"] = json!(-1);
+    assert!(
+        matches!(cad_build::build(&parse(v.clone())),Err(BuildError::InvalidDrawingSheet{message,..}) if message.contains("size-band table"))
+    );
+    v["drawing_sheets"][0]["dimension_tables"][0]["width"] = json!(191);
+    v["drawing_sheets"][0]["dimension_tables"][0]["rows"][0]["label"] = json!("X".repeat(44));
+    assert!(
+        matches!(cad_build::build(&parse(v)),Err(BuildError::InvalidDrawingSheet{message,..}) if message.contains("size-band table"))
+    );
+}
+
+#[test]
+fn one_row_size_band_reserves_footer_after_the_column_header() {
+    let mut v = native_table_value();
+    v["drawing_sheets"][0]["width"] = json!(220);
+    let table = &mut v["drawing_sheets"][0]["dimension_tables"][0];
+    table["show_size_limits"] = json!(true);
+    table["width"] = json!(191);
+    table["height"] = json!(22);
+    assert!(
+        matches!(cad_build::build(&parse(v.clone())),Err(BuildError::InvalidDrawingSheet{message,..}) if message.contains("15+8"))
+    );
+    v["drawing_sheets"][0]["dimension_tables"][0]["height"] = json!(23);
+    assert!(cad_build::build(&parse(v)).is_ok());
+}

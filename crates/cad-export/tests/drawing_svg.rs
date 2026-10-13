@@ -68,6 +68,7 @@ fn native_dimension_tables_render_rounded_values_and_reject_bad_layout() {
     s.dimension_tables.push(DrawingDimensionTable {
         id: "machine".into(),
         title: "Machining & setup".into(),
+        show_size_limits: false,
         x: 10.,
         y: 100.,
         width: 190.,
@@ -78,6 +79,7 @@ fn native_dimension_tables_render_rounded_values_and_reject_bad_layout() {
             value_mm: 5.00000001,
             lower_bound_mm: 5.0,
             upper_bound_mm: 5.00000002,
+            authored_limits_mm: None,
         }],
     });
     let svg = drawing_sheet_to_svg(&s).unwrap();
@@ -136,6 +138,84 @@ fn native_dimension_tables_render_rounded_values_and_reject_bad_layout() {
     assert!(
         drawing_sheet_to_svg(&bad).is_err(),
         "table row must not alias a generated section fragment"
+    );
+}
+
+#[test]
+fn authored_size_bands_are_separate_exact_paper_cells() {
+    let mut s = sheet();
+    s.width = 420.;
+    s.dimension_tables.push(cad_export::DrawingDimensionTable {
+        id: "machine".into(),
+        title: "Machining size bands".into(),
+        show_size_limits: true,
+        x: 10.,
+        y: 100.,
+        width: 195.,
+        height: 48.,
+        rows: vec![
+            cad_export::DrawingDimensionRow {
+                dimension: "pilot_depth".into(),
+                label: "Pilot depth".into(),
+                value_mm: 5.00000001,
+                lower_bound_mm: 5.0,
+                upper_bound_mm: 5.00000002,
+                authored_limits_mm: Some([4.9, 5.1]),
+            },
+            cad_export::DrawingDimensionRow {
+                dimension: "floor_stock".into(),
+                label: "Floor stock".into(),
+                value_mm: 11.,
+                lower_bound_mm: 10.999999999,
+                upper_bound_mm: 11.000000001,
+                authored_limits_mm: None,
+            },
+        ],
+    });
+    let svg = drawing_sheet_to_svg(&s).unwrap();
+    assert!(svg.contains("DESIGN LIMITS"));
+    assert!(svg.contains("≈ 5.000 mm"));
+    assert!(svg.contains("4.9..5.1 mm"));
+    assert!(svg.contains(">not specified</text>"));
+    assert!(
+        !svg.contains("5.00000002.."),
+        "native numerical bound is not a size limit"
+    );
+    let mut bad = s.clone();
+    bad.dimension_tables[0].width = 190.;
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "three paper columns need width"
+    );
+    let mut legacy = s.clone();
+    legacy.dimension_tables[0].show_size_limits = false;
+    legacy.dimension_tables[0].width = 190.;
+    let nominal_only = drawing_sheet_to_svg(&legacy).unwrap();
+    assert!(!nominal_only.contains("DESIGN LIMITS"));
+    assert!(!nominal_only.contains("4.9..5.1 mm"));
+    let mut bad = s.clone();
+    bad.dimension_tables[0].rows[0].authored_limits_mm = Some([5., 5.]);
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "size limits need a real band"
+    );
+    let mut bad = s.clone();
+    bad.dimension_tables[0].rows[0].authored_limits_mm = Some([1e-300, 1e300]);
+    assert!(
+        drawing_sheet_to_svg(&bad).is_err(),
+        "exact limit string must fit"
+    );
+    let mut short = s.clone();
+    short.dimension_tables[0].rows.truncate(1);
+    short.dimension_tables[0].height = 22.;
+    assert!(
+        drawing_sheet_to_svg(&short).is_err(),
+        "header, row and footer need paper separation"
+    );
+    short.dimension_tables[0].height = 23.;
+    assert!(
+        drawing_sheet_to_svg(&short).is_ok(),
+        "minimum separated one-row band table"
     );
 }
 

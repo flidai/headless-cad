@@ -21,6 +21,8 @@ pub struct DrawingSheet {
 pub struct DrawingDimensionTable {
     pub id: String,
     pub title: String,
+    /// Explicit opt-in to an additional column of source-authored size limits.
+    pub show_size_limits: bool,
     pub x: f64,
     pub y: f64,
     pub width: f64,
@@ -34,6 +36,8 @@ pub struct DrawingDimensionRow {
     pub value_mm: f64,
     pub lower_bound_mm: f64,
     pub upper_bound_mm: f64,
+    /// Authored size limits, separate from the kernel's arithmetic bounds.
+    pub authored_limits_mm: Option<[f64; 2]>,
 }
 #[derive(Debug, Clone)]
 pub struct DrawingSheetView {
@@ -198,6 +202,7 @@ pub fn drawing_sheet_to_svg(sheet: &DrawingSheet) -> Result<String, ExportError>
     }
     let mut emitted_table_ids = BTreeSet::new();
     for (i, table) in sheet.dimension_tables.iter().enumerate() {
+        let show_limits = table.show_size_limits;
         if !safe_id(&table.id)
             || !ids.insert(table.id.to_ascii_lowercase())
             || !emitted_table_ids.insert(format!("drawing-table-{}", table.id.to_ascii_lowercase()))
@@ -213,8 +218,8 @@ pub fn drawing_sheet_to_svg(sheet: &DrawingSheet) -> Result<String, ExportError>
             || table.y + table.height > sheet.height - 35.
             || table.rows.is_empty()
             || table.rows.len() > 16
-            || table.height < 10. + table.rows.len() as f64 * 8.
-            || table.width < 80.
+            || table.height < (if show_limits { 15. } else { 10. }) + table.rows.len() as f64 * 8.
+            || table.width < if show_limits { 191. } else { 80. }
             || text_width_mm(&table.title, 3.2) > table.width - 6.
         {
             return Err(invalid("invalid drawing dimension table bounds or title"));
@@ -235,6 +240,10 @@ pub fn drawing_sheet_to_svg(sheet: &DrawingSheet) -> Result<String, ExportError>
         let mut dimensions = BTreeSet::new();
         for row in &table.rows {
             let value = format!("≈ {:.3} mm", row.value_mm);
+            let limits = row.authored_limits_mm.map_or_else(
+                || "not specified".into(),
+                |[lower, upper]| format!("{lower}..{upper} mm"),
+            );
             if !safe_id(&row.dimension)
                 || !dimensions.insert(row.dimension.to_ascii_lowercase())
                 || !emitted_table_ids.insert(format!(
@@ -248,8 +257,13 @@ pub fn drawing_sheet_to_svg(sheet: &DrawingSheet) -> Result<String, ExportError>
                     .any(|v| !v.is_finite())
                 || row.lower_bound_mm > row.value_mm
                 || row.value_mm > row.upper_bound_mm
-                || text_width_mm(&row.label, 2.8) > table.width - 42.
-                || text_width_mm(&value, 2.8) > 36.
+                || row.authored_limits_mm.is_some_and(|[lower, upper]| {
+                    !lower.is_finite() || !upper.is_finite() || lower <= 0. || upper <= lower
+                })
+                || text_width_mm(&row.label, 2.8)
+                    > if show_limits { 85. } else { table.width - 42. }
+                || text_width_mm(&value, 2.8) > if show_limits { 40. } else { 36. }
+                || (show_limits && text_width_mm(&limits, 2.8) > 60.)
             {
                 return Err(invalid("invalid drawing dimension table row or text fit"));
             }
@@ -272,11 +286,29 @@ pub fn drawing_sheet_to_svg(sheet: &DrawingSheet) -> Result<String, ExportError>
             table.x + table.width
         )
         .unwrap();
-        for (row_index, row) in table.rows.iter().enumerate() {
-            let baseline = table.y + 12. + row_index as f64 * 7.;
-            writeln!(out, "<g id=\"drawing-table-{}-{}\" data-dimension=\"{}\"><text x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"2.8\">{}</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-family=\"monospace\" font-size=\"2.8\">≈ {:.3} mm</text></g>", table.id, row.dimension, row.dimension, table.x + 3., baseline, escape(&row.label)?, table.x + table.width - 3., baseline, row.value_mm).unwrap();
+        let native_right = table.x + 128.;
+        let limits_right = table.x + table.width - 3.;
+        if show_limits {
+            writeln!(out, "<text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-family=\"monospace\" font-size=\"2.2\">NATIVE</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-family=\"monospace\" font-size=\"2.2\">DESIGN LIMITS</text>", native_right, table.y + 11., limits_right, table.y + 11.).unwrap();
         }
-        writeln!(out, "<text x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"2\">Nominal native geometry</text>", table.x + 3., table.y + table.height - 2.).unwrap();
+        for (row_index, row) in table.rows.iter().enumerate() {
+            if show_limits {
+                let baseline = table.y + 17. + row_index as f64 * 7.;
+                let limits = row.authored_limits_mm.map_or_else(
+                    || "not specified".into(),
+                    |[lower, upper]| format!("{lower}..{upper} mm"),
+                );
+                writeln!(out, "<g id=\"drawing-table-{}-{}\" data-dimension=\"{}\"><text x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"2.8\">{}</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-family=\"monospace\" font-size=\"2.8\">≈ {:.3} mm</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-family=\"monospace\" font-size=\"2.8\">{}</text></g>", table.id, row.dimension, row.dimension, table.x + 3., baseline, escape(&row.label)?, native_right, baseline, row.value_mm, limits_right, baseline, escape(&limits)?).unwrap();
+            } else {
+                let baseline = table.y + 12. + row_index as f64 * 7.;
+                writeln!(out, "<g id=\"drawing-table-{}-{}\" data-dimension=\"{}\"><text x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"2.8\">{}</text><text x=\"{}\" y=\"{}\" text-anchor=\"end\" font-family=\"monospace\" font-size=\"2.8\">≈ {:.3} mm</text></g>", table.id, row.dimension, row.dimension, table.x + 3., baseline, escape(&row.label)?, table.x + table.width - 3., baseline, row.value_mm).unwrap();
+            }
+        }
+        if show_limits {
+            writeln!(out, "<text x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"2\">Native ≈ rounded; size limits authored, or not specified</text>", table.x + 3., table.y + table.height - 2.).unwrap();
+        } else {
+            writeln!(out, "<text x=\"{}\" y=\"{}\" font-family=\"monospace\" font-size=\"2\">Nominal native geometry</text>", table.x + 3., table.y + table.height - 2.).unwrap();
+        }
         out.push_str("</g>\n");
     }
     let title_y = sheet.height - 35.;

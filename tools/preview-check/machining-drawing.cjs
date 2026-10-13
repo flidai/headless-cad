@@ -103,7 +103,8 @@ const assert=require('node:assert/strict');
   for(const table of sheet.dimension_tables){
    const rendered=visual.tables.find(t=>t.id===`drawing-table-${table.id}`);
    assert.ok(rendered,`visible ${table.id}`);assert.equal(table.output,'drive_module_release');
-   assert.equal(table.rows.length,5);assert.equal(rendered.rows.length,5);
+   assert.equal(table.show_size_limits,true);
+   assert.equal(table.rows.length,7);assert.equal(rendered.rows.length,7);
    const box=table.paper_box_mm,[x,y,w,h]=rendered.bounds;
    assert.ok(x>=box.x-.02&&y>=box.y-.02&&x+w<=box.x+box.width+.02&&y+h<=box.y+box.height+.02,
     `table ${table.id} overflows paper box`);
@@ -122,13 +123,23 @@ const assert=require('node:assert/strict');
     }
     assert.ok(actual.text.includes(`≈ ${native.value_mm.toFixed(3)} mm`),`${id}: ${actual.text}`);
     assert.ok(actual.text.includes(row.label),`source-authored label ${id}`);
+    if(native.tolerance){
+     const limits=[native.tolerance.lower_limit_mm,native.tolerance.upper_limit_mm];
+     assert.deepEqual(row.authored_size_limits_mm,limits);
+     const shown=actual.text.match(/([-+0-9.eE]+)\.\.([-+0-9.eE]+) mm/);
+     assert.ok(shown,`explicit authored limits ${id}`);
+     assert.deepEqual(shown.slice(1).map(Number),limits,`exact authored limits ${id}`);
+    }else{
+     assert.equal(row.authored_size_limits_mm,null);
+     assert.ok(actual.text.includes('not specified'),`no implied limits ${id}`);
+    }
     const [rx,ry,rw,rh]=actual.bounds;
     assert.ok(rx>=box.x-.02&&ry>=box.y-.02&&rx+rw<=box.x+box.width+.02&&ry+rh<=box.y+box.height+.02,
       `row ${id} overflows paper box`);
    }
   }
-  assert.equal(seen.size,10);
-  assert.ok(visual.footer.some(t=>t.includes('Nominal native geometry')));
+  assert.equal(seen.size,14);
+  assert.ok(visual.footer.some(t=>t.includes('size limits authored, or not specified')));
   assert.ok(visual.footer.some(t=>t.includes(`Revision: ${sheet.declaration.revision}`)));
   assert.ok(visual.footer.some(t=>t.includes(`Source context: ${manifest.recipe_context_hash}`)));
   assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);

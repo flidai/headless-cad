@@ -2401,13 +2401,14 @@ part identities and numerical bounds. Sheets with tables use drawing report
 schema 2; sheets without tables retain schema 1.
 
 The rotating drive's `end_cover_machining` A3 sheet combines three native
-sections with ten measurements: four pilot depths, four remaining housing
-thicknesses and two cover thicknesses. `pilot_depth` accepts 4–6 mm (default 5)
+sections with fourteen measurements: four pilot depths, four remaining housing
+thicknesses, two cover thicknesses, two flange thicknesses and two representative
+screw-shank lengths. `pilot_depth` accepts 4–6 mm (default 5)
 and `cover_thickness` accepts 1.5–3 mm (default 2). Screw placement and shank
 length follow these parameters, leaving a nominal 0.5 mm gap at each pilot
-floor while the heads remain seated on the covers. The assembly now has twenty
+floor while the heads remain seated on the covers. The assembly now has twenty-six
 native datum dimensions, including its ten existing retention measurements.
-The [independent STEP checks](docs/evidence/machining-tables-local.json) cover
+The initial [independent STEP checks](docs/evidence/machining-tables-local.json) cover
 five configurations, including both parameter extremes: all thirty exported
 components match independently constructed solids, the ten table measurements
 match exported face planes, and all four screw-tip gaps measure 0.5 mm. Ten
@@ -2433,6 +2434,27 @@ binding, and twelve publication-preserving refusals. Scale-only and tag-only
 source revisions leave all 38 compared STEP/B-rep files unchanged. A fresh
 [accepted drawing replay](docs/evidence/paper-annotations-replay-local.json)
 matches 149 artifacts and 27 manifest fields.
+
+Tables can opt into `show_size_limits = True`. The separate design-limit column
+comes from each native datum dimension's authored `tolerance` report. These
+limits retain their full decimal value; only the measured nominal column is
+rounded. Rows without an authored band say `not specified`. A value that cannot
+fit at the declared text size rejects publication instead of truncating limits.
+
+The drive declares independent size bands of ±0.10 mm for pilot depth and screw
+shank length, and ±0.05 mm for flange and cover thickness. Four native stacks
+calculate `pilot depth + flange + cover − screw shank`, with a nominal 0.5 mm
+allowance and outward bounds of approximately 0.20–0.80 mm. Each must stay
+within 0.15–0.85 mm. This calculation assumes the modeled flange, cover and screw
+head seating; it does not establish actual assembly contact, thread engagement,
+preload or manufactured-part conformance.
+
+The [axial size-band evidence](docs/evidence/axial-size-bands-local.json) covers
+five parameter configurations with independent STEP flange/shank face
+measurements and decimal interval calculations. Thirteen invalid edits preserve
+the previous generation, including an enlarged shank band that loses the
+required allowance. The [accepted axial replay](docs/evidence/axial-size-bands-replay-local.json)
+matches 149 files and 27 manifest fields after restart and offline rebuild.
 
 
 ### Authored dimensional tolerances

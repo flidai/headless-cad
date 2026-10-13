@@ -113,13 +113,19 @@ pub(super) fn publish(
                     value_mm: native.value_mm,
                     lower_bound_mm: native.lower_bound_mm,
                     upper_bound_mm: native.upper_bound_mm,
+                    authored_limits_mm: native
+                        .tolerance
+                        .as_ref()
+                        .map(|t| [t.lower_limit_mm, t.upper_limit_mm]),
                 });
                 row_evidence.push(json!({"dimension":row.dimension,"label":row.label,
+                    "authored_size_limits_mm":native.tolerance.as_ref().map(|t| [t.lower_limit_mm,t.upper_limit_mm]),
                     "native_dimension":witness}));
             }
             dimension_tables.push(cad_export::DrawingDimensionTable {
                 id: table.id.clone(),
                 title: table.title.clone(),
+                show_size_limits: table.show_size_limits,
                 x: table.x,
                 y: table.y,
                 width: table.width,
@@ -128,6 +134,7 @@ pub(super) fn publish(
             });
             table_evidence.push(
                 json!({"id":table.id,"title":table.title,"output":table.output,
+                "show_size_limits":table.show_size_limits,
                 "paper_box_mm":{"x":table.x,"y":table.y,"width":table.width,"height":table.height},
                 "rows":row_evidence}),
             );

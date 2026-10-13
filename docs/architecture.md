@@ -2072,7 +2072,7 @@ drawing report. Each row retains the complete face/part/occurrence witness and
 numerical interval; SVG prints rounded nominal millimetres. Table-bearing sheets
 use drawing-report schema 2, while existing sheets retain schema 1. Atomic
 publication and captured-source replay apply to the report and SVG together.
-The drive's second A3 sheet measures ten pilot and cover dimensions. Its
+The drive's second A3 sheet measures fourteen pilot, cover, flange and screw dimensions. Its
 parameterized screw envelopes maintain a nominal 0.5 mm tip gap; threads,
 preload, load capacity and manufactured-part conformance remain outside scope.
 
@@ -2086,6 +2086,18 @@ Conservative label bounds reject overlaps and viewport overflow without silently
 shrinking text. Unstyled viewports and standalone section exports retain their
 existing presentation. This is bounded section annotation layout, not projected
 hidden-line drafting or general automatic label placement.
+
+Dimension tables can explicitly request authored size limits. Native rounded
+measurements and exact decimal design bounds occupy separate columns; absent
+authored bands remain `not specified`. Table declarations cannot override the
+native dimension's tolerance report. Text fit and separate header/footer space
+are validated before publication. Four drive-module axial stacks use measured
+pilot depth, flange thickness, cover thickness and screw shank length, with
+independent authored bands. The outward combined allowance must remain within
+0.15–0.85 mm (nominal 0.5 mm; default bounds approximately 0.20–0.80 mm).
+This is conditional on the modeled seating arrangement, not a contact solution
+or a thread/preload/load model. The full report includes all four screw
+occurrences; the sheet displays one representative shank dimension per side.
 
 `cad section` implements the first authoritative planar-section query. It
 returns oriented native lines/circular arcs with face provenance, plane frame,

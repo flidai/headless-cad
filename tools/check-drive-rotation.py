@@ -278,6 +278,68 @@ def native_cover_dimensions(out,manifest,pitch,depth,thickness,physical_faces):
     d.require(len(facts)==10,'ten sourced machining dimensions')
     return facts
 
+def axial_size_allowances(shapes,manifest,diameter,pitch,depth,thickness,native_dimensions):
+    """Independently identify flange/shank STEP planes and combine size bands."""
+    from decimal import Decimal
+    dimensions=manifest['datum_dimensions'];facts={};stacks={};r=diameter/2
+    def measured(name,path,coordinates,expected):
+        report=dimensions[name]
+        d.require(report['status']=='passed' and report['declaration']['output']=='drive_module_release',name)
+        d.close(report['value_mm'],expected,'STEP measured '+name,absolute=2e-6)
+        d.require(report['lower_bound_mm']<=expected<=report['upper_bound_mm'],'enclosing interval '+name)
+        endpoints=[report['from'],report['to']]
+        for endpoint in endpoints:
+            witness=endpoint['semantic_datum']
+            d.require(endpoint['instance_path']==list(path) and witness['selection']['status']=='resolved'
+                      and len(witness['selection']['witnesses'])==1
+                      and witness['target_content_hash']==endpoint['part_content_hash'],'face-bound '+name)
+        actual=sorted(e['world_plane']['origin'][0] for e in endpoints)
+        for a,b in zip(actual,sorted(coordinates)):d.close(a,b,'actual STEP support '+name,absolute=2e-6)
+        facts[name]={'value_mm':expected,'world_support_x_mm':actual}
+    for side,prefix,flange_x in [('left',25,[23,25]),('right',25+pitch,[43+pitch,41+pitch])]:
+        sleeve_path=(side+'_support','sleeve' if side=='left' else 'right_sleeve')
+        areas=[math.pi*((r+6)**2-(r+.15)**2),math.pi*((r+6)**2-(r+4)**2)]
+        planes=[planar_face_at(shapes[sleeve_path],x,0,area,side+' flange')[1]
+                for x,area in zip(flange_x,areas)]
+        flange=side+'_flange_thickness';measured(flange,sleeve_path,planes,2.)
+        native_dimensions[flange]=facts[flange]
+        for tag,y in [('minus',-17),('plus',17)]:
+            path=(side+'_support',side+'_cover_screw_'+tag)
+            tip=prefix+(depth-.5 if side=='left' else 16-depth+.5)
+            underhead=prefix+(-2-thickness if side=='left' else 18+thickness)
+            planes=[planar_face_at(shapes[path],tip,y,math.pi*1.65**2,side+' screw tip')[1],
+                    planar_face_at(shapes[path],underhead,y,math.pi*(3**2-1.65**2),side+' underhead')[1]]
+            shank=side+'_cover_'+tag+'_shank';length=depth-.5+2+thickness
+            measured(shank,path,planes,length)
+            if tag=='minus':native_dimensions[shank]=facts[shank]
+            terms=[(side+'_cover_'+tag+'_depth',depth,.1,1),
+                   (flange,2.,.05,1),(side+'_cover_thickness',thickness,.05,1),
+                   (shank,length,.1,-1)]
+            lower=Decimal(0);upper=Decimal(0);nominal=Decimal(0)
+            for name,value,band,sign in terms:
+                tol=dimensions[name]['tolerance']
+                for key,want in [('nominal_mm',value),('lower_deviation_mm',-band),
+                                 ('upper_deviation_mm',band),('lower_limit_mm',value-band),
+                                 ('upper_limit_mm',value+band)]:
+                    d.close(tol[key],want,'authored '+name+' '+key,absolute=1e-12)
+                v,b=Decimal(str(value)),Decimal(str(band));nominal+=sign*v
+                lower+=v-b if sign==1 else -v-b
+                upper+=v+b if sign==1 else -v+b
+            name=side+'_cover_'+tag+'_tip_allowance';stack=manifest['tolerance_stacks'][name]
+            d.require(stack['status']=='passed' and stack['measurement_interval_certified'],'certified native stack '+name)
+            d.require([(t['datum_dimension'],t['coefficient']) for t in stack['terms']]==
+                      [(n,s) for n,v,b,s in terms],'exact independent signed terms '+name)
+            for key,want in [('nominal_mm',float(nominal)),('lower_limit_mm',float(lower)),
+                             ('upper_limit_mm',float(upper))]:d.close(stack[key],want,'independent decimal stack '+name,absolute=1e-10)
+            d.require(stack['lower_limit_mm']<=float(lower) and stack['upper_limit_mm']>=float(upper),
+                      'outward design interval '+name)
+            d.require(stack['lower_limit_mm']>=.15 and stack['upper_limit_mm']<=.85,'positive conditional allowance')
+            stacks[name]={'nominal_mm':float(nominal),'independent_limits_mm':[str(lower),str(upper)],
+                          'native_limits_mm':[stack['lower_limit_mm'],stack['upper_limit_mm']]}
+    d.require(len(dimensions)==26 and len(facts)==6 and len(stacks)==4,'complete axial allowance inventory')
+    return {'native_step_measurements':facts,'authored_independent_stacks':stacks,
+            'scope':'Independent size bands conditional on nominal seating; no thread, preload or manufactured conformance proof'}
+
 def machining_sheet_binding(out,manifest,native_dimensions):
     """Verify every published table row embeds its exact current native report."""
     sheet=json.loads((out/'drawing-end_cover_machining.json').read_text())
@@ -299,8 +361,8 @@ def machining_sheet_binding(out,manifest,native_dimensions):
     groups={e.attrib['id']:e for e in xml.iter() if e.tag.endswith('g') and 'id' in e.attrib}
     seen=set();rows=[]
     for table in tables:
-        d.require(table['output']=='drive_module_release' and len(table['rows'])==5,
-                  'five current assembly rows per side')
+        d.require(table['output']=='drive_module_release' and len(table['rows'])==7 and table['show_size_limits'],
+                  'seven current assembly rows per side with authored limits')
         d.require('drawing-table-'+table['id'] in groups,'SVG table '+table['id'])
         box=table['paper_box_mm']
         d.require(box['x']>=10 and box['y']>=10 and box['x']+box['width']<=410 and
@@ -319,11 +381,19 @@ def machining_sheet_binding(out,manifest,native_dimensions):
             visible=' '.join(''.join(group.itertext()).split())
             expected=f"≈ {measurement['value_mm']:.3f} mm"
             d.require(expected in visible,'displayed native millimetres '+name+': '+visible)
+            limits=row['authored_size_limits_mm'];tol=measurement.get('tolerance')
+            if tol:
+                d.require(limits==[tol['lower_limit_mm'],tol['upper_limit_mm']],'exact report size bands '+name)
+                printed=re.search(r'([-+0-9.eE]+)\.\.([-+0-9.eE]+) mm',visible)
+                d.require(printed is not None and [float(v) for v in printed.groups()]==limits,
+                          'round-trip authored size limits '+name)
+            else:
+                d.require(limits is None and 'not specified' in visible,'no invented size band '+name)
             rows.append({'id':name,'value_mm':measurement['value_mm'],
                          'native_report_digest':source['digest'],'svg_text':visible})
     d.require(seen==set(native_dimensions),'every expected machining dimension displayed')
     all_text=' '.join(xml.itertext())
-    d.require('Nominal native geometry' in all_text and
+    d.require('size limits authored, or not specified' in all_text and
               sheet['declaration']['revision'] in all_text and
               manifest['recipe_context_hash'][:12] in all_text,
               'visible native scope, revision and source context')
@@ -486,6 +556,7 @@ def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
     new_certificates=all_phase_new_pair_certificates(diameter,pitch,depth,thickness)
     physical_faces=cover_axial_faces(shapes,pitch,depth,thickness)
     native_dimensions=native_cover_dimensions(out,manifest,pitch,depth,thickness,physical_faces)
+    axial_allowances=axial_size_allowances(shapes,manifest,diameter,pitch,depth,thickness,native_dimensions)
     sheet_rows=machining_sheet_binding(out,manifest,native_dimensions)
     r=diameter/2
     nominal_contacts={}
@@ -624,6 +695,7 @@ def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
                 fixed_rotor_certificates=new_certificates,
                 actual_step_axial_faces=physical_faces,
                 native_machining_dimensions=native_dimensions,
+                conditional_axial_size_allowances=axial_allowances,
                 published_machining_rows=sheet_rows,
                 nominal_contacts=nominal_contacts,
                 actual_native_queries=query_count,proofs=proofs,
@@ -640,7 +712,8 @@ def rejected_edits(cad,directory):
     for label in ['offset_axis','missing_reference','excessive_gap',
                   'unknown_table_dimension','wrong_table_output','table_overflow',
                   'stale_floor_datum','pilot_reaches_opposite_cap',
-                  'unknown_paper_annotation','impossible_paper_annotation_layout']:
+                  'unknown_paper_annotation','impossible_paper_annotation_layout',
+                  'shank_band_loses_axial_allowance']:
         changed=json.loads(json.dumps(original))
         if label=='offset_axis':changed['rigid_rotation_groups'][0]['pivot']=[1,0,0]
         elif label=='missing_reference':changed['rigid_rotation_groups'][0]['reference_instance_path']=['base']
@@ -663,6 +736,9 @@ def rejected_edits(cad,directory):
         elif label=='unknown_paper_annotation':
             sheet=next(x for x in changed['drawing_sheets'] if x['id']=='end_cover_machining')
             sheet['views'][0]['annotation_labels'][0]['dimension']='missing_native_dimension'
+        elif label=='shank_band_loses_axial_allowance':
+            dimension=next(x for x in changed['datum_dimensions'] if x['id']=='left_cover_minus_shank')
+            dimension['tolerance']['upper']=.4
         else:
             sheet=next(x for x in changed['drawing_sheets'] if x['id']=='end_cover_machining')
             sheet['views'][0]['width']=20
@@ -671,7 +747,7 @@ def rejected_edits(cad,directory):
         diagnostic=json.loads(result.stderr)
         d.require(diagnostic.get('code') in ['invalid_rotation_group','rotation_group_failed',
                   'clearance_check_failed','invalid_drawing_sheet','invalid_graph',
-                  'datum_dimension_failed'] or
+                  'datum_dimension_failed','tolerance_stack_failed'] or
                   label in {'pilot_reaches_opposite_cap','impossible_paper_annotation_layout'}
                   and isinstance(diagnostic.get('code'),str),
                   'structured failure '+label)
@@ -715,7 +791,7 @@ def main():
                 python_version=platform.python_version(),
                 ocp_distribution=importlib.metadata.version('cadquery-ocp'),
                 cases=cases,annotation_variants=annotation_variants,rejected_edits=failures,
-                scope='Native continuous named-pair proofs, conservative full-turn bounds for 54 new fixed/rotor pairs, independent sampled STEP checks of all pairs, and actual STEP face/tip measurements bound to ten source-revision native drawing rows. No general assembly collision, installation or load certification')
+                scope='Native continuous named-pair proofs, conservative full-turn bounds for 54 fixed/rotor pairs, independent STEP face measurements bound to fourteen drawing rows, and four authored independent-interval axial allowances conditional on nominal seating. No general assembly collision, thread, preload, installation or load certification')
     (args.out_dir/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 
 if __name__=='__main__':main()

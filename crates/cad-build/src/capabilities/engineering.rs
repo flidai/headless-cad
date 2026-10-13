@@ -489,6 +489,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             arg("id", T::String),
             arg("title", T::String),
             arg("output", T::String),
+            optional(arg("show_size_limits", T::Boolean), json!(false)),
             arg("x", T::Number),
             arg("y", T::Number),
             arg("width", T::Number),
@@ -496,10 +497,10 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
             arg("rows", array(object("drawing_dimension_row"), None)),
         ],
     );
-    for field in &mut dimension_table.arguments[3..7] {
+    for field in &mut dimension_table.arguments[4..8] {
         field.units = Some("paper mm");
     }
-    dimension_table.obligations.extend(["at most 8 tables per sheet, 1..16 rows per table and 128 rows per recipe; unique portable table IDs per sheet", "rectangles lie within printable margins and do not overlap section viewports or other tables; minimum 80 mm width and 10+8 mm per row height", "output must be declared assembly output and equal every referenced native datum_dimension output; values and witnesses come only from evaluated native reports"]);
+    dimension_table.obligations.extend(["at most 8 tables per sheet, 1..16 rows per table and 128 rows per recipe; unique portable table IDs per sheet", "rectangles lie within printable margins and do not overlap section viewports or other tables; minimum 80 mm width and 10+8 mm per row height", "output must be declared assembly output and equal every referenced native datum_dimension output; values and witnesses come only from evaluated native reports", "show_size_limits=true adds authored size-limit cells from each native datum dimension tolerance report; false preserves the nominal-only layout; three-column tables need width at least 191 mm, height at least 15+8 mm per row, and labels fitting 85 mm"]);
     let mut sheet = object_spec(
         "drawing_sheet",
         vec![

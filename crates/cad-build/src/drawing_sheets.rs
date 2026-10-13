@@ -50,6 +50,8 @@ pub struct DrawingDimensionTable {
     pub id: String,
     pub title: String,
     pub output: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub show_size_limits: bool,
     pub x: f64,
     pub y: f64,
     pub width: f64,
@@ -115,6 +117,10 @@ fn safe_id(id: &str) -> bool {
                 | "LPT9"
         )
 }
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 fn native_dimension_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 128
@@ -339,7 +345,7 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
     let dimensions: BTreeMap<_, _> = recipe
         .datum_dimensions
         .iter()
-        .map(|d| (d.id.as_str(), d.output.as_str()))
+        .map(|d| (d.id.as_str(), d))
         .collect();
     for sheet in &recipe.drawing_sheets {
         sheet.validate()?;
@@ -366,7 +372,11 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
                 });
             }
             for row in &table.rows {
-                if dimensions.get(row.dimension.as_str()) != Some(&table.output.as_str()) {
+                if dimensions
+                    .get(row.dimension.as_str())
+                    .map(|d| d.output.as_str())
+                    != Some(table.output.as_str())
+                {
                     return Err(BuildError::InvalidDrawingSheet {
                         id: sheet.id.clone(),
                         message: format!(
@@ -375,6 +385,20 @@ pub(super) fn preflight(recipe: &Recipe) -> Result<(), BuildError> {
                         ),
                     });
                 }
+            }
+            // Size-band columns are distinct from native measurement bounds.
+            // Their extra cell is admitted before geometry even for a selected
+            // build that does not request this sheet's assembly output.
+            if table.show_size_limits
+                && (table.height < 15. + table.rows.len() as f64 * 8.
+                    || table.width < 191.
+                    || table
+                        .rows
+                        .iter()
+                        .any(|r| r.label.len() as f64 * 2.8 * 0.7 > 85.))
+            {
+                return Err(BuildError::InvalidDrawingSheet { id: sheet.id.clone(),
+                    message: "size-band table needs height at least 15+8 mm per row, width at least 191 mm and labels fitting an 85 mm column".into() });
             }
         }
         if !ids.insert(sheet.id.to_ascii_lowercase()) {

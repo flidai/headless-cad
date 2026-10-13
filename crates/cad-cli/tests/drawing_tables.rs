@@ -65,10 +65,13 @@ fn machining_tables_bind_native_faces_replay_and_reject_bad_references_atomicall
     let tables = drawing["dimension_tables"].as_array().unwrap();
     assert_eq!(tables.len(), 2);
     let mut count = 0;
+    let mut bands = 0;
+    let mut unspecified = 0;
     for table in tables {
         assert_eq!(table["output"], "drive_module_release");
+        assert_eq!(table["show_size_limits"], true);
         let rows = table["rows"].as_array().unwrap();
-        assert_eq!(rows.len(), 5);
+        assert_eq!(rows.len(), 7);
         for row in rows {
             count += 1;
             let id = row["dimension"].as_str().unwrap();
@@ -83,15 +86,35 @@ fn machining_tables_bind_native_faces_replay_and_reject_bad_references_atomicall
             let lower = report["lower_bound_mm"].as_f64().unwrap();
             let upper = report["upper_bound_mm"].as_f64().unwrap();
             assert!(lower <= value && value <= upper);
-            assert!(svg.contains(&format!(
+            let row_id = format!(
                 "id=\"drawing-table-{}-{id}\"",
                 table["id"].as_str().unwrap()
-            )));
-            assert!(svg.contains(&format!("≈ {value:.3} mm")));
+            );
+            let rendered = svg.lines().find(|line| line.contains(&row_id)).unwrap();
+            assert!(rendered.contains(&format!("≈ {value:.3} mm")));
+            if let Some(tolerance) = report["tolerance"].as_object() {
+                bands += 1;
+                let design_lower = tolerance["lower_limit_mm"].as_f64().unwrap();
+                let design_upper = tolerance["upper_limit_mm"].as_f64().unwrap();
+                assert!(design_lower < design_upper);
+                assert_eq!(
+                    row["authored_size_limits_mm"],
+                    serde_json::json!([design_lower, design_upper])
+                );
+                assert!(rendered.contains(&format!("{design_lower}..{design_upper} mm")));
+                assert!(!rendered.contains("not specified"));
+            } else {
+                unspecified += 1;
+                assert!(row["authored_size_limits_mm"].is_null());
+                assert!(rendered.contains(">not specified</text>"));
+            }
         }
     }
-    assert_eq!(count, 10);
-    assert_eq!(svg.matches("Nominal native geometry").count(), 2);
+    assert_eq!(count, 14);
+    assert_eq!(bands, 10);
+    assert_eq!(unspecified, 4);
+    assert_eq!(svg.matches("DESIGN LIMITS").count(), 2);
+    assert_eq!(svg.matches("Nominal native geometry").count(), 0);
     assert!(svg.contains("Revision: A"));
     assert!(svg.contains("Source context:"));
 

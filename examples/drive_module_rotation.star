@@ -151,9 +151,13 @@ end_cover = part(id = "end_cover", body = cover_body, part_number = "DM-END-COVE
     "start":face_datum(from_feature = cover_body, role = "start_cap", x_direction = [1,0,0]),
     "end":face_datum(from_feature = cover_body, role = "end_cap", x_direction = [1,0,0]),
 })
-cover_screw = part(id = "cover_screw_envelope", body = cover_screw_body, part_number = "DM-COVER-SCREW-ENVELOPE", revision = design_revision, description = "Nominal unthreaded end-cover screw envelope; no preload or thread model", material = "Steel", density_kg_per_m3 = 7800)
+cover_screw = part(id = "cover_screw_envelope", body = cover_screw_body, part_number = "DM-COVER-SCREW-ENVELOPE", revision = design_revision, description = "Nominal unthreaded end-cover screw envelope; no preload or thread model", material = "Steel", density_kg_per_m3 = 7800, datums = {
+    "tip":face_datum(from_feature = cover_screw_body, role = "segment_0", x_direction = [1,0,0]),
+    "underhead":face_datum(from_feature = cover_screw_body, role = "segment_2", x_direction = [1,0,0]),
+})
 sleeve = part(id = "sleeve", body = sleeve_body, part_number = "DM-SLEEVE", revision = design_revision, description = "Flanged bronze bush seated against the outer housing face", material = "Bronze", density_kg_per_m3 = 8800, datums = {
     "outer_thrust":face_datum(from_feature = sleeve_body, role = "segment_0", x_direction = [1,0,0]),
+    "flange_inner":face_datum(from_feature = sleeve_body, role = "segment_2", x_direction = [1,0,0]),
 })
 shaft = part(id = "shaft", body = shaft_body, part_number = "DM-SHAFT", revision = design_revision, description = "Finite keyed shaft with integral shoulder and three retaining grooves", material = "Steel", density_kg_per_m3 = 7800, datums = {
     "shoulder":face_datum(from_feature = shaft_stock, role = "segment_2", x_direction = [1,0,0]),
@@ -342,7 +346,8 @@ def cover_machining_dimensions():
             datum_dimension(id = side+"_cover_"+tag+"_depth", output = "drive_module_release",
                 from_instance_path = path, from_datum = "outboard",
                 to_instance_path = path, to_datum = tag+"_floor", direction = -1,
-                min = pilot_depth-0.0001, max = pilot_depth+0.0001)
+                min = pilot_depth-0.0001, max = pilot_depth+0.0001,
+                tolerance = {"nominal":pilot_depth,"lower":-0.10,"upper":0.10})
             datum_dimension(id = side+"_cover_"+tag+"_remaining_floor", output = "drive_module_release",
                 from_instance_path = path, from_datum = "inboard",
                 to_instance_path = path, to_datum = tag+"_floor", direction = -1,
@@ -351,8 +356,35 @@ def cover_machining_dimensions():
         datum_dimension(id = side+"_cover_thickness", output = "drive_module_release",
             from_instance_path = cover_path, from_datum = "start",
             to_instance_path = cover_path, to_datum = "end", direction = -1,
-            min = cover_thickness-0.0001, max = cover_thickness+0.0001)
+            min = cover_thickness-0.0001, max = cover_thickness+0.0001,
+            tolerance = {"nominal":cover_thickness,"lower":-0.05,"upper":0.05})
+        sleeve_path = [side+"_support", "sleeve" if side == "left" else "right_sleeve"]
+        datum_dimension(id = side+"_flange_thickness", output = "drive_module_release",
+            from_instance_path = sleeve_path, from_datum = "outer_thrust",
+            to_instance_path = sleeve_path, to_datum = "flange_inner", direction = -1,
+            min = flange_thickness-0.0001, max = flange_thickness+0.0001,
+            tolerance = {"nominal":flange_thickness,"lower":-0.05,"upper":0.05})
+        for tag in ["minus","plus"]:
+            screw_path = [side+"_support", ("left_cover_screw_" if side == "left" else "right_cover_screw_")+tag]
+            datum_dimension(id = side+"_cover_"+tag+"_shank", output = "drive_module_release",
+                from_instance_path = screw_path, from_datum = "tip",
+                to_instance_path = screw_path, to_datum = "underhead", direction = -1,
+                min = screw_shank_length-0.0001, max = screw_shank_length+0.0001,
+                tolerance = {"nominal":screw_shank_length,"lower":-0.10,"upper":0.10})
 cover_machining_dimensions()
+# Conditional independent-size-band allowance, assuming nominal flange/cover
+# seating and a screw head seated against the cover. No thread, torque, preload,
+# contact or load-capacity result follows from this axial arithmetic.
+def check_cover_tip_allowances():
+    for side in ["left","right"]:
+        for tag in ["minus","plus"]:
+            tolerance_stack(id = side+"_cover_"+tag+"_tip_allowance", terms = [
+                {"datum_dimension":side+"_cover_"+tag+"_depth","coefficient":1},
+                {"datum_dimension":side+"_flange_thickness","coefficient":1},
+                {"datum_dimension":side+"_cover_thickness","coefficient":1},
+                {"datum_dimension":side+"_cover_"+tag+"_shank","coefficient":-1},
+            ], min = 0.15, max = 0.85)
+check_cover_tip_allowances()
 # The views show both native drilled sections and the cover aperture; the
 # tables bind each printed number to an evaluated face-to-face datum report.
 def machining_rows(side):
@@ -362,6 +394,8 @@ def machining_rows(side):
         {"dimension":side+"_cover_minus_remaining_floor","label":"Minus remaining floor"},
         {"dimension":side+"_cover_plus_remaining_floor","label":"Plus remaining floor"},
         {"dimension":side+"_cover_thickness","label":"Retainer cover thickness"},
+        {"dimension":side+"_flange_thickness","label":"Sleeve flange thickness"},
+        {"dimension":side+"_cover_minus_shank","label":"Screw shank envelope"},
     ]
 drawing_sheet(id = "end_cover_machining", title = "End-cover pilot machining and retainer dimensions", revision = design_revision, width = 420, height = 297,
     views = [
@@ -370,8 +404,8 @@ drawing_sheet(id = "end_cover_machining", title = "End-cover pilot machining and
         {"view":"end_cover_section","x":290,"y":10,"width":120,"height":170,"scale":0.8,"paper_annotation_font_mm":2.8,"paper_caption":"END COVER","annotation_labels":[{"dimension":"cover_sleeve_aperture","tag":"B"},{"dimension":"cover_minus_clearance","tag":"C1"},{"dimension":"cover_plus_clearance","tag":"C2"}]},
     ],
     dimension_tables = [
-        {"id":"left_pilots","title":"LEFT HOUSING / COVER","output":"drive_module_release","x":10,"y":190,"width":195,"height":64,"rows":machining_rows("left")},
-        {"id":"right_pilots","title":"RIGHT HOUSING / COVER","output":"drive_module_release","x":215,"y":190,"width":195,"height":64,"rows":machining_rows("right")},
+        {"id":"left_pilots","title":"LEFT HOUSING / COVER","output":"drive_module_release","show_size_limits":True,"x":10,"y":190,"width":195,"height":72,"rows":machining_rows("left")},
+        {"id":"right_pilots","title":"RIGHT HOUSING / COVER","output":"drive_module_release","show_size_limits":True,"x":215,"y":190,"width":195,"height":72,"rows":machining_rows("right")},
     ])
 tolerance_stack(id = "shaft_axial_endplay", terms = [
     {"datum_dimension":"shaft_stop_span","coefficient":1},

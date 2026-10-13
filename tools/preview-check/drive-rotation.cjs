@@ -26,7 +26,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
   assert.match(source,/pilot_depth\s*=\s*param\(name\s*=\s*"pilot_depth",\s*default\s*=\s*5\)/);
   assert.match(source,/cover_thickness\s*=\s*param\(name\s*=\s*"cover_thickness",\s*default\s*=\s*2\)/);
   const manifest=await(await page.request.get(`${base}/manifest.json`)).json();
-  assert.equal(Object.keys(manifest.datum_dimensions).length,20);
+  assert.equal(Object.keys(manifest.datum_dimensions).length,26);
   assert.equal(manifest.drawing_sheets.end_cover_machining.status,'published');
   const section=await(await page.request.get(`${base}/section-mounting_plan.json`)).json();
   const baseSection=section.occurrences.find(o=>o.instance_path.length===1&&o.instance_path[0]==='base');

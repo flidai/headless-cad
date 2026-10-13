@@ -23,7 +23,7 @@ const assert=require('node:assert/strict');
     source.includes('left_cover_shaft_gap')?13:11);
    if(covers){
     const tableSource=source.includes('id = "end_cover_machining"');
-    assert.equal(Object.keys(manifest.datum_dimensions).length,tableSource?20:10);
+    assert.equal(Object.keys(manifest.datum_dimensions).length,manifest.tolerance_stacks.left_cover_minus_tip_allowance?26:tableSource?20:10);
     if(tableSource)assert.equal(manifest.drawing_sheets.end_cover_machining.status,'published');
    }
    assert.ok((await page.goto(`${base}/${name}/rotation-rotor.html`)).ok());

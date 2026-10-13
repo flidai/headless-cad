@@ -13,12 +13,12 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
     assert_eq!(group.clearance_check_ids.len(), 13);
     assert_eq!(built.assemblies["drive_module_release"].instances.len(), 30);
     assert_eq!(built.assemblies["drive_module_release"].parts.len(), 14);
-    assert_eq!(built.datum_dimensions.len(), 20);
+    assert_eq!(built.datum_dimensions.len(), 26);
     assert_eq!(
         built.drawing_sheets["end_cover_machining"]
             .datum_dimension_ids
             .len(),
-        10
+        14
     );
     let r = 12. / 2.;
     let pi = std::f64::consts::PI;
@@ -56,9 +56,21 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
                     .abs()
                     < 1e-9
             );
+            let shank = &built.datum_dimensions[&format!("{side}_cover_{tag}_shank")];
+            assert!((shank.value_mm - 8.5).abs() < 1e-9);
+            assert!(shank.tolerance.is_some());
+            let stack = &built.tolerance_stacks[&format!("{side}_cover_{tag}_tip_allowance")];
+            assert!((stack.nominal_mm - 0.5).abs() < 1e-9);
+            assert!(stack.lower_limit_mm > 0.19 && stack.lower_limit_mm < 0.21);
+            assert!(stack.upper_limit_mm > 0.79 && stack.upper_limit_mm < 0.81);
+            assert!(stack.measurement_interval_certified);
         }
         assert!(
             (built.datum_dimensions[&format!("{side}_cover_thickness")].value_mm - 2.).abs() < 1e-9
+        );
+        assert!(
+            (built.datum_dimensions[&format!("{side}_flange_thickness")].value_mm - 2.).abs()
+                < 1e-9
         );
     }
     let screw_volume = pi * (1.65f64.powi(2) * 8.5 + 3f64.powi(2) * 2.);
@@ -123,6 +135,20 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
         }
     }
     assert_eq!((common, bore_orbits, queries), (6, 2, 27));
+    let mut widened = replay.clone();
+    widened
+        .datum_dimensions
+        .iter_mut()
+        .find(|d| d.id == "left_cover_minus_shank")
+        .unwrap()
+        .tolerance
+        .as_mut()
+        .unwrap()
+        .upper = 0.4;
+    assert!(matches!(
+        engine.build_outputs(&widened, &["shaft".into()]),
+        Err(cad_build::BuildError::ToleranceStackFailed { .. })
+    ));
     let mut reversed = replay.clone();
     reversed.rigid_rotation_groups[0].angle_radians *= -1.;
     let cached = engine.build(&reversed).unwrap();

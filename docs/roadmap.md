@@ -42,9 +42,12 @@ five configurations and ten publication-preserving refusals; the
 149 artifacts and 27 manifest fields. Paper-sized annotations now have
 [independent scale/edit evidence](evidence/paper-annotations-local.json): native
 labels retain a 2.8 mm print size at two model scales and annotation-only edits
-preserve compared solid artifacts. Authored size bands and an axial allowance
-stack are the next drawing increment; these are distinct from nominal
-measurement correctness.
+preserve compared solid artifacts. Authored size bands and four conditional
+axial allowance stacks now have [independent evidence](evidence/axial-size-bands-local.json)
+across five configurations, including native STEP flange/shank measurements and
+decimal interval arithmetic. This leaves nominal seating/contact validation,
+broader manufacturing semantics, projected drawings and commercial release
+readiness open.
 
 M3's large-assembly gate also includes the architecture's
 [exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):

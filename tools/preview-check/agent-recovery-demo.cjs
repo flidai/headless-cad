@@ -58,10 +58,10 @@ const assert=require('node:assert/strict');
    if(fixture)assert.equal(fixture.named_continuous_clearance_checks,expectedChecks);
    if(fixture){
     const tableSource=source.includes('id = "end_cover_machining"');
-    assert.equal(Object.keys(manifest.datum_dimensions).length,tableSource?20:10);
-    assert.equal(fixture.native_axial_dimensions,tableSource?20:10);
+    assert.equal(Object.keys(manifest.datum_dimensions).length,manifest.tolerance_stacks.left_cover_minus_tip_allowance?26:tableSource?20:10);
+    assert.equal(fixture.native_axial_dimensions,manifest.tolerance_stacks.left_cover_minus_tip_allowance?26:tableSource?20:10);
     if(tableSource){
-     assert.equal(fixture.native_machining_dimension_rows,10);
+     assert.equal(fixture.native_machining_dimension_rows,manifest.tolerance_stacks.left_cover_minus_tip_allowance?14:10);
      assert.equal(manifest.drawing_sheets.end_cover_machining.status,'published');
     }
    }
