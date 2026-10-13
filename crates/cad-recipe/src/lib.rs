@@ -125,6 +125,7 @@ struct GraphStore {
     clearance_checks: RefCell<Vec<serde_json::Value>>,
     datum_dimensions: RefCell<Vec<serde_json::Value>>,
     nominal_seating_checks: RefCell<Vec<serde_json::Value>>,
+    pocket_fit_checks: RefCell<Vec<serde_json::Value>>,
     rigid_rotation_groups: RefCell<Vec<serde_json::Value>>,
     rigid_translation_groups: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
@@ -1171,6 +1172,47 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// Certify complete capsule insert clearance inside a native blind capsule pocket.
+    fn pocket_fit_check(
+        id: &str,
+        output: &str,
+        pocket_instance_path: Value,
+        pocket_datum: &str,
+        insert_instance_path: Value,
+        insert_datum: &str,
+        min_side_clearance_mm: Value,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let check = cad_build::PocketFitCheck {
+            id: id.into(),
+            output: output.into(),
+            pocket: cad_build::DatumDimensionEndpoint {
+                instance_path: occurrence_path(pocket_instance_path, "pocket_instance_path")?,
+                datum: pocket_datum.into(),
+            },
+            insert: cad_build::DatumDimensionEndpoint {
+                instance_path: occurrence_path(insert_instance_path, "insert_instance_path")?,
+                datum: insert_datum.into(),
+            },
+            min_side_clearance_mm: number(min_side_clearance_mm)?,
+        };
+        check.validate()?;
+        let graph = store(eval)?;
+        let mut checks = graph.pocket_fit_checks.borrow_mut();
+        anyhow::ensure!(
+            checks.len() < cad_build::MAX_POCKET_FIT_CHECKS,
+            "too many pocket fit checks"
+        );
+        anyhow::ensure!(
+            !checks.iter().any(|old| old["id"]
+                .as_str()
+                .is_some_and(|v| v.eq_ignore_ascii_case(id))),
+            "duplicate pocket fit check ID"
+        );
+        checks.push(serde_json::to_value(check)?);
+        Ok(NoneType)
+    }
+
     /// Declare a source-owned independent worst-case linear dimensional stack.
     fn tolerance_stack(
         id: &str,
@@ -2128,6 +2170,7 @@ pub fn from_starlark_with_modules_and_provenance(
     let clearance_checks = graph.clearance_checks.into_inner();
     let datum_dimensions = graph.datum_dimensions.into_inner();
     let nominal_seating_checks = graph.nominal_seating_checks.into_inner();
+    let pocket_fit_checks = graph.pocket_fit_checks.into_inner();
     let rigid_rotation_groups = graph.rigid_rotation_groups.into_inner();
     let rigid_translation_groups = graph.rigid_translation_groups.into_inner();
     let face_datums = graph.face_datums.into_inner();
@@ -2143,7 +2186,7 @@ pub fn from_starlark_with_modules_and_provenance(
             || feature["op"] == "blind_slot_pattern"
     });
     let mut value = serde_json::json!({
-        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !slot_center_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() || !rigid_translation_groups.is_empty() { 2 } else { 1 },
+        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !slot_center_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !pocket_fit_checks.is_empty() || !rigid_rotation_groups.is_empty() || !rigid_translation_groups.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -2173,6 +2216,9 @@ pub fn from_starlark_with_modules_and_provenance(
     }
     if !clearance_checks.is_empty() {
         value["clearance_checks"] = serde_json::json!(clearance_checks);
+    }
+    if !pocket_fit_checks.is_empty() {
+        value["pocket_fit_checks"] = serde_json::json!(pocket_fit_checks);
     }
     if !nominal_seating_checks.is_empty() {
         value["nominal_seating_checks"] = serde_json::json!(nominal_seating_checks);

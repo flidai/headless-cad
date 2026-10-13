@@ -8,7 +8,7 @@ of completion dates or an assertion that the present implementation has parity.
 
 ## Current checkpoint
 
-The latest accepted workflow mounts the actual pocketed drive base at both
+The accepted drive workflow mounts the actual pocketed drive base at both
 slot endpoints and certifies continuous adjustment. Its original clearance,
 seating, retention, tolerance and mass obligations remain active. Durable agent
 acceptance preserves the parameter override and all engineering checks through
@@ -17,7 +17,9 @@ failed revisions, restart and offline replay. Retained receipts are below.
 Material-aware mounting certificates now account for actual pocket openings
 and bind through-slot travel to original physical walls. The tightened and
 adjustment recipes accept a pocketed base. Native capsule-floor seating now
-supports actual height-setting inserts through bounded datum attachments.
+supports actual height-setting inserts through bounded datum attachments. The
+latest increment adds a separate whole-footprint capsule fit certificate, with
+independently checked side clearance and publication-preserving collision refusal.
 General Booleans, arbitrary surfaces, complex attached contact chains and rated
 mechanical loading remain separate work.
 
@@ -1179,3 +1181,50 @@ between its floors. This removes a topology-event refusal at the valid 6 mm
 second-pocket depth; both opening directions are covered by regression tests.
 These local support interfaces do not establish insert retention, preload,
 full-contact constraints or rated load capacity. Commercial gates remain open.
+
+### Complete capsule insert fit
+
+The insert revision adds a source-owned `pocket_fit_check` beside
+floor seating. The native query bounds the complete capsule footprint against
+four actual finite pocket walls, includes guarded axial overlap/floor gap, and
+binds current native face identities. Both placement uncertainty and the authored
+minimum clearance participate in acceptance. Global selected-output and cache
+behavior must remain unchanged; a failed fit preserves the published generation.
+
+The decisive boundary cases separate this obligation from local floor contact:
+a 0.159 mm lateral shift leaves 0.041 mm clearance, while 0.161 mm leaves only
+0.039 mm against the 0.04 mm requirement. A 0.3 mm shift physically intersects
+the stock even though floor seats and proud-height measurements still pass.
+Independent STEP acceptance must measure actual trimmed sidewalls and confirm
+native witness-face bindings; a distance to the whole pocket body would be zero
+at the floor and cannot validate side clearance.
+
+The [independent fit receipt](evidence/pocket-fit-local.json) records six positive
+configurations and six publication-preserving refusals. It maps native witness
+faces to independently imported STEP faces, measures finite sidewall distances,
+checks full moments/nonpenetration, and replays the captured source. The isolated
+collision control retains both seats and heights while STEP measures 7.63 mm³
+of stock overlap. Native tests, recipe/CLI regressions and strict workspace
+Clippy pass. Old schema-1 serialization remains compatible, with explicit null
+checks refused. All five commercial release gates remain open.
+
+[Browser acceptance](evidence/pocket-fit-browser-local.json) verifies both fit
+rows, current source navigation, stable artifact hashes and zero writes/errors.
+Bounded catalog traversal now includes separate folder navigation, so earlier
+artifact-heavy subtrees cannot hide later examples from inspection.
+
+### Next reusable modeling increment: line/arc profile pockets
+
+Generalize axial blind pockets beyond obrounds, beginning with a motor housing
+that combines mounting slots, a rounded rectangular recess and a separate deeper
+cable pocket. Use one bounded simple closed line/arc contour per operation,
+serial same-cap depths, positive web and separated voids. Retain old capsule
+face ordering and semantic roles; keep capsule-specific certificates narrowly
+admitted. Intersecting pockets, islands, undercuts and ambiguous boundaries stay
+outside this first domain.
+
+Acceptance requires exact native moments, independent STEP geometry, closed
+oriented meshes with shared rim vertices, both opening directions, earlier-floor
+lineage through subsequent cuts, source replay and failed-generation preservation.
+This extends reusable operation composition toward the commercial modeling gate;
+it does not close that gate or general curved Boolean modeling.

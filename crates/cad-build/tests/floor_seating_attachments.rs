@@ -66,3 +66,57 @@ fn unsupported_attachment_operands_and_cancellation_refuse() {
         assert!(run(v).is_err(), "case {case}");
     }
 }
+
+#[test]
+fn capsule_fit_is_independent_of_seating_global_and_cache_safe() {
+    for bottom in [false, true] {
+        let mut v = fixture(bottom);
+        v["features"][3] = json!({"op":"path","id":"pad_profile","start":[3,-8],"segments":[{"kind":"line_to","end":[3,8]},{"kind":"arc_to","center":[0,8],"end":[-3,8]},{"kind":"line_to","end":[-3,-8]},{"kind":"arc_to","center":[0,-8],"end":[3,-8]}]});
+        v["nominal_seating_checks"] = json!([]);
+        v["pocket_fit_checks"] = json!([{"id":"fit","output":"root","pocket":{"instance_path":["placed","plate"],"datum":"floor"},"insert":{"instance_path":["placed","pad"],"datum":"seat"},"min_side_clearance_mm":2.9}]);
+        let source: Recipe = serde_json::from_value(v.clone()).unwrap();
+        let mut engine = BuildEngine::default();
+        let result = engine.build_outputs(&source, &["stock".into()]).unwrap();
+        assert!(result.assemblies.is_empty());
+        let report = &result.pocket_fit_checks["fit"];
+        assert!(report.side_clearance_lower_mm < 3. && report.side_clearance_upper_mm > 3.);
+        assert_eq!(
+            report.query.insert_floor_face,
+            report.insert.semantic_datum.selection.witnesses[0].target_face
+        );
+        assert_eq!(
+            engine
+                .build_outputs(&source, &["stock".into()])
+                .unwrap()
+                .stats
+                .computed_solids,
+            0
+        );
+        let mut failed = source.clone();
+        failed.pocket_fit_checks[0].min_side_clearance_mm = 3.1;
+        assert!(matches!(
+            engine.build_outputs(&failed, &["stock".into()]),
+            Err(cad_build::BuildError::PocketFitCheckFailed { .. })
+        ));
+        let mut array = v.clone();
+        array["pocket_fit_checks"][0] = json!(["fit","root",{"instance_path":["placed","plate"],"datum":"floor"},{"instance_path":["placed","pad"],"datum":"seat"},2.9]);
+        assert!(serde_json::from_value::<Recipe>(array).is_err());
+        let mut wrong_cap = v.clone();
+        wrong_cap["face_datums"][1]["role"] = json!("end_cap");
+        assert!(matches!(
+            run(wrong_cap),
+            Err(cad_build::BuildError::PocketFitCheckFailed { .. })
+        ));
+        let mut wrong_floor = v.clone();
+        wrong_floor["face_datums"][0]["role"] = json!("end_cap");
+        wrong_floor["face_datums"][0]["anchor_feature"] = json!("stock");
+        assert!(run(wrong_floor).is_err());
+        v["pocket_fit_checks"][0]["unknown"] = json!(1);
+        assert!(serde_json::from_value::<Recipe>(v).is_err());
+        failed.pocket_fit_checks[0].min_side_clearance_mm = -1.;
+        assert!(matches!(
+            engine.build(&failed),
+            Err(cad_build::BuildError::InvalidPocketFitCheck { .. })
+        ));
+    }
+}

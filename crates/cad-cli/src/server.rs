@@ -152,7 +152,31 @@ fn handle(mut stream: TcpStream, root: &Path) -> io::Result<()> {
             &mut stream,
             200,
             "text/html; charset=utf-8",
-            gallery(&directory).as_bytes(),
+            gallery(&directory, "").as_bytes(),
+            head,
+        );
+    }
+    if directory
+        .symlink_metadata(&path)
+        .is_ok_and(|metadata| metadata.is_dir())
+    {
+        if path
+            .components()
+            .any(|c| private_stage_directory(&c.as_os_str().to_string_lossy()))
+        {
+            return respond(
+                &mut stream,
+                404,
+                "text/plain",
+                b"Artifact not found\n",
+                head,
+            );
+        }
+        return respond(
+            &mut stream,
+            200,
+            "text/html; charset=utf-8",
+            gallery(&directory, &path.to_string_lossy()).as_bytes(),
             head,
         );
     }
@@ -328,7 +352,7 @@ fn url(path: &str) -> String {
     result
 }
 
-fn gallery(directory: &Dir) -> String {
+fn gallery(directory: &Dir, folder: &str) -> String {
     fn discover(
         directory: &Dir,
         prefix: &str,
@@ -401,15 +425,25 @@ fn gallery(directory: &Dir) -> String {
     let mut previews = Vec::new();
     let mut sections = std::collections::BTreeMap::new();
     let mut studies = std::collections::BTreeMap::new();
-    discover(
-        directory,
-        "",
-        0,
-        &mut 5000,
-        &mut previews,
-        &mut sections,
-        &mut studies,
-    );
+    let scoped = directory.open_dir(if folder.is_empty() { "." } else { folder });
+    let prefix = if folder.is_empty() {
+        String::new()
+    } else {
+        format!("{folder}/")
+    };
+    let mut remaining = 5000;
+    if let Ok(scoped) = &scoped {
+        discover(
+            scoped,
+            &prefix,
+            0,
+            &mut remaining,
+            &mut previews,
+            &mut sections,
+            &mut studies,
+        );
+    }
+    let truncated = remaining == 0 || previews.len() >= 500;
     let mut models = std::collections::BTreeMap::new();
     for path in previews {
         let stem = path
@@ -422,7 +456,43 @@ fn gallery(directory: &Dir) -> String {
         }
     }
     let previews: Vec<_> = models.into_values().collect();
-    let mut output = String::from("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Headless CAD · Models</title><style>body{margin:0;background:#0d1522;color:#e6edf5;font:16px system-ui;padding:clamp(16px,4vw,40px)}main{max-width:1200px;margin:auto}h1{font-size:36px;margin-bottom:8px}.muted{color:#9aaec4}section{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:20px;margin-top:32px}article{background:#172438;border:1px solid #2b4059;border-radius:16px;overflow:hidden;padding:20px}img{width:100%;height:210px;object-fit:contain;background:#eff4f9;border-radius:10px}a{color:#91d1ff;text-decoration:none}a:hover{text-decoration:underline}nav{display:flex;gap:16px;flex-wrap:wrap;margin-top:18px}h2{font-size:20px;overflow-wrap:anywhere}</style></head><body><main><p class=\"muted\">RUST KERNEL / READ-ONLY VIEWER</p><h1>Model library</h1><p class=\"muted\">Recipes are the source of truth. Open a generated model to orbit, inspect faces, and download geometry.</p><section>");
+    let mut output = String::from("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Headless CAD · Models</title><style>body{margin:0;background:#0d1522;color:#e6edf5;font:16px system-ui;padding:clamp(16px,4vw,40px)}main{max-width:1200px;margin:auto}h1{font-size:36px;margin-bottom:8px}.muted{color:#9aaec4}section{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:20px;margin-top:32px}article{background:#172438;border:1px solid #2b4059;border-radius:16px;overflow:hidden;padding:20px}img{width:100%;height:210px;object-fit:contain;background:#eff4f9;border-radius:10px}a{color:#91d1ff;text-decoration:none}a:hover{text-decoration:underline}nav{display:flex;gap:16px;flex-wrap:wrap;margin-top:18px}h2{font-size:20px;overflow-wrap:anywhere}</style></head><body><main><p class=\"muted\">RUST KERNEL / READ-ONLY VIEWER</p><h1>Model library</h1><p class=\"muted\">Recipes are the source of truth. Open a generated model to orbit, inspect faces, and download geometry.</p>");
+    // Immediate folders have an independent budget, so an artifact-heavy earlier
+    // subtree cannot make later example directories disappear from navigation.
+    output.push_str("<nav aria-label=\"Artifact folders\"><a href=\"/\">All models</a>");
+    if let Ok(scoped) = scoped {
+        if let Ok(entries) = scoped.entries() {
+            let mut folders: Vec<_> = entries
+                .take(5001)
+                .filter_map(Result::ok)
+                .filter(|e| e.file_type().is_ok_and(|k| k.is_dir()))
+                .filter_map(|e| e.file_name().to_str().map(str::to_owned))
+                .filter(|name| !private_stage_directory(name))
+                .collect();
+            folders.sort();
+            for name in folders {
+                let path = format!("{prefix}{name}");
+                output.push_str(&format!(
+                    "<a href=\"{}/\">{}</a>",
+                    url(&path),
+                    escape(&name)
+                ));
+                let fit = format!("{path}/pocket-fit-checks.html");
+                if directory.metadata(&fit).is_ok_and(|m| m.is_file()) {
+                    output.push_str(&format!(
+                        "<a href=\"{}\">Pocket fit · {}</a>",
+                        url(&fit),
+                        escape(&name)
+                    ));
+                }
+            }
+        }
+    }
+    output.push_str("</nav>");
+    if truncated {
+        output.push_str("<p class=\"muted\">Model scan limit reached. Open an artifact folder to inspect its models.</p>");
+    }
+    output.push_str("<section>");
     for preview in &previews {
         let stem = preview
             .strip_suffix(".preview.html")
@@ -559,6 +629,20 @@ fn gallery(directory: &Dir) -> String {
             output.push_str(&format!(
                 "<a href=\"{}\">Nominal seating</a>",
                 url(&seating_report)
+            ));
+        }
+        let pocket_fit_report = if folder.is_empty() {
+            "pocket-fit-checks.html".to_owned()
+        } else {
+            format!("{folder}/pocket-fit-checks.html")
+        };
+        if directory
+            .metadata(&pocket_fit_report)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!(
+                "<a href=\"{}\">Pocket fit</a>",
+                url(&pocket_fit_report)
             ));
         }
         let clearance_report = if folder.is_empty() {
@@ -812,6 +896,30 @@ mod tests {
         assert!(response.contains("/nested/part%20%26%20test.exchange.json"));
         assert!(response.contains("loading=\"lazy\""));
         assert!(response.contains("Recipes are the source of truth"));
+    }
+
+    #[test]
+    fn bounded_catalog_retains_later_folder_navigation_and_reports() {
+        let dir = tempfile::tempdir().unwrap();
+        let noisy = dir.path().join("aaa");
+        std::fs::create_dir(&noisy).unwrap();
+        for index in 0..5001 {
+            std::fs::write(noisy.join(format!("artifact-{index}.json")), "{}").unwrap();
+        }
+        let late = dir.path().join("zzz");
+        std::fs::create_dir(&late).unwrap();
+        std::fs::write(late.join("part.preview.html"), "preview").unwrap();
+        std::fs::write(late.join("pocket-fit-checks.html"), "report").unwrap();
+        let root = request(dir.path(), b"GET / HTTP/1.1\r\n\r\n");
+        assert!(root.contains("Model scan limit reached"));
+        assert!(root.contains("href=\"/zzz/\""));
+        assert!(root.contains("/zzz/pocket-fit-checks.html"));
+        let child = request(dir.path(), b"GET /zzz/ HTTP/1.1\r\n\r\n");
+        assert!(child.contains("/zzz/part.preview.html"));
+        assert!(child.contains("/zzz/pocket-fit-checks.html"));
+        std::fs::create_dir(dir.path().join(".cad-stage-private")).unwrap();
+        let private = request(dir.path(), b"GET /.cad-stage-private/ HTTP/1.1\r\n\r\n");
+        assert!(private.starts_with("HTTP/1.1 404"));
     }
 
     #[test]

@@ -40,6 +40,7 @@ mod convex_trim_clearance;
 mod hub_keyway;
 mod keyseat;
 mod planar_seating;
+mod pocket_fit;
 mod rotation_clearance;
 mod slot_trim_clearance;
 mod solid_clearance;
@@ -106,6 +107,7 @@ pub use math::Tolerance;
 use math::{cross, dot, sub};
 pub use orthogonal::{boolean, translate, BooleanOp};
 pub use planar_seating::{certify_planar_seating, PlanarSeating};
+pub use pocket_fit::{certify_capsule_pocket_fit, CapsulePocketFit};
 pub use polygon::{extrude_polygon, validate_polygon, MAX_POLYGON_POINTS};
 pub use prism::{extrude_polygon_with_holes, validate_polygon_with_holes, MAX_POLYGON_HOLES};
 pub use profile_prism::{

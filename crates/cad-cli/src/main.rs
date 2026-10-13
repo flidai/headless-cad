@@ -26,6 +26,7 @@ mod drawing;
 mod exchange;
 mod integrity;
 mod nominal_seating;
+mod pocket_fit;
 mod report_numbers;
 mod rigid_rotation;
 mod rigid_translation;
@@ -275,6 +276,7 @@ fn report(recipe: &Recipe, build: &BuildResult) -> Result<Value, Box<dyn Error>>
         "rigid_rotation_groups": build.rigid_rotation_groups,
         "clearance_checks": build.clearance_checks,
         "nominal_seating_checks": build.nominal_seating_checks,
+        "pocket_fit_checks": build.pocket_fit_checks,
         "exchange_requirements": exchange::pending(&recipe.exchange_requirements),
         "exchange_policy_status": if recipe.exchange_requirements.is_empty() { "not_requested" } else { "pending_publication" },
         "sketch_reports": build.sketch_reports,
@@ -561,7 +563,7 @@ fn difference(before: &Value, after: &Value) -> Value {
         "before_bindings": before["mechanism_bindings"], "after_bindings": after["mechanism_bindings"],
         "before_context_hash": before["mechanism_context_hash"], "after_context_hash": after["mechanism_context_hash"],
     });
-    json!({"outputs":changes,"rigid_translation_groups":{"before":before["rigid_translation_groups"],"after":after["rigid_translation_groups"]},"rigid_rotation_groups":{"before":before["rigid_rotation_groups"],"after":after["rigid_rotation_groups"]},"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"nominal_seating_checks":{"before":before["nominal_seating_checks"],"after":after["nominal_seating_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"slot_center_datums":{"before":before["slot_center_datums"],"after":after["slot_center_datums"]},"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
+    json!({"outputs":changes,"rigid_translation_groups":{"before":before["rigid_translation_groups"],"after":after["rigid_translation_groups"]},"rigid_rotation_groups":{"before":before["rigid_rotation_groups"],"after":after["rigid_rotation_groups"]},"datum_dimensions":{"before":before["datum_dimensions"],"after":after["datum_dimensions"]},"clearance_checks":{"before":before["clearance_checks"],"after":after["clearance_checks"]},"nominal_seating_checks":{"before":before["nominal_seating_checks"],"after":after["nominal_seating_checks"]},"pocket_fit_checks":{"before":before["pocket_fit_checks"],"after":after["pocket_fit_checks"]},"tolerance_stacks":{"before":before["tolerance_stacks"],"after":after["tolerance_stacks"]},"drawing_sheets":{"before":before["drawing_sheets"],"after":after["drawing_sheets"]},"mechanisms":mechanisms,"section_views":view_changes,"exchange_requirements":exchange_changes,"exchange_policy_status":{"before":before["exchange_policy_status"],"after":after["exchange_policy_status"]},"face_assertions":assertions,"property_assertions":properties,"sketches":sketches,"face_datums":datums,"slot_center_datums":{"before":before["slot_center_datums"],"after":after["slot_center_datums"]},"scope":{"before":before["scope"],"after":after["scope"]},"comparison":"build hashes, measured properties, sketch solutions, assertion witnesses, native section views, pending exchange requirements and associative datum resolutions; not a proof of geometric equivalence"})
 }
 
 fn validate_assembly_manifest(path: &Path, raw: &Value) -> Result<Value, Box<dyn Error>> {
@@ -1600,6 +1602,7 @@ fn run_with_source(cli: Cli, source: Option<&source::Snapshot>) -> Result<Value,
         tolerance_stacks::publish(&build, &summary, &mut artifacts)?;
         clearance::publish(&build, &summary, &mut artifacts)?;
         nominal_seating::publish(&build, &summary, &mut artifacts)?;
+        pocket_fit::publish(&build, &summary, &mut artifacts)?;
         rigid_rotation::publish(&build, &summary, &mut artifacts)?;
         rigid_translation::publish(&build, &summary, &mut artifacts)?;
         summary["mesh_cache"] = serde_json::to_value(mesh_cache.stats())?;
@@ -1807,6 +1810,26 @@ fn main() {
                         message,
                     } => {
                         report["code"] = json!("nominal_seating_check_failed");
+                        report["check_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::InvalidPocketFitCheck {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("invalid_pocket_fit_check");
+                        report["check_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::PocketFitCheckFailed {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("pocket_fit_check_failed");
                         report["check_id"] = json!(id);
                         report["output_name"] = json!(output);
                         report["diagnostic"] = json!(message);

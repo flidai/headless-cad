@@ -3536,9 +3536,11 @@ height measurements remain required during selected-output builds.
 The current seating attachment contract supports an identity mount attached to
 a directly placed sibling's native face, with that same face named as the
 opposite seating endpoint. Complex attachment chains remain unsupported.
-A local contact disk does not prove the complete insert clears every wall;
-centered profiles use positive nominal clearance, and the independent export
-checks validate whole-body nonpenetration for the accepted configurations.
+A separate `pocket_fit_check` certifies clearance around the complete capsule
+insert footprint against the actual pocket walls. The recipe requires at least
+0.04 mm; a sideways shift can fail this check while still passing floor seating.
+The native report includes guarded clearance, wall overlap and floor-gap
+intervals, physical face witnesses and current source bindings.
 No insert retention, preload or rated-load model is implied.
 
 [Independent insert evidence](docs/evidence/pocketed-inserts-local.json) covers
@@ -3547,3 +3549,41 @@ four configurations and seven publication-preserving refusals.
 source links, contact reports and native drawing. With `./scripts/dev.sh`, open
 [the seated fixture](http://localhost:8080/seated_pocket_inserts/seated_pocket_inserts.gpu.html)
 or [its height drawing](http://localhost:8080/seated_pocket_inserts/drawing-seated_insert_heights.svg).
+
+
+### Check the complete insert fit
+
+`pocket_fit_check` binds an assembly occurrence and native floor datum to an
+insert occurrence and its floor-facing cap. For the supported solid capsule
+inserts and strict blind capsule pockets, the kernel bounds clearance over the
+whole footprint analytically. It also requires positive axial wall overlap and
+refuses resolved below-floor penetration. The existing floor-seat check remains
+responsible for nominal contact; arithmetic-level coincidence is not an exact
+physical-contact guarantee.
+
+```sh
+cad build examples/seated_pocket_inserts.star --param first_insert_shift=0.1 \
+  --out-dir out/shifted_insert
+# Rejected: remaining 0.039 mm is below the authored 0.04 mm requirement.
+cad build examples/seated_pocket_inserts.star --param first_insert_shift=0.161 \
+  --out-dir out/shifted_insert
+```
+
+The rejected build preserves the previous published generation. Inspect
+`pocket-fit-checks.html` or its source-bound JSON report. Selected-output builds
+and warm-cache builds enforce these checks globally. Unsupported profile shapes,
+attachment chains and insufficient numerical precision refuse explicitly.
+
+[Independent fit evidence](docs/evidence/pocket-fit-local.json) covers six
+configurations and six rejected revisions, including a collision that the
+separate floor-seat checks correctly do not detect. The native guarantees cover
+the documented capsule domain; arbitrary-profile fit remains unsupported.
+
+The model library keeps bounded recursive scanning and provides immediate-folder
+navigation. When the overview reaches its scan limit, open an example folder to
+see its models and reports; direct artifact links remain available.
+
+[Browser acceptance](docs/evidence/pocket-fit-browser-local.json) checks the
+new report, exact captured recipe selection, read-only inspection and stable
+artifact hashes. Open the [insert folder](http://localhost:8080/seated_pocket_inserts/)
+or [native fit report](http://localhost:8080/seated_pocket_inserts/pocket-fit-checks.html).

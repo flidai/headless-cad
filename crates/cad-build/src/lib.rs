@@ -45,6 +45,7 @@ pub use translation_groups::{
 };
 mod datum_dimensions;
 mod nominal_seating;
+mod pocket_fit;
 pub use datum_dimensions::{
     DatumDimension, DatumDimensionEndpoint, DatumDimensionReport, DatumDimensionWitness,
     MAX_DATUM_DIMENSIONS, MAX_DATUM_DIMENSION_WORK,
@@ -53,6 +54,7 @@ pub use nominal_seating::{
     NominalSeatingCheck, NominalSeatingCheckReport, MAX_NOMINAL_SEATING_CHECKS,
     MAX_NOMINAL_SEATING_WORK,
 };
+pub use pocket_fit::{PocketFitCheck, PocketFitCheckReport, MAX_POCKET_FIT_CHECKS};
 mod clearance_checks;
 pub use clearance_checks::{
     ClearanceCheck, ClearanceCheckReport, ClearanceOccurrenceWitness, RotationPath,
@@ -150,6 +152,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("clearance_checks.rs").as_slice(),
             include_bytes!("datum_dimensions.rs").as_slice(),
             include_bytes!("nominal_seating.rs").as_slice(),
+            include_bytes!("pocket_fit.rs").as_slice(),
             include_bytes!("rotation_groups.rs").as_slice(),
             include_bytes!("translation_groups.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
@@ -210,6 +213,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub nominal_seating_checks: Vec<NominalSeatingCheck>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub pocket_fit_checks: Vec<PocketFitCheck>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub rigid_rotation_groups: Vec<RigidRotationGroup>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub rigid_translation_groups: Vec<RigidTranslationGroup>,
@@ -269,6 +274,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             nominal_seating_checks: Option<Vec<NominalSeatingCheck>>,
             #[serde(default, deserialize_with = "present_vec")]
+            pocket_fit_checks: Option<Vec<PocketFitCheck>>,
+            #[serde(default, deserialize_with = "present_vec")]
             rigid_rotation_groups: Option<Vec<RigidRotationGroup>>,
             #[serde(default, deserialize_with = "present_vec")]
             rigid_translation_groups: Option<Vec<RigidTranslationGroup>>,
@@ -308,6 +315,11 @@ impl<'de> Deserialize<'de> for Recipe {
         if raw.schema_version == 1 && raw.datum_dimensions.is_some() {
             return Err(serde::de::Error::custom(
                 "datum dimensions require schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.pocket_fit_checks.is_some() {
+            return Err(serde::de::Error::custom(
+                "pocket fit checks require schema version 2",
             ));
         }
         if raw.schema_version == 1 && raw.nominal_seating_checks.is_some() {
@@ -385,6 +397,7 @@ impl<'de> Deserialize<'de> for Recipe {
             clearance_checks: raw.clearance_checks.unwrap_or_default(),
             datum_dimensions: raw.datum_dimensions.unwrap_or_default(),
             nominal_seating_checks: raw.nominal_seating_checks.unwrap_or_default(),
+            pocket_fit_checks: raw.pocket_fit_checks.unwrap_or_default(),
             rigid_rotation_groups: raw.rigid_rotation_groups.unwrap_or_default(),
             rigid_translation_groups: raw.rigid_translation_groups.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
@@ -1163,6 +1176,7 @@ pub struct BuildResult {
     pub clearance_checks: BTreeMap<String, ClearanceCheckReport>,
     pub datum_dimensions: BTreeMap<String, DatumDimensionReport>,
     pub nominal_seating_checks: BTreeMap<String, NominalSeatingCheckReport>,
+    pub pocket_fit_checks: BTreeMap<String, PocketFitCheckReport>,
     pub rigid_rotation_groups: BTreeMap<String, RigidRotationGroupReport>,
     pub rigid_translation_groups: BTreeMap<String, RigidTranslationGroupReport>,
     pub face_datums: ResolvedFaceDatums,
@@ -1176,6 +1190,19 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("invalid pocket fit check '{id}' on '{output}': {message}")]
+    InvalidPocketFitCheck {
+        id: String,
+        output: String,
+        message: String,
+    },
+    #[error("pocket fit check '{id}' on '{output}' failed: {message}")]
+    PocketFitCheckFailed {
+        id: String,
+        output: String,
+        message: String,
+    },
+
     #[error("invalid nominal seating check '{id}' on '{output}': {message}")]
     InvalidNominalSeatingCheck {
         id: String,
@@ -2038,6 +2065,7 @@ impl BuildEngine {
         drawing_sheets::preflight(recipe)?;
         datum_dimensions::preflight(recipe)?;
         nominal_seating::preflight(recipe)?;
+        pocket_fit::preflight(recipe)?;
         tolerance_stacks::preflight(recipe)?;
         clearance_checks::preflight(recipe)?;
         rotation_groups::preflight(recipe)?;
@@ -3027,6 +3055,7 @@ impl BuildEngine {
             clearance_checks: BTreeMap::new(),
             datum_dimensions: BTreeMap::new(),
             nominal_seating_checks: BTreeMap::new(),
+            pocket_fit_checks: BTreeMap::new(),
             rigid_rotation_groups: BTreeMap::new(),
             rigid_translation_groups: BTreeMap::new(),
             face_datums: BTreeMap::new(),
@@ -3080,6 +3109,7 @@ impl BuildEngine {
             .chain(recipe.property_assertions.iter().map(|a| a.output.clone()))
             .chain(recipe.section_views.iter().map(|a| a.output.clone()))
             .chain(recipe.clearance_checks.iter().map(|a| a.output.clone()))
+            .chain(recipe.pocket_fit_checks.iter().map(|a| a.output.clone()))
             .chain(recipe.datum_dimensions.iter().map(|a| a.output.clone()))
             .chain(
                 recipe
@@ -3144,6 +3174,12 @@ impl BuildEngine {
             tolerance,
         )?;
         result.nominal_seating_checks = nominal_seating::evaluate(
+            recipe,
+            &assertion_assemblies,
+            &result.face_datums,
+            tolerance,
+        )?;
+        result.pocket_fit_checks = pocket_fit::evaluate(
             recipe,
             &assertion_assemblies,
             &result.face_datums,

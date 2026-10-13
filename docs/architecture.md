@@ -4016,9 +4016,37 @@ Nested targets, attached ancestors, joints and nonidentity source mount frames
 remain outside this admission. Insufficient precision blocks publication.
 
 A local floor contact disk does not certify the full insert against side walls.
-The height-setting insert fixture uses centered smaller capsule profiles with
-bounded positive nominal clearance, and independent STEP checks must establish
-whole-body nonpenetration for accepted configurations. Native floor seating and
+The height-setting insert fixture adds a separate native full-footprint fit
+obligation, and independent STEP checks establish whole-body nonpenetration for
+accepted configurations. Native floor seating and
 protrusion dimensions remain global obligations for selected-output and warm
 builds. Tests must isolate these obligations so an earlier dimension failure
 cannot conceal a missing contact check.
+
+
+### Complete capsule insert fit
+
+The kernel owns `certify_capsule_pocket_fit`, independently of the seating query.
+Admission requires strict reconstructed native pocket topology and a solid,
+constant capsule extrusion with parallel or opposite extrusion axes. For pocket
+radius R and insert radius r, the planar margin is R − r − d, where d is the
+maximum distance of either insert centerline endpoint from the pocket's finite
+centerline segment. Convexity bounds the complete centerline; the radius offset
+then covers the entire footprint. This is an analytic certificate, not a mesh or
+sampled collision test. An actual physical sidewall pair provides an upper-bound
+witness. Raw native supports must agree within the query's arithmetic budget.
+
+The report binds the selected floor, its four shortened walls, the insert's
+floor-facing cap, witness points and guarded clearance/axial intervals. Positive
+wall overlap and no resolved below-floor penetration are required. A guarded
+floor interval that spans zero is nominal coincidence, not a proof of exact
+mathematical nonpenetration. Seating remains a separate source-owned obligation.
+
+The build layer resolves current semantic face identities and charges bounded
+placement uncertainty before checking the authored minimum clearance. The same
+strict attachment admission used for nominal seating applies. Fit obligations
+are global even for selected outputs and cache hits. Manifest, check, diff and
+read-only HTML/JSON publication retain the declaration and native witnesses;
+failed checks preserve the prior complete generation. Independent STEP acceptance
+must exercise a safe lateral edit, a below-minimum gap and a true wall collision,
+with floor-seating positive controls to demonstrate independent coverage.

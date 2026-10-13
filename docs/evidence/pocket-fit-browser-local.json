@@ -1,0 +1,28 @@
+{
+  "valid": true,
+  "instances": 3,
+  "fit_checks": 2,
+  "floor_seats": 2,
+  "native_height_dimensions": 2,
+  "source_navigation": true,
+  "read_only": true,
+  "native_intervals_mm": {
+    "first_insert_pocket_fit": [
+      0.19999999492299708,
+      0.2000000050770086
+    ],
+    "second_insert_pocket_fit": [
+      0.19999999415537104,
+      0.20000000584463465
+    ]
+  },
+  "manifest_sha256": "ad8ed9477759fd3f28b37ad001bbb4498d01a40f4cadc4220742613129cf25df",
+  "pocket_fit_report_sha256": "87c7aa8644d04def9a1c2f20abc4c8c3ec53a2a9760ca081d3e5f899bc3ffb67",
+  "bundle_sha256": "52c2ee0d2647d47bdbac871977421aae341a9c0f399fa1cc8e4b31ebac2e5b0e",
+  "source_provenance_sha256": "9c91e6ca82e85a3dafe114d8b2ab44d49e2f3f6d9943b05a2df9df612a3dd0c0",
+  "script_sha256": "d91031b94df15e7c8e68409c6d7449120891407c079326845e2cfc111122d5a3",
+  "screenshots": [
+    "/tmp/cad-pocket-fit-report.png",
+    "/tmp/cad-pocket-fit-viewer.png"
+  ]
+}

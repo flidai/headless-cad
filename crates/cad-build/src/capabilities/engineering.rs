@@ -435,6 +435,24 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         "direct authored hierarchy frames, or an identity authored source mount attached to the exact opposite seating endpoint as a directly placed sibling with a current zero-offset native planar face datum; target direction hint and complete raw placement operands must satisfy bounded conditioning and precision; other attachment chains, nested targets and joints remain unsupported",
         "local nominal planar boundary coincidence only; no full-face contact coverage, full-body nonpenetration, preload, threaded engagement, manufacturing tolerance, force or rated contact claim",
     ]);
+    let mut pocket_fit = object_spec(
+        "pocket_fit_check",
+        vec![
+            arg("id", T::String),
+            arg("output", T::String),
+            arg("pocket", object("section_anchor")),
+            arg("insert", object("section_anchor")),
+            arg("min_side_clearance_mm", T::Number),
+        ],
+    );
+    pocket_fit.obligations.extend([
+        "Starlark pocket_fit_check(id,output,pocket_instance_path,pocket_datum,insert_instance_path,insert_datum,min_side_clearance_mm)",
+        "schema 2; at most 32 global checks; exact distinct assembly leaf paths and current zero-offset semantic planar datums; selected outputs and warm caches do not bypass fit obligations",
+        "strict native blind/mixed capsule pocket and a hole-free constant capsule prism insert with parallel/opposite axes; complete footprint containment is certified by both finite centerline endpoint distances, not sampling",
+        "physical four pocket walls and floor, selected floor-facing insert cap, actual trimmed wall witnesses and part hashes are bound to the report; guarded side clearance must meet the positive declared minimum and guarded axial wall overlap must be positive",
+        "floor penetration is refused when resolved beyond explicit arithmetic uncertainty; nominal floor contact may yield an interval straddling zero and is not exact mathematical nonpenetration; floor seating remains a separate source obligation",
+        "same bounded occurrence placement and direct sibling identity-mount attachment contract as nominal_seating_check; no arbitrary pocket profiles, intersecting voids, insertion-path, preload, friction or retention certificate",
+    ]);
     let mut stack_term = object_spec(
         "tolerance_stack_term",
         vec![
@@ -644,6 +662,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         stack_term,
         datum_dimension,
         nominal_seating,
+        pocket_fit,
         clearance,
         rotation_path,
         rotation_group,

@@ -31,6 +31,7 @@ fn inserts_follow_actual_serial_floors_on_both_caps_and_keep_proud_height() {
         let built = engine.build(&source).unwrap();
         assert_eq!(built.assemblies["seated_pocket_inserts"].instances.len(), 3);
         assert_eq!(built.nominal_seating_checks.len(), 2);
+        assert_eq!(built.pocket_fit_checks.len(), 2);
         assert_eq!(built.datum_dimensions.len(), 5);
         let lineage = &built.face_assertions["first_floor_survives"].witnesses[0];
         assert_eq!(lineage.target_face.0, lineage.anchor_faces[0].0 + 4);
@@ -100,4 +101,89 @@ fn selected_warm_build_retains_floor_seating_and_protrusion_obligations() {
     let restored = engine.build_outputs(&source, &selected).unwrap();
     assert_eq!(restored.stats.computed_solids, 0);
     assert_eq!(restored.nominal_seating_checks.len(), 2);
+}
+
+#[test]
+fn whole_insert_fit_rejects_sideways_collisions_that_keep_floor_seating() {
+    let mut engine = BuildEngine::default();
+    let selected = ["through_stage".into()];
+    for side in [0., 1.] {
+        for (shift, expected) in [(0., 0.2), (0.1, 0.1), (0.159, 0.041), (-0.1, 0.1)] {
+            let source = recipe(&[("pocket_side", side), ("first_insert_shift", shift)]);
+            let built = engine.build_outputs(&source, &selected).unwrap();
+            let fit = &built.pocket_fit_checks["first_insert_pocket_fit"];
+            assert_eq!(fit.status, "passed");
+            assert!(fit.side_clearance_lower_mm <= expected);
+            assert!(fit.side_clearance_upper_mm >= expected);
+            assert!(fit.side_clearance_upper_mm - fit.side_clearance_lower_mm < 1e-6);
+            assert!(fit.axial_overlap_lower_mm > 2.99);
+            assert!(fit.signed_floor_gap_lower_mm <= 0.);
+            assert!(fit.signed_floor_gap_upper_mm >= 0.);
+            let seat = &built.nominal_seating_checks["first_insert_floor_seat"];
+            assert_eq!(fit.query.pocket_floor_face, seat.query.right_face);
+            assert_eq!(fit.query.insert_floor_face, seat.query.left_face);
+            assert_eq!(fit.pocket.part_content_hash, seat.right.part_content_hash);
+            assert_eq!(
+                engine
+                    .build_outputs(&source, &selected)
+                    .unwrap()
+                    .stats
+                    .computed_solids,
+                0
+            );
+        }
+        for shift in [0.161, 0.3, -0.3] {
+            let mut candidate = recipe(&[("pocket_side", side), ("first_insert_shift", shift)]);
+            assert!(matches!(
+                engine.build_outputs(&candidate, &selected),
+                Err(BuildError::PocketFitCheckFailed { .. })
+            ));
+            // Positive control proves floor seating and proud-height checks cannot
+            // substitute for the full-footprint fit obligation.
+            candidate.pocket_fit_checks.clear();
+            let control = engine.build_outputs(&candidate, &selected).unwrap();
+            assert_eq!(control.nominal_seating_checks.len(), 2);
+        }
+    }
+}
+
+#[test]
+fn pocket_fit_schema_and_parameters_are_strict() {
+    let source = recipe(&[]);
+    let mut value = serde_json::to_value(&source).unwrap();
+    value["pocket_fit_checks"][0]["unexpected"] = true.into();
+    assert!(serde_json::from_value::<Recipe>(value).is_err());
+    let mut value = serde_json::to_value(&source).unwrap();
+    value["schema_version"] = 1.into();
+    assert!(serde_json::from_value::<Recipe>(value).is_err());
+    for minimum in [0., -1., f64::NAN, f64::INFINITY] {
+        let mut candidate = source.clone();
+        candidate.pocket_fit_checks[0].min_side_clearance_mm = minimum;
+        assert!(matches!(
+            BuildEngine::default().build(&candidate),
+            Err(BuildError::InvalidPocketFitCheck { .. })
+        ));
+    }
+}
+
+#[test]
+fn pocket_fit_preserves_schema_one_roundtrip_and_rejects_null() {
+    let old: Recipe = serde_json::from_value(serde_json::json!({
+        "schema_version": 1, "units": "mm", "features": [], "outputs": []
+    }))
+    .unwrap();
+    let value = serde_json::to_value(&old).unwrap();
+    assert!(value.get("pocket_fit_checks").is_none());
+    let _: Recipe = serde_json::from_value(value.clone()).unwrap();
+    for schema in [1, 2] {
+        for empty in [serde_json::Value::Null, serde_json::json!([])] {
+            let mut candidate = value.clone();
+            candidate["schema_version"] = schema.into();
+            candidate["pocket_fit_checks"] = empty.clone();
+            assert_eq!(
+                serde_json::from_value::<Recipe>(candidate).is_ok(),
+                schema == 2 && empty.is_array()
+            );
+        }
+    }
 }
