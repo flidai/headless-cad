@@ -2651,7 +2651,7 @@ screw motion, coupled moving bodies and arbitrary trajectories remain unsupporte
 
 `examples/drive_module_rotation.star` extends the retained drive with one full
 turn of its shaft, keyed disc, key, three washers and three open rings. The
-source fixes the remaining fifteen occurrences. `rigid_rotation_group` declares
+source fixes the remaining twenty-one occurrences. `rigid_rotation_group` declares
 exact leaf paths, a reference occurrence, and pivot/axis coordinates in that
 reference body's frame; the builder resolves one shared world rotation.
 A `clearance_check` can reference `rotation_group = "rotor"` instead of a
@@ -2686,13 +2686,15 @@ source, native dimensions and exported solids remain at the authored pose.
 The inspector uses the captured generation instead of combining motion evidence
 with live updates from another revision.
 
-`tools/check-drive-rotation.py` independently checks both signed full turns on
-two parameter configurations, native proof identities, actual STEP sample
-witnesses, eleven distances at nine phases per case, all 276 occurrence pairs
-at each phase, and failed-publication preservation. Sampled STEP observations
-support the native continuous proof; sampling alone does not close collision
-or mechanical-release gates. Group membership does not certify ring installation,
-strength, preload or unlisted contacts.
+`tools/check-drive-rotation.py` independently checks signed full turns across
+four parameter configurations, native proof identities, actual STEP sample
+witnesses, eleven distances at nine phases per case, all 435 occurrence pairs
+at each phase, and failed-publication preservation. For the 54 new cover/screw
+versus rotor pairs, separate conservative axial/radial bounds establish
+full-turn separation with an explicit numerical allowance. These independent
+bounds are distinct from the eleven native named-pair certificates. Sampling
+alone does not close collision or mechanical-release gates. Group membership
+does not certify ring installation, strength, preload or unlisted contacts.
 
 ### Finite keyseats in round shafts
 
@@ -3024,9 +3026,30 @@ The rotating drive (`examples/drive_module_rotation.star`) uses a rounded,
 four-hole mounting plate. `base_corner_radius` (2–10 mm, default 6) controls
 four native longitudinal fillets and their semantic radius dimensions on the
 mounting drawing. Its material assertions include the removed corner volume;
-the retained 24-part assembly keeps its eleven named clearance checks and
+the expanded 30-part assembly keeps its eleven named clearance checks and
 nine-member rotation group. The viewer remains an inspector of the captured
 recipe and evidence. These nominal dimensions do not certify manufactured fit.
+
+The same drive now has two removable sleeve-retaining end covers and four
+nominal screw envelopes. Each housing has its own outboard `hole_pattern`:
+two constrained 3.5 mm blind pilots, 5 mm deep, aligned with the cover's
+4.1 mm clearance holes. Opposite cap frames compensate for the housing's
+asymmetric area centroid, so the screw axes stay at the authored positions.
+The covers overlap the sleeve flanges by 1.5 mm radially while clearing the
+rotating shaft hardware. Source checks include machined material volume,
+pilot walls and floors, section diameters, and the unchanged shaft endplay.
+The assembly uses 14 part definitions; left and right housings have distinct
+geometry. Screw envelopes do not model threads, preload or rated retention.
+The eleven native continuous checks still cover their named original pairs;
+adding these parts does not implicitly extend that certificate.
+
+The retained [independent geometry report](docs/evidence/drive-covers-local.json)
+covers four configurations, including the 16 mm shaft and 90 mm mounting pitch.
+All 30 STEP components match independent solids; the 54 added fixed/rotor pairs
+have guarded full-turn lower bounds of at least 2.4999 mm. Nine sampled poses
+per configuration show no positive-volume intersections among all 435 pairs.
+The [accepted offline replay](docs/evidence/drive-covers-offline-replay-local.json)
+matches 147 artifact files and 27 manifest fields after an agent restart.
 
 `examples/rounded_bearing_fit.star` pairs a rounded, through-bored housing with
 a genuinely keyed shaft. Its static `bore_trim_witness` certificate checks the

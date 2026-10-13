@@ -3493,3 +3493,46 @@ overlapping, outer-crossing or floor-breakthrough builds refuse while preserving
 every byte of the previous verified generation. The central tangent pitch
 accounts for the oblique case's 3 mm face-frame Y offset; this is a bounded
 adversarial sweep, not a general tolerance or machining proof.
+
+### Drive-module end-cover integration
+
+The rotating drive recipe now uses face-attached solved hole patterns in its
+actual left and right housings. Separate outboard cap selections create two
+3.5 mm diameter, 5 mm deep nominal pilots per housing. The local frame origin
+is the cap's material-area centroid, which moves with the central bore radius;
+explicit opposite-sign Y offsets keep both patterns on the intended housing
+axes. No viewer-side coordinates participate in construction.
+
+Two common 2 mm covers overlap the sleeve flanges by 1.5 mm radially. Four
+shared unthreaded screw envelopes align with the pilots and cover clearance
+holes. The assembly contains 30 leaf occurrences from 14 part definitions,
+with nine rotating and 21 stationary components. Original sleeve/shaft poses,
+ten axial dimensions and endplay stacks remain unchanged. Source obligations
+add pilot wall/floor lineage, machined material volume and three section views
+with diameter dimensions. These checks describe nominal geometry; thread
+engagement, preload, installation and rated loads remain open.
+
+The eleven native continuous clearance declarations retain their original
+named-pair scope. The current clearance recognizers do not admit the exact
+multi-bore polygon covers or eccentric stepped screw shapes for these new
+queries. Independent full-phase envelope bounds and sampled OCCT checks must
+therefore be reported separately from native certificates. Neither extra
+parts nor independent nominal geometry evidence closes the commercial
+mechanical-intent or manufacturing release gates.
+
+The retained [independent end-cover evidence](evidence/drive-covers-local.json)
+pins source, executable and oracle identities across four configurations,
+including the maximum 16 mm shaft / 90 mm pitch. Every one of the 30 STEP leaves
+matches its independently constructed OCCT reference in both subtraction
+directions. Each configuration has 54 guarded full-turn separation bounds
+(minimum 2.4999 mm), 435 pair-intersection checks at nine phases with zero
+positive-volume intersection, and six nominal contact checks using zero OCCT
+distance plus independently derived positive seating area. Five invalid edits
+preserve the complete prior generation. Nine selected geometry/engineering
+artifacts also replay byte for byte from captured source. The
+[accepted-delivery replay](evidence/drive-covers-offline-replay-local.json)
+separately records process restart, sealed delivery and offline equality for
+147 artifact files and 27 semantic manifest fields. Browser checks pick all
+six added cover/screw occurrences, expose their captured source and retain
+GET-only inspection. These are bounded nominal results, not physical retention
+or general contact certification.

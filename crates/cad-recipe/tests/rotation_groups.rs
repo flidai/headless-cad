@@ -11,8 +11,45 @@ fn complete_drive_group_preserves_source_obligations_and_counts_actual_queries()
     assert_eq!(group.members.len(), 9);
     assert_eq!(group.coverage, "named_pairs_only");
     assert_eq!(group.clearance_check_ids.len(), 11);
-    assert_eq!(built.assemblies["drive_module_release"].instances.len(), 24);
+    assert_eq!(built.assemblies["drive_module_release"].instances.len(), 30);
+    assert_eq!(built.assemblies["drive_module_release"].parts.len(), 14);
     assert_eq!(built.datum_dimensions.len(), 10);
+    let r = 12. / 2.;
+    let pi = std::f64::consts::PI;
+    let housing_volume =
+        (2048. - pi * (r + 4.025f64).powi(2)) * 16. - 2. * pi * 1.75f64.powi(2) * 5.;
+    for (side, output, floor_z) in [("left", "housing", 5.), ("right", "right_housing", 11.)] {
+        let feature = format!("housing_{side}_pilots");
+        assert!(built.sketch_reports[&feature].is_fully_constrained());
+        let body = &built.outputs[output].result.model;
+        assert!((body.volume() - housing_volume).abs() < 1e-6);
+        let section = &built.section_views[&format!("{side}_cover_pilot_section")];
+        assert_eq!(section.circle_dimensions.len(), 2);
+        for tag in ["minus", "plus"] {
+            let floor = &built.face_assertions[&format!("{side}_cover_{tag}_floor")];
+            assert_eq!(floor.witnesses.len(), 1);
+            let plane = body.faces[floor.witnesses[0].target_face.0]
+                .try_plane()
+                .unwrap();
+            assert!((plane.origin[2] - floor_z).abs() < 1e-9);
+            let diameter = section
+                .circle_dimensions
+                .iter()
+                .find(|dimension| {
+                    dimension.declaration.id == format!("{side}_cover_{tag}_diameter")
+                })
+                .unwrap();
+            assert!((diameter.value_mm - 3.5).abs() < 1e-9);
+        }
+    }
+    let cover_area = 2048. - pi * (r + 4.5f64).powi(2) - 2. * pi * 2.05f64.powi(2);
+    assert!((built.outputs["end_cover"].result.model.volume() - 2. * cover_area).abs() < 1e-6);
+    assert_eq!(
+        built.section_views["end_cover_section"]
+            .circle_dimensions
+            .len(),
+        3
+    );
     assert!(built.tolerance_stacks["shaft_axial_endplay"].measurement_interval_certified);
     assert!(built.tolerance_stacks["hub_axial_endplay"].measurement_interval_certified);
     let mut queries = 0;

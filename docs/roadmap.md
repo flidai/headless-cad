@@ -866,3 +866,11 @@ broader face-attached features and the commercial modeling gate remain open.
 The [retained local oracle](evidence/sketched-blind-housing-local.json) has eight
 OCCT comparisons with zero directed STEP solid difference, including oblique
 top/bottom poses with tangent offsets, plus seven preserved-generation refusals.
+
+The main rotating drive integrates constrained blind pilots into handed
+housings, two removable end covers and four nominal screw envelopes. Its 30
+occurrences use 14 definitions; source obligations check added material,
+face lineage and section dimensions while preserving shaft endplay. The
+original eleven native motion checks keep their named scope. Continue toward
+native clearance for the exact added shapes, thread/fastener semantics,
+installation and load validation; nominal covers do not close R3 or R4.

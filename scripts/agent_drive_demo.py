@@ -119,6 +119,24 @@ def run(cad, *args):
     return json.loads(result.stdout)
 
 
+def drive_summary(manifest):
+    """Check the delivered mechanical fixture and retain its explicit scope."""
+    assembly = manifest['outputs']['drive_module_release']
+    assert assembly['instances'] == 30
+    assert assembly['definitions'] == 14
+    members = manifest['rigid_rotation_groups']['rotor']['members']
+    assert len(members) == 9
+    assert len(manifest['datum_dimensions']) == 10
+    for feature in ('housing_left_pilots', 'housing_right_pilots'):
+        assert feature in manifest['sketch_reports']
+    return {'occurrences': assembly['instances'], 'definitions': assembly['definitions'],
+            'rotor_members': len(members),
+            'named_continuous_clearance_checks': len(manifest['clearance_checks']),
+            'native_axial_dimensions': len(manifest['datum_dimensions']),
+            'face_attached_pilot_patterns': ['housing_left_pilots', 'housing_right_pilots'],
+            'scope': 'Nominal end covers and unthreaded screw envelopes; named clearance checks do not certify every contact, thread engagement or load capacity'}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cad', type=Path, default=Path('target/release/cad'))
@@ -168,9 +186,7 @@ def main():
                 client.download(job, root / name)
                 run(cad, 'verify', root / name, '--manifest-hash', job['manifest_hash'])
                 manifest = json.loads((root / name / 'manifest.json').read_text())
-                assert len(manifest['clearance_checks']) == 11
-                assert len(manifest['datum_dimensions']) == 10
-                assert len(manifest['rigid_rotation_groups']['rotor']['members']) == 9
+                drive_summary(manifest)
                 manifests.append(manifest)
             trace = client.trace
         finally:
@@ -192,6 +208,7 @@ def main():
                   'before_snapshot': snapshot['snapshot_id'], 'rejected_snapshot': invalid['snapshot_id'],
                   'after_snapshot': repaired['snapshot_id'], 'native_rejection': rejected['worker']['result'],
                   'jobs': summaries, 'worker_admission': {name: job['worker'].get('admission') for name, job in [('before', before), ('rejected', rejected), ('after', after)]},
+                  'mechanical_fixture': {name: drive_summary(manifest) for name, manifest in zip(('before', 'after'), manifests)},
                   'tool_calls': len(trace), 'trace': trace}
         (root / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
         title = 'Recipe proposal → native rejection → repaired rotating drive'
@@ -201,7 +218,7 @@ def main():
 <p>A real local MCP client captured the Starlark recipe, built a candidate, received a native clearance failure, repaired the source, and delivered verified artifacts. The source workspace was unchanged.</p>
 <div class="cards"><section><h2>Revision A</h2><p>12 mm shaft · 60 mm mounting pitch</p><a href="before/rotation-rotor.html">Inspect rotating drive and captured source →</a></section>
 <section><h2>Revision B</h2><p>14 mm shaft · 72 mm mounting pitch</p><a href="after/rotation-rotor.html">Inspect repaired revision and captured source →</a></section></div>
-<ul><li>9 rotor members, 11 named continuous clearance checks, 10 native axial dimensions.</li><li>Invalid 0.3 mm minimum clearance rejected; earlier candidate preserved.</li><li>Captured source replayed offline after server exit with identical native B-reps and STEP.</li></ul>
+<ul><li>30 components from 14 definitions, including two removable bearing covers and four nominal screw envelopes.</li><li>9 rotor members, {len(manifests[1]['clearance_checks'])} named continuous clearance checks, 10 native axial dimensions.</li><li>Invalid 0.3 mm minimum clearance rejected; earlier candidate preserved.</li><li>Captured source replayed offline after server exit with identical native B-reps and STEP.</li></ul>
 <p><a href="report.json">Client trace and native rejection</a> · <a href="after/clearance-checks.html">Clearance evidence</a> · <a href="after/tolerance-stacks.html">Tolerance stacks</a> · <a href="after/drive_module_release.step">Download STEP</a></p>
 <small>This is a scripted interface acceptance fixture, not a claim of autonomous engineering. Viewer controls inspect only. Named-pair proofs do not certify all assembly contacts or rated loads.</small>''')
         root.rename(destination)

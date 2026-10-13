@@ -11,6 +11,13 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
   for(const link of await page.locator('a').evaluateAll(nodes=>nodes.map(n=>n.href)))assert.ok((await page.request.get(link)).ok(),link);
   const evidence=await(await page.request.get(`${base}/rigid-rotation-groups.json`)).json();
   const group=evidence.groups.rotor;assert.equal(group.members.length,9);assert.equal(group.coverage,'named_pairs_only');assert.equal(group.clearance_check_ids.length,11);
+  const assembly=await(await page.request.get(`${base}/drive_module_release.assembly.json`)).json();
+  assert.equal(assembly.instances.length,30);assert.equal(Object.keys(assembly.definitions).length,14);
+  const added=[
+   ['left_support','left_cover'],['right_support','right_cover'],
+   ...['left','right'].flatMap(side=>['minus','plus'].map(tag=>[`${side}_support`,`${side}_cover_screw_${tag}`])),
+  ];
+  for(const path of added)assert.ok(assembly.instances.some(i=>i.id===JSON.stringify(path)),`placed ${path.join('/')}`);
   const source=await(await page.request.get(`${base}/recipe.star`)).text();
   const section=await(await page.request.get(`${base}/section-mounting_plan.json`)).json();
   const baseSection=section.occurrences.find(o=>o.instance_path.length===1&&o.instance_path[0]==='base');
@@ -85,9 +92,38 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
   assert.deepEqual(reset,before);
   await page.locator('#recipe-toggle').click();
   const options=await page.locator('#occurrence-select option').evaluateAll(nodes=>nodes.map(n=>({value:n.value,text:n.textContent})));
-  for(const name of ['shaft','parallel_key','hub_left_ring','shaft_ring']){
+  for(const name of ['shaft','parallel_key','hub_left_ring','shaft_ring',
+   'left_cover','right_cover','left_cover_screw_minus','right_cover_screw_plus']){
    const option=options.find(o=>o.text.includes(name));assert.ok(option,name);await page.locator('#occurrence-select').selectOption(option.value);
    assert.equal(await page.locator('#recipe-source').textContent(),source);assert.ok((await page.locator('#recipe-summary').textContent()).includes(name));
+  }
+  assert.ok(source.includes('hole_pattern(id = feature_id'));
+  assert.ok(source.includes('id = "end_cover_body"'));
+  assert.ok(source.includes('id = "cover_screw_body"'));
+  const picked=[];
+  for(const [side,paths] of [['left',added.filter(path=>path[0]==='left_support')],
+                            ['right',added.filter(path=>path[0]==='right_support')]]){
+   for(const path of paths){
+    const target=JSON.stringify(path);
+    const point=await page.evaluate(({side,target})=>{
+     yaw=side==='left'?Math.PI:0;pitch=0;zoom=1;draw();
+     const owns=(x,y)=>x>=0&&y>=0&&x<bufferWidth&&y<bufferHeight&&
+      scene.faces[faceBuffer[y*bufferWidth+x]]?.instance_id===target;
+     for(let y=2;y<bufferHeight-2;y++)for(let x=2;x<bufferWidth-2;x++){
+      if(owns(x,y)&&owns(x-1,y)&&owns(x+1,y)&&owns(x,y-1)&&owns(x,y+1))
+       return[(x+.5)/renderRatio,(y+.5)/renderRatio];
+     }
+     return null;
+    },{side,target});
+    assert.ok(point,`visible pickable surface for ${path.join('/')}`);
+    await page.locator('#view').click({position:{x:point[0],y:point[1]}});
+    const selection=await page.locator('#selection').textContent();
+    assert.ok(selection.includes(path.map(JSON.stringify).join(' / ')),
+     `picked ${path.join('/')}: ${selection}`);
+    assert.equal(await page.locator('#recipe-source').textContent(),source);
+    assert.ok((await page.locator('#recipe-summary').textContent()).includes(path.at(-1)));
+    picked.push(path.join('/'));
+   }
   }
   await page.locator('#rotation-phase').evaluate(slider=>{slider.value='.25';slider.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.waitForTimeout(1200);
@@ -101,6 +137,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs');
   await page.locator('#drawing').evaluate(img=>img.decode());
   await capture('/tmp/cad-rounded-drive-drawing.png');
   assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);
-  console.log(JSON.stringify({valid:true,moving_occurrences:9,stationary_occurrences:15,rounded_corners:4,radius_annotations:4,phases:[.125,.25,.5,1],captured_source:true,read_only:true,errors},null,2));
+  console.log(JSON.stringify({valid:true,moving_occurrences:9,stationary_occurrences:21,
+   added_picked_occurrences:picked,rounded_corners:4,radius_annotations:4,
+   phases:[.125,.25,.5,1],captured_source:true,read_only:true,errors},null,2));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

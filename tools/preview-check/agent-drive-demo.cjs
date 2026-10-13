@@ -16,12 +16,16 @@ const assert=require('node:assert/strict');
   for(const [name,diameter] of [['before',12],['after',14]]) {
    const source=await(await page.request.get(`${base}/${name}/recipe.star`)).text();
    const manifest=await(await page.request.get(`${base}/${name}/manifest.json`)).json();
-   assert.equal(manifest.outputs.drive_module_release.instances,24);assert.equal(manifest.outputs.drive_module_release.definitions,11);
+   const covers=source.includes('id = "end_cover_body"');
+   assert.equal(manifest.outputs.drive_module_release.instances,covers?30:24);
+   assert.equal(manifest.outputs.drive_module_release.definitions,covers?14:11);
    assert.equal(Object.keys(manifest.clearance_checks).length,11);
    assert.ok((await page.goto(`${base}/${name}/rotation-rotor.html`)).ok());
    assert.equal(await page.locator('#rotation-inspection').getAttribute('data-error'),null);
    await page.locator('#recipe-toggle').click();
-   for(const part of ['shaft','parallel_key','shaft_ring']) {
+   const parts=['shaft','parallel_key','shaft_ring'];
+   if(covers)parts.push('left_cover','right_cover_screw_plus');
+   for(const part of parts) {
     const id=await page.locator('#occurrence-select option').evaluateAll((nodes,part)=>nodes.find(n=>n.textContent.includes(part))?.value,part);
     assert.ok(id);await page.locator('#occurrence-select').selectOption(id);
     assert.equal(await page.locator('#recipe-source').textContent(),source);

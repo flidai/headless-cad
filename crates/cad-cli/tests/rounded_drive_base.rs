@@ -23,7 +23,8 @@ fn success(output: std::process::Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 fn verify(report: &Value, out: &Path, radius: f64, pitch: f64) {
-    assert_eq!(report["outputs"]["drive_module_release"]["instances"], 24);
+    assert_eq!(report["outputs"]["drive_module_release"]["instances"], 30);
+    assert_eq!(report["outputs"]["drive_module_release"]["definitions"], 14);
     assert_eq!(report["clearance_checks"].as_object().unwrap().len(), 11);
     assert_eq!(
         report["rigid_rotation_groups"]["rotor"]["members"]
@@ -77,6 +78,33 @@ fn verify(report: &Value, out: &Path, radius: f64, pitch: f64) {
         assert_eq!(witness["status"], "resolved");
         assert_eq!(witness["witnesses"].as_array().unwrap().len(), 1);
     }
+    for side in ["left", "right"] {
+        for tag in ["minus", "plus"] {
+            for suffix in ["wall", "floor"] {
+                let key = format!("{side}_cover_{tag}_{suffix}");
+                assert_eq!(report["face_assertions"][&key]["status"], "resolved");
+                assert_eq!(
+                    report["face_assertions"][&key]["witnesses"]
+                        .as_array()
+                        .unwrap()
+                        .len(),
+                    1
+                );
+            }
+        }
+        let section: Value = serde_json::from_slice(
+            &fs::read(out.join(format!("section-{side}_cover_pilot_section.json"))).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            section["section_view"]["circle_dimensions"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+    assert!(out.join("section-end_cover_section.json").exists());
     assert!(out.join("drawing-drive_module_sections.svg").exists());
 }
 #[test]
@@ -120,6 +148,9 @@ fn rounded_main_drive_preserves_engineering_and_publishes_fitting_native_radius_
         "shaft",
         "drive_disc",
         "housing",
+        "right_housing",
+        "end_cover",
+        "cover_screw_envelope",
         "sleeve",
         "parallel_key",
         "washer",

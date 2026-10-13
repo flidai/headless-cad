@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import shutil
 import tempfile
-from agent_drive_demo import Client, run
+from agent_drive_demo import Client, run, drive_summary
 from evidence import publish_new
 from replay_delivery import replay_accepted, sha256
 
@@ -76,11 +76,13 @@ def main():
         conflict=second.tool('cad_evaluate',{**after_args,'params':{'shaft_diameter':15}},error=True)
         assert len(second.tool('cad_jobs',{})['jobs'])==3
         deliveries=[]
+        mechanical_fixture={}
         for name,job in [('before',before),('after',after)]:
             verified=second.tool('cad_verify',{'job_id':job['job_id'],'manifest_digest':job['manifest_hash']})
             assert verified['success'],verified
             deliveries.append(second.download(job,stage/name,stream=args.stream_artifacts or args.replay_accepted))
             run(cad,'verify',stage/name,'--manifest-hash',job['manifest_hash'])
+            mechanical_fixture[name]=drive_summary(json.loads((stage/name/'manifest.json').read_text()))
         if args.accept_revisions:
             assert second.tool('cad_accept',accept_before)==accepted_before
             assert second.tool('cad_accept',accept_after)==accepted_after
@@ -94,6 +96,7 @@ def main():
     evidence={'valid':True,'source_workspace_unchanged':True,'durable_jobs':3,'recovered_retry_results':3,
               'acceptances':acceptances,'stale_acceptance':stale_acceptance,'deliveries':deliveries,
               'offline_replay':replay_evidence,
+              'mechanical_fixture':mechanical_fixture,
               'snapshots':discovered,'before_job':before['job_id'],'after_job':after['job_id'],
               'rejected_job':rejected,'conflicting_retry':conflict,'trace':trace,
               'scope':'One local writer; accepted source replay uses the same pinned local executable and verified captured delivery, not an external release, hosted service or autonomous AI reasoning'}
@@ -105,6 +108,8 @@ def main():
         page=page.replace('Release acceptance and hosted operation remain separate work.','Local acceptance checks the expected prior revision. Manufacturing release, external delivery and hosted operation remain separate work.')
         page=page.replace('</html>','<section><h2>Accepted revisions</h2><p>Revision A was accepted first. A stale proposal was refused. Revision B was accepted with A as its expected base. Both acceptance results and the current head survived restart.</p><p>Recipes remain authoritative; acceptance records identify verified candidates without changing source files.</p></section></html>')
         (stage/'index.html').write_text(page)
+    page=(stage/'index.html').read_text().replace('</html>','<section><h2>Removable bearing covers</h2><p>Both revisions contain 30 components from 14 definitions. Two end covers align with constrained blind pilot holes in the housings; four nominal screw envelopes show the fastening layout. Captured source controls the geometry. Thread engagement, preload and rated loads remain unverified.</p></section></html>')
+    (stage/'index.html').write_text(page)
     if args.stream_artifacts or args.replay_accepted:
         page=(stage/'index.html').read_text().replace('</html>','<section><h2>Verified delivery</h2><p>Artifact chunks match the captured generation. Both delivery streams passed a final integrity check before these pages were published.</p></section></html>')
         (stage/'index.html').write_text(page)
