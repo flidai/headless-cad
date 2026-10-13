@@ -3930,3 +3930,25 @@ uncertainty is an explicit refusal, not a successful STL export. Engineering
 queries likewise retain original through-wall supports when removing blind
 topology for consistency checks; regenerated clean supports cannot hide raw
 support departures.
+
+
+### Drive-base relief integration
+
+Optional same-cap relief operations must replace the actual base body in the
+assembly and body export, retain source references to the original through slots
+and fillets, and update exact material volume and mass. Depth zero aliases the
+original feature and preserves its STEP payloads. All existing engineering
+obligations remain active; new floor/depth/web checks add obligations globally,
+including selected-output and warm-cache builds.
+
+Planar wall datums on a strictly reconstructed blind or mixed body use the four
+actual straight-edge corners of that trimmed wall. This includes unchanged
+outer walls and shortened pocket walls; deriving a shortened wall frame from
+uncut stock would give the wrong origin. Cap and floor centroids keep their
+analytic contracts. This frame admission does not widen seating or clearance.
+
+A development preset passes the pocket-depth parameter to build/watch and
+publishes ordinary artifacts. The HTTP inspector remains read-only. Imported
+machining references must use the finished body, while preserving earlier
+features as semantic anchors. Imported adjustment or seating studies that do
+not admit mixed stock must refuse, retaining their previous publication.

@@ -12,6 +12,7 @@ turn_radians = param(name = "turn_radians", default = 6.283185307179586)
 shaft_diameter = param(name = "shaft_diameter", default = 12)
 mounting_pitch = param(name = "mounting_pitch", default = 60)
 base_corner_radius = param(name = "base_corner_radius", default = 6)
+base_pocket_depth = param(name = "base_pocket_depth", default = 0)
 base_slot_length = param(name = "base_slot_length", default = 6)
 required_clearance = param(name = "required_clearance", default = 0.09)
 minimum_endplay = param(name = "minimum_endplay", default = 0.1)
@@ -27,6 +28,8 @@ def validate_parameters():
         fail("base_corner_radius must be 2..10 mm")
     if base_slot_length < 2 or base_slot_length > 8:
         fail("base_slot_length must be 2..8 mm")
+    if base_pocket_depth != 0 and (base_pocket_depth < 0.5 or base_pocket_depth > 1.5):
+        fail("base_pocket_depth must be 0 (unmachined) or 0.5..1.5 mm")
     if minimum_endplay <= 0:
         fail("minimum_endplay must be positive")
     if required_clearance <= 0:
@@ -54,6 +57,22 @@ base_slotted = slot_pattern(id = "base_slotted", body = base_body,
     frame_origin = [0,0,0], frame_x_direction = [1,0,0], frame_y_direction = [0,1,0],
     slots = [{"id":["front_minus","front_plus","rear_minus","rear_plus"][i],"center":xy,"direction":[1,0],"centerline_length":base_slot_length,"radius":3}
         for i,xy in enumerate(bolt_centers)])
+# Optional separated relief pockets preserve the full-height mounting slots.
+# Their names describe machining geometry, not a certified strength benefit.
+def machine_base_reliefs():
+    if base_pocket_depth == 0:
+        return [base_slotted, base_slotted]
+    shallow = blind_slot_pattern(id = "base_shallow_relief", body = base_slotted,
+        from_feature = base_slotted, cap = "end_cap", depth = base_pocket_depth,
+        frame_origin = [0,0,6], frame_x_direction = [1,0,0], frame_y_direction = [0,1,0],
+        slots = [{"id":"shallow","center":[p/2+23,0],"direction":[0,1],"centerline_length":18,"radius":3}])
+    deep = blind_slot_pattern(id = "base_deep_relief", body = shallow,
+        from_feature = base_slotted, cap = "end_cap", depth = base_pocket_depth+1,
+        frame_origin = [0,0,6], frame_x_direction = [1,0,0], frame_y_direction = [0,1,0],
+        slots = [{"id":"deep","center":[p/2+43,0],"direction":[0,1],"centerline_length":18,"radius":3}])
+    return [shallow, deep]
+base_shallow_relief, base_finished = machine_base_reliefs()
+
 housing_body = extrude(id = "housing_body", profile = polygon(id = "housing_profile",
     points = [[-22,-26],[22,-26],[22,14],[14,22],[-14,22],[-22,14]],
     circular_holes = [{"center":[0,0],"radius":r+4.025}]), height = 16)
@@ -142,8 +161,16 @@ clamp = part(id = "clamp_bar", body = clamp_body, part_number = "DM-CLAMP", revi
     datums = {"end":face_datum(from_feature = clamp_body, role = "end_cap", x_direction = [1,0,0])})
 nut = part(id = "nut_envelope", body = nut_body, part_number = "DM-NUT-ENVELOPE", revision = design_revision, description = "Underside clamp nut envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800,
     datums = {"end":face_datum(from_feature = nut_body, role = "end_cap", x_direction = [1,0,0])})
-base = part(id = "base", body = base_slotted, part_number = "DM-BASE", revision = design_revision, description = "Four obround mounting slots and native tangent corner fillets", material = "Aluminum", density_kg_per_m3 = 2700,
-    datums = {"start":face_datum(from_feature = base_slotted, role = "start_cap", x_direction = [1,0,0])})
+def base_datums():
+    result = {"start":face_datum(from_feature = base_slotted, role = "start_cap", x_direction = [1,0,0])}
+    if base_pocket_depth > 0:
+        result["end"] = face_datum(from_feature = base_slotted, role = "end_cap", x_direction = [1,0,0])
+        result["shallow_floor"] = face_datum(from_feature = base_shallow_relief, role = "slot_shallow_floor", x_direction = [1,0,0])
+        result["deep_floor"] = face_datum(from_feature = base_finished, role = "slot_deep_floor", x_direction = [1,0,0])
+    return result
+base = part(id = "base", body = base_finished, part_number = "DM-BASE", revision = design_revision,
+    description = "Four obround mounting slots, native corner fillets and two relief pockets" if base_pocket_depth > 0 else "Four obround mounting slots and native tangent corner fillets",
+    material = "Aluminum", density_kg_per_m3 = 2700, datums = base_datums())
 housing = part(id = "housing_left", body = housing_left_pilots, part_number = "DM-HOUSING-L", revision = design_revision, description = "Left bearing housing with two outboard blind end-cover pilots", material = "Aluminum", density_kg_per_m3 = 2700,
     datums = {"axis":datum(), "seat":datum(offset = [0,-26,0]),
         "outboard":face_datum(from_feature = housing_body, role = "start_cap", x_direction = [1,0,0]),
@@ -242,7 +269,7 @@ fit_inspection = assembly(id = "fit_inspection", instances = [
     instance(id = "inspect_shaft", part = shaft, offset = [10,0,32], rotation = shaft_frame),
 ])
 assembly_output(name = "bearing_fit_inspection", assembly = fit_inspection)
-output(name = "base", feature = base_slotted)
+output(name = "base", feature = base_finished)
 output(name = "housing", feature = housing_left_pilots)
 output(name = "right_housing", feature = housing_right_pilots)
 output(name = "end_cover", feature = cover_body)
@@ -278,6 +305,8 @@ cover_engineering_checks()
 
 # Independent material-volume formulas include actual holes, not bounding boxes.
 base_volume = (80*(p+90)-4*(pi*3*3+6*base_slot_length)-(4-pi)*base_corner_radius*base_corner_radius)*6
+base_relief_area = 108+9*pi
+base_volume = base_volume-(base_relief_area*(2*base_pocket_depth+1) if base_pocket_depth > 0 else 0)
 housing_volume = (44*48-64-pi*(r+4.025)*(r+4.025))*16-2*pi*pilot_radius*pilot_radius*pilot_depth
 cover_volume = (2048-pi*(r+4.5)*(r+4.5)-2*pi*2.05*2.05)*cover_thickness
 cover_screw_volume = pi*(1.65*1.65*screw_shank_length+3*3*2)
@@ -331,7 +360,7 @@ clearance_check(id = "right_cover_shaft_gap", output = "drive_module_release", l
 section_view(id = "mounting_plan", output = "drive_module_release", origin = [0,0,3])
 def base_radius_dimensions():
     for feature, offset in [(base_front_left,[-10,-10]),(base_front_right,[10,-10]),(base_back_right,[10,10]),(base_body,[-10,10])]:
-        assert_faces(id = feature+"_survives", from_feature = feature, role = "fillet_wall", in_feature = base_slotted, count = 1)
+        assert_faces(id = feature+"_survives", from_feature = feature, role = "fillet_wall", in_feature = base_finished, count = 1)
         section_circle_dimension(view = "mounting_plan", id = feature+"_radius", from_feature = feature, role = "fillet_wall", instance_path = ["base"], kind = "radius", coverage = "single_arc", label_offset = offset, min = base_corner_radius-0.000001, max = base_corner_radius+0.000001)
 base_radius_dimensions()
 section_dimension(view = "mounting_plan", id = "support_pitch", from_instance_path = ["left_support","housing"], from_datum = "axis", to_instance_path = ["right_support","right_housing"], to_datum = "axis", axis = "x", offset = -50,
@@ -459,3 +488,38 @@ rigid_rotation_group(id = "rotor", output = "drive_module_release",
         ["hub_right_ring"],["shaft_washer"],["shaft_ring"]],
     reference_instance_path = ["shaft"], pivot = [0,0,0], axis = [0,0,1],
     angle_radians = turn_radians)
+
+
+# These are additional obligations on the actual assembled base. All preceding
+# clearance, seating, retention, mass, section and tolerance checks still run.
+def check_base_reliefs():
+    if base_pocket_depth == 0:
+        return
+    assert_faces(id = "base_shallow_floor_survives", from_feature = base_shallow_relief,
+        role = "slot_shallow_floor", in_feature = base_finished, count = 1)
+    for name in ["front_minus","front_plus","rear_minus","rear_plus"]:
+        assert_faces(id = "base_"+name+"_survives", from_feature = base_slotted,
+            role = "slot_"+name+"_walls", in_feature = base_finished, count = 4)
+    for name,datum_name,depth in [("base_shallow_depth","shallow_floor",base_pocket_depth),("base_deep_depth","deep_floor",base_pocket_depth+1)]:
+        datum_dimension(id = name, output = "drive_module_release",
+            from_instance_path = ["base"], from_datum = "end",
+            to_instance_path = ["base"], to_datum = datum_name, direction = -1,
+            min = depth-0.000001, max = depth+0.000001)
+    datum_dimension(id = "base_remaining_web", output = "drive_module_release",
+        from_instance_path = ["base"], from_datum = "deep_floor",
+        to_instance_path = ["base"], to_datum = "start", direction = -1,
+        min = 5-base_pocket_depth-0.000001, max = 5-base_pocket_depth+0.000001)
+    area = 80*(p+90)-4*(pi*9+6*base_slot_length)-(4-pi)*base_corner_radius*base_corner_radius
+    section_view(id = "base_relief_section", output = "base", origin = [0,0,5.75],
+        min_area = area-2*base_relief_area-0.000001, max_area = area-2*base_relief_area+0.000001)
+    section_view(id = "base_web_section", output = "base", origin = [0,0,3],
+        min_area = area-0.000001, max_area = area+0.000001)
+    drawing_sheet(id = "base_relief_machining", title = "Drive base — separated relief machining",
+        revision = design_revision, width = 420, height = 297,
+        views = [
+            {"view":"base_relief_section","x":10,"y":10,"width":195,"height":170,"scale":0.8,"paper_annotation_font_mm":2.8,"paper_caption":"SECTION Z = 5.75 MM","annotation_labels":[]},
+            {"view":"base_web_section","x":215,"y":10,"width":195,"height":170,"scale":0.8,"paper_annotation_font_mm":2.8,"paper_caption":"SECTION Z = 3 MM","annotation_labels":[]},
+        ],
+        dimension_tables = [{"id":"base_depths","title":"NATIVE BASE FLOOR MEASUREMENTS","output":"drive_module_release","x":10,"y":190,"width":400,"height":55,
+            "rows":[{"dimension":"base_shallow_depth","label":"Shallow relief depth"},{"dimension":"base_deep_depth","label":"Deep relief depth"},{"dimension":"base_remaining_web","label":"Material below deep relief"}]}])
+check_base_reliefs()

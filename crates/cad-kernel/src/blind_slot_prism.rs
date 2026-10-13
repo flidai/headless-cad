@@ -660,7 +660,12 @@ impl Geometry {
         }
         Ok(result)
     }
-    pub(crate) fn face_centroid(&self, id: FaceId, t: Tolerance) -> Result<[f64; 3], KernelError> {
+    pub(crate) fn face_centroid(
+        &self,
+        model: &ModelSnapshot,
+        id: FaceId,
+        t: Tolerance,
+    ) -> Result<[f64; 3], KernelError> {
         let (_, _, _, base_f) = sizes(&self.stock);
         if id.0 >= base_f + 4 * self.slots.len() {
             let index = id.0 - (base_f + 4 * self.slots.len());
@@ -717,7 +722,40 @@ impl Geometry {
             }
             return Ok(std::array::from_fn(|k| base[k] + moment[k] / remain));
         }
-        Err(bad())
+        // Recognition proves these are rectangular extrusion walls, including
+        // shortened blind walls. Use their actual trimmed corners, never the
+        // uncut stock wall or its arbitrary supporting-plane origin.
+        let face = model.faces.get(id.0).ok_or_else(bad)?;
+        if face.try_plane().is_none() || face.loops.len() != 1 {
+            return Err(bad());
+        }
+        let boundary = model.loops.get(face.loops[0].0).ok_or_else(bad)?;
+        if boundary.edges.len() != 4
+            || boundary.edges.iter().any(|e| {
+                !matches!(
+                    model.edges.get(e.edge.0).map(|e| &e.curve),
+                    Some(Curve::Line(_))
+                )
+            })
+        {
+            return Err(bad());
+        }
+        let points = model.loop_points(face.loops[0]).ok_or_else(bad)?;
+        if points.len() != 4 || points.iter().any(|p| !finite(*p)) {
+            return Err(bad());
+        }
+        let reference = points[0];
+        let center = std::array::from_fn(|i| {
+            reference[i]
+                + points
+                    .iter()
+                    .map(|p| (p[i] - reference[i]) / 4.)
+                    .sum::<f64>()
+        });
+        if !finite(center) {
+            return Err(KernelError::NumericRange);
+        }
+        Ok(center)
     }
 }
 
@@ -1211,6 +1249,84 @@ mod tests {
             }
             assert!(blind_obround_slot_frame(&corrupt, t).is_err());
             assert!(cut_blind_obround_slots(&corrupt, &pair[..1], cap, 3., t).is_err());
+        }
+    }
+
+    #[test]
+    fn actual_planar_wall_frames_survive_blind_and_mixed_machining() {
+        let t = Tolerance::default();
+        let stock = extrude_rectangle(100., 80., 12., t).unwrap().model;
+        let outer = FaceId(2);
+        let original = stock.face_frame(outer, [0., 0., 1.], [0.; 3], t).unwrap();
+        let through = cut_obround_slots(
+            &stock,
+            &[ObroundSlot {
+                id: "mount".into(),
+                center: [25., 20.],
+                direction: [1., 0.],
+                centerline_length: 8.,
+                radius: 3.,
+            }],
+            t,
+        )
+        .unwrap();
+        for mixed in [false, true] {
+            let (body, outer) = if mixed {
+                (
+                    &through.model,
+                    through.history.input_faces["body"][&outer][0],
+                )
+            } else {
+                (&stock, outer)
+            };
+            let frame = blind_obround_slot_frame(body, t).unwrap();
+            let delta = sub([70., 50., 0.], frame.origin);
+            let slot = ObroundSlot {
+                id: "pocket".into(),
+                center: [dot(delta, frame.x_direction), dot(delta, frame.y_direction)],
+                direction: [frame.x_direction[0], frame.y_direction[0]],
+                centerline_length: 10.,
+                radius: 3.,
+            };
+            for cap in [FaceId(0), FaceId(1)] {
+                let op =
+                    cut_blind_obround_slots(body, std::slice::from_ref(&slot), cap, 3., t).unwrap();
+                let outer = op.history.input_faces["body"][&outer][0];
+                let wall = op.history.generated_faces["slot_pocket_wall_0"][0];
+                let outer_frame = op
+                    .model
+                    .face_frame(outer, [0., 0., 1.], [0.; 3], t)
+                    .unwrap();
+                for k in 0..3 {
+                    assert!((outer_frame.origin[k] - original.origin[k]).abs() < 1e-9);
+                }
+                let wall_frame = op.model.face_frame(wall, [0., 0., 1.], [0.; 3], t).unwrap();
+                assert!((wall_frame.origin[0] - 70.).abs() < 1e-9);
+                assert!(((wall_frame.origin[1] - 50.).abs() - 3.).abs() < 1e-9);
+                assert!(
+                    (wall_frame.origin[2] - if cap == FaceId(0) { 1.5 } else { 10.5 }).abs() < 1e-9
+                );
+                let q = [0.5, 0.5, 0., std::f64::consts::FRAC_1_SQRT_2];
+                let offset = [20., -7., 11.];
+                let posed = transform(&op.model, offset, q, t).unwrap().model;
+                let s = std::f64::consts::FRAC_1_SQRT_2;
+                for (id, expected) in [(outer, outer_frame.origin), (wall, wall_frame.origin)] {
+                    let actual = posed.face_frame(id, [s, -s, 0.], [0.; 3], t).unwrap();
+                    let independent = [
+                        offset[0] + 0.5 * expected[0] + 0.5 * expected[1] + s * expected[2],
+                        offset[1] + 0.5 * expected[0] + 0.5 * expected[1] - s * expected[2],
+                        offset[2] - s * expected[0] + s * expected[1],
+                    ];
+                    for (actual, expected) in actual.origin.into_iter().zip(independent) {
+                        assert!((actual - expected).abs() < 1e-9);
+                    }
+                    let mut corrupt = op.model.clone();
+                    if let Surface::Plane(p) = &mut corrupt.faces[id.0].surface {
+                        p.origin[0] += 0.001;
+                    }
+                    assert!(corrupt.face_frame(id, [0., 0., 1.], [0.; 3], t).is_err());
+                }
+            }
         }
     }
 

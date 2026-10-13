@@ -1,0 +1,28 @@
+{
+  "valid": true,
+  "read_only": true,
+  "actual_assembly_base_source": true,
+  "native_depth_dimensions": 3,
+  "through_slots": 4,
+  "blind_pockets": 2,
+  "moving_occurrences": 9,
+  "named_clearance_pairs": 13,
+  "recipe_context_hash": "2ccaf45d02504052b23062964e9a15636f9d6d89a925c318313f54bc7b8f5edf",
+  "script_sha256": "009a9947c84aa5cf74db056b8f4305458169b35a9d07e98182a96d6da0ef8a98",
+  "artifacts_sha256": {
+    "manifest.json": "81ae835167908cfc584abc61f33b1aaa1421cef840de0365ee8c10404e30571f",
+    "recipe.star": "7582dda185717c228b864f932c6c7246acfc846ab8d94abf068ce7d8ab382765",
+    "source-provenance.json": "67a5a44098f6976dc8ee10783e5ab80199883c90307b4f073adc2c67dc73d1d1",
+    "drive_module_release.assembly.json": "979e79d75fbd70664f841c5643021e9095495ccf3228b5e4187248d120edcbdc",
+    "rigid-rotation-groups.json": "2487b6a5af3515a3f9607b05216ce80b1939a190198553adb5cead385ea88231",
+    "datum-dimensions.json": "dfc6a4f43302775e9c7b70b6779640683e0668b7e2c8e29e8db7689c4039002d",
+    "section-base_relief_section.json": "4c27671591855c37842287042a11fc2bcc0d8d76bc02c68970fc7bc234f70c03",
+    "section-base_web_section.json": "6d79f65f3fe27caab2d13379f9eb7ca279a69af8c30845b447426f40a4768249",
+    "drawing-base_relief_machining.json": "7210ace140041fac1f00e61ee5d0d026a24518ac10ed0a7c7bd73cb3c651417d"
+  },
+  "screenshots": [
+    "/tmp/cad-pocketed-drive-drawing.png",
+    "/tmp/cad-pocketed-drive-assembly.png",
+    "/tmp/cad-pocketed-drive-base.png"
+  ]
+}

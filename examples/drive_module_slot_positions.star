@@ -1,7 +1,7 @@
 # Native slot centers and surviving stock sidewalls own these machining datums.
 # The imported drive remains the geometry source; no center coordinates are
 # repeated as authored datum locations.
-load("drive_module_rotation.star", "base_stock", "base_slotted", "mounting_pitch", "design_revision")
+load("drive_module_rotation.star", "base_stock", "base_slotted", "base_finished", "mounting_pitch", "design_revision")
 
 position_drawing_scale = param(name = "position_drawing_scale", default = 1)
 
@@ -14,7 +14,7 @@ def machining_datums():
         result[name] = slot_center_datum(from_feature = base_slotted, role = "slot_"+name+"_walls")
     return result
 
-machining_base = part(id = "machining_base", body = base_slotted,
+machining_base = part(id = "machining_base", body = base_finished,
     part_number = "DM-BASE", revision = design_revision,
     description = "Native slot center machining references", datums = machining_datums())
 machining_layout = assembly(id = "base_machining_layout", instances = [instance(id = "machining_leaf", part = machining_base)])

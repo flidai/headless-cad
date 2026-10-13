@@ -1,0 +1,1436 @@
+{
+  "valid": true,
+  "binary_sha256": "619eb0116083af2bd80a1b0ec8d95aef1cd456d4ee0987694264e03188988824",
+  "oracle_script_sha256": "3b9d543b80cbc58b17c9194477dff06877012f008f847d327221c6c1e7aba3b6",
+  "legacy_base_step_sha256": "0a5593aea2fda2953025ed3afbed5abd5c495d7b2841efcd219b4df8c1e9330e",
+  "source_inventory_sha256": {
+    "crates/cad-export/tools/check_angle_fixture_ocp.py": "abfe02cb7b71cd6188c04c329f7fa8d166e47e5e03f9aa2bf8a74b6ee262588f",
+    "crates/cad-export/tools/check_apex_ocp.py": "a7e5771a329e72a95eb16038d5c96e7051a6a0c8662339f2f61f49116fdf2370",
+    "crates/cad-export/tools/check_arc_prisms_ocp.py": "d615a610314c9d96eea45e83ddd835e9dc1bf5d1d51e2b8d7e5aacb6a4b34c6b",
+    "crates/cad-export/tools/check_assembly_ocp.py": "6f9c696910f9517886a521b7888338e3d5be08555ad9d0113d2e7100692cc20a",
+    "crates/cad-export/tools/check_blind_bores_ocp.py": "4f8275a724bd3dc8c33a648507bcce3bd05c83febd5bc2dbcd524cd0d4e321f3",
+    "crates/cad-export/tools/check_blind_pallet_ocp.py": "90b41ee27e43c4b2149a99da7bd57a3293fde2f329185522d1d998ff00697a58",
+    "crates/cad-export/tools/check_bom_csv.py": "97a0928e202acda3805455069be1867574cc287bcd71107332ef40e0e2da7e90",
+    "crates/cad-export/tools/check_capsule_link_ocp.py": "6615f86d74eee644db19304c2a8fac0fff602fddde35c9692b4cbf07d7c3a109",
+    "crates/cad-export/tools/check_chamfered_guide_ocp.py": "8967663c04462fb55c184476f9988f6be0912920f3ebdf07b5d60af8c895e5b6",
+    "crates/cad-export/tools/check_common_ocp.py": "bc531c267236de3a8b4fa5f190d09d912d6ecef7e202b875128df9ee2eb38c26",
+    "crates/cad-export/tools/check_concave_holes_ocp.py": "8dc584e95eedae39f6c76d5b4ed6724a63c011d56e19e5834fa6e08dac5eba0d",
+    "crates/cad-export/tools/check_constrained_fixture_ocp.py": "c526cea1fe9768889d02e7b45da9aad992ca4371bb4797a67c9072c79f6dbee0",
+    "crates/cad-export/tools/check_counterbored_fixture_ocp.py": "bf36d00aa6e8d5d13cfef4554c759753907cb42e6bdd26ad137b1f83a77296fc",
+    "crates/cad-export/tools/check_counterbores_ocp.py": "57713019b4c2beb5015aae3763261e40a9ac5c436be5b417f9c2cba4b782ebda",
+    "crates/cad-export/tools/check_countersinks_ocp.py": "668dc48fd82f50304427ee130cf8918fb77078bec71d6b858272d55ceac95f7c",
+    "crates/cad-export/tools/check_countersunk_bearing_cover_ocp.py": "b1878e9e9d399651b7ca76e1eedcc1d01c6fb1ba93124489eb04d25e0cf6955e",
+    "crates/cad-export/tools/check_drill_jig_ocp.py": "0ab4bbba28469815236a892e64523a078511e3a6280111666c2e5852d665bc65",
+    "crates/cad-export/tools/check_four_bar_ocp.py": "f4ad7d8692f465ebfa379b93937478a10bd4a1f30b677271cf47265e0f6237a1",
+    "crates/cad-export/tools/check_jointed_stage_ocp.py": "256d1cd31b3582753e6768fa4ef9aaeb1c9f87bfbedd14f2c09bc0b80a7fb9e5",
+    "crates/cad-export/tools/check_machined_bearing_ocp.py": "695bc21152c3d7a17afa1647c7ae7cf5cf3d85ad62432f3c8bbbd91dba65463a",
+    "crates/cad-export/tools/check_modular_bore_ocp.py": "9a7909125d00fc208f2cb20605970fb0d50f7ff5825141db7894e7a2627f8145",
+    "crates/cad-export/tools/check_modular_stage_ocp.py": "53c2a01ff51e28b7b4c536f7d89becf9c80c8dacba185dee9934fb7b1b7e3cc0",
+    "crates/cad-export/tools/check_motion_ocp.py": "3150384e4b7f34500f740a99790d9a77111c73ba92552ab2edb9b4781d4b5fe7",
+    "crates/cad-export/tools/check_properties_ocp.py": "ecf3f877f62135ef815f5f00c92692817849ab3da58ee95582d594d13586e857",
+    "crates/cad-export/tools/check_round_bearing_cartridge_ocp.py": "3a1bc6e1124ce1b482e045e19376025785bcff5b9b706096ffbff94eb810d9a8",
+    "crates/cad-export/tools/check_round_stock_ocp.py": "313be5ddf2d2725283d6b619bb22a9e04b78d9898b7b509a11f9800b2aadbc1a",
+    "crates/cad-export/tools/check_section_anchors_ocp.py": "72f970602bc5ddcac4d0d8980c8729a49e15d1598559e7be80f8d867ce0f97ea",
+    "crates/cad-export/tools/check_section_circle_dimensions_ocp.py": "33de655eb2b2124cc68466852463b0f2fda7a57ffd244d642fe52c645de90939",
+    "crates/cad-export/tools/check_section_dimensions_ocp.py": "8c3d79bb195645476ff18b09a365dc3ba5e787d3d9e0ff6316b0fac414783f6a",
+    "crates/cad-export/tools/check_section_views_ocp.py": "042bef9b1f25efdaa6dd8f2305f6841f8793193c8af815d565a69ec659e0c7b5",
+    "crates/cad-export/tools/check_sections_ocp.py": "77c8f5a241e07a17058a3e0de1fce8beeaf81ec1f2b6409d6e3a4b1c097de08f",
+    "crates/cad-export/tools/check_split_bearing_ocp.py": "f1b860bce06d5a95761a92071bbb3f991fe8b175a2d9f5e89dcc77efe48d0958",
+    "crates/cad-export/tools/check_step_materials_ocp.py": "e9bb582ca6ecd95ae6fcfe2cc09600d120750e26ab0c51d2a667bb46d0342a54",
+    "crates/cad-export/tools/check_step_metadata_ocp.py": "b9c2d102fac050d7c992562c926ee847d59810eefaa010fbf7ba70bc59264c59",
+    "crates/cad-export/tools/check_step_ocp.py": "7235d4f4ae84cc8dd6f19237ba11eca47352afcb3e1440e3c24b5d70c1d150d7",
+    "crates/cad-export/tools/check_tangent_fixture_ocp.py": "2f1110b9913afbe66da2106822df88e1bea501042376b9ea9c0081e590b8a077",
+    "crates/cad-export/tools/check_through_bores_ocp.py": "0b0dea78349a605962710275352dc21c03d4252b92dffbdbe41e0baf6fdf8933",
+    "crates/cad-export/tools/check_twin_lobe_ocp.py": "8525f83cdfa3cb11afd6e7134c8a61580a3ea8751d4492d5bffb6e4f2f81e78a",
+    "examples/drive_module_adjustment.star": "b029060d6c60733db98427d0194431e43dc15979a06e498ea1bdde75cd14cb19",
+    "examples/drive_module_adjustment.star.lock.json": "451210e2f7fa1c2bd430b3b605b2cd9de352f2ec4c2fb3ec9053842923e4fd45",
+    "examples/drive_module_rotation.star": "7582dda185717c228b864f932c6c7246acfc846ab8d94abf068ce7d8ab382765",
+    "examples/drive_module_slot_drawing.star": "9c87c285c42f5a7a7bb5600db023cfa8999182ee45ae9c5645b0400807e953c0",
+    "examples/drive_module_slot_drawing.star.lock.json": "451210e2f7fa1c2bd430b3b605b2cd9de352f2ec4c2fb3ec9053842923e4fd45",
+    "examples/drive_module_slot_positions.star": "d604590a095c7726d64b1f13067c97a3cda7d3bb6af096c6d79a4c4ba17ed5cc",
+    "examples/drive_module_slot_positions.star.lock.json": "451210e2f7fa1c2bd430b3b605b2cd9de352f2ec4c2fb3ec9053842923e4fd45",
+    "examples/drive_module_tightened.star": "89b5de69eea273fee414541903ef1f8f2255712eff8b4cf022c2c7d231c48b3e",
+    "examples/drive_module_tightened.star.lock.json": "451210e2f7fa1c2bd430b3b605b2cd9de352f2ec4c2fb3ec9053842923e4fd45",
+    "tools/bench-agent-stream.py": "8f0792c9dbac2e55f9059cb26ef37370643defd51ad7ca3fdd706c7e503913ab",
+    "tools/bench-export-spool.py": "e9506162b6ed1485c9fd2c1fdabea8fdba504fea4f45e9d934f6804b55a79b18",
+    "tools/check-blind-slots.py": "ff0e091d9362b37aa84081c8135fbd159a3c9eb46bb35828654a2d495b596c6e",
+    "tools/check-coaxial-clearance.py": "f75a1d8263b3a6c4859f03971c90a4f8b1700b392e398ebc68fe5c5c9e6b91b3",
+    "tools/check-convex-clearance.py": "0e85dd56ded209d024c4f3f7d7f2009aca967a4d30d8541f559b93a7539f2b0d",
+    "tools/check-cylinder-clearance.py": "09eb0c3795f7e1c7c4cb15b26fb8c3e53c6df807fe09c12d227cfb0c1405810a",
+    "tools/check-disjoint-stock.py": "74675811f25eaee609da8347a1cbc93c9ddacc3ad06dd809b6d11e12c4bde60d",
+    "tools/check-drive-module.py": "e5aa864859972c80e892f6b30dabf069dcabf767d645c6c8b38800060ffdaff6",
+    "tools/check-drive-rotation.py": "10938e85c1d47216a3dbd98335ce7b1c5c7bfe6dfbf120215e27585187c22921",
+    "tools/check-fillet-dimensions.py": "84d6e382658f6ba2cde1e5c3f52256b03e242698fe52488a32977a6e0f43b68d",
+    "tools/check-hub-keyway.py": "d8b9ddfc9adba7017bffe58d8b2a52eaf1a076dd192045718c0edb896dd5c30c",
+    "tools/check-keyed-clearance.py": "0f0bc8e8bd3fd4fb4b52286523027387b6c65441d535270f6f304f0570b4cbc4",
+    "tools/check-keyed-coupling.py": "e8d1aac5cd2efc4e6b6fefc9c818d7048a643e08938becf45aa7555ae2029c7a",
+    "tools/check-keyed-drive-module.py": "148d283f9ee82615f6b97d263a4c978c7e3aad2942c0179d89119364d6129c47",
+    "tools/check-keyseat.py": "b3a402ff4b03a148a496eb51aaf16267743e6549767f202c793f77da69f8aff8",
+    "tools/check-longitudinal-fillet.py": "6afdde3e7a4043dc5fc654ed790b571e02525a77f6fb2fb01580b9d4c54cc402",
+    "tools/check-mixed-slots.py": "3522b773e7067baee9de36a5911ea425ed69eab7b8bd6333b424f78759526ae8",
+    "tools/check-obround-slots.py": "730a75374a71eec4db19852605df7d1266d8f76fa18fcda8bcc1274ed347aee6",
+    "tools/check-parallel-clearance.py": "74282df908b423a701e67ce7a7bb8e48e6e3b3ec50589a8fa4efb627d3d3b15a",
+    "tools/check-pocketed-drive.py": "3b9d543b80cbc58b17c9194477dff06877012f008f847d327221c6c1e7aba3b6",
+    "tools/check-polygon-bore-rotation.py": "12c471f0c538dba1d0ee607bc45375e16642e487cab35360465a63447de1e201",
+    "tools/check-retained-drive-module.py": "d82389e37def121fe9ecb8eec82df1fcdd6ca9f47e407be4744647db201731ea",
+    "tools/check-retained-shaft.py": "5270cf83474033b301770c168703400b8c9e44073cab5fc537bf910ddeb060bc",
+    "tools/check-revolved-clearance.py": "04bbd402f3358ecee4e861724a2ec462c88024243ede3b9d62b7abfcd82c2b66",
+    "tools/check-rotation-clearance.py": "4492623a1341a2fadfdde9491718ee233dddd8604feecdf2491896728ca4f8a5",
+    "tools/check-rounded-bearing-fit.py": "6f5d06a868e08b9a910952fe535dd5b3faddcda693735ca36fb578d9b6879a24",
+    "tools/check-rounded-rotor.py": "2241d06afefa6bd3dd484c1e81e944384656516d333c42ec069615ee81dcdb5f",
+    "tools/check-serial-blind-slots.py": "44902b792d9c7cc53dd3eb0c0fdd8075757b198ca57da2832fd8c7d90ad169b9",
+    "tools/check-sketched-blind-boundaries.py": "b3a0bbe4130d4f184b41f4be9359cf1894d91dd7a928d4da9e3b148974b747e6",
+    "tools/check-sketched-blind-housing.py": "2801bda00d52d4b778221a15d48ed63c4744318a027cde0ebb84e4c09767cc86",
+    "tools/check-slot-adjustment.py": "df2336011e835a720b09bf37552b5268abd446760a0ccbead91d64a60d0a1084",
+    "tools/check-slot-dimensions.py": "99fe41c678047eeac6e3c66b7c81c79b781d2f002537d4d59d1de5fbd1518c68",
+    "tools/check-slot-positions.py": "9dcb22dca0be3defd4f462a4595b5c34342f053a0ea181818ae6fcbb7cdc7f7b",
+    "tools/check-source-provenance.py": "978d738560ac6eaed8c5f883f2c3f3b6f78de357434d939946157a3d4ca59532",
+    "tools/check-tightened-mounting.py": "5f19c2f6d9e407d53fb0237aa1feeebe94614a25c7850f0da731e202f303b4f4",
+    "tools/check-tolerance-stacks.py": "b2802b766e60c9482d2195e5bff7c1440ad27756bf1f71329932ac25d78159b0",
+    "tools/check-translation-clearance.py": "e4f6a684d9748dd31b7bf6ab375088c38d27f3c15f4b0ffed82047f9d60ff66e"
+  },
+  "python": "3.13.15",
+  "ocp": "8.0.1.1.0",
+  "cases": [
+    {
+      "case": "legacy_zero",
+      "parameters": {
+        "mounting_pitch": 60.0,
+        "base_slot_length": 6.0,
+        "base_corner_radius": 6.0,
+        "base_pocket_depth": 0.0
+      },
+      "volume_mm3": 70272.0,
+      "centroid_mm": [
+        75.263419401157,
+        0.0,
+        2.999999999999999
+      ],
+      "central_inertia_mm5": [
+        [
+          37119957.69499019,
+          0.0,
+          -1.862645149230957e-09
+        ],
+        [
+          0.0,
+          132573813.80425936,
+          0.0
+        ],
+        [
+          -1.862645149230957e-09,
+          0.0,
+          169272139.49924955
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "topology": {
+        "through_slots": 4,
+        "blind_slots": 0,
+        "floor_faces": 0,
+        "semicylinder_faces": 8
+      },
+      "section_strata": [
+        {
+          "z": 3.0,
+          "active_blind": 0,
+          "through_loops": 4,
+          "area_mm2": 11711.999999999995,
+          "loops": 5
+        }
+      ],
+      "native_witnesses": null,
+      "obligations": {
+        "face_assertions": [
+          "base_back_right_survives",
+          "base_body_survives",
+          "base_front_left_survives",
+          "base_front_right_survives",
+          "left_cover_minus_floor",
+          "left_cover_minus_wall",
+          "left_cover_plus_floor",
+          "left_cover_plus_wall",
+          "left_housing_bore_survives",
+          "left_outboard_cap_survives",
+          "right_cover_minus_floor",
+          "right_cover_minus_wall",
+          "right_cover_plus_floor",
+          "right_cover_plus_wall",
+          "right_housing_bore_survives",
+          "right_outboard_cap_survives"
+        ],
+        "property_assertions": [
+          "cover_screw_envelope_volume",
+          "end_cover_volume",
+          "left_housing_machined_volume",
+          "mass_budget",
+          "material_mass",
+          "material_volume",
+          "right_housing_machined_volume"
+        ],
+        "clearance_checks": [
+          "disc_shaft_gap",
+          "hub_left_washer_hub_gap",
+          "hub_left_washer_shaft_gap",
+          "hub_right_washer_hub_gap",
+          "hub_right_washer_shaft_gap",
+          "left_cover_shaft_gap",
+          "left_support_disc_gap",
+          "left_support_running_gap",
+          "right_cover_shaft_gap",
+          "right_support_disc_gap",
+          "right_support_running_gap",
+          "shaft_washer_bush_gap",
+          "shaft_washer_shaft_gap"
+        ],
+        "nominal_seating_checks": [
+          "left_cover_flange_seat",
+          "left_cover_minus_head_seat",
+          "left_cover_plus_head_seat",
+          "right_cover_flange_seat",
+          "right_cover_minus_head_seat",
+          "right_cover_plus_head_seat"
+        ],
+        "datum_dimensions": [
+          "bush_outer_span",
+          "hub_left_ring_thickness",
+          "hub_left_washer_thickness",
+          "hub_right_ring_thickness",
+          "hub_right_washer_thickness",
+          "hub_stop_span",
+          "hub_width",
+          "left_cover_minus_depth",
+          "left_cover_minus_remaining_floor",
+          "left_cover_minus_shank",
+          "left_cover_plus_depth",
+          "left_cover_plus_remaining_floor",
+          "left_cover_plus_shank",
+          "left_cover_thickness",
+          "left_flange_thickness",
+          "right_cover_minus_depth",
+          "right_cover_minus_remaining_floor",
+          "right_cover_minus_shank",
+          "right_cover_plus_depth",
+          "right_cover_plus_remaining_floor",
+          "right_cover_plus_shank",
+          "right_cover_thickness",
+          "right_flange_thickness",
+          "shaft_ring_thickness",
+          "shaft_stop_span",
+          "shaft_washer_thickness"
+        ],
+        "section_views": [
+          "bearing_section",
+          "end_cover_section",
+          "left_cover_pilot_section",
+          "mounting_plan",
+          "right_cover_pilot_section"
+        ],
+        "drawing_sheets": [
+          "drive_module_sections",
+          "end_cover_machining"
+        ],
+        "tolerance_stacks": [
+          "housing_sleeve_diametral_limits",
+          "hub_axial_endplay",
+          "left_cover_minus_tip_allowance",
+          "left_cover_plus_tip_allowance",
+          "right_cover_minus_tip_allowance",
+          "right_cover_plus_tip_allowance",
+          "running_diametral_limits",
+          "shaft_axial_endplay"
+        ],
+        "rigid_rotation_groups": [
+          "rotor"
+        ]
+      },
+      "base_content_hash": "6c5c22875cb59604225a45754211fe3c7dc5c7fc1529f559a7f17ee0ddf82faa",
+      "assembly_material_volume_mm3": 196485.34445370466,
+      "assembly_material_mass_kg": 0.8194055364044844,
+      "output_hashes": {
+        "base": "6c5c22875cb59604225a45754211fe3c7dc5c7fc1529f559a7f17ee0ddf82faa",
+        "bearing_fit_inspection": "3dc64a9018dbc0c9dd2eaf4423687eb15b77a7b4bbb564daf5fbac7823a6276a",
+        "cover_screw_envelope": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "drive_disc": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "drive_module_release": "24ee9e0800f7f5be12b85f10f292fd03c4f37593df7bae27973312fcd90608a8",
+        "end_cover": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "housing": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "parallel_key": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "retaining_ring": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "right_housing": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "shaft": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "sleeve": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "washer": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990"
+      },
+      "feature_hashes": {
+        "base_back_right": "dc214800c0e2cad26297363fae4801adac6a5687315582a1bca017bc161151c7",
+        "base_body": "1693883f90c7bdec592ef2ece851e7b2e456cb572cea47343fd8db56bb75a11c",
+        "base_front_left": "b66be1860c83fdc47843a30791f47dfce55c1b7828acb5a584c4b48b898fec86",
+        "base_front_right": "1c6fc0213e40060632f1df9cb692d179130c298c9acea35ddb9c981c24143818",
+        "base_profile": "5396b6588c9a89ccf4df839c132f8f95fea8be4ea6a347b6bf9bbaadb7e44479",
+        "base_slotted": "6c5c22875cb59604225a45754211fe3c7dc5c7fc1529f559a7f17ee0ddf82faa",
+        "base_stock": "ef78cb841174aee66c923d2624fca7419d9a8ecdca2f22ed0d01ff8528a0bd7d",
+        "bolt_body": "60f2a7146a29a80c7f07cd1670c36bc2fe92c45a1e5244b70df7b1a768872d6e",
+        "bolt_profile": "bf837c00e739d521c2e740a0e43c44b070252bc36a85df0bea3cbee26b28845a",
+        "clamp_body": "c87f738e9afd0cd29cc0ad25b940b90842affab4b3ed47afa8224b106a289bd0",
+        "clamp_profile": "b5fa9511aed105976626de11188fad3cd082d0c580c28ba1cfa017b99eab555a",
+        "cover_screw_body": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "cover_screw_profile": "9276bed8ab644a2e676510112d39d5eb2298b55977087be99748e76814debc2f",
+        "disc_body": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "disc_profile": "5c6922b9ddc5c9325be3f5bae52d61d1966f293f073e8fadd3f806bfb5bb7594",
+        "disc_stock": "23626a23e68ab07590c8e45b79030d95541c730a0c0f3c8ed7a7808b574c88ca",
+        "end_cover_body": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "end_cover_profile": "51a43423f5a7412cb8a87f18f975e292ec66384730405d33f044f9e73b24958d",
+        "housing_body": "5bbfb388f9b94d85aed9ebaa5f41394581b47ded8f73081ce162a66aa075e450",
+        "housing_left_pilots": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "housing_profile": "ca38443cbc772448327220f7c4e798e1f5b8a499701345ca4faa3418aaf51f3d",
+        "housing_right_pilots": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "key_body": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "key_profile": "d77e4e0d9e8caf5d3b4368a7d467a65507e5b8a6192f6df822d7113c4ea99c62",
+        "keyway_box": "5da496f0028164432371631f31069c1a0663524374dae97d89e3d44e9a4911ab",
+        "keyway_profile": "9981ca00cb85a41c6025acb91de8326362ed735d6ba0d01eaa0e2fa4af55eb93",
+        "keyway_tool": "80dfe51eaf28418d8805e16abf024458c98ad41956a977fcd1f247bb16ad8e7d",
+        "nut_body": "670310266a37ca46bf3b08293cc2189ed4dce42e27ec4d44f3888ff811f4df03",
+        "nut_profile": "ba8b149a00d3637033d7ef224cccf6a2f10d93a530d442d9fb3dcee01d627c1f",
+        "ring_body": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "ring_profile": "b20c6b2ccfaafca29426bcbdd28c417437d69fcd6fc111d0c9a18c89f6fe2572",
+        "seat_box": "7183506f539b528baf01d7f58fa85bf99a90652863f64455014820cc43748798",
+        "seat_profile": "d8472a2aa6299d3f049043eb0031636d1a050d1bd54bb5a25728a64238cbfff6",
+        "seat_tool": "4b8122655720cb7a890bd4e94e8994635d6f85fdaaee8a1b0b7c4a66bad23588",
+        "shaft_body": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "shaft_profile": "add38a05d015f9e5bfc0543bf746483759a55c45dae4c12469a36474dc0d8a06",
+        "shaft_stock": "4896468cf6272757e15ac5b91d2f8885075fd3985a589df05487a0d8d05e7f62",
+        "sleeve_body": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "sleeve_profile": "13254dea58f3abb66f979c8b1bc75d15de79b851784c9542890a72d16c6160ce",
+        "washer_body": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990",
+        "washer_profile": "882f968873bd870890adc3c61cac9a3e4bd149a5c990ef34974edbcc374ecfe3"
+      }
+    },
+    {
+      "case": "relief_half",
+      "parameters": {
+        "mounting_pitch": 60.0,
+        "base_slot_length": 6.0,
+        "base_corner_radius": 6.0,
+        "base_pocket_depth": 0.5
+      },
+      "volume_mm3": 69999.45133223537,
+      "centroid_mm": [
+        75.29170012684163,
+        0.0,
+        2.9907527405769407
+      ],
+      "central_inertia_mm5": [
+        [
+          37106526.16539061,
+          0.0,
+          -5230.9687459189445
+        ],
+        [
+          0.0,
+          132536566.65983531,
+          0.0
+        ],
+        [
+          -5230.9687459189445,
+          0.0,
+          169224652.53124228
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "topology": {
+        "through_slots": 4,
+        "blind_slots": 2,
+        "floor_faces": 2,
+        "semicylinder_faces": 12
+      },
+      "section_strata": [
+        {
+          "z": 5.75,
+          "active_blind": 2,
+          "through_loops": 4,
+          "area_mm2": 11439.451332235376,
+          "loops": 7
+        },
+        {
+          "z": 5.0,
+          "active_blind": 1,
+          "through_loops": 4,
+          "area_mm2": 11575.725666117685,
+          "loops": 6
+        },
+        {
+          "z": 2.25,
+          "active_blind": 0,
+          "through_loops": 4,
+          "area_mm2": 11711.999999999995,
+          "loops": 5
+        }
+      ],
+      "native_witnesses": {
+        "depths_mm": {
+          "base_shallow_depth": 0.5,
+          "base_deep_depth": 1.5,
+          "base_remaining_web": 4.5
+        },
+        "first_floor_witness": {
+          "anchor_faces": [
+            30
+          ],
+          "target_face": 34,
+          "target_feature": "base_deep_relief"
+        }
+      },
+      "obligations": {
+        "face_assertions": [
+          "base_back_right_survives",
+          "base_body_survives",
+          "base_front_left_survives",
+          "base_front_minus_survives",
+          "base_front_plus_survives",
+          "base_front_right_survives",
+          "base_rear_minus_survives",
+          "base_rear_plus_survives",
+          "base_shallow_floor_survives",
+          "left_cover_minus_floor",
+          "left_cover_minus_wall",
+          "left_cover_plus_floor",
+          "left_cover_plus_wall",
+          "left_housing_bore_survives",
+          "left_outboard_cap_survives",
+          "right_cover_minus_floor",
+          "right_cover_minus_wall",
+          "right_cover_plus_floor",
+          "right_cover_plus_wall",
+          "right_housing_bore_survives",
+          "right_outboard_cap_survives"
+        ],
+        "property_assertions": [
+          "cover_screw_envelope_volume",
+          "end_cover_volume",
+          "left_housing_machined_volume",
+          "mass_budget",
+          "material_mass",
+          "material_volume",
+          "right_housing_machined_volume"
+        ],
+        "clearance_checks": [
+          "disc_shaft_gap",
+          "hub_left_washer_hub_gap",
+          "hub_left_washer_shaft_gap",
+          "hub_right_washer_hub_gap",
+          "hub_right_washer_shaft_gap",
+          "left_cover_shaft_gap",
+          "left_support_disc_gap",
+          "left_support_running_gap",
+          "right_cover_shaft_gap",
+          "right_support_disc_gap",
+          "right_support_running_gap",
+          "shaft_washer_bush_gap",
+          "shaft_washer_shaft_gap"
+        ],
+        "nominal_seating_checks": [
+          "left_cover_flange_seat",
+          "left_cover_minus_head_seat",
+          "left_cover_plus_head_seat",
+          "right_cover_flange_seat",
+          "right_cover_minus_head_seat",
+          "right_cover_plus_head_seat"
+        ],
+        "datum_dimensions": [
+          "base_deep_depth",
+          "base_remaining_web",
+          "base_shallow_depth",
+          "bush_outer_span",
+          "hub_left_ring_thickness",
+          "hub_left_washer_thickness",
+          "hub_right_ring_thickness",
+          "hub_right_washer_thickness",
+          "hub_stop_span",
+          "hub_width",
+          "left_cover_minus_depth",
+          "left_cover_minus_remaining_floor",
+          "left_cover_minus_shank",
+          "left_cover_plus_depth",
+          "left_cover_plus_remaining_floor",
+          "left_cover_plus_shank",
+          "left_cover_thickness",
+          "left_flange_thickness",
+          "right_cover_minus_depth",
+          "right_cover_minus_remaining_floor",
+          "right_cover_minus_shank",
+          "right_cover_plus_depth",
+          "right_cover_plus_remaining_floor",
+          "right_cover_plus_shank",
+          "right_cover_thickness",
+          "right_flange_thickness",
+          "shaft_ring_thickness",
+          "shaft_stop_span",
+          "shaft_washer_thickness"
+        ],
+        "section_views": [
+          "base_relief_section",
+          "base_web_section",
+          "bearing_section",
+          "end_cover_section",
+          "left_cover_pilot_section",
+          "mounting_plan",
+          "right_cover_pilot_section"
+        ],
+        "drawing_sheets": [
+          "base_relief_machining",
+          "drive_module_sections",
+          "end_cover_machining"
+        ],
+        "tolerance_stacks": [
+          "housing_sleeve_diametral_limits",
+          "hub_axial_endplay",
+          "left_cover_minus_tip_allowance",
+          "left_cover_plus_tip_allowance",
+          "right_cover_minus_tip_allowance",
+          "right_cover_plus_tip_allowance",
+          "running_diametral_limits",
+          "shaft_axial_endplay"
+        ],
+        "rigid_rotation_groups": [
+          "rotor"
+        ]
+      },
+      "base_content_hash": "746b6823ce979c6b2c7f1b95fec2a8defe290b2e625b0be85e8b61e4621ddc5f",
+      "assembly_material_volume_mm3": 196212.79578594005,
+      "assembly_material_mass_kg": 0.81866965500152,
+      "output_hashes": {
+        "base": "746b6823ce979c6b2c7f1b95fec2a8defe290b2e625b0be85e8b61e4621ddc5f",
+        "bearing_fit_inspection": "3dc64a9018dbc0c9dd2eaf4423687eb15b77a7b4bbb564daf5fbac7823a6276a",
+        "cover_screw_envelope": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "drive_disc": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "drive_module_release": "9667d4206537b520934d253f017e1509a46102fb17eb931b0f490ecf94927ca6",
+        "end_cover": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "housing": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "parallel_key": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "retaining_ring": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "right_housing": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "shaft": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "sleeve": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "washer": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990"
+      },
+      "feature_hashes": {
+        "base_back_right": "dc214800c0e2cad26297363fae4801adac6a5687315582a1bca017bc161151c7",
+        "base_body": "1693883f90c7bdec592ef2ece851e7b2e456cb572cea47343fd8db56bb75a11c",
+        "base_deep_relief": "746b6823ce979c6b2c7f1b95fec2a8defe290b2e625b0be85e8b61e4621ddc5f",
+        "base_front_left": "b66be1860c83fdc47843a30791f47dfce55c1b7828acb5a584c4b48b898fec86",
+        "base_front_right": "1c6fc0213e40060632f1df9cb692d179130c298c9acea35ddb9c981c24143818",
+        "base_profile": "5396b6588c9a89ccf4df839c132f8f95fea8be4ea6a347b6bf9bbaadb7e44479",
+        "base_shallow_relief": "61fd31fea40be39bb2cd495cf04f0107311d1beb86fdc999bbd403b4782f18cc",
+        "base_slotted": "6c5c22875cb59604225a45754211fe3c7dc5c7fc1529f559a7f17ee0ddf82faa",
+        "base_stock": "ef78cb841174aee66c923d2624fca7419d9a8ecdca2f22ed0d01ff8528a0bd7d",
+        "bolt_body": "60f2a7146a29a80c7f07cd1670c36bc2fe92c45a1e5244b70df7b1a768872d6e",
+        "bolt_profile": "bf837c00e739d521c2e740a0e43c44b070252bc36a85df0bea3cbee26b28845a",
+        "clamp_body": "c87f738e9afd0cd29cc0ad25b940b90842affab4b3ed47afa8224b106a289bd0",
+        "clamp_profile": "b5fa9511aed105976626de11188fad3cd082d0c580c28ba1cfa017b99eab555a",
+        "cover_screw_body": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "cover_screw_profile": "9276bed8ab644a2e676510112d39d5eb2298b55977087be99748e76814debc2f",
+        "disc_body": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "disc_profile": "5c6922b9ddc5c9325be3f5bae52d61d1966f293f073e8fadd3f806bfb5bb7594",
+        "disc_stock": "23626a23e68ab07590c8e45b79030d95541c730a0c0f3c8ed7a7808b574c88ca",
+        "end_cover_body": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "end_cover_profile": "51a43423f5a7412cb8a87f18f975e292ec66384730405d33f044f9e73b24958d",
+        "housing_body": "5bbfb388f9b94d85aed9ebaa5f41394581b47ded8f73081ce162a66aa075e450",
+        "housing_left_pilots": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "housing_profile": "ca38443cbc772448327220f7c4e798e1f5b8a499701345ca4faa3418aaf51f3d",
+        "housing_right_pilots": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "key_body": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "key_profile": "d77e4e0d9e8caf5d3b4368a7d467a65507e5b8a6192f6df822d7113c4ea99c62",
+        "keyway_box": "5da496f0028164432371631f31069c1a0663524374dae97d89e3d44e9a4911ab",
+        "keyway_profile": "9981ca00cb85a41c6025acb91de8326362ed735d6ba0d01eaa0e2fa4af55eb93",
+        "keyway_tool": "80dfe51eaf28418d8805e16abf024458c98ad41956a977fcd1f247bb16ad8e7d",
+        "nut_body": "670310266a37ca46bf3b08293cc2189ed4dce42e27ec4d44f3888ff811f4df03",
+        "nut_profile": "ba8b149a00d3637033d7ef224cccf6a2f10d93a530d442d9fb3dcee01d627c1f",
+        "ring_body": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "ring_profile": "b20c6b2ccfaafca29426bcbdd28c417437d69fcd6fc111d0c9a18c89f6fe2572",
+        "seat_box": "7183506f539b528baf01d7f58fa85bf99a90652863f64455014820cc43748798",
+        "seat_profile": "d8472a2aa6299d3f049043eb0031636d1a050d1bd54bb5a25728a64238cbfff6",
+        "seat_tool": "4b8122655720cb7a890bd4e94e8994635d6f85fdaaee8a1b0b7c4a66bad23588",
+        "shaft_body": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "shaft_profile": "add38a05d015f9e5bfc0543bf746483759a55c45dae4c12469a36474dc0d8a06",
+        "shaft_stock": "4896468cf6272757e15ac5b91d2f8885075fd3985a589df05487a0d8d05e7f62",
+        "sleeve_body": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "sleeve_profile": "13254dea58f3abb66f979c8b1bc75d15de79b851784c9542890a72d16c6160ce",
+        "washer_body": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990",
+        "washer_profile": "882f968873bd870890adc3c61cac9a3e4bd149a5c990ef34974edbcc374ecfe3"
+      }
+    },
+    {
+      "case": "relief_one",
+      "parameters": {
+        "mounting_pitch": 60.0,
+        "base_slot_length": 6.0,
+        "base_corner_radius": 6.0,
+        "base_pocket_depth": 1.0
+      },
+      "volume_mm3": 69863.17699835308,
+      "centroid_mm": [
+        75.31567618002205,
+        0.0,
+        2.987321172493258
+      ],
+      "central_inertia_mm5": [
+        [
+          37100148.83440283,
+          0.0,
+          -8864.903682094067
+        ],
+        [
+          0.0,
+          132501462.82628532,
+          0.0
+        ],
+        [
+          -8864.903682094067,
+          0.0,
+          169184090.35208866
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "topology": {
+        "through_slots": 4,
+        "blind_slots": 2,
+        "floor_faces": 2,
+        "semicylinder_faces": 12
+      },
+      "section_strata": [
+        {
+          "z": 5.5,
+          "active_blind": 2,
+          "through_loops": 4,
+          "area_mm2": 11439.451332235376,
+          "loops": 7
+        },
+        {
+          "z": 4.5,
+          "active_blind": 1,
+          "through_loops": 4,
+          "area_mm2": 11575.725666117685,
+          "loops": 6
+        },
+        {
+          "z": 2.0,
+          "active_blind": 0,
+          "through_loops": 4,
+          "area_mm2": 11711.999999999995,
+          "loops": 5
+        }
+      ],
+      "native_witnesses": {
+        "depths_mm": {
+          "base_shallow_depth": 1.0,
+          "base_deep_depth": 2.0,
+          "base_remaining_web": 4.0
+        },
+        "first_floor_witness": {
+          "anchor_faces": [
+            30
+          ],
+          "target_face": 34,
+          "target_feature": "base_deep_relief"
+        }
+      },
+      "obligations": {
+        "face_assertions": [
+          "base_back_right_survives",
+          "base_body_survives",
+          "base_front_left_survives",
+          "base_front_minus_survives",
+          "base_front_plus_survives",
+          "base_front_right_survives",
+          "base_rear_minus_survives",
+          "base_rear_plus_survives",
+          "base_shallow_floor_survives",
+          "left_cover_minus_floor",
+          "left_cover_minus_wall",
+          "left_cover_plus_floor",
+          "left_cover_plus_wall",
+          "left_housing_bore_survives",
+          "left_outboard_cap_survives",
+          "right_cover_minus_floor",
+          "right_cover_minus_wall",
+          "right_cover_plus_floor",
+          "right_cover_plus_wall",
+          "right_housing_bore_survives",
+          "right_outboard_cap_survives"
+        ],
+        "property_assertions": [
+          "cover_screw_envelope_volume",
+          "end_cover_volume",
+          "left_housing_machined_volume",
+          "mass_budget",
+          "material_mass",
+          "material_volume",
+          "right_housing_machined_volume"
+        ],
+        "clearance_checks": [
+          "disc_shaft_gap",
+          "hub_left_washer_hub_gap",
+          "hub_left_washer_shaft_gap",
+          "hub_right_washer_hub_gap",
+          "hub_right_washer_shaft_gap",
+          "left_cover_shaft_gap",
+          "left_support_disc_gap",
+          "left_support_running_gap",
+          "right_cover_shaft_gap",
+          "right_support_disc_gap",
+          "right_support_running_gap",
+          "shaft_washer_bush_gap",
+          "shaft_washer_shaft_gap"
+        ],
+        "nominal_seating_checks": [
+          "left_cover_flange_seat",
+          "left_cover_minus_head_seat",
+          "left_cover_plus_head_seat",
+          "right_cover_flange_seat",
+          "right_cover_minus_head_seat",
+          "right_cover_plus_head_seat"
+        ],
+        "datum_dimensions": [
+          "base_deep_depth",
+          "base_remaining_web",
+          "base_shallow_depth",
+          "bush_outer_span",
+          "hub_left_ring_thickness",
+          "hub_left_washer_thickness",
+          "hub_right_ring_thickness",
+          "hub_right_washer_thickness",
+          "hub_stop_span",
+          "hub_width",
+          "left_cover_minus_depth",
+          "left_cover_minus_remaining_floor",
+          "left_cover_minus_shank",
+          "left_cover_plus_depth",
+          "left_cover_plus_remaining_floor",
+          "left_cover_plus_shank",
+          "left_cover_thickness",
+          "left_flange_thickness",
+          "right_cover_minus_depth",
+          "right_cover_minus_remaining_floor",
+          "right_cover_minus_shank",
+          "right_cover_plus_depth",
+          "right_cover_plus_remaining_floor",
+          "right_cover_plus_shank",
+          "right_cover_thickness",
+          "right_flange_thickness",
+          "shaft_ring_thickness",
+          "shaft_stop_span",
+          "shaft_washer_thickness"
+        ],
+        "section_views": [
+          "base_relief_section",
+          "base_web_section",
+          "bearing_section",
+          "end_cover_section",
+          "left_cover_pilot_section",
+          "mounting_plan",
+          "right_cover_pilot_section"
+        ],
+        "drawing_sheets": [
+          "base_relief_machining",
+          "drive_module_sections",
+          "end_cover_machining"
+        ],
+        "tolerance_stacks": [
+          "housing_sleeve_diametral_limits",
+          "hub_axial_endplay",
+          "left_cover_minus_tip_allowance",
+          "left_cover_plus_tip_allowance",
+          "right_cover_minus_tip_allowance",
+          "right_cover_plus_tip_allowance",
+          "running_diametral_limits",
+          "shaft_axial_endplay"
+        ],
+        "rigid_rotation_groups": [
+          "rotor"
+        ]
+      },
+      "base_content_hash": "18b5300473f27d26c018a9c630b7934c0798052437451165f056eef9d79f66ea",
+      "assembly_material_volume_mm3": 196076.52145205776,
+      "assembly_material_mass_kg": 0.8183017143000377,
+      "output_hashes": {
+        "base": "18b5300473f27d26c018a9c630b7934c0798052437451165f056eef9d79f66ea",
+        "bearing_fit_inspection": "3dc64a9018dbc0c9dd2eaf4423687eb15b77a7b4bbb564daf5fbac7823a6276a",
+        "cover_screw_envelope": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "drive_disc": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "drive_module_release": "2619930929af919a9785ce712036d4af24966597bf44c3c42c0ae8123081e7d1",
+        "end_cover": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "housing": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "parallel_key": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "retaining_ring": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "right_housing": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "shaft": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "sleeve": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "washer": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990"
+      },
+      "feature_hashes": {
+        "base_back_right": "dc214800c0e2cad26297363fae4801adac6a5687315582a1bca017bc161151c7",
+        "base_body": "1693883f90c7bdec592ef2ece851e7b2e456cb572cea47343fd8db56bb75a11c",
+        "base_deep_relief": "18b5300473f27d26c018a9c630b7934c0798052437451165f056eef9d79f66ea",
+        "base_front_left": "b66be1860c83fdc47843a30791f47dfce55c1b7828acb5a584c4b48b898fec86",
+        "base_front_right": "1c6fc0213e40060632f1df9cb692d179130c298c9acea35ddb9c981c24143818",
+        "base_profile": "5396b6588c9a89ccf4df839c132f8f95fea8be4ea6a347b6bf9bbaadb7e44479",
+        "base_shallow_relief": "aa2b77dca86f18a8816436acc419e01d94ad8ecad39336e863fbf74955da232f",
+        "base_slotted": "6c5c22875cb59604225a45754211fe3c7dc5c7fc1529f559a7f17ee0ddf82faa",
+        "base_stock": "ef78cb841174aee66c923d2624fca7419d9a8ecdca2f22ed0d01ff8528a0bd7d",
+        "bolt_body": "60f2a7146a29a80c7f07cd1670c36bc2fe92c45a1e5244b70df7b1a768872d6e",
+        "bolt_profile": "bf837c00e739d521c2e740a0e43c44b070252bc36a85df0bea3cbee26b28845a",
+        "clamp_body": "c87f738e9afd0cd29cc0ad25b940b90842affab4b3ed47afa8224b106a289bd0",
+        "clamp_profile": "b5fa9511aed105976626de11188fad3cd082d0c580c28ba1cfa017b99eab555a",
+        "cover_screw_body": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "cover_screw_profile": "9276bed8ab644a2e676510112d39d5eb2298b55977087be99748e76814debc2f",
+        "disc_body": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "disc_profile": "5c6922b9ddc5c9325be3f5bae52d61d1966f293f073e8fadd3f806bfb5bb7594",
+        "disc_stock": "23626a23e68ab07590c8e45b79030d95541c730a0c0f3c8ed7a7808b574c88ca",
+        "end_cover_body": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "end_cover_profile": "51a43423f5a7412cb8a87f18f975e292ec66384730405d33f044f9e73b24958d",
+        "housing_body": "5bbfb388f9b94d85aed9ebaa5f41394581b47ded8f73081ce162a66aa075e450",
+        "housing_left_pilots": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "housing_profile": "ca38443cbc772448327220f7c4e798e1f5b8a499701345ca4faa3418aaf51f3d",
+        "housing_right_pilots": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "key_body": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "key_profile": "d77e4e0d9e8caf5d3b4368a7d467a65507e5b8a6192f6df822d7113c4ea99c62",
+        "keyway_box": "5da496f0028164432371631f31069c1a0663524374dae97d89e3d44e9a4911ab",
+        "keyway_profile": "9981ca00cb85a41c6025acb91de8326362ed735d6ba0d01eaa0e2fa4af55eb93",
+        "keyway_tool": "80dfe51eaf28418d8805e16abf024458c98ad41956a977fcd1f247bb16ad8e7d",
+        "nut_body": "670310266a37ca46bf3b08293cc2189ed4dce42e27ec4d44f3888ff811f4df03",
+        "nut_profile": "ba8b149a00d3637033d7ef224cccf6a2f10d93a530d442d9fb3dcee01d627c1f",
+        "ring_body": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "ring_profile": "b20c6b2ccfaafca29426bcbdd28c417437d69fcd6fc111d0c9a18c89f6fe2572",
+        "seat_box": "7183506f539b528baf01d7f58fa85bf99a90652863f64455014820cc43748798",
+        "seat_profile": "d8472a2aa6299d3f049043eb0031636d1a050d1bd54bb5a25728a64238cbfff6",
+        "seat_tool": "4b8122655720cb7a890bd4e94e8994635d6f85fdaaee8a1b0b7c4a66bad23588",
+        "shaft_body": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "shaft_profile": "add38a05d015f9e5bfc0543bf746483759a55c45dae4c12469a36474dc0d8a06",
+        "shaft_stock": "4896468cf6272757e15ac5b91d2f8885075fd3985a589df05487a0d8d05e7f62",
+        "sleeve_body": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "sleeve_profile": "13254dea58f3abb66f979c8b1bc75d15de79b851784c9542890a72d16c6160ce",
+        "washer_body": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990",
+        "washer_profile": "882f968873bd870890adc3c61cac9a3e4bd149a5c990ef34974edbcc374ecfe3"
+      }
+    },
+    {
+      "case": "relief_one_half",
+      "parameters": {
+        "mounting_pitch": 60.0,
+        "base_slot_length": 6.0,
+        "base_corner_radius": 6.0,
+        "base_pocket_depth": 1.5
+      },
+      "volume_mm3": 69726.90266447076,
+      "centroid_mm": [
+        75.33974595085097,
+        0.0,
+        2.984853391628909
+      ],
+      "central_inertia_mm5": [
+        [
+          37093976.39379212,
+          0.0,
+          -11669.584274077788
+        ],
+        [
+          0.0,
+          132466483.24729826,
+          0.0
+        ],
+        [
+          -11669.584274077788,
+          0.0,
+          169143447.5371209
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "topology": {
+        "through_slots": 4,
+        "blind_slots": 2,
+        "floor_faces": 2,
+        "semicylinder_faces": 12
+      },
+      "section_strata": [
+        {
+          "z": 5.25,
+          "active_blind": 2,
+          "through_loops": 4,
+          "area_mm2": 11439.451332235376,
+          "loops": 7
+        },
+        {
+          "z": 4.0,
+          "active_blind": 1,
+          "through_loops": 4,
+          "area_mm2": 11575.725666117685,
+          "loops": 6
+        },
+        {
+          "z": 1.75,
+          "active_blind": 0,
+          "through_loops": 4,
+          "area_mm2": 11711.999999999995,
+          "loops": 5
+        }
+      ],
+      "native_witnesses": {
+        "depths_mm": {
+          "base_shallow_depth": 1.5,
+          "base_deep_depth": 2.5,
+          "base_remaining_web": 3.5
+        },
+        "first_floor_witness": {
+          "anchor_faces": [
+            30
+          ],
+          "target_face": 34,
+          "target_feature": "base_deep_relief"
+        }
+      },
+      "obligations": {
+        "face_assertions": [
+          "base_back_right_survives",
+          "base_body_survives",
+          "base_front_left_survives",
+          "base_front_minus_survives",
+          "base_front_plus_survives",
+          "base_front_right_survives",
+          "base_rear_minus_survives",
+          "base_rear_plus_survives",
+          "base_shallow_floor_survives",
+          "left_cover_minus_floor",
+          "left_cover_minus_wall",
+          "left_cover_plus_floor",
+          "left_cover_plus_wall",
+          "left_housing_bore_survives",
+          "left_outboard_cap_survives",
+          "right_cover_minus_floor",
+          "right_cover_minus_wall",
+          "right_cover_plus_floor",
+          "right_cover_plus_wall",
+          "right_housing_bore_survives",
+          "right_outboard_cap_survives"
+        ],
+        "property_assertions": [
+          "cover_screw_envelope_volume",
+          "end_cover_volume",
+          "left_housing_machined_volume",
+          "mass_budget",
+          "material_mass",
+          "material_volume",
+          "right_housing_machined_volume"
+        ],
+        "clearance_checks": [
+          "disc_shaft_gap",
+          "hub_left_washer_hub_gap",
+          "hub_left_washer_shaft_gap",
+          "hub_right_washer_hub_gap",
+          "hub_right_washer_shaft_gap",
+          "left_cover_shaft_gap",
+          "left_support_disc_gap",
+          "left_support_running_gap",
+          "right_cover_shaft_gap",
+          "right_support_disc_gap",
+          "right_support_running_gap",
+          "shaft_washer_bush_gap",
+          "shaft_washer_shaft_gap"
+        ],
+        "nominal_seating_checks": [
+          "left_cover_flange_seat",
+          "left_cover_minus_head_seat",
+          "left_cover_plus_head_seat",
+          "right_cover_flange_seat",
+          "right_cover_minus_head_seat",
+          "right_cover_plus_head_seat"
+        ],
+        "datum_dimensions": [
+          "base_deep_depth",
+          "base_remaining_web",
+          "base_shallow_depth",
+          "bush_outer_span",
+          "hub_left_ring_thickness",
+          "hub_left_washer_thickness",
+          "hub_right_ring_thickness",
+          "hub_right_washer_thickness",
+          "hub_stop_span",
+          "hub_width",
+          "left_cover_minus_depth",
+          "left_cover_minus_remaining_floor",
+          "left_cover_minus_shank",
+          "left_cover_plus_depth",
+          "left_cover_plus_remaining_floor",
+          "left_cover_plus_shank",
+          "left_cover_thickness",
+          "left_flange_thickness",
+          "right_cover_minus_depth",
+          "right_cover_minus_remaining_floor",
+          "right_cover_minus_shank",
+          "right_cover_plus_depth",
+          "right_cover_plus_remaining_floor",
+          "right_cover_plus_shank",
+          "right_cover_thickness",
+          "right_flange_thickness",
+          "shaft_ring_thickness",
+          "shaft_stop_span",
+          "shaft_washer_thickness"
+        ],
+        "section_views": [
+          "base_relief_section",
+          "base_web_section",
+          "bearing_section",
+          "end_cover_section",
+          "left_cover_pilot_section",
+          "mounting_plan",
+          "right_cover_pilot_section"
+        ],
+        "drawing_sheets": [
+          "base_relief_machining",
+          "drive_module_sections",
+          "end_cover_machining"
+        ],
+        "tolerance_stacks": [
+          "housing_sleeve_diametral_limits",
+          "hub_axial_endplay",
+          "left_cover_minus_tip_allowance",
+          "left_cover_plus_tip_allowance",
+          "right_cover_minus_tip_allowance",
+          "right_cover_plus_tip_allowance",
+          "running_diametral_limits",
+          "shaft_axial_endplay"
+        ],
+        "rigid_rotation_groups": [
+          "rotor"
+        ]
+      },
+      "base_content_hash": "54159ba6bb00b5bc761a7705cbc07de6081d41c1725e50bf1ddbb81e4651abbb",
+      "assembly_material_volume_mm3": 195940.24711817544,
+      "assembly_material_mass_kg": 0.8179337735985555,
+      "output_hashes": {
+        "base": "54159ba6bb00b5bc761a7705cbc07de6081d41c1725e50bf1ddbb81e4651abbb",
+        "bearing_fit_inspection": "3dc64a9018dbc0c9dd2eaf4423687eb15b77a7b4bbb564daf5fbac7823a6276a",
+        "cover_screw_envelope": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "drive_disc": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "drive_module_release": "8a3fe6e3a1ae85e8a6bd5317f985e63bcf47c4842812b526943f174bc848944b",
+        "end_cover": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "housing": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "parallel_key": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "retaining_ring": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "right_housing": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "shaft": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "sleeve": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "washer": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990"
+      },
+      "feature_hashes": {
+        "base_back_right": "dc214800c0e2cad26297363fae4801adac6a5687315582a1bca017bc161151c7",
+        "base_body": "1693883f90c7bdec592ef2ece851e7b2e456cb572cea47343fd8db56bb75a11c",
+        "base_deep_relief": "54159ba6bb00b5bc761a7705cbc07de6081d41c1725e50bf1ddbb81e4651abbb",
+        "base_front_left": "b66be1860c83fdc47843a30791f47dfce55c1b7828acb5a584c4b48b898fec86",
+        "base_front_right": "1c6fc0213e40060632f1df9cb692d179130c298c9acea35ddb9c981c24143818",
+        "base_profile": "5396b6588c9a89ccf4df839c132f8f95fea8be4ea6a347b6bf9bbaadb7e44479",
+        "base_shallow_relief": "2ccc82a45c97b5f802dd529e956b719ba3012853cee584a159ef23ec12827d3c",
+        "base_slotted": "6c5c22875cb59604225a45754211fe3c7dc5c7fc1529f559a7f17ee0ddf82faa",
+        "base_stock": "ef78cb841174aee66c923d2624fca7419d9a8ecdca2f22ed0d01ff8528a0bd7d",
+        "bolt_body": "60f2a7146a29a80c7f07cd1670c36bc2fe92c45a1e5244b70df7b1a768872d6e",
+        "bolt_profile": "bf837c00e739d521c2e740a0e43c44b070252bc36a85df0bea3cbee26b28845a",
+        "clamp_body": "c87f738e9afd0cd29cc0ad25b940b90842affab4b3ed47afa8224b106a289bd0",
+        "clamp_profile": "b5fa9511aed105976626de11188fad3cd082d0c580c28ba1cfa017b99eab555a",
+        "cover_screw_body": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "cover_screw_profile": "9276bed8ab644a2e676510112d39d5eb2298b55977087be99748e76814debc2f",
+        "disc_body": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "disc_profile": "5c6922b9ddc5c9325be3f5bae52d61d1966f293f073e8fadd3f806bfb5bb7594",
+        "disc_stock": "23626a23e68ab07590c8e45b79030d95541c730a0c0f3c8ed7a7808b574c88ca",
+        "end_cover_body": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "end_cover_profile": "51a43423f5a7412cb8a87f18f975e292ec66384730405d33f044f9e73b24958d",
+        "housing_body": "5bbfb388f9b94d85aed9ebaa5f41394581b47ded8f73081ce162a66aa075e450",
+        "housing_left_pilots": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "housing_profile": "ca38443cbc772448327220f7c4e798e1f5b8a499701345ca4faa3418aaf51f3d",
+        "housing_right_pilots": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "key_body": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "key_profile": "d77e4e0d9e8caf5d3b4368a7d467a65507e5b8a6192f6df822d7113c4ea99c62",
+        "keyway_box": "5da496f0028164432371631f31069c1a0663524374dae97d89e3d44e9a4911ab",
+        "keyway_profile": "9981ca00cb85a41c6025acb91de8326362ed735d6ba0d01eaa0e2fa4af55eb93",
+        "keyway_tool": "80dfe51eaf28418d8805e16abf024458c98ad41956a977fcd1f247bb16ad8e7d",
+        "nut_body": "670310266a37ca46bf3b08293cc2189ed4dce42e27ec4d44f3888ff811f4df03",
+        "nut_profile": "ba8b149a00d3637033d7ef224cccf6a2f10d93a530d442d9fb3dcee01d627c1f",
+        "ring_body": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "ring_profile": "b20c6b2ccfaafca29426bcbdd28c417437d69fcd6fc111d0c9a18c89f6fe2572",
+        "seat_box": "7183506f539b528baf01d7f58fa85bf99a90652863f64455014820cc43748798",
+        "seat_profile": "d8472a2aa6299d3f049043eb0031636d1a050d1bd54bb5a25728a64238cbfff6",
+        "seat_tool": "4b8122655720cb7a890bd4e94e8994635d6f85fdaaee8a1b0b7c4a66bad23588",
+        "shaft_body": "f85441b31adf9937aeb7625814e3fa7df706704c825c4255988e816d22c1a34a",
+        "shaft_profile": "add38a05d015f9e5bfc0543bf746483759a55c45dae4c12469a36474dc0d8a06",
+        "shaft_stock": "4896468cf6272757e15ac5b91d2f8885075fd3985a589df05487a0d8d05e7f62",
+        "sleeve_body": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "sleeve_profile": "13254dea58f3abb66f979c8b1bc75d15de79b851784c9542890a72d16c6160ce",
+        "washer_body": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990",
+        "washer_profile": "882f968873bd870890adc3c61cac9a3e4bd149a5c990ef34974edbcc374ecfe3"
+      }
+    },
+    {
+      "case": "wide_pitch",
+      "parameters": {
+        "mounting_pitch": 90.0,
+        "base_slot_length": 6.0,
+        "base_corner_radius": 6.0,
+        "base_pocket_depth": 1.0
+      },
+      "volume_mm3": 84263.17699835308,
+      "centroid_mm": [
+        90.26172928228749,
+        0.0,
+        2.9894878973023715
+      ],
+      "central_inertia_mm5": [
+        [
+          44823350.7536512,
+          0.0,
+          -8817.118428017944
+        ],
+        [
+          0.0,
+          228638997.7934299,
+          0.0
+        ],
+        [
+          -8817.118428017944,
+          0.0,
+          272958423.39998484
+        ]
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "topology": {
+        "through_slots": 4,
+        "blind_slots": 2,
+        "floor_faces": 2,
+        "semicylinder_faces": 12
+      },
+      "section_strata": [
+        {
+          "z": 5.5,
+          "active_blind": 2,
+          "through_loops": 4,
+          "area_mm2": 13839.451332235376,
+          "loops": 7
+        },
+        {
+          "z": 4.5,
+          "active_blind": 1,
+          "through_loops": 4,
+          "area_mm2": 13975.725666117685,
+          "loops": 6
+        },
+        {
+          "z": 2.0,
+          "active_blind": 0,
+          "through_loops": 4,
+          "area_mm2": 14111.999999999995,
+          "loops": 5
+        }
+      ],
+      "native_witnesses": {
+        "depths_mm": {
+          "base_shallow_depth": 1.0,
+          "base_deep_depth": 2.0,
+          "base_remaining_web": 4.0
+        },
+        "first_floor_witness": {
+          "anchor_faces": [
+            30
+          ],
+          "target_face": 34,
+          "target_feature": "base_deep_relief"
+        }
+      },
+      "obligations": {
+        "face_assertions": [
+          "base_back_right_survives",
+          "base_body_survives",
+          "base_front_left_survives",
+          "base_front_minus_survives",
+          "base_front_plus_survives",
+          "base_front_right_survives",
+          "base_rear_minus_survives",
+          "base_rear_plus_survives",
+          "base_shallow_floor_survives",
+          "left_cover_minus_floor",
+          "left_cover_minus_wall",
+          "left_cover_plus_floor",
+          "left_cover_plus_wall",
+          "left_housing_bore_survives",
+          "left_outboard_cap_survives",
+          "right_cover_minus_floor",
+          "right_cover_minus_wall",
+          "right_cover_plus_floor",
+          "right_cover_plus_wall",
+          "right_housing_bore_survives",
+          "right_outboard_cap_survives"
+        ],
+        "property_assertions": [
+          "cover_screw_envelope_volume",
+          "end_cover_volume",
+          "left_housing_machined_volume",
+          "mass_budget",
+          "material_mass",
+          "material_volume",
+          "right_housing_machined_volume"
+        ],
+        "clearance_checks": [
+          "disc_shaft_gap",
+          "hub_left_washer_hub_gap",
+          "hub_left_washer_shaft_gap",
+          "hub_right_washer_hub_gap",
+          "hub_right_washer_shaft_gap",
+          "left_cover_shaft_gap",
+          "left_support_disc_gap",
+          "left_support_running_gap",
+          "right_cover_shaft_gap",
+          "right_support_disc_gap",
+          "right_support_running_gap",
+          "shaft_washer_bush_gap",
+          "shaft_washer_shaft_gap"
+        ],
+        "nominal_seating_checks": [
+          "left_cover_flange_seat",
+          "left_cover_minus_head_seat",
+          "left_cover_plus_head_seat",
+          "right_cover_flange_seat",
+          "right_cover_minus_head_seat",
+          "right_cover_plus_head_seat"
+        ],
+        "datum_dimensions": [
+          "base_deep_depth",
+          "base_remaining_web",
+          "base_shallow_depth",
+          "bush_outer_span",
+          "hub_left_ring_thickness",
+          "hub_left_washer_thickness",
+          "hub_right_ring_thickness",
+          "hub_right_washer_thickness",
+          "hub_stop_span",
+          "hub_width",
+          "left_cover_minus_depth",
+          "left_cover_minus_remaining_floor",
+          "left_cover_minus_shank",
+          "left_cover_plus_depth",
+          "left_cover_plus_remaining_floor",
+          "left_cover_plus_shank",
+          "left_cover_thickness",
+          "left_flange_thickness",
+          "right_cover_minus_depth",
+          "right_cover_minus_remaining_floor",
+          "right_cover_minus_shank",
+          "right_cover_plus_depth",
+          "right_cover_plus_remaining_floor",
+          "right_cover_plus_shank",
+          "right_cover_thickness",
+          "right_flange_thickness",
+          "shaft_ring_thickness",
+          "shaft_stop_span",
+          "shaft_washer_thickness"
+        ],
+        "section_views": [
+          "base_relief_section",
+          "base_web_section",
+          "bearing_section",
+          "end_cover_section",
+          "left_cover_pilot_section",
+          "mounting_plan",
+          "right_cover_pilot_section"
+        ],
+        "drawing_sheets": [
+          "base_relief_machining",
+          "drive_module_sections",
+          "end_cover_machining"
+        ],
+        "tolerance_stacks": [
+          "housing_sleeve_diametral_limits",
+          "hub_axial_endplay",
+          "left_cover_minus_tip_allowance",
+          "left_cover_plus_tip_allowance",
+          "right_cover_minus_tip_allowance",
+          "right_cover_plus_tip_allowance",
+          "running_diametral_limits",
+          "shaft_axial_endplay"
+        ],
+        "rigid_rotation_groups": [
+          "rotor"
+        ]
+      },
+      "base_content_hash": "ea6b628a5eb298f32415eba44b884448e86828bdd02040db52f2204d08882430",
+      "assembly_material_volume_mm3": 213869.44151793473,
+      "assembly_material_mass_kg": 0.8836464908138781,
+      "output_hashes": {
+        "base": "ea6b628a5eb298f32415eba44b884448e86828bdd02040db52f2204d08882430",
+        "bearing_fit_inspection": "b2a9fd58d31b2d58dfc1e15044484e3750210ce69b8895e1ce22768c59b2e04d",
+        "cover_screw_envelope": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "drive_disc": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "drive_module_release": "334857bf28a936dd4ed16babd317ac6997e9c0859988d67a77c66687dbaf405b",
+        "end_cover": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "housing": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "parallel_key": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "retaining_ring": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "right_housing": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "shaft": "5eb0cdd8878a5a6ffe26f89476cc232c2bb9833af3ae5dd7cb349bdaa193af76",
+        "sleeve": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "washer": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990"
+      },
+      "feature_hashes": {
+        "base_back_right": "4788611fbf75eb0251f2271932548f4a17bb43f64995df2b5db2175bbb6b92f0",
+        "base_body": "3ea9fe4a0c64e8d70d30488b0b55465ead286e9799c47ab11a3cf70040c8a79d",
+        "base_deep_relief": "ea6b628a5eb298f32415eba44b884448e86828bdd02040db52f2204d08882430",
+        "base_front_left": "6f2fbdca97d14a9a44e025c7333cc57d6d9749248f9e903c415437a6458c6fce",
+        "base_front_right": "58a4268c82ebf5fe55930b197a0c2592904c2fb3ef9083c600128a2d4af4db89",
+        "base_profile": "c701a61c277815928ab0556b8301011d5c718358c9f1140637fd6f91c9432157",
+        "base_shallow_relief": "c15984122ab41110789ca0146962f6d6bff52ebdacc6358af220117ecbf8154a",
+        "base_slotted": "37707c358d18bff43a0752c601f55b1a43b954886bf3f1def75158ffc695f4be",
+        "base_stock": "215ca86412caa8cdb470c32367fab8e84f3a1663fa6a04b2e69dc44569e942d8",
+        "bolt_body": "60f2a7146a29a80c7f07cd1670c36bc2fe92c45a1e5244b70df7b1a768872d6e",
+        "bolt_profile": "bf837c00e739d521c2e740a0e43c44b070252bc36a85df0bea3cbee26b28845a",
+        "clamp_body": "c87f738e9afd0cd29cc0ad25b940b90842affab4b3ed47afa8224b106a289bd0",
+        "clamp_profile": "b5fa9511aed105976626de11188fad3cd082d0c580c28ba1cfa017b99eab555a",
+        "cover_screw_body": "04d3424df14c35437171ab328f46fddd597dca0870c044eea988eca14c400787",
+        "cover_screw_profile": "9276bed8ab644a2e676510112d39d5eb2298b55977087be99748e76814debc2f",
+        "disc_body": "74fd42306d7032e64620fcedf5f100a07ddeaaf612c47e186e015a3bcfc0da8a",
+        "disc_profile": "5c6922b9ddc5c9325be3f5bae52d61d1966f293f073e8fadd3f806bfb5bb7594",
+        "disc_stock": "23626a23e68ab07590c8e45b79030d95541c730a0c0f3c8ed7a7808b574c88ca",
+        "end_cover_body": "153ec5fe885d9fee68535079d4ee4a2d9453cb3f2b4acb42b3cbe6458c899d30",
+        "end_cover_profile": "51a43423f5a7412cb8a87f18f975e292ec66384730405d33f044f9e73b24958d",
+        "housing_body": "5bbfb388f9b94d85aed9ebaa5f41394581b47ded8f73081ce162a66aa075e450",
+        "housing_left_pilots": "4a0641084de9d7e66b9f9b0268b77714ea2ed399700b45dcf9d61659360bea34",
+        "housing_profile": "ca38443cbc772448327220f7c4e798e1f5b8a499701345ca4faa3418aaf51f3d",
+        "housing_right_pilots": "4e271cf2cb534e8dc2269f3859c55ce1debfa2e1fcd7e19c2f5f588b878bb2fb",
+        "key_body": "f823a95a955e175fce8cb1cffe53106c325ec868138729d278177c059f462561",
+        "key_profile": "d77e4e0d9e8caf5d3b4368a7d467a65507e5b8a6192f6df822d7113c4ea99c62",
+        "keyway_box": "5da496f0028164432371631f31069c1a0663524374dae97d89e3d44e9a4911ab",
+        "keyway_profile": "9981ca00cb85a41c6025acb91de8326362ed735d6ba0d01eaa0e2fa4af55eb93",
+        "keyway_tool": "80dfe51eaf28418d8805e16abf024458c98ad41956a977fcd1f247bb16ad8e7d",
+        "nut_body": "670310266a37ca46bf3b08293cc2189ed4dce42e27ec4d44f3888ff811f4df03",
+        "nut_profile": "ba8b149a00d3637033d7ef224cccf6a2f10d93a530d442d9fb3dcee01d627c1f",
+        "ring_body": "2fcb56e8dc51744d682e8513fcdb0d0e35afc0cda0cae93770e3530348093189",
+        "ring_profile": "b20c6b2ccfaafca29426bcbdd28c417437d69fcd6fc111d0c9a18c89f6fe2572",
+        "seat_box": "7183506f539b528baf01d7f58fa85bf99a90652863f64455014820cc43748798",
+        "seat_profile": "d8472a2aa6299d3f049043eb0031636d1a050d1bd54bb5a25728a64238cbfff6",
+        "seat_tool": "57f8d19d23959bfde054f7911ffba1519e5e177ded10507612b9709a3cc188b6",
+        "shaft_body": "5eb0cdd8878a5a6ffe26f89476cc232c2bb9833af3ae5dd7cb349bdaa193af76",
+        "shaft_profile": "cf6cc3a1cc9e38a6b1ad2c69571c42f21f413e6c73df095a2c65053585ec80cb",
+        "shaft_stock": "5b1c00a4113ce890be9ac2d81597b859cc13965f3ad5740e8340d42f52abc590",
+        "sleeve_body": "274a3bd3c446f0306e14d963abc330d4286527a0dbd77f9be7ffd4da5923bb89",
+        "sleeve_profile": "13254dea58f3abb66f979c8b1bc75d15de79b851784c9542890a72d16c6160ce",
+        "washer_body": "948d78687750878006dd3d7e5a8fad5f3413144b508be2bf6c6c63fe2e16c990",
+        "washer_profile": "882f968873bd870890adc3c61cac9a3e4bd149a5c990ef34974edbcc374ecfe3"
+      }
+    }
+  ],
+  "imported_finished_base": {
+    "drive_module_slot_positions": {
+      "base_content_hash": "18b5300473f27d26c018a9c630b7934c0798052437451165f056eef9d79f66ea",
+      "drawing": "base_slot_positions"
+    },
+    "drive_module_slot_drawing": {
+      "base_content_hash": "18b5300473f27d26c018a9c630b7934c0798052437451165f056eef9d79f66ea",
+      "drawing": "base_slot_machining"
+    }
+  },
+  "refusals": [
+    {
+      "case": "low_depth",
+      "diagnostic": {
+        "causes": [],
+        "code": "recipe_failed",
+        "error": "Traceback (most recent call last):\n  * revisions.star:41, in <module>\n      validate_parameters()\n  * revisions.star:32, in validate_parameters\n      fail(\"base_pocket_depth must be 0 (unmachined) or 0.5..1.5 mm\")\nerror: fail: base_pocket_depth must be 0 (unmachined) or 0.5..1.5 mm\n  --> revisions.star:32:9\n   |\n32 |         fail(\"base_pocket_depth must be 0 (unmachined) or 0.5..1.5 mm\")\n   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n"
+      }
+    },
+    {
+      "case": "high_depth",
+      "diagnostic": {
+        "causes": [],
+        "code": "recipe_failed",
+        "error": "Traceback (most recent call last):\n  * revisions.star:41, in <module>\n      validate_parameters()\n  * revisions.star:32, in validate_parameters\n      fail(\"base_pocket_depth must be 0 (unmachined) or 0.5..1.5 mm\")\nerror: fail: base_pocket_depth must be 0 (unmachined) or 0.5..1.5 mm\n  --> revisions.star:32:9\n   |\n32 |         fail(\"base_pocket_depth must be 0 (unmachined) or 0.5..1.5 mm\")\n   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n"
+      }
+    },
+    {
+      "case": "wrong_cap",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: blind obround pockets require 1..4 separated native capsules opening one canonical prism cap, each with a resolved depth and positive remaining web",
+        "error": "feature 'base_deep_relief' failed: unsupported geometry: blind obround pockets require 1..4 separated native capsules opening one canonical prism cap, each with a resolved depth and positive remaining web",
+        "feature": "base_deep_relief",
+        "snapshot": {
+          "executor_build_id": "4e2c992bba1b5ee1f2b0b18d32ad1ba23d1190ed4aaddfc08a168c5efcbde203",
+          "kernel_build_id": "5840157a179e506c761ba2127adc58e9dedb0616b024c79cf5587e64fc2a0da7"
+        }
+      }
+    },
+    {
+      "case": "through_overlap",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "error": "feature 'base_shallow_relief' failed: unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "feature": "base_shallow_relief",
+        "snapshot": {
+          "executor_build_id": "4e2c992bba1b5ee1f2b0b18d32ad1ba23d1190ed4aaddfc08a168c5efcbde203",
+          "kernel_build_id": "5840157a179e506c761ba2127adc58e9dedb0616b024c79cf5587e64fc2a0da7"
+        }
+      }
+    },
+    {
+      "case": "impossible_web",
+      "diagnostic": {
+        "actual_value_mm": 4.0,
+        "causes": [],
+        "code": "datum_dimension_failed",
+        "diagnostic": "native measurement interval exceeds declared design bounds",
+        "dimension_id": "base_remaining_web",
+        "error": "datum dimension 'base_remaining_web' on 'drive_module_release' failed: native measurement interval exceeds declared design bounds",
+        "output_name": "drive_module_release"
+      }
+    },
+    {
+      "case": "drive_module_adjustment_pocketed",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "mounting_slot_0_shank_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "pre-placement clearance admission: operation exceeds resource limit: solid clearance topology budget exceeded",
+        "error": "clearance check 'mounting_slot_0_shank_gap' on 'drive_module_adjustment' failed: pre-placement clearance admission: operation exceeds resource limit: solid clearance topology budget exceeded",
+        "lower_bound_mm": null,
+        "output_name": "drive_module_adjustment",
+        "upper_bound_mm": null
+      }
+    },
+    {
+      "case": "drive_module_tightened_pocketed",
+      "diagnostic": {
+        "causes": [],
+        "check_id": "tight_slot_0_shank_gap",
+        "code": "clearance_check_failed",
+        "diagnostic": "pre-placement clearance admission: operation exceeds resource limit: solid clearance topology budget exceeded",
+        "error": "clearance check 'tight_slot_0_shank_gap' on 'drive_module_tightened' failed: pre-placement clearance admission: operation exceeds resource limit: solid clearance topology budget exceeded",
+        "lower_bound_mm": null,
+        "output_name": "drive_module_tightened",
+        "upper_bound_mm": null
+      }
+    }
+  ],
+  "scope": "Actual drive base with four full-height mounting slots and optional two serial end-cap relief pockets; independent OCCT Boolean, closed-form moments, native floor witnesses and retained assembly obligations."
+}

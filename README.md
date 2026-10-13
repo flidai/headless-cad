@@ -52,6 +52,11 @@ coordinate grid for disconnected stock while preserving topology and face lineag
 trim; its 1–12 row/column parameters reach 144 solids. Full native validation and
 ambiguous-plane rejection still apply, and overlapping Boolean grids remain bounded.
 
+The [pocketed drive module](#inspect-the-pocketed-drive-module) demonstrates 30
+placed parts, source-owned rotor motion, native mounting slots and relief pockets,
+measured machining drawings, and retained engineering checks. Picking its base
+opens the exact captured Starlark operation in the read-only inspector.
+
 No existing CAD kernel is linked at runtime. Open CASCADE is used only as an
 optional independent interoperability oracle in development.
 
@@ -3418,3 +3423,39 @@ covers seven generated cases, two fixture variants and eight refusal cases,
 including maximum capacity, posed inputs, unchanged through-wall references,
 closed STL and exact STEP comparisons. [Browser evidence](docs/evidence/mixed-slots-browser-local.json)
 checks both sheets, native measurements and captured-source navigation.
+
+
+### Inspect the pocketed drive module
+
+The drive recipe accepts `base_pocket_depth`: `0` preserves the original base;
+`0.5..1.5` mm machines two separated relief pockets of depths `d` and `d+1`.
+The actual assembly uses that finished base. Existing rotation clearances,
+cover seating, retention dimensions, tolerance stacks and mass checks still run.
+Additional native dimensions measure both floors and the remaining web.
+
+```sh
+cad build examples/drive_module_rotation.star --param base_pocket_depth=1 \
+  --out-dir out/drive_module_pocketed
+./scripts/dev.sh --host 0.0.0.0 --port 8080
+```
+
+The development server includes this parameter preset and watches its source.
+Open [the assembled drive](http://localhost:8080/drive_module_pocketed/drive_module_release.gpu.html),
+[the base](http://localhost:8080/drive_module_pocketed/base.preview.html), or
+[the relief machining sheet](http://localhost:8080/drive_module_pocketed/drawing-base_relief_machining.svg).
+The manifest captures the parameter override, and picking the base reveals the
+same authoritative `drive_module_rotation.star` recipe and its final operation.
+
+The slot-size and slot-position drawing recipes also accept this override and
+measure the finished pocketed base. The adjustment and tightened-mounting recipes
+currently refuse it because their travel/seating certificates do not admit mixed
+stock. Pocket geometry and nominal dimensions do not establish base stiffness,
+fatigue life, preload or load capacity.
+
+
+[Independent drive-base evidence](docs/evidence/pocketed-drive-local.json) covers
+five depth/pitch configurations, both imported machining drawings, all original
+seating and rotor obligations, captured replay and seven publication-preserving
+refusals. [Browser evidence](docs/evidence/pocketed-drive-browser-local.json)
+verifies the actual assembled base, its source, the two section contours and
+native 1/2/4 mm depth/web table in the live preset.

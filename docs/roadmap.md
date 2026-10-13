@@ -8,17 +8,17 @@ of completion dates or an assertion that the present implementation has parity.
 
 ## Current checkpoint
 
-The latest accepted kernel increment combines up to four native through slots
-with four blind pockets at distinct depths. Original through-slot dimensions
-and earlier floor references remain tied to the finished physical part. Its
-independent STEP, replay and browser receipts are recorded below. The viewer
-remains an inspector; Starlark and Git own modeling changes.
+The latest accepted increment applies two optional relief operations to the
+actual drive-module base. Its original clearance, seating, retention, tolerance
+and mass obligations remain active. Native floor references produce depth/web
+measurements and a machining sheet; imported slot drawings also measure the
+finished part. Independent STEP, replay and live browser receipts are below.
 
-The next modeling priority is applying this composition to the **actual drive
-module base**, retaining every existing engineering obligation and adding native
-pocket-depth measurements. Mixed-stock seating remains refused until its
-material-footprint proof accounts for real openings. General Booleans and
-arbitrary surfaces remain separate kernel work.
+The next engineering priority is **material-aware mounting certificates** on
+mixed stock: seating must account for real pocket openings, and through-slot
+travel must bind original physical walls. Current adjustment and tightened
+studies refuse a pocketed base until those native proofs are implemented.
+General Booleans and arbitrary surfaces remain separate kernel work.
 
 The complete product is still experimental. All five commercial release gates
 remain open; accepted feature increments are evidence toward those gates, not
@@ -1100,3 +1100,17 @@ captured replay and preservation of the previous publication also pass.
 [Browser evidence](evidence/mixed-slots-browser-local.json) records the recessed
 part, five sections, two machining sheets, three floor/web measurements, three
 through-slot measurements and source inspection. All commercial gates stay open.
+
+
+The [pocketed-drive oracle](evidence/pocketed-drive-local.json) passes five
+configurations spanning no pockets, depths 0.5/1/1.5 mm and wider mounting pitch.
+Native mass moments and independent STEP solids agree, with zero bidirectional
+volume difference. It verifies all original engineering obligation IDs, including
+six seating checks and the rotor group, and exact base material removal. The
+zero-depth base STEP matches the frozen legacy payload. Two imported machining
+recipes bind dimensions to the finished base; seven rejected revisions preserve
+published output, including unsupported pocketed adjustment/tightened studies.
+[Live browser acceptance](evidence/pocketed-drive-browser-local.json) verifies
+source selection on the actual assembled base, floor lineage, two section
+states and measured 1/2/4 mm depths/web. The launcher watches this parameter
+preset alongside ordinary examples. All five commercial release gates stay open.
