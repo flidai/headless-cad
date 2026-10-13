@@ -3257,3 +3257,35 @@ cover five isolated cases, nine rejected revisions and two drive configurations.
 They compare actual STEP boundaries and analytic full-path bounds, and sample
 all 435 part pairs at nine phases per drive configuration without positive-volume
 intersections. Continuous native proof remains scoped to the four named slot pairs.
+
+### Inspect seated mounting endpoints
+
+`examples/drive_module_tightened.star` places the same drive at either end of its
+mounting slots. Eight native checks verify local seating of the four bolt heads
+and nuts; four additional checks retain the shank-to-slot gaps. Select a part in
+the preview to inspect its captured Starlark declaration.
+
+```sh
+cad build examples/drive_module_tightened.star --out-dir out/drive_module_tightened
+cad build examples/drive_module_tightened.star --param mounting_endpoint=1 \
+  --out-dir out/drive_module_tightened_right
+```
+
+These are nominal geometric seating witnesses. Threads, preload, friction and
+rated mounting loads remain outside their scope. A positive `bolt_lift` or
+`nut_drop` introduces a gap and fails the corresponding native seating check.
+For a scripted accepted-revision demonstration with restart and offline replay:
+
+```sh
+python scripts/agent_tightened_demo.py --cad target/release/cad \
+  --state-dir /tmp/cad-tightened-state --out-dir out/tightened-demo
+```
+
+The [accepted endpoint replay](docs/evidence/tightened-mounting-replay-local.json)
+records a refused nut gap, two accepted endpoint revisions and recovery after
+restart; offline replay matches 87 artifacts and 29 semantic manifest fields.
+[Browser evidence](docs/evidence/tightened-mounting-browser-local.json) checks both
+endpoint previews, native report links and exact captured source navigation.
+The [independent STEP oracle](docs/evidence/tightened-mounting-local.json) checks
+four endpoint configurations, eight seating disks and four slot gaps per
+configuration, all 435 part pairs, and five publication-preserving refusals.

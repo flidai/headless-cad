@@ -138,9 +138,12 @@ bolt_body = revolve(id = "bolt_body", profile = polygon(id = "bolt_profile", poi
 
 clamp_body = extrude(id = "clamp_body", profile = polygon(id = "clamp_profile", points = [[0,-34],[12,-34],[12,34],[0,34]], circular_holes = [{"center":[6,y],"radius":3} for y in [-28,28]]), height = 6)
 nut_body = extrude(id = "nut_body", profile = circle(id = "nut_profile", radius = 5, inner_radius = 2.6), height = 5)
-clamp = part(id = "clamp_bar", body = clamp_body, part_number = "DM-CLAMP", revision = design_revision, description = "Bridge clamp seated on bearing housing", material = "Aluminum", density_kg_per_m3 = 2700)
-nut = part(id = "nut_envelope", body = nut_body, part_number = "DM-NUT-ENVELOPE", revision = design_revision, description = "Underside clamp nut envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800)
-base = part(id = "base", body = base_slotted, part_number = "DM-BASE", revision = design_revision, description = "Four obround mounting slots and native tangent corner fillets", material = "Aluminum", density_kg_per_m3 = 2700)
+clamp = part(id = "clamp_bar", body = clamp_body, part_number = "DM-CLAMP", revision = design_revision, description = "Bridge clamp seated on bearing housing", material = "Aluminum", density_kg_per_m3 = 2700,
+    datums = {"end":face_datum(from_feature = clamp_body, role = "end_cap", x_direction = [1,0,0])})
+nut = part(id = "nut_envelope", body = nut_body, part_number = "DM-NUT-ENVELOPE", revision = design_revision, description = "Underside clamp nut envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800,
+    datums = {"end":face_datum(from_feature = nut_body, role = "end_cap", x_direction = [1,0,0])})
+base = part(id = "base", body = base_slotted, part_number = "DM-BASE", revision = design_revision, description = "Four obround mounting slots and native tangent corner fillets", material = "Aluminum", density_kg_per_m3 = 2700,
+    datums = {"start":face_datum(from_feature = base_slotted, role = "start_cap", x_direction = [1,0,0])})
 housing = part(id = "housing_left", body = housing_left_pilots, part_number = "DM-HOUSING-L", revision = design_revision, description = "Left bearing housing with two outboard blind end-cover pilots", material = "Aluminum", density_kg_per_m3 = 2700,
     datums = {"axis":datum(), "seat":datum(offset = [0,-26,0]),
         "outboard":face_datum(from_feature = housing_body, role = "start_cap", x_direction = [1,0,0]),
@@ -184,7 +187,8 @@ ring = part(id = "retaining_ring", body = ring_body, part_number = "DM-RING-INST
     "start":face_datum(from_feature = ring_body, role = "start_cap", x_direction = [1,0,0]),
     "end":face_datum(from_feature = ring_body, role = "end_cap", x_direction = [1,0,0]),
 })
-bolt = part(id = "clamp_bolt_envelope", body = bolt_body, part_number = "DM-CLAMP-BOLT-ENVELOPE", revision = design_revision, description = "Through-clamp head and shank envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800)
+bolt = part(id = "clamp_bolt_envelope", body = bolt_body, part_number = "DM-CLAMP-BOLT-ENVELOPE", revision = design_revision, description = "Through-clamp head and shank envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800,
+    datums = {"underhead":face_datum(from_feature = bolt_body, role = "segment_2", x_direction = [1,0,0])})
 left_support = assembly(id = "left_support_definition", instances = [
     instance(id = "housing", part = housing),
     instance(id = "sleeve", part = sleeve, offset = [0,0,-2]),

@@ -1788,6 +1788,26 @@ fn main() {
                         report["diagnostic"] = json!(message);
                         report["actual_value_mm"] = json!(actual_value);
                     }
+                    cad_build::BuildError::InvalidNominalSeatingCheck {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("invalid_nominal_seating_check");
+                        report["check_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                    }
+                    cad_build::BuildError::NominalSeatingCheckFailed {
+                        id,
+                        output,
+                        message,
+                    } => {
+                        report["code"] = json!("nominal_seating_check_failed");
+                        report["check_id"] = json!(id);
+                        report["output_name"] = json!(output);
+                        report["diagnostic"] = json!(message);
+                    }
                     cad_build::BuildError::InvalidClearanceCheck {
                         id,
                         output,

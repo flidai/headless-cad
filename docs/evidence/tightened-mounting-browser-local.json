@@ -1,0 +1,58 @@
+{
+  "valid": true,
+  "read_only": true,
+  "states": [
+    {
+      "phase": "before",
+      "endpoint": -1,
+      "occurrences": 30,
+      "seats": 8,
+      "gaps": 4,
+      "selected": [
+        {
+          "instance": "tight_nut_0",
+          "part": "nut_envelope",
+          "feature": "nut_body"
+        },
+        {
+          "instance": "tight_bolt_0",
+          "part": "clamp_bolt_envelope",
+          "feature": "bolt_body"
+        }
+      ]
+    },
+    {
+      "phase": "after",
+      "endpoint": 1,
+      "occurrences": 30,
+      "seats": 8,
+      "gaps": 4,
+      "selected": [
+        {
+          "instance": "tight_nut_0",
+          "part": "nut_envelope",
+          "feature": "nut_body"
+        },
+        {
+          "instance": "tight_bolt_0",
+          "part": "clamp_bolt_envelope",
+          "feature": "bolt_body"
+        }
+      ]
+    }
+  ],
+  "source_bundle_hash": {
+    "before": "91cf5bb641f46b522382d9323e2adfb14aaf4f7d8e7f3a9c00877f376842760c",
+    "after": "45195dfe5e8ca33d44382367b2941a14d3998b46cec6d34c2ae18cee356eb8a2"
+  },
+  "source_provenance_sha256": {
+    "before": "606e4192f75283d1ead7769d9598e85217ced40e24d763bbaaedf9568d11d940",
+    "after": "b627dbb44b3216040e845116c3d059602395070ecd06afc9d702d5dc7c5cbe87"
+  },
+  "screenshots": [
+    "/tmp/cad-tightened-before-browser.png",
+    "/tmp/cad-tightened-after-browser.png"
+  ],
+  "browser_script_sha256_start": "6210139eabf8a43775be559793c5d35dc3f8e8ba2a038c746ece255ec9150cf1",
+  "browser_script_sha256_end": "6210139eabf8a43775be559793c5d35dc3f8e8ba2a038c746ece255ec9150cf1"
+}

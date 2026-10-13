@@ -3792,3 +3792,22 @@ verification preserves a later part selection or manual source-file choice.
 Highlighting uses text nodes, with explicit UTF-8 to JavaScript string conversion.
 Missing provenance falls back to complete source; mismatched provenance refuses
 navigation. None of these actions invokes geometry or modifies a recipe.
+
+### Nominal seating at mounting-slot endpoints
+
+The tightened mounting study reuses the drive's native parts at the two authored
+slot endpoints. Eight source-selected face pairs certify opposed planar supports
+and a protected material disk: four bolt-underhead/clamp-top pairs and four
+nut-top/base-bottom pairs. Four separate static native slot/shank checks retain
+the named radial clearance obligation. Moving the upper assembly changes its
+occurrence transforms, not the shared part geometry.
+
+Seating admits strictly reconstructed annular cylinder caps and convex outward
+arc-prism caps with circular and capsule holes. For the latter, a convex chord
+polygon supplies a conservative inner material bound; exact circle and capsule
+distances limit the witness disk around holes. Native support consistency and
+arithmetic guards remain prerequisites. This is a local geometric seating
+certificate, not a contact solver or a claim about threads, preload, friction,
+torque capacity or rated loads. Unsupported trims and incoherent native supports
+are refused. Machine-readable seating failures identify the source check and
+output so a revision client can preserve its accepted head and repair the recipe.

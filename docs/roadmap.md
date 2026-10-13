@@ -966,3 +966,27 @@ and preservation of manual source selection during asynchronous verification.
 The [accepted revision replay](evidence/source-provenance-replay-local.json)
 matches 88 artifacts and 30 semantic manifest fields after restart. These receipts
 pin the tested executable and scripts; all five commercial gates remain open.
+
+The next mounting increment adds a separately authored seated endpoint study:
+eight bolt/head and nut/base seating witnesses plus four native slot gaps at
+either end of the slots. Acceptance requires independent STEP face/disk inclusion,
+all-leaf intersection checks, failed seating edits preserving publication, and a
+source revision/restart/replay workflow. Nominal seating alone does not establish
+thread engagement, preload or mounting load capacity.
+
+The [endpoint revision workflow](evidence/tightened-mounting-replay-local.json)
+now passes acceptance, explicit rejection of an unseated nut, stale-head refusal,
+restart recovery and offline replay of 87 artifacts and 29 semantic fields.
+It verifies that the accepted source revision moves precisely 29 leaves by 6 mm
+while preserving their native feature hashes. [Browser checks](evidence/tightened-mounting-browser-local.json)
+cover both endpoint previews and exact source navigation. Independent STEP
+geometry acceptance remains separately recorded; all commercial gates stay open.
+
+The [independent tightened mounting oracle](evidence/tightened-mounting-local.json)
+passes four configurations spanning both slot endpoints, 6/8 mm centerline
+lengths and 60/90 mm support pitches. Each checks 30 exact STEP leaves, eight
+protected seating disks, four shank gaps and all 435 part pairs with zero
+positive intersection volume. Five rejected revisions preserve every published
+artifact. The receipt pins the release binary and 72 recipe, lock and oracle
+helper files. This establishes the declared endpoint geometry, not preload,
+thread engagement or load capacity.

@@ -35,6 +35,7 @@ enum Trim {
         x: [f64; 3],
         points: Vec<[f64; 2]>,
         holes: Vec<CircleHole>,
+        slots: Vec<SlotHole>,
     },
 }
 
@@ -46,7 +47,7 @@ struct SeatFace {
 
 fn unsupported() -> KernelError {
     KernelError::Unsupported(
-        "planar seating requires opposed canonical revolution annuli or convex polygon through-bore caps with a shared positive-area material disk".into(),
+        "planar seating requires opposed canonical annular or convex prism caps with a shared positive-area material disk".into(),
     )
 }
 
@@ -55,6 +56,58 @@ fn add(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
 }
 fn mul(a: [f64; 3], s: f64) -> [f64; 3] {
     a.map(|x| x * s)
+}
+
+fn chord_polygon(path: &PlanarPath, t: Tolerance) -> Result<Vec<[f64; 2]>, KernelError> {
+    // CCW arcs bulge outside their chord. Thus a disk contained in this
+    // convex chord polygon is also contained in the native outer boundary.
+    if path.segments.iter().any(|s| {
+        matches!(
+            s,
+            PathSegment::ArcTo {
+                clockwise: true,
+                ..
+            }
+        )
+    }) {
+        return Err(unsupported());
+    }
+    let mut points = vec![path.start];
+    for segment in path.segments.iter().take(path.segments.len() - 1) {
+        points.push(match segment {
+            PathSegment::LineTo { end } | PathSegment::ArcTo { end, .. } => *end,
+        });
+    }
+    validate_polygon(&points, t).map_err(|_| unsupported())?;
+    Ok(points)
+}
+
+fn support_error(
+    model: &ModelSnapshot,
+    origin: [f64; 3],
+    extent: f64,
+    t: Tolerance,
+) -> Result<f64, KernelError> {
+    let scale = model
+        .vertices
+        .iter()
+        .map(|v| norm(v.position))
+        .chain(model.edges.iter().flat_map(|e| match &e.curve {
+            Curve::Line(l) => vec![norm(l.origin)],
+            Curve::Circle(c) => vec![norm(c.origin), c.radius],
+            Curve::CircularArc(a) => vec![norm(a.circle.origin), a.circle.radius],
+        }))
+        .chain(model.faces.iter().flat_map(|f| match &f.surface {
+            Surface::Plane(p) => vec![norm(p.origin)],
+            Surface::Cylinder(c) => vec![norm(c.origin), c.radius],
+            Surface::Cone(c) => vec![norm(c.origin)],
+        }))
+        .fold(norm(origin).max(extent), f64::max);
+    let error = (4096. * f64::EPSILON * (scale + extent)).next_up();
+    if !error.is_normal() || error > t.linear / 64. {
+        return Err(KernelError::NumericRange);
+    }
+    Ok(error)
 }
 
 fn admit(model: &ModelSnapshot, id: FaceId, t: Tolerance) -> Result<SeatFace, KernelError> {
@@ -91,6 +144,42 @@ fn admit(model: &ModelSnapshot, id: FaceId, t: Tolerance) -> Result<SeatFace, Ke
             inner,
             outer,
         }
+    } else if let Ok(g) = crate::analytic::recognize(model, Some(t)) {
+        if id != g.start_cap && id != g.end_cap {
+            return Err(unsupported());
+        }
+        let raw_error = support_error(model, g.origin, g.radius + g.height, t)?;
+        crate::convex_clearance::support::circular_consistency(model, &g, raw_error)?;
+        Trim::Annulus {
+            center: if id == g.start_cap {
+                g.origin
+            } else {
+                add(g.origin, mul(g.axis, g.height))
+            },
+            axis: g.axis,
+            x: g.x_direction,
+            inner: g.inner_radius,
+            outer: g.radius,
+        }
+    } else if let Ok(g) = crate::arc_prism::recognize(model, t) {
+        if id != FaceId(0) && id != FaceId(1) {
+            return Err(unsupported());
+        }
+        let points = chord_polygon(&g.path, t)?;
+        let extent = points
+            .iter()
+            .map(|p| p[0].hypot(p[1]))
+            .fold(g.height, f64::max);
+        let raw_error = support_error(model, g.origin, extent, t)?;
+        crate::convex_clearance::support::arc_consistency(model, &g, raw_error, t)?;
+        Trim::Polygon {
+            origin: g.origin,
+            axis: g.axis,
+            x: g.x_direction,
+            points,
+            holes: g.circular_holes,
+            slots: g.slot_holes,
+        }
     } else {
         let g = crate::convex_trim_clearance::admit(model, t)?;
         if id != FaceId(0) && id != FaceId(1) {
@@ -116,6 +205,7 @@ fn admit(model: &ModelSnapshot, id: FaceId, t: Tolerance) -> Result<SeatFace, Ke
             x: g.x_direction,
             points,
             holes: g.circular_holes,
+            slots: Vec::new(),
         }
     };
     Ok(SeatFace {
@@ -148,6 +238,7 @@ fn margin(face: &SeatFace, point: [f64; 3]) -> f64 {
             x,
             points,
             holes,
+            slots,
         } => {
             let d = sub(point, *origin);
             let y = cross(*axis, *x);
@@ -160,10 +251,19 @@ fn margin(face: &SeatFace, point: [f64; 3]) -> f64 {
                     crate::simple_polygon::distance(p, points[i], points[(i + 1) % points.len()])
                 })
                 .fold(f64::INFINITY, f64::min);
-            holes
+            let circles = holes
                 .iter()
                 .map(|h| (p[0] - h.center[0]).hypot(p[1] - h.center[1]) - h.radius)
-                .fold(outer, f64::min)
+                .fold(outer, f64::min);
+            slots
+                .iter()
+                .map(|s| {
+                    let half = s.centerline_length / 2.;
+                    let d = [p[0] - s.center[0], p[1] - s.center[1]];
+                    let along = (d[0] * s.direction[0] + d[1] * s.direction[1]).clamp(-half, half);
+                    (d[0] - along * s.direction[0]).hypot(d[1] - along * s.direction[1]) - s.radius
+                })
+                .fold(circles, f64::min)
         }
     }
 }
@@ -199,9 +299,9 @@ fn candidates(face: &SeatFace) -> Vec<[f64; 3]> {
 
 /// Certify local nominal seating from two already placed native snapshots.
 /// Both selected faces must be opposed planar boundaries. At least one must be
-/// a planar annulus of a full-turn linear-meridian revolution; the other may
-/// also be such an annulus or a convex polygon prism cap with circular through
-/// bores. The protected disk lies strictly in both trimmed face interiors.
+/// an admitted planar annulus; the other may be an annulus or a convex prism
+/// cap with circular or capsule through bores. The protected disk lies strictly
+/// in both trimmed face interiors.
 pub fn certify_planar_seating(
     left: &ModelSnapshot,
     left_face: FaceId,
@@ -459,5 +559,76 @@ mod tests {
         let witness = certify_planar_seating(&disk.model, face, &opposed, face, 0.2, t).unwrap();
         assert!(witness.disk_radius_lower_mm > 3.9);
         assert!(norm(witness.disk_center) < 1e-9);
+    }
+
+    fn slotted_plate(slot_radius: f64, t: Tolerance) -> ModelSnapshot {
+        let stock = extrude_rectangle(80., 50., 8., t).unwrap().model;
+        cut_obround_slots(
+            &stock,
+            &[ObroundSlot {
+                id: "mount".into(),
+                center: [40., 25.],
+                direction: [1., 0.],
+                centerline_length: 8.,
+                radius: slot_radius,
+            }],
+            t,
+        )
+        .unwrap()
+        .model
+    }
+
+    #[test]
+    fn native_nut_annulus_seats_on_slotted_plate_in_both_orders_and_oblique_pose() {
+        let t = Tolerance::default();
+        let plate = slotted_plate(3., t);
+        let nut = extrude_annulus(5., 2.6, 2., t).unwrap().model;
+        let nut = translate(&nut, [36., 25., -2.], t).unwrap().model;
+        let face = FaceId(1);
+        let disk = certify_planar_seating(&plate, FaceId(0), &nut, face, 0.4, t).unwrap();
+        assert!(disk.disk_radius_lower_mm > 0.4);
+        assert!(disk.disk_area_lower_mm2 > 0.);
+        assert!(disk.signed_gap_lower_mm < 0. && disk.signed_gap_upper_mm > 0.);
+        let reverse = certify_planar_seating(&nut, face, &plate, FaceId(0), 0.4, t).unwrap();
+        assert!(reverse.disk_radius_lower_mm > 0.4);
+
+        let pose = [0.2, 0.3, 0.4, 0.71_f64.sqrt()];
+        let world_plate = transform(&plate, [41., -27., 12.], pose, t).unwrap().model;
+        let world_nut = transform(&nut, [41., -27., 12.], pose, t).unwrap().model;
+        let world =
+            certify_planar_seating(&world_plate, FaceId(0), &world_nut, face, 0.4, t).unwrap();
+        assert!(world.disk_radius_lower_mm > 0.4);
+        assert!((world.disk_radius_lower_mm - disk.disk_radius_lower_mm).abs() < 1e-7);
+    }
+
+    #[test]
+    fn slotted_annular_seat_refuses_margin_intrusion_and_corrupt_support() {
+        let t = Tolerance::default();
+        let plate = slotted_plate(3., t);
+        let nut = translate(
+            &extrude_annulus(5., 2.6, 2., t).unwrap().model,
+            [36., 25., -2.],
+            t,
+        )
+        .unwrap()
+        .model;
+        assert!(certify_planar_seating(&plate, FaceId(0), &nut, FaceId(1), 0.4, t).is_ok());
+        assert!(certify_planar_seating(&plate, FaceId(0), &nut, FaceId(1), 0.85, t).is_err());
+        let intrusive = slotted_plate(4.5, t);
+        assert!(certify_planar_seating(&intrusive, FaceId(0), &nut, FaceId(1), 0.4, t).is_err());
+        let raised = translate(&nut, [0., 0., 0.01], t).unwrap().model;
+        assert!(certify_planar_seating(&plate, FaceId(0), &raised, FaceId(1), 0.4, t).is_err());
+        let mut broken_slot = plate.clone();
+        if let Surface::Plane(p) = &mut broken_slot.faces[0].surface {
+            p.origin[2] += 1e-4;
+        }
+        assert!(certify_planar_seating(&broken_slot, FaceId(0), &nut, FaceId(1), 0.4, t).is_err());
+        let mut broken_annulus = nut.clone();
+        if let Surface::Cylinder(c) = &mut broken_annulus.faces[3].surface {
+            c.radius += 1e-4;
+        }
+        assert!(
+            certify_planar_seating(&plate, FaceId(0), &broken_annulus, FaceId(1), 0.4, t).is_err()
+        );
     }
 }
