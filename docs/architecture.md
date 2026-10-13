@@ -1,7 +1,7 @@
 # Target architecture: commercial-scale, AI-native headless CAD
 
 Status: target design, with an implementation baseline and release gates below.
-Updated: 2026-10-12. The project goal is active.
+Updated: 2026-10-13. The project goal is active.
 
 ## Product goal
 
@@ -2098,6 +2098,46 @@ independent authored bands. The outward combined allowance must remain within
 This is conditional on the modeled seating arrangement, not a contact solution
 or a thread/preload/load model. The full report includes all four screw
 occurrences; the sheet displays one representative shank dimension per side.
+
+Source-owned `nominal_seating_check` obligations now bind two exact leaf paths
+and semantic planar face datums. The original Rust kernel admits canonical
+full-turn linear-meridian revolution annuli and convex polygon prism caps with
+circular through-bores. It checks opposed normals, a signed plane-gap interval
+containing zero within a strict arithmetic budget, and a protected material disk
+inside both projected face trims. This is arithmetic-level support coincidence,
+not a claim of an exactly shared three-dimensional surface. The bounded deterministic search may refuse a valid
+contact; it never substitutes a mesh intersection or snaps a resolvable gap to
+modeling tolerance. Source-to-world placement uncertainty widens the gap and
+reduces the certified disk radius before the authored minimum is checked.
+The error budget includes every authored ancestor transform, including large
+intermediate translations that cancel. Attached occurrence frames are refused
+in this initial supported domain.
+
+The six drive obligations cover both sleeve-flange/cover pairs and four
+screw-underhead/cover pairs. These are local nominal face checks: a screw shank
+may cross the cover plane through a hole, so whole-body opposing halfspaces are
+not required. Global noninterference remains a separate check. These witnesses
+do not establish a contact solution, thread engagement, preload, loads, or
+manufacturing conformance. The size stacks remain conditional on nominal seating
+and independently authored size bands. Failed obligations preserve the complete
+previous generation, including when geometry is cached or an output is selected.
+`nominal-seating-checks.json` retains source/context, part/assembly identities,
+semantic face witnesses, native disk and arithmetic bounds; its HTML is read-only.
+
+| Seating input | Admission / evidence |
+| --- | --- |
+| Revolution annulus against polygon cap with circular through-bores | Native support reconciliation, protected projected disk; drive flange and underhead fixtures |
+| Two revolution planar faces | Admitted, including a zero-inner-radius disk; native kernel tests |
+| Common rigid pose and nested explicit occurrence transforms | Conservative native and full-path placement budgets; oblique kernel test and nested drive fixture |
+| Resolvable gap, penetration, tilt, insufficient disk, corrupt support | Refused; no tolerance snapping or mesh fallback |
+| Attached occurrence frames, blind-bored caps, freeform faces, general contact | Outside this certificate's domain |
+
+
+The native seating increment retains [independent STEP evidence](evidence/native-seating-local.json) across five configurations, six
+seating pairs per configuration and eighteen publication-preserving refusals.
+The [accepted offline replay](evidence/native-seating-replay-local.json)
+matches 150 artifacts and 28 manifest fields after restart. These receipts cover
+the bounded nominal planar seating domain; all five commercial gates remain open.
 
 `cad section` implements the first authoritative planar-section query. It
 returns oriented native lines/circular arcs with face provenance, plane frame,

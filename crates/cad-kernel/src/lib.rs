@@ -38,6 +38,7 @@ mod convex_clearance;
 mod convex_trim_clearance;
 mod hub_keyway;
 mod keyseat;
+mod planar_seating;
 mod rotation_clearance;
 mod solid_clearance;
 mod stepped_keyseat;
@@ -92,6 +93,7 @@ pub use mass_properties::MassProperties;
 pub use math::Tolerance;
 use math::{cross, dot, sub};
 pub use orthogonal::{boolean, translate, BooleanOp};
+pub use planar_seating::{certify_planar_seating, PlanarSeating};
 pub use polygon::{extrude_polygon, validate_polygon, MAX_POLYGON_POINTS};
 pub use prism::{extrude_polygon_with_holes, validate_polygon_with_holes, MAX_POLYGON_HOLES};
 pub use profile_prism::{

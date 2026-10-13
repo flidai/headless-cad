@@ -53,6 +53,17 @@ const assert=require('node:assert/strict');
     assert.ok(source.includes('id = "end_cover_body"'));
     assert.ok(source.includes('id = "cover_screw_body"'));
    }
+   if(source.includes('nominal_seating_check(')){
+    assert.equal(Object.keys(manifest.nominal_seating_checks).length,6);
+    assert.equal(fixture.native_nominal_seating_checks,6);
+    const seats=await(await page.request.get(`${base}/${name}/nominal-seating-checks.json`)).json();
+    assert.deepEqual(seats.checks,manifest.nominal_seating_checks);
+    assert.equal(seats.recipe_context_hash,manifest.recipe_context_hash);
+    if(name==='after'&&report.offline_replay){
+     assert.ok(report.offline_replay.compared_files.some(f=>f.name==='nominal-seating-checks.json'));
+     assert.ok(report.offline_replay.semantic_manifest_fields.includes('nominal_seating_checks'));
+    }
+   }
    const expectedChecks=source.includes('left_cover_shaft_gap')?13:11;
    assert.equal(Object.keys(manifest.clearance_checks).length,expectedChecks);
    if(fixture)assert.equal(fixture.named_continuous_clearance_checks,expectedChecks);

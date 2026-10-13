@@ -331,6 +331,24 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         "direction must be exactly -1 or 1; signed dot(to_origin-from_origin,direction*from_normal), no absolute value; nonpositive or unresolved measurements fail; normals must be arithmetic-parallel or opposed",
         "report retains native and world support planes, conservative native extents, semantic face selections, datum and occurrence frames, part hashes, value and explicit arithmetic bounds including admitted angular departure over native extents; global selected-output and warm-cache obligation",
         "native measurement bounds must entirely satisfy min/max without tolerance slack; authored manufacturing tolerance is separately nominal-checked and is not measurement arithmetic uncertainty"]);
+    let mut nominal_seating = object_spec(
+        "nominal_seating_check",
+        vec![
+            arg("id", T::String),
+            arg("output", T::String),
+            arg("left", object("section_anchor")),
+            arg("right", object("section_anchor")),
+            arg("min_shared_disk_radius_mm", T::Number),
+        ],
+    );
+    nominal_seating.obligations.extend([
+        "schema 2; at most 32 checks with unique portable IDs, an assembly output, distinct exact leaf paths and zero-offset native planar face datums",
+        "Starlark nominal_seating_check(id,output,left_instance_path,left_datum,right_instance_path,right_datum,min_shared_disk_radius_mm)",
+        "world-transformed canonical full-turn revolution annulus or convex polygon prism cap with separated circular throughbores; opposed supports coincident within bounded arithmetic error and a positive material disk common to their projected trims",
+        "kernel arithmetic gap and normal guards, plus separate occurrence-placement gap and disk-radius uncertainty; full disk-radius lower bound must meet the declared minimum",
+        "global selected-output and warm-cache obligation; reports bind source paths, native face IDs, part hashes and placement frames",
+        "local nominal planar boundary coincidence only; attached occurrence paths unsupported; no exact three-dimensional face contact, full-body nonpenetration, preload, threaded engagement, manufacturing tolerance, force or rated contact claim",
+    ]);
     let mut stack_term = object_spec(
         "tolerance_stack_term",
         vec![
@@ -532,6 +550,7 @@ pub(super) fn objects() -> Vec<ObjectSpec> {
         stack,
         stack_term,
         datum_dimension,
+        nominal_seating,
         clearance,
         rotation_path,
         rotation_group,

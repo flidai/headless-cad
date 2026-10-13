@@ -91,6 +91,12 @@ pub(super) fn scope(
         .chain(recipe.datum_dimensions.iter().map(|a| a.output.as_str()))
         .chain(
             recipe
+                .nominal_seating_checks
+                .iter()
+                .map(|a| a.output.as_str()),
+        )
+        .chain(
+            recipe
                 .rigid_rotation_groups
                 .iter()
                 .map(|a| a.output.as_str()),

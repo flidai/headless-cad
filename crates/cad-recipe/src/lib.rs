@@ -73,6 +73,7 @@ struct GraphStore {
     tolerance_stacks: RefCell<Vec<serde_json::Value>>,
     clearance_checks: RefCell<Vec<serde_json::Value>>,
     datum_dimensions: RefCell<Vec<serde_json::Value>>,
+    nominal_seating_checks: RefCell<Vec<serde_json::Value>>,
     rigid_rotation_groups: RefCell<Vec<serde_json::Value>>,
     face_datums: RefCell<Vec<serde_json::Value>>,
     mechanisms: RefCell<Vec<serde_json::Value>>,
@@ -879,6 +880,47 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "duplicate datum dimension ID"
         );
         dimensions.push(serde_json::to_value(d)?);
+        Ok(NoneType)
+    }
+
+    /// Certify a local shared material disk on opposed nominal planar faces.
+    fn nominal_seating_check(
+        id: &str,
+        output: &str,
+        left_instance_path: Value,
+        left_datum: &str,
+        right_instance_path: Value,
+        right_datum: &str,
+        min_shared_disk_radius_mm: Value,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<NoneType> {
+        let check = cad_build::NominalSeatingCheck {
+            id: id.into(),
+            output: output.into(),
+            left: cad_build::DatumDimensionEndpoint {
+                instance_path: occurrence_path(left_instance_path, "left_instance_path")?,
+                datum: left_datum.into(),
+            },
+            right: cad_build::DatumDimensionEndpoint {
+                instance_path: occurrence_path(right_instance_path, "right_instance_path")?,
+                datum: right_datum.into(),
+            },
+            min_shared_disk_radius_mm: number(min_shared_disk_radius_mm)?,
+        };
+        check.validate()?;
+        let graph = store(eval)?;
+        let mut checks = graph.nominal_seating_checks.borrow_mut();
+        anyhow::ensure!(
+            checks.len() < cad_build::MAX_NOMINAL_SEATING_CHECKS,
+            "too many nominal seating checks"
+        );
+        anyhow::ensure!(
+            !checks.iter().any(|old| old["id"]
+                .as_str()
+                .is_some_and(|v| v.eq_ignore_ascii_case(id))),
+            "duplicate nominal seating check ID"
+        );
+        checks.push(serde_json::to_value(check)?);
         Ok(NoneType)
     }
 
@@ -1705,6 +1747,7 @@ pub fn from_starlark_with_modules(
     let tolerance_stacks = graph.tolerance_stacks.into_inner();
     let clearance_checks = graph.clearance_checks.into_inner();
     let datum_dimensions = graph.datum_dimensions.into_inner();
+    let nominal_seating_checks = graph.nominal_seating_checks.into_inner();
     let rigid_rotation_groups = graph.rigid_rotation_groups.into_inner();
     let face_datums = graph.face_datums.into_inner();
     let mechanisms = graph.mechanisms.into_inner();
@@ -1718,7 +1761,7 @@ pub fn from_starlark_with_modules(
         .iter()
         .any(|feature| feature["op"] == "hole_pattern");
     let mut value = serde_json::json!({
-        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !rigid_rotation_groups.is_empty() { 2 } else { 1 },
+        "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() { 2 } else { 1 },
         "units": "mm",
         "features": graph.features.into_inner(),
         "outputs": graph.outputs.into_inner(),
@@ -1745,6 +1788,9 @@ pub fn from_starlark_with_modules(
     }
     if !clearance_checks.is_empty() {
         value["clearance_checks"] = serde_json::json!(clearance_checks);
+    }
+    if !nominal_seating_checks.is_empty() {
+        value["nominal_seating_checks"] = serde_json::json!(nominal_seating_checks);
     }
     if !tolerance_stacks.is_empty() {
         value["tolerance_stacks"] = serde_json::json!(tolerance_stacks);

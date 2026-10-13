@@ -207,6 +207,24 @@ module = assembly(id = "drive_module_release", instances = [
 ] + [instance(id = "clamp_bolt_"+str(i), part = bolt, offset = [xy[0],xy[1],-5]) for i,xy in enumerate(bolt_centers)]
   + [instance(id = "clamp_nut_"+str(i), part = nut, offset = [xy[0],xy[1],-5]) for i,xy in enumerate(bolt_centers)])
 assembly_output(name = "drive_module_release", assembly = module)
+def check_nominal_cover_seating():
+    for side in ["left", "right"]:
+        prefix = side+"_support"
+        sleeve = [prefix, "sleeve" if side == "left" else "right_sleeve"]
+        cover = [prefix, "left_cover" if side == "left" else "right_cover"]
+        cover_flange_datum = "end" if side == "left" else "start"
+        cover_head_datum = "start" if side == "left" else "end"
+        nominal_seating_check(id = side+"_cover_flange_seat", output = "drive_module_release",
+            left_instance_path = sleeve, left_datum = "outer_thrust",
+            right_instance_path = cover, right_datum = cover_flange_datum,
+            min_shared_disk_radius_mm = 0.2)
+        for tag in ["minus", "plus"]:
+            screw = [prefix, side+"_cover_screw_"+tag]
+            nominal_seating_check(id = side+"_cover_"+tag+"_head_seat", output = "drive_module_release",
+                left_instance_path = screw, left_datum = "underhead",
+                right_instance_path = cover, right_datum = cover_head_datum,
+                min_shared_disk_radius_mm = 0.2)
+check_nominal_cover_seating()
 # A focused section target excludes perpendicular clamp fasteners, whose oblique
 # circular sections are outside the current native section-query family.
 fit_inspection = assembly(id = "fit_inspection", instances = [

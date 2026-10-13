@@ -533,6 +533,20 @@ fn gallery(directory: &Dir) -> String {
                 url(&datum_report)
             ));
         }
+        let seating_report = if folder.is_empty() {
+            "nominal-seating-checks.html".to_owned()
+        } else {
+            format!("{folder}/nominal-seating-checks.html")
+        };
+        if directory
+            .metadata(&seating_report)
+            .is_ok_and(|metadata| metadata.is_file())
+        {
+            output.push_str(&format!(
+                "<a href=\"{}\">Nominal seating</a>",
+                url(&seating_report)
+            ));
+        }
         let clearance_report = if folder.is_empty() {
             "clearance-checks.html".to_owned()
         } else {

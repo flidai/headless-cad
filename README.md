@@ -2457,6 +2457,28 @@ required allowance. The [accepted axial replay](docs/evidence/axial-size-bands-r
 matches 149 files and 27 manifest fields after restart and offline rebuild.
 
 
+### Native nominal seating
+
+`nominal_seating_check` binds exact assembly occurrence paths and semantic face
+datums. It checks opposed native planar supports and a protected disk lying
+inside both projected face trims, with planes coincident within arithmetic
+uncertainty. Gap bounds describe numerical uncertainty; resolvable
+gaps, penetration, tilt, insufficient material and unsupported faces reject the
+build. The bounded candidate search can refuse a valid contact.
+
+See `examples/nominal_seating.star` for an isolated flange/plate example. The drive
+module adds six obligations: two sleeve-flange/cover seats and four screw-head
+seats. Inspect `nominal-seating-checks.html` and its source-bound JSON report.
+These are nominal local face checks, separate from whole-body collision checks,
+contact forces, threads, preload and manufactured-part conformance. The viewer
+only inspects the evidence; the Starlark recipe owns each requirement.
+
+The native seating increment retains [independent STEP evidence](docs/evidence/native-seating-local.json) across five configurations, six
+seating pairs per configuration and eighteen publication-preserving refusals.
+The [accepted offline replay](docs/evidence/native-seating-replay-local.json)
+matches 150 artifacts and 28 manifest fields after restart. These receipts cover
+the bounded nominal planar seating domain; all five commercial gates remain open.
+
 ### Authored dimensional tolerances
 
 Both `section_dimension` and `section_circle_dimension` accept an optional

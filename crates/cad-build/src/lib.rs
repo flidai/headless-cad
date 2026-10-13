@@ -39,9 +39,14 @@ pub use rotation_groups::{
     MAX_ROTATION_GROUP_MEMBERS_TOTAL,
 };
 mod datum_dimensions;
+mod nominal_seating;
 pub use datum_dimensions::{
     DatumDimension, DatumDimensionEndpoint, DatumDimensionReport, DatumDimensionWitness,
     MAX_DATUM_DIMENSIONS, MAX_DATUM_DIMENSION_WORK,
+};
+pub use nominal_seating::{
+    NominalSeatingCheck, NominalSeatingCheckReport, MAX_NOMINAL_SEATING_CHECKS,
+    MAX_NOMINAL_SEATING_WORK,
 };
 mod clearance_checks;
 pub use clearance_checks::{
@@ -133,6 +138,7 @@ pub fn executor_build_id() -> &'static str {
             include_bytes!("tolerance_stacks.rs").as_slice(),
             include_bytes!("clearance_checks.rs").as_slice(),
             include_bytes!("datum_dimensions.rs").as_slice(),
+            include_bytes!("nominal_seating.rs").as_slice(),
             include_bytes!("rotation_groups.rs").as_slice(),
             include_bytes!("../Cargo.toml").as_slice(),
         ] {
@@ -190,6 +196,8 @@ pub struct Recipe {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub datum_dimensions: Vec<DatumDimension>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub nominal_seating_checks: Vec<NominalSeatingCheck>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub rigid_rotation_groups: Vec<RigidRotationGroup>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub face_datums: Vec<FaceDatumDefinition>,
@@ -243,6 +251,8 @@ impl<'de> Deserialize<'de> for Recipe {
             #[serde(default, deserialize_with = "present_vec")]
             datum_dimensions: Option<Vec<DatumDimension>>,
             #[serde(default, deserialize_with = "present_vec")]
+            nominal_seating_checks: Option<Vec<NominalSeatingCheck>>,
+            #[serde(default, deserialize_with = "present_vec")]
             rigid_rotation_groups: Option<Vec<RigidRotationGroup>>,
             #[serde(default, deserialize_with = "present_vec")]
             face_datums: Option<Vec<FaceDatumDefinition>>,
@@ -273,6 +283,11 @@ impl<'de> Deserialize<'de> for Recipe {
         if raw.schema_version == 1 && raw.datum_dimensions.is_some() {
             return Err(serde::de::Error::custom(
                 "datum dimensions require schema version 2",
+            ));
+        }
+        if raw.schema_version == 1 && raw.nominal_seating_checks.is_some() {
+            return Err(serde::de::Error::custom(
+                "nominal seating checks require schema version 2",
             ));
         }
         if raw.schema_version == 1 && raw.clearance_checks.is_some() {
@@ -339,6 +354,7 @@ impl<'de> Deserialize<'de> for Recipe {
             tolerance_stacks: raw.tolerance_stacks.unwrap_or_default(),
             clearance_checks: raw.clearance_checks.unwrap_or_default(),
             datum_dimensions: raw.datum_dimensions.unwrap_or_default(),
+            nominal_seating_checks: raw.nominal_seating_checks.unwrap_or_default(),
             rigid_rotation_groups: raw.rigid_rotation_groups.unwrap_or_default(),
             face_datums: raw.face_datums.unwrap_or_default(),
             mechanisms: raw.mechanisms.unwrap_or_default(),
@@ -1014,6 +1030,7 @@ pub struct BuildResult {
     pub tolerance_stacks: BTreeMap<String, ToleranceStackReport>,
     pub clearance_checks: BTreeMap<String, ClearanceCheckReport>,
     pub datum_dimensions: BTreeMap<String, DatumDimensionReport>,
+    pub nominal_seating_checks: BTreeMap<String, NominalSeatingCheckReport>,
     pub rigid_rotation_groups: BTreeMap<String, RigidRotationGroupReport>,
     pub face_datums: ResolvedFaceDatums,
     pub mechanism_reports: BTreeMap<String, MechanismReport>,
@@ -1025,6 +1042,18 @@ pub struct BuildResult {
 
 #[derive(Debug, Error)]
 pub enum BuildError {
+    #[error("invalid nominal seating check '{id}' on '{output}': {message}")]
+    InvalidNominalSeatingCheck {
+        id: String,
+        output: String,
+        message: String,
+    },
+    #[error("nominal seating check '{id}' on '{output}' failed: {message}")]
+    NominalSeatingCheckFailed {
+        id: String,
+        output: String,
+        message: String,
+    },
     #[error("invalid rotation group '{id}' on '{output}': {message}")]
     InvalidRotationGroup {
         id: String,
@@ -1819,6 +1848,7 @@ impl BuildEngine {
         section_views::preflight(recipe)?;
         drawing_sheets::preflight(recipe)?;
         datum_dimensions::preflight(recipe)?;
+        nominal_seating::preflight(recipe)?;
         tolerance_stacks::preflight(recipe)?;
         clearance_checks::preflight(recipe)?;
         rotation_groups::preflight(recipe)?;
@@ -2556,6 +2586,7 @@ impl BuildEngine {
             tolerance_stacks: BTreeMap::new(),
             clearance_checks: BTreeMap::new(),
             datum_dimensions: BTreeMap::new(),
+            nominal_seating_checks: BTreeMap::new(),
             rigid_rotation_groups: BTreeMap::new(),
             face_datums: BTreeMap::new(),
             motion_studies: mechanism_evaluation.motion_studies,
@@ -2603,6 +2634,12 @@ impl BuildEngine {
             .chain(recipe.datum_dimensions.iter().map(|a| a.output.clone()))
             .chain(
                 recipe
+                    .nominal_seating_checks
+                    .iter()
+                    .map(|a| a.output.clone()),
+            )
+            .chain(
+                recipe
                     .rigid_rotation_groups
                     .iter()
                     .map(|a| a.output.clone()),
@@ -2642,6 +2679,12 @@ impl BuildEngine {
             tolerance,
         )?;
         result.datum_dimensions = datum_dimensions::evaluate(
+            recipe,
+            &assertion_assemblies,
+            &result.face_datums,
+            tolerance,
+        )?;
+        result.nominal_seating_checks = nominal_seating::evaluate(
             recipe,
             &assertion_assemblies,
             &result.face_datums,

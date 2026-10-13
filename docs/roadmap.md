@@ -45,9 +45,19 @@ labels retain a 2.8 mm print size at two model scales and annotation-only edits
 preserve compared solid artifacts. Authored size bands and four conditional
 axial allowance stacks now have [independent evidence](evidence/axial-size-bands-local.json)
 across five configurations, including native STEP flange/shank measurements and
-decimal interval arithmetic. This leaves nominal seating/contact validation,
-broader manufacturing semantics, projected drawings and commercial release
-readiness open.
+decimal interval arithmetic. A bounded native nominal seating increment now checks six flange/cover and
+screw-head/cover face pairs, with a protected material disk and explicit
+arithmetic uncertainty. Full contact solving, broader manufacturing semantics,
+projected drawings and commercial release readiness remain open. Acceptance
+requires independent STEP face/disk checks and publication-preserving gap,
+penetration and insufficient-area refusals; a local seating witness alone does
+not close the mechanical-intent gate.
+
+The native seating increment retains [independent STEP evidence](evidence/native-seating-local.json) across five configurations, six
+seating pairs per configuration and eighteen publication-preserving refusals.
+The [accepted offline replay](evidence/native-seating-replay-local.json)
+matches 150 artifacts and 28 manifest fields after restart. These receipts cover
+the bounded nominal planar seating domain; all five commercial gates remain open.
 
 M3's large-assembly gate also includes the architecture's
 [exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):

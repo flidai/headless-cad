@@ -128,12 +128,16 @@ def drive_summary(manifest):
     assert len(members) == 9
     has_machining_sheet = 'end_cover_machining' in manifest['drawing_sheets']
     has_axial_allowance = 'left_cover_minus_tip_allowance' in manifest['tolerance_stacks']
+    if manifest.get('nominal_seating_checks'):
+        assert len(manifest['nominal_seating_checks']) == 6
+        assert all(c['status'] == 'passed' for c in manifest['nominal_seating_checks'].values())
     assert len(manifest['datum_dimensions']) == (26 if has_axial_allowance else 20 if has_machining_sheet else 10)
     for feature in ('housing_left_pilots', 'housing_right_pilots'):
         assert feature in manifest['sketch_reports']
     return {'occurrences': assembly['instances'], 'definitions': assembly['definitions'],
             'rotor_members': len(members),
             'named_continuous_clearance_checks': len(manifest['clearance_checks']),
+            'native_nominal_seating_checks': len(manifest.get('nominal_seating_checks', {})),
             'native_axial_dimensions': len(manifest['datum_dimensions']),
             'native_machining_dimension_rows': 14 if has_axial_allowance else 10 if has_machining_sheet else 0,
             'native_tip_allowance_stacks': 4 if has_axial_allowance else 0,
@@ -225,7 +229,7 @@ def main():
 <div class="cards"><section><h2>Revision A</h2><p>12 mm shaft · 60 mm mounting pitch</p><a href="before/rotation-rotor.html">Inspect rotating drive and captured source →</a></section>
 <section><h2>Revision B</h2><p>14 mm shaft · 72 mm mounting pitch</p><a href="after/rotation-rotor.html">Inspect repaired revision and captured source →</a></section></div>
 <ul><li>30 components from 14 definitions, including two removable bearing covers and four nominal screw envelopes.</li><li>9 rotor members, {len(manifests[1]['clearance_checks'])} named continuous clearance checks, {len(manifests[1]['datum_dimensions'])} native axial dimensions, including fourteen measured machining rows.</li><li>Nominal screw-tip floor gap: 0.5 mm; threads, preload and rated loads remain unverified.</li><li>Invalid 0.3 mm minimum clearance rejected; earlier candidate preserved.</li><li>Captured source replayed offline after server exit with identical native B-reps and STEP.</li></ul>
-<p><a href="report.json">Client trace and native rejection</a> · <a href="after/clearance-checks.html">Clearance evidence</a> · <a href="after/drawing-end_cover_machining.svg">End-cover machining sheet</a> · <a href="after/tolerance-stacks.html">Tolerance stacks</a> · <a href="after/drive_module_release.step">Download STEP</a></p>
+<p><a href="report.json">Client trace and native rejection</a> · <a href="after/clearance-checks.html">Clearance evidence</a> · <a href="after/drawing-end_cover_machining.svg">End-cover machining sheet</a> · <a href="after/tolerance-stacks.html">Tolerance stacks</a> · <a href="after/nominal-seating-checks.html">Nominal seating</a> · <a href="after/drive_module_release.step">Download STEP</a></p>
 <small>This is a scripted interface acceptance fixture, not a claim of autonomous engineering. Viewer controls inspect only. Named-pair proofs do not certify all assembly contacts or rated loads.</small>''')
         root.rename(destination)
     print(json.dumps({'valid': True, 'url_path': str(destination / 'index.html'), 'tool_calls': len(trace)}, indent=2))

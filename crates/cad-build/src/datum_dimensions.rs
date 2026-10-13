@@ -201,7 +201,7 @@ fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
 fn norm(a: [f64; 3]) -> f64 {
     a[0].hypot(a[1]).hypot(a[2])
 }
-fn resolve(
+pub(super) fn resolve(
     endpoint: &DatumDimensionEndpoint,
     assembly: &BuiltAssembly,
     datums: &ResolvedFaceDatums,

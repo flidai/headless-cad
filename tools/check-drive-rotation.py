@@ -27,8 +27,11 @@ from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
 from OCP.gp import gp_Trsf,gp_Ax1,gp_Pnt,gp_Dir
 from OCP.TopExp import TopExp_Explorer
-from OCP.TopAbs import TopAbs_FACE
+from OCP.TopAbs import TopAbs_FACE,TopAbs_EDGE,TopAbs_IN,TopAbs_REVERSED
 from OCP.BRepAdaptor import BRepAdaptor_Surface
+from OCP.BRepClass import BRepClass_FaceClassifier
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeVertex
 from OCP.GeomAbs import GeomAbs_Plane
 from OCP.TopoDS import TopoDS
 from OCP.BRepGProp import BRepGProp
@@ -166,6 +169,40 @@ def planar_face_at(shape,x,y,area,label):
         iterator.Next()
     d.require(len(matches)==1,'one exact STEP planar face '+label+': '+str(len(matches)))
     return matches[0]
+
+def planar_seating_face(shape,x,area,label,center_y=None):
+    """Identify one actual trimmed STEP face from its support, area and centroid."""
+    matches=[];iterator=TopExp_Explorer(shape,TopAbs_FACE)
+    while iterator.More():
+        face=TopoDS.Face(iterator.Current());surface=BRepAdaptor_Surface(face)
+        if surface.GetType()==GeomAbs_Plane:
+            props=GProp_GProps();BRepGProp.SurfaceProperties_s(face,props)
+            normal=surface.Plane().Axis().Direction()
+            if (abs(surface.Plane().Location().X()-x)<2e-6 and
+                abs(props.Mass()-area)<2e-5 and
+                abs(abs(normal.X())-1)<1e-9 and
+                (center_y is None or abs(props.CentreOfMass().Y()-center_y)<2e-6)):
+                matches.append((face,surface.Plane().Location().X(),props.Mass()))
+        iterator.Next()
+    d.require(len(matches)==1,'one trimmed STEP seating face '+label+': '+str(len(matches)))
+    return matches[0]
+
+def certified_step_face_disk(face,center,radius,label):
+    """Check the claimed disk lies within an actual exported planar face trim."""
+    plane=BRepAdaptor_Surface(face).Plane()
+    point=gp_Pnt(plane.Location().X(),center[1],center[2])
+    classifier=BRepClass_FaceClassifier();classifier.Perform(face,point,1e-8)
+    d.require(classifier.State()==TopAbs_IN,'disk center inside actual STEP face '+label)
+    vertex=BRepBuilderAPI_MakeVertex(point).Vertex()
+    closest=float('inf');edges=0;iterator=TopExp_Explorer(face,TopAbs_EDGE)
+    while iterator.More():
+        edge=iterator.Current();distance=BRepExtrema_DistShapeShape(vertex,edge)
+        distance.Perform();d.require(distance.IsDone(),'STEP face edge distance '+label)
+        closest=min(closest,distance.Value());edges+=1;iterator.Next()
+    d.require(edges>=2 and math.isfinite(closest),'trimmed STEP face boundary '+label)
+    d.require(closest+2e-6>=radius,'reported disk inside actual STEP face '+label)
+    return {'center_classification':'inside','nearest_step_boundary_mm':closest,
+            'verified_radius_lower_mm':max(0.,closest-2e-6),'edge_count':edges}
 
 def cover_axial_faces(shapes,pitch,depth,thickness):
     """Measure both blind floors, screw tips and cover caps from STEP topology."""
@@ -339,6 +376,104 @@ def axial_size_allowances(shapes,manifest,diameter,pitch,depth,thickness,native_
     d.require(len(dimensions)==26 and len(facts)==6 and len(stacks)==4,'complete axial allowance inventory')
     return {'native_step_measurements':facts,'authored_independent_stacks':stacks,
             'scope':'Independent size bands conditional on nominal seating; no thread, preload or manufactured conformance proof'}
+
+def native_seating_checks(out,shapes,manifest,diameter,pitch,thickness):
+    """Bind six local native disks to independently selected trimmed STEP faces."""
+    published=json.loads((out/'nominal-seating-checks.json').read_text())
+    d.require(published['recipe_context_hash']==manifest['recipe_context_hash'] and
+              published['recipe_source']==manifest['recipe_source'] and
+              published['checks']==manifest['nominal_seating_checks'],
+              'current source-bound published seating report')
+    d.require(published['kind']=='native_nominal_planar_seating' and
+              published['units']=='mm' and published['schema_version']==1,
+              'typed native seating publication')
+    names={side+'_cover_flange_seat' for side in ['left','right']}
+    names.update(side+'_cover_'+tag+'_head_seat'
+                 for side in ['left','right'] for tag in ['minus','plus'])
+    checks=published['checks'];d.require(set(checks)==names,'six exact named seating obligations')
+    r=diameter/2;cover_area=2048-math.pi*((r+4.5)**2+2*2.05**2)
+    details={}
+    for side,prefix,sleeve in [('left',25,'sleeve'),('right',25+pitch,'right_sleeve')]:
+        cover_path=(side+'_support',side+'_cover')
+        flange_path=(side+'_support',sleeve)
+        flange_x=prefix+(-2 if side=='left' else 18)
+        flange_area=math.pi*((r+6)**2-(r+.15)**2)
+        cover_inner=flange_x
+        cover_outer=prefix+(-2-thickness if side=='left' else 18+thickness)
+        configs=[(side+'_cover_flange_seat',flange_path,'outer_thrust',
+                  flange_x,flange_area,None,cover_path,'end' if side=='left' else 'start',
+                  cover_inner,cover_area,None)]
+        for tag,y in [('minus',-17),('plus',17)]:
+            configs.append((side+'_cover_'+tag+'_head_seat',
+                (side+'_support',side+'_cover_screw_'+tag),'underhead',
+                cover_outer,math.pi*(3**2-1.65**2),y,
+                cover_path,'start' if side=='left' else 'end',
+                cover_outer,cover_area,None))
+        for (name,left_path,left_datum,left_x,left_area,left_y,
+             right_path,right_datum,right_x,right_area,right_y) in configs:
+            report=checks[name];declaration=report['declaration'];query=report['query']
+            d.require(report['status']=='passed' and declaration['id']==name and
+                      declaration['output']=='drive_module_release' and
+                      report['assembly_content_hash']==manifest['outputs']['drive_module_release']['content_hash'],
+                      'passed current assembly seating '+name)
+            d.close(declaration['min_shared_disk_radius_mm'],.2,'authored shared disk '+name)
+            endpoints=[('left',left_path,left_datum,left_x,left_area,left_y),
+                       ('right',right_path,right_datum,right_x,right_area,right_y)]
+            faces={};boundaries={}
+            for label,path,datum,x,area,y in endpoints:
+                native=report[label]
+                d.require(declaration[label]=={'instance_path':list(path),'datum':datum} and
+                          native['instance_path']==list(path) and native['datum']==datum and
+                          native['semantic_datum']['selection']['status']=='resolved' and
+                          len(native['semantic_datum']['selection']['witnesses'])==1 and
+                          native['semantic_datum']['target_content_hash']==native['part_content_hash'],
+                          'exact source-selected native face '+name+' '+label)
+                d.require(query[label+'_face']==native['semantic_datum']['selection']['witnesses'][0]['target_face'],
+                          'native query selected face ID '+name+' '+label)
+                face,step_x,step_area=planar_seating_face(shapes[path],x,area,name+' '+label,y)
+                d.close(native['world_plane']['origin'][0],step_x,
+                        'native/STEP seating support '+name+' '+label,absolute=2e-6)
+                faces[label]=face
+                center=query['disk_center']
+                d.require(len(center)==3 and all(math.isfinite(c) for c in center),
+                          'finite protected disk center '+name)
+                d.close(center[0],step_x,'disk centered on STEP plane '+name+' '+label,absolute=2e-6)
+                radius=report['disk_radius_lower_mm']
+                boundaries[label]=certified_step_face_disk(face,center,radius,name+' '+label)
+            left_plane=BRepAdaptor_Surface(faces['left']).Plane()
+            right_plane=BRepAdaptor_Surface(faces['right']).Plane()
+            left_normal=left_plane.Axis().Direction().X()*(-1 if faces['left'].Orientation()==TopAbs_REVERSED else 1)
+            right_normal=right_plane.Axis().Direction().X()*(-1 if faces['right'].Orientation()==TopAbs_REVERSED else 1)
+            d.require(left_normal*right_normal < -1+1e-9 and
+                      math.isfinite(report['normal_opposition_bound']) and
+                      query['normal_opposition_bound']<=report['normal_opposition_bound']<1e-6,
+                      'opposed actual STEP and native face normals '+name)
+            d.require(report['signed_gap_lower_mm']<=0<=report['signed_gap_upper_mm'] and
+                      report['signed_gap_upper_mm']-report['signed_gap_lower_mm']<1e-5 and
+                      report['placement_uncertainty_mm']>=0,
+                      'arithmetic coincidence, not tolerance snapping '+name)
+            step_gap=(right_plane.Location().X()-left_plane.Location().X())*left_normal
+            d.require(report['signed_gap_lower_mm']-2e-8<=step_gap<=
+                      report['signed_gap_upper_mm']+2e-8,
+                      'actual STEP plane gap inside native interval plus export guard '+name)
+            radius=report['disk_radius_lower_mm'];area=report['disk_area_lower_mm2']
+            d.require(radius>=declaration['min_shared_disk_radius_mm'] and
+                      radius<=query['disk_radius_lower_mm'] and area>0 and
+                      area<=math.pi*radius**2+1e-8,
+                      'source-to-world guarded native disk '+name)
+            pair_volume=k.properties(k.boolean(BRepAlgoAPI_Common,
+                shapes[left_path],shapes[right_path]))[0]
+            d.close(pair_volume,0,'separate exact STEP body intersection '+name,absolute=3e-6)
+            details[name]={'step_support_x_mm':[left_plane.Location().X(),right_plane.Location().X()],
+                           'step_signed_gap_mm':step_gap,
+                           'step_oriented_normal_x':[left_normal,right_normal],
+                           'step_pair_common_volume_mm3':pair_volume,
+                           'disk_center_mm':query['disk_center'],
+                           'native_disk_radius_lower_mm':radius,
+                           'native_disk_area_lower_mm2':area,
+                           'step_face_boundaries':boundaries,
+                           'source_face_ids':[query['left_face'],query['right_face']]}
+    return details
 
 def machining_sheet_binding(out,manifest,native_dimensions):
     """Verify every published table row embeds its exact current native report."""
@@ -557,6 +692,7 @@ def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
     physical_faces=cover_axial_faces(shapes,pitch,depth,thickness)
     native_dimensions=native_cover_dimensions(out,manifest,pitch,depth,thickness,physical_faces)
     axial_allowances=axial_size_allowances(shapes,manifest,diameter,pitch,depth,thickness,native_dimensions)
+    seating=native_seating_checks(out,shapes,manifest,diameter,pitch,thickness)
     sheet_rows=machining_sheet_binding(out,manifest,native_dimensions)
     r=diameter/2
     nominal_contacts={}
@@ -681,14 +817,15 @@ def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
                  'section-left_cover_pilot_section.json',
                  'section-right_cover_pilot_section.json',
                  'section-end_cover_section.json',
-                 'datum-dimensions.json','drawing-end_cover_machining.json',
+                 'datum-dimensions.json','nominal-seating-checks.json',
+                 'nominal-seating-checks.html','drawing-end_cover_machining.json',
                  'drawing-end_cover_machining.svg']:
         d.require(digest(out/name)==digest(replay/name),'captured replay differs: '+name)
         compared.append(name)
     rebuilt_manifest=json.loads((replay/'manifest.json').read_text())
     for field in ['recipe_source_hash','feature_hashes','outputs','face_assertions',
                   'section_views','clearance_checks','rigid_rotation_groups',
-                  'datum_dimensions','drawing_sheets']:
+                  'datum_dimensions','nominal_seating_checks','drawing_sheets']:
         d.require(manifest[field]==rebuilt_manifest[field],
                   'captured replay semantics differ: '+field)
     return dict(case=tag,parameters=parameters,occurrences=30,definitions=14,
@@ -696,6 +833,7 @@ def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
                 actual_step_axial_faces=physical_faces,
                 native_machining_dimensions=native_dimensions,
                 conditional_axial_size_allowances=axial_allowances,
+                native_nominal_seating=seating,
                 published_machining_rows=sheet_rows,
                 nominal_contacts=nominal_contacts,
                 actual_native_queries=query_count,proofs=proofs,
@@ -713,7 +851,10 @@ def rejected_edits(cad,directory):
                   'unknown_table_dimension','wrong_table_output','table_overflow',
                   'stale_floor_datum','pilot_reaches_opposite_cap',
                   'unknown_paper_annotation','impossible_paper_annotation_layout',
-                  'shank_band_loses_axial_allowance']:
+                  'shank_band_loses_axial_allowance',
+                  'seating_wrong_cover_cap','seating_impossible_disk',
+                  'seating_unknown_screw_face','seating_open_gap',
+                  'seating_face_penetration']:
         changed=json.loads(json.dumps(original))
         if label=='offset_axis':changed['rigid_rotation_groups'][0]['pivot']=[1,0,0]
         elif label=='missing_reference':changed['rigid_rotation_groups'][0]['reference_instance_path']=['base']
@@ -739,6 +880,19 @@ def rejected_edits(cad,directory):
         elif label=='shank_band_loses_axial_allowance':
             dimension=next(x for x in changed['datum_dimensions'] if x['id']=='left_cover_minus_shank')
             dimension['tolerance']['upper']=.4
+        elif label=='seating_wrong_cover_cap':
+            check=next(x for x in changed['nominal_seating_checks'] if x['id']=='left_cover_flange_seat')
+            check['right']['datum']='start'
+        elif label=='seating_impossible_disk':
+            check=next(x for x in changed['nominal_seating_checks'] if x['id']=='left_cover_minus_head_seat')
+            check['min_shared_disk_radius_mm']=1.0
+        elif label=='seating_unknown_screw_face':
+            check=next(x for x in changed['nominal_seating_checks'] if x['id']=='right_cover_plus_head_seat')
+            check['left']['datum']='missing_face'
+        elif label in {'seating_open_gap','seating_face_penetration'}:
+            support=next(x for x in changed['assemblies'] if x['id']=='left_support_definition')
+            cover=next(x for x in support['instances'] if x['id']=='left_cover')
+            cover['transform']['translation'][2]+=(-.1 if label=='seating_open_gap' else .1)
         else:
             sheet=next(x for x in changed['drawing_sheets'] if x['id']=='end_cover_machining')
             sheet['views'][0]['width']=20
@@ -747,7 +901,8 @@ def rejected_edits(cad,directory):
         diagnostic=json.loads(result.stderr)
         d.require(diagnostic.get('code') in ['invalid_rotation_group','rotation_group_failed',
                   'clearance_check_failed','invalid_drawing_sheet','invalid_graph',
-                  'datum_dimension_failed','tolerance_stack_failed'] or
+                  'datum_dimension_failed','tolerance_stack_failed',
+                  'nominal_seating_check_failed','invalid_nominal_seating_check'] or
                   label in {'pilot_reaches_opposite_cap','impossible_paper_annotation_layout'}
                   and isinstance(diagnostic.get('code'),str),
                   'structured failure '+label)
@@ -791,7 +946,7 @@ def main():
                 python_version=platform.python_version(),
                 ocp_distribution=importlib.metadata.version('cadquery-ocp'),
                 cases=cases,annotation_variants=annotation_variants,rejected_edits=failures,
-                scope='Native continuous named-pair proofs, conservative full-turn bounds for 54 fixed/rotor pairs, independent STEP face measurements bound to fourteen drawing rows, and four authored independent-interval axial allowances conditional on nominal seating. No general assembly collision, thread, preload, installation or load certification')
+                scope='Native continuous named-pair proofs, conservative full-turn bounds for 54 fixed/rotor pairs, six local nominal planar seating disks independently checked on trimmed STEP faces, fourteen drawing rows bound to STEP measurements, and four authored independent-interval axial allowances conditional on nominal seating. No general assembly collision, thread, preload, installation or load certification')
     (args.out_dir/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 
 if __name__=='__main__':main()
