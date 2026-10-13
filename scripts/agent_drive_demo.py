@@ -137,6 +137,7 @@ def drive_summary(manifest):
     return {'occurrences': assembly['instances'], 'definitions': assembly['definitions'],
             'rotor_members': len(members),
             'named_continuous_clearance_checks': len(manifest['clearance_checks']),
+            'native_obround_mounting_slots': 4 if 'base_slotted' in manifest['feature_hashes'] else 0,
             'native_nominal_seating_checks': len(manifest.get('nominal_seating_checks', {})),
             'native_axial_dimensions': len(manifest['datum_dimensions']),
             'native_machining_dimension_rows': 14 if has_axial_allowance else 10 if has_machining_sheet else 0,

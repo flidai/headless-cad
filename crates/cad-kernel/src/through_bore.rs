@@ -53,6 +53,9 @@ fn polygon(
 }
 pub(crate) fn stock(a: &ModelSnapshot, t: Tolerance) -> Result<Stock, KernelError> {
     if let Ok(g) = crate::arc_prism::recognize(a, t) {
+        if !g.slot_holes.is_empty() {
+            return Err(bad());
+        }
         return Ok(Stock {
             origin: g.origin,
             axis: g.axis,

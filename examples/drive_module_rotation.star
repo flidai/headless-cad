@@ -12,6 +12,7 @@ turn_radians = param(name = "turn_radians", default = 6.283185307179586)
 shaft_diameter = param(name = "shaft_diameter", default = 12)
 mounting_pitch = param(name = "mounting_pitch", default = 60)
 base_corner_radius = param(name = "base_corner_radius", default = 6)
+base_slot_length = param(name = "base_slot_length", default = 6)
 required_clearance = param(name = "required_clearance", default = 0.09)
 minimum_endplay = param(name = "minimum_endplay", default = 0.1)
 pilot_depth = param(name = "pilot_depth", default = 5)
@@ -24,6 +25,8 @@ def validate_parameters():
         fail("mounting_pitch must be 60..90 mm")
     if base_corner_radius < 2 or base_corner_radius > 10:
         fail("base_corner_radius must be 2..10 mm")
+    if base_slot_length < 2 or base_slot_length > 8:
+        fail("base_slot_length must be 2..8 mm")
     if minimum_endplay <= 0:
         fail("minimum_endplay must be positive")
     if required_clearance <= 0:
@@ -41,13 +44,16 @@ pi = 3.141592653589793
 shaft_frame = [0.5,0.5,0.5,0.5]
 bolt_centers = [[x,y] for x in [33,p+33] for y in [-28,28]]
 base_stock = extrude(id = "base_stock", profile = polygon(id = "base_profile",
-    points = [[0,-40],[p+90,-40],[p+90,40],[0,40]],
-    circular_holes = [{"center":xy,"radius":3} for xy in bolt_centers]), height = 6)
-# Exact tangent edge fillets preserve the four real anchor holes.
+    points = [[0,-40],[p+90,-40],[p+90,40],[0,40]]), height = 6)
+# Exact tangent corner fillets precede full-height mounting slots.
 base_front_left = fillet(id = "base_front_left", body = base_stock, faces = [{"from_feature":base_stock,"role":"wall_3"},{"from_feature":base_stock,"role":"wall_0"}], radius = base_corner_radius)
 base_front_right = fillet(id = "base_front_right", body = base_front_left, faces = [{"from_feature":base_stock,"role":"wall_0"},{"from_feature":base_stock,"role":"wall_1"}], radius = base_corner_radius)
 base_back_right = fillet(id = "base_back_right", body = base_front_right, faces = [{"from_feature":base_stock,"role":"wall_1"},{"from_feature":base_stock,"role":"wall_2"}], radius = base_corner_radius)
 base_body = fillet(id = "base_body", body = base_back_right, faces = [{"from_feature":base_stock,"role":"wall_2"},{"from_feature":base_stock,"role":"wall_3"}], radius = base_corner_radius)
+base_slotted = slot_pattern(id = "base_slotted", body = base_body,
+    frame_origin = [0,0,0], frame_x_direction = [1,0,0], frame_y_direction = [0,1,0],
+    slots = [{"id":["front_minus","front_plus","rear_minus","rear_plus"][i],"center":xy,"direction":[1,0],"centerline_length":base_slot_length,"radius":3}
+        for i,xy in enumerate(bolt_centers)])
 housing_body = extrude(id = "housing_body", profile = polygon(id = "housing_profile",
     points = [[-22,-26],[22,-26],[22,14],[14,22],[-14,22],[-22,14]],
     circular_holes = [{"center":[0,0],"radius":r+4.025}]), height = 16)
@@ -134,7 +140,7 @@ clamp_body = extrude(id = "clamp_body", profile = polygon(id = "clamp_profile", 
 nut_body = extrude(id = "nut_body", profile = circle(id = "nut_profile", radius = 5, inner_radius = 2.6), height = 5)
 clamp = part(id = "clamp_bar", body = clamp_body, part_number = "DM-CLAMP", revision = design_revision, description = "Bridge clamp seated on bearing housing", material = "Aluminum", density_kg_per_m3 = 2700)
 nut = part(id = "nut_envelope", body = nut_body, part_number = "DM-NUT-ENVELOPE", revision = design_revision, description = "Underside clamp nut envelope; no thread or preload model", material = "Steel", density_kg_per_m3 = 7800)
-base = part(id = "base", body = base_body, part_number = "DM-BASE", revision = design_revision, description = "Four-hole mounting plate with native tangent corner fillets", material = "Aluminum", density_kg_per_m3 = 2700)
+base = part(id = "base", body = base_slotted, part_number = "DM-BASE", revision = design_revision, description = "Four obround mounting slots and native tangent corner fillets", material = "Aluminum", density_kg_per_m3 = 2700)
 housing = part(id = "housing_left", body = housing_left_pilots, part_number = "DM-HOUSING-L", revision = design_revision, description = "Left bearing housing with two outboard blind end-cover pilots", material = "Aluminum", density_kg_per_m3 = 2700,
     datums = {"axis":datum(), "seat":datum(offset = [0,-26,0]),
         "outboard":face_datum(from_feature = housing_body, role = "start_cap", x_direction = [1,0,0]),
@@ -232,7 +238,7 @@ fit_inspection = assembly(id = "fit_inspection", instances = [
     instance(id = "inspect_shaft", part = shaft, offset = [10,0,32], rotation = shaft_frame),
 ])
 assembly_output(name = "bearing_fit_inspection", assembly = fit_inspection)
-output(name = "base", feature = base_body)
+output(name = "base", feature = base_slotted)
 output(name = "housing", feature = housing_left_pilots)
 output(name = "right_housing", feature = housing_right_pilots)
 output(name = "end_cover", feature = cover_body)
@@ -267,7 +273,7 @@ def cover_engineering_checks():
 cover_engineering_checks()
 
 # Independent material-volume formulas include actual holes, not bounding boxes.
-base_volume = (80*(p+90)-4*pi*3*3-(4-pi)*base_corner_radius*base_corner_radius)*6
+base_volume = (80*(p+90)-4*(pi*3*3+6*base_slot_length)-(4-pi)*base_corner_radius*base_corner_radius)*6
 housing_volume = (44*48-64-pi*(r+4.025)*(r+4.025))*16-2*pi*pilot_radius*pilot_radius*pilot_depth
 cover_volume = (2048-pi*(r+4.5)*(r+4.5)-2*pi*2.05*2.05)*cover_thickness
 cover_screw_volume = pi*(1.65*1.65*screw_shank_length+3*3*2)
@@ -321,7 +327,7 @@ clearance_check(id = "right_cover_shaft_gap", output = "drive_module_release", l
 section_view(id = "mounting_plan", output = "drive_module_release", origin = [0,0,3])
 def base_radius_dimensions():
     for feature, offset in [(base_front_left,[-10,-10]),(base_front_right,[10,-10]),(base_back_right,[10,10]),(base_body,[-10,10])]:
-        assert_faces(id = feature+"_survives", from_feature = feature, role = "fillet_wall", in_feature = base_body, count = 1)
+        assert_faces(id = feature+"_survives", from_feature = feature, role = "fillet_wall", in_feature = base_slotted, count = 1)
         section_circle_dimension(view = "mounting_plan", id = feature+"_radius", from_feature = feature, role = "fillet_wall", instance_path = ["base"], kind = "radius", coverage = "single_arc", label_offset = offset, min = base_corner_radius-0.000001, max = base_corner_radius+0.000001)
 base_radius_dimensions()
 section_dimension(view = "mounting_plan", id = "support_pitch", from_instance_path = ["left_support","housing"], from_datum = "axis", to_instance_path = ["right_support","right_housing"], to_datum = "axis", axis = "x", offset = -50,

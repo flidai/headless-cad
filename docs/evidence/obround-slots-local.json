@@ -1,0 +1,969 @@
+{
+  "valid": true,
+  "executable_sha256": "c9da52fcbe10fe11e10d107b93606a6c41ab975651118060ad4b53a7197a631b",
+  "oracle_script_sha256": "730a75374a71eec4db19852605df7d1266d8f76fa18fcda8bcc1274ed347aee6",
+  "cases": [
+    {
+      "case": "four-identity",
+      "parameters": {
+        "scale": 1,
+        "pose": 0,
+        "slots": 4,
+        "length": 6,
+        "radius": 2,
+        "variant": "standard",
+        "posed_input": false
+      },
+      "volume_mm3": 12893.805328941537,
+      "centroid_mm": [
+        0.0,
+        0.0,
+        4.0
+      ],
+      "central_inertia_mm5": [
+        [
+          1511455.1874300372,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2770100.5169048933,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4144021.780826221
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 12893.805328941537,
+          "centroid_mm": [
+            1.1374145717222782e-15,
+            -2.512892658456196e-16,
+            4.0
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 12893.805328941537,
+          "centroid_mm": [
+            -2.0279484612102637e-16,
+            -2.2483776417765967e-16,
+            4.0
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 12893.805328941535,
+          "centroid_mm": [
+            3.552713678800501e-15,
+            0.0,
+            4.0
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 14,
+        "cylinder_radii_mm": [
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          3.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0
+        ],
+        "slot_cylindrical_faces": 8,
+        "endpoint_axis_locations_verified": 8
+      },
+      "section": {
+        "area_mm2": 1611.725666117692,
+        "loop_count": 6
+      },
+      "source_sha256": "388a4ca6de2538a549319cc5a19f38416b14cb778b388e6e2f8ff2e261428652",
+      "captured_source_sha256": "388a4ca6de2538a549319cc5a19f38416b14cb778b388e6e2f8ff2e261428652",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "four-oblique",
+      "parameters": {
+        "scale": 1,
+        "pose": 2,
+        "slots": 4,
+        "length": 6,
+        "radius": 2,
+        "variant": "standard",
+        "posed_input": false
+      },
+      "volume_mm3": 12893.805328941537,
+      "centroid_mm": [
+        27.82842712474619,
+        -14.82842712474619,
+        7.0
+      ],
+      "central_inertia_mm5": [
+        [
+          3142399.8164968435,
+          -1001621.9643293782,
+          444998.32379022357
+        ],
+        [
+          -1001621.9643293782,
+          3142399.8164968435,
+          444998.32379022357
+        ],
+        [
+          444998.32379022357,
+          444998.32379022357,
+          2140777.8521674657
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 12893.805328941537,
+          "centroid_mm": [
+            27.8284271247462,
+            -14.82842712474619,
+            6.999999999999998
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 12893.805328941538,
+          "centroid_mm": [
+            27.8284271247462,
+            -14.828427124746195,
+            7.000000000000004
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 12893.805328941542,
+          "centroid_mm": [
+            27.828427124746202,
+            -14.828427124746181,
+            6.9999999999999964
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 14,
+        "cylinder_radii_mm": [
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          3.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0
+        ],
+        "slot_cylindrical_faces": 8,
+        "endpoint_axis_locations_verified": 8
+      },
+      "section": null,
+      "source_sha256": "e8e050ceb1c294defdf814fc6e90ad612311089cd159d1dff35946743b6628b7",
+      "captured_source_sha256": "e8e050ceb1c294defdf814fc6e90ad612311089cd159d1dff35946743b6628b7",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "four-oblique-posed-input",
+      "parameters": {
+        "scale": 1,
+        "pose": 2,
+        "slots": 4,
+        "length": 6,
+        "radius": 2,
+        "variant": "standard",
+        "posed_input": true
+      },
+      "volume_mm3": 12893.805328941537,
+      "centroid_mm": [
+        27.82842712474619,
+        -14.82842712474619,
+        7.0
+      ],
+      "central_inertia_mm5": [
+        [
+          3142399.8164968435,
+          -1001621.9643293782,
+          444998.32379022357
+        ],
+        [
+          -1001621.9643293782,
+          3142399.8164968435,
+          444998.32379022357
+        ],
+        [
+          444998.32379022357,
+          444998.32379022357,
+          2140777.8521674657
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 12893.805328941537,
+          "centroid_mm": [
+            27.8284271247462,
+            -14.82842712474619,
+            6.999999999999998
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 12893.805328941547,
+          "centroid_mm": [
+            27.828427124746202,
+            -14.828427124746192,
+            7.000000000000005
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 12893.805328941547,
+          "centroid_mm": [
+            27.8284271247462,
+            -14.828427124746185,
+            6.999999999999998
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 14,
+        "cylinder_radii_mm": [
+          4.0,
+          4.0000000000000036,
+          4.0,
+          4.0,
+          3.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0
+        ],
+        "slot_cylindrical_faces": 8,
+        "endpoint_axis_locations_verified": 8
+      },
+      "section": null,
+      "source_sha256": "1334eb043c13cab43d284622ae5ca87c889a6ee1649d583b7ce5d62255265c7a",
+      "captured_source_sha256": "1334eb043c13cab43d284622ae5ca87c889a6ee1649d583b7ce5d62255265c7a",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "one-halfscale",
+      "parameters": {
+        "scale": 0.5,
+        "pose": 1,
+        "slots": 1,
+        "length": 6,
+        "radius": 2,
+        "variant": "standard",
+        "posed_input": false
+      },
+      "volume_mm3": 1721.4247779607695,
+      "centroid_mm": [
+        24.851306547008267,
+        -12.084967687423848,
+        9.0
+      ],
+      "central_inertia_mm5": [
+        [
+          49263.97148506638,
+          1045.6070968421548,
+          0.0
+        ],
+        [
+          1045.6070968421548,
+          92136.80196851905,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          136810.30737902338
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 1721.4247779607695,
+          "centroid_mm": [
+            24.851306547008264,
+            -12.084967687423848,
+            9.000000000000004
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 1721.4247779607695,
+          "centroid_mm": [
+            24.85130654700827,
+            -12.084967687423845,
+            9.000000000000002
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 1721.4247779607692,
+          "centroid_mm": [
+            24.851306547008267,
+            -12.084967687423848,
+            9.0
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 8,
+        "cylinder_radii_mm": [
+          2.0,
+          2.0,
+          2.0,
+          2.0,
+          1.5,
+          1.0,
+          1.0
+        ],
+        "slot_cylindrical_faces": 2,
+        "endpoint_axis_locations_verified": 2
+      },
+      "section": null,
+      "source_sha256": "803323b40803c0b3d19b01aaaa820c58aaf13b4a9808a2db1e883d6d2bcaef2a",
+      "captured_source_sha256": "803323b40803c0b3d19b01aaaa820c58aaf13b4a9808a2db1e883d6d2bcaef2a",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "four-double",
+      "parameters": {
+        "scale": 2,
+        "pose": 1,
+        "slots": 4,
+        "length": 6,
+        "radius": 2,
+        "variant": "standard",
+        "posed_input": false
+      },
+      "volume_mm3": 103150.44263153229,
+      "centroid_mm": [
+        25.0,
+        -12.0,
+        15.0
+      ],
+      "central_inertia_mm5": [
+        [
+          48366565.99776119,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          88643216.54095659,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          132608696.98643908
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 103150.44263153229,
+          "centroid_mm": [
+            25.000000000000004,
+            -12.000000000000004,
+            14.999999999999998
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 103150.44263153229,
+          "centroid_mm": [
+            24.999999999999986,
+            -12.000000000000002,
+            14.999999999999996
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 103150.44263153228,
+          "centroid_mm": [
+            24.999999999999993,
+            -12.0,
+            15.0
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 14,
+        "cylinder_radii_mm": [
+          8.0,
+          8.0,
+          8.0,
+          8.0,
+          6.0,
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          4.0
+        ],
+        "slot_cylindrical_faces": 8,
+        "endpoint_axis_locations_verified": 8
+      },
+      "section": null,
+      "source_sha256": "c2b33ee791ae1bd65ad1ae52bdaad24c10638c797fe9fbd543218fd4b02c93d4",
+      "captured_source_sha256": "c2b33ee791ae1bd65ad1ae52bdaad24c10638c797fe9fbd543218fd4b02c93d4",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "short-slots",
+      "parameters": {
+        "scale": 1,
+        "pose": 0,
+        "slots": 4,
+        "length": 2,
+        "radius": 1.5,
+        "variant": "standard",
+        "posed_input": false
+      },
+      "volume_mm3": 13645.734517542562,
+      "centroid_mm": [
+        0.0,
+        0.0,
+        4.0
+      ],
+      "central_inertia_mm5": [
+        [
+          1568000.2938965026,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2925900.2762666945,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4348346.068642743
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 13645.734517542565,
+          "centroid_mm": [
+            -2.1661404719269972e-16,
+            2.4993928522234583e-16,
+            3.9999999999999996
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 13645.734517542565,
+          "centroid_mm": [
+            -1.4163226162599596e-16,
+            -1.374666068722902e-16,
+            4.0
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 13645.734517542562,
+          "centroid_mm": [
+            3.552713678800501e-15,
+            0.0,
+            4.0
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 14,
+        "cylinder_radii_mm": [
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          3.0,
+          1.5,
+          1.5,
+          1.5,
+          1.5,
+          1.5,
+          1.5,
+          1.5,
+          1.5
+        ],
+        "slot_cylindrical_faces": 8,
+        "endpoint_axis_locations_verified": 8
+      },
+      "section": {
+        "area_mm2": 1705.7168146928211,
+        "loop_count": 6
+      },
+      "source_sha256": "5f01e052b6f88750181f7bb5b566a358ac9eab7c514f97b00ff3f2f8c563e339",
+      "captured_source_sha256": "5f01e052b6f88750181f7bb5b566a358ac9eab7c514f97b00ff3f2f8c563e339",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "outer-clearance",
+      "parameters": {
+        "scale": 1,
+        "pose": 0,
+        "slots": 1,
+        "length": 6,
+        "radius": 2,
+        "variant": "outer_clearance",
+        "posed_input": false
+      },
+      "volume_mm3": 13771.398223686156,
+      "centroid_mm": [
+        0.42271424493364107,
+        0.0,
+        4.0
+      ],
+      "central_inertia_mm5": [
+        [
+          1595566.760150095,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2888625.698581353,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4337297.544345463
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 13771.398223686156,
+          "centroid_mm": [
+            0.4227142449336433,
+            -2.6082082665918153e-16,
+            4.000000000000001
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 13771.398223686158,
+          "centroid_mm": [
+            0.4227142449336422,
+            1.8632646479341671e-16,
+            4.0
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 13771.398223686154,
+          "centroid_mm": [
+            0.42271424493364407,
+            0.0,
+            4.0
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 8,
+        "cylinder_radii_mm": [
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          3.0,
+          2.0,
+          2.0
+        ],
+        "slot_cylindrical_faces": 2,
+        "endpoint_axis_locations_verified": 2
+      },
+      "section": {
+        "area_mm2": 1721.4247779607695,
+        "loop_count": 3
+      },
+      "source_sha256": "79583f7d279a80344b9059d72cf69018a7df60d37f5c15ac1de39478d1299279",
+      "captured_source_sha256": "79583f7d279a80344b9059d72cf69018a7df60d37f5c15ac1de39478d1299279",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "circle-clearance",
+      "parameters": {
+        "scale": 1,
+        "pose": 0,
+        "slots": 1,
+        "length": 6,
+        "radius": 2,
+        "variant": "circle_clearance",
+        "posed_input": false
+      },
+      "volume_mm3": 13771.398223686156,
+      "centroid_mm": [
+        0.17205956703329112,
+        0.0,
+        4.0
+      ],
+      "central_inertia_mm5": [
+        [
+          1595566.760150095,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          2987331.008523253,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4436002.854287362
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 13771.398223686158,
+          "centroid_mm": [
+            0.1720595670332905,
+            -5.271577386585213e-16,
+            4.0
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 13771.398223686156,
+          "centroid_mm": [
+            0.17205956703329114,
+            -1.5183564727861103e-16,
+            4.0
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 13771.398223686154,
+          "centroid_mm": [
+            0.17205956703329406,
+            0.0,
+            4.0
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 8,
+        "cylinder_radii_mm": [
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          3.0,
+          2.0,
+          2.0
+        ],
+        "slot_cylindrical_faces": 2,
+        "endpoint_axis_locations_verified": 2
+      },
+      "section": {
+        "area_mm2": 1721.4247779607695,
+        "loop_count": 3
+      },
+      "source_sha256": "e6b4372a80dd606d6a03a64ea70f35a6914deb637ff61434be343f42b3225c30",
+      "captured_source_sha256": "e6b4372a80dd606d6a03a64ea70f35a6914deb637ff61434be343f42b3225c30",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    },
+    {
+      "case": "slot-clearance",
+      "parameters": {
+        "scale": 1,
+        "pose": 0,
+        "slots": 2,
+        "length": 6,
+        "radius": 2,
+        "variant": "slot_clearance",
+        "posed_input": false
+      },
+      "volume_mm3": 13478.867258771283,
+      "centroid_mm": [
+        0.3884825164791755,
+        0.3472469421042909,
+        4.0
+      ],
+      "central_inertia_mm5": [
+        [
+          1554580.8128012635,
+          43708.72482218125,
+          0.0
+        ],
+        [
+          43708.72482218125,
+          2939458.507860111,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          4350264.736567814
+        ]
+      ],
+      "comparisons": [
+        {
+          "source": "OCCT",
+          "volume_mm3": 13478.867258771283,
+          "centroid_mm": [
+            0.388482516479175,
+            0.34724694210429086,
+            4.0
+          ]
+        },
+        {
+          "source": "STEP",
+          "volume_mm3": 13478.867258771283,
+          "centroid_mm": [
+            0.38848251647917437,
+            0.3472469421042912,
+            4.0
+          ]
+        },
+        {
+          "source": "native",
+          "volume_mm3": 13478.86725877128,
+          "centroid_mm": [
+            0.3884825164791792,
+            0.34724694210429163,
+            4.0
+          ]
+        }
+      ],
+      "directed_difference_mm3": [
+        0.0,
+        0.0
+      ],
+      "surfaces": {
+        "plane_faces": 10,
+        "cylinder_radii_mm": [
+          4.0,
+          4.0,
+          4.0,
+          4.0,
+          3.0,
+          2.0,
+          2.0,
+          2.0,
+          2.0
+        ],
+        "slot_cylindrical_faces": 4,
+        "endpoint_axis_locations_verified": 4
+      },
+      "section": {
+        "area_mm2": 1684.8584073464103,
+        "loop_count": 4
+      },
+      "source_sha256": "cc5db0ba3cd82ba89af90ef639cb08c790104fbd9362ca417fc6627bd788741a",
+      "captured_source_sha256": "cc5db0ba3cd82ba89af90ef639cb08c790104fbd9362ca417fc6627bd788741a",
+      "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9",
+      "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa"
+    }
+  ],
+  "rejections": [
+    {
+      "case": "outer_contact",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "error": "feature 'finished_local' failed: unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "feature": "finished_local",
+        "snapshot": {
+          "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa",
+          "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9"
+        }
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "near_outer_penetration",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "error": "feature 'finished_local' failed: unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "feature": "finished_local",
+        "snapshot": {
+          "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa",
+          "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9"
+        }
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "circle_contact",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "error": "feature 'finished_local' failed: unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "feature": "finished_local",
+        "snapshot": {
+          "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa",
+          "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9"
+        }
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "circle_overlap",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "error": "feature 'finished_local' failed: unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "feature": "finished_local",
+        "snapshot": {
+          "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa",
+          "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9"
+        }
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "slot_contact",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "error": "feature 'finished_local' failed: unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "feature": "finished_local",
+        "snapshot": {
+          "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa",
+          "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9"
+        }
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "slot_overlap",
+      "diagnostic": {
+        "causes": [],
+        "code": "kernel_operation_failed",
+        "diagnostic": "unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "error": "feature 'finished_local' failed: unsupported geometry: obround slots require a canonical convex right prism, complete contained capsules, and strict separation from all other boundaries",
+        "feature": "finished_local",
+        "snapshot": {
+          "executor_build_id": "cfc95bd6a3ca1e7240e93a38a91b17174776a7a73c5606ee32056bac8b8145fa",
+          "kernel_build_id": "bb53fe7c0d49479f0a8eaf5e6b3206a140bc46a23c7c6dfbe4930bbe0d9255d9"
+        }
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "zero_length",
+      "diagnostic": {
+        "causes": [],
+        "code": "invalid_graph",
+        "error": "feature 'finished_local' parameter 'slot centerline length' must be finite and positive",
+        "feature": "finished_local",
+        "parameter": "slot centerline length"
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "nonunit_direction",
+      "diagnostic": {
+        "causes": [],
+        "code": "invalid_sketch",
+        "error": "invalid sketch feature 'finished_local': slot 'slot_1' direction must be a unit vector",
+        "feature": "finished_local"
+      },
+      "preserved_files": 11
+    },
+    {
+      "case": "too_many",
+      "diagnostic": {
+        "causes": [],
+        "code": "recipe_failed",
+        "error": "Traceback (most recent call last):\n  * refusals.star:7, in <module>\n      body = slot_pattern(id=\"finished_local\", body=body, slots=[{\"id\":\"slot_1\",\"ce...\nerror: slot pattern requires 1..=4 slots\n --> refusals.star:7:8\n  |\n7 | body = slot_pattern(id=\"finished_local\", body=body, slots=[{\"id\":\"slot_1\",\"center\":[-14,-20],\"direction\":[1,0],\"centerline_length\":6,\"radius\":2},{\"id\":\"slot_2\",\"center\":[14,-20],\"direction\":[0,1],\"centerline_length\":6,\"radius\":2},{\"id\":\"slot_3\",\"center\":[0,-12],\"direction\":[1,0],\"centerline_length\":6,\"radius\":2},{\"id\":\"slot_4\",\"center\":[0,-12],\"direction\":[1,0],\"centerline_length\":6,\"radius\":2},{\"id\":\"slot_5\",\"center\":[0,-12],\"direction\":[1,0],\"centerline_length\":6,\"radius\":2}], frame_origin=[0, 12, 0], frame_x_direction=[1, 0, 0], frame_y_direction=[0, 1, 0])\n  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n"
+      },
+      "preserved_files": 11
+    }
+  ],
+  "cache_source_mutation": {
+    "original_step_sha256": "27e762cbdd7e8394570d860f3da88987c21cbf5d1c309b042be1201a09a66b10",
+    "revised_step_sha256": "6b11fd46b8100720dd28a86f3c091f6c8244bb33852bbd33d849e0fc5737fd28",
+    "restored_publication_files": 11,
+    "original_slot_feature_hash": "a399d70dfed4f4d0048d3e7769a524aac36c6b5edd9e5fbc361e5c24c67e1ea5",
+    "revised_slot_feature_hash": "1a064e1a54a0c7b6c1c92d51d20fd24dc7c2dcc3fad376259e03c06cb6d75a70"
+  },
+  "python": "3.13.15",
+  "ocp": "8.0.1.1.0",
+  "scope": "bounded positive-length through capsules on four-corner filleted convex plate with existing circular bore; analytic nominal moments and independent OCCT STEP comparison, no general inner-arc Boolean"
+}

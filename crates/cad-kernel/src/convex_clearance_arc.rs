@@ -130,7 +130,7 @@ impl ArcShape {
     }
 }
 pub(super) fn convex(g: &ArcPrismGeometry) -> Result<(), KernelError> {
-    if !g.circular_holes.is_empty() {
+    if !g.circular_holes.is_empty() || !g.slot_holes.is_empty() {
         return Err(unsupported());
     }
     let shape = ArcShape::new(g, [0.; 3], 1.);

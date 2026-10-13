@@ -2457,6 +2457,38 @@ required allowance. The [accepted axial replay](docs/evidence/axial-size-bands-r
 matches 149 files and 27 manifest fields after restart and offline rebuild.
 
 
+### Native obround mounting slots
+
+`slot_pattern` cuts up to four named, full-height capsules in a convex polygon
+or supported convex rounded prism. Each capsule retains two planar walls and
+two semicylindrical walls; mass properties, sections, meshes and STEP derive
+from the native solid. Centers and unit directions belong to an explicit
+source frame on a stock cap plane. The default frame is model XYZ; transformed
+stock needs a correspondingly transformed frame. Its origin need not lie inside
+cap material.
+
+See `examples/obround_slot_plate.star`. The drive base uses four radius-3 mm
+slots with center spacing controlled by `base_slot_length` (2–8 mm, default 6).
+The existing four corner fillets and their semantic radius dimensions survive.
+Only the slot feature needs recomputing when slot length changes.
+
+Capsules must be strictly separated from each other and circular holes, and
+inside a conservative polygon inscribed in the outer boundary. Near rounded
+corners this may refuse geometrically valid cuts. Existing slot-bearing stock,
+blind slots, concave boundaries and overlapping cuts are outside this operation.
+Subsequent unsupported machining and clearance queries explicitly refuse these
+bodies. This adds a bounded native machining capability, not general Booleans.
+
+The [slot oracle](docs/evidence/obround-slots-local.json) retains nine
+geometry cases and nine publication-preserving refusals, with independent
+capsule moments, oblique source frames and zero bidirectional STEP volume
+difference. The [complete drive checks](docs/evidence/slotted-drive-local.json)
+cover five configurations with slot center spacings from 2 to 8 mm and
+22 rejected edits. Slot-length-only changes rebuild one solid feature.
+The [accepted offline replay](docs/evidence/slotted-base-replay-local.json)
+matches 150 artifacts and 28 manifest fields. These bounded checks leave
+the five commercial release gates open.
+
 ### Native nominal seating
 
 `nominal_seating_check` binds exact assembly occurrence paths and semantic face

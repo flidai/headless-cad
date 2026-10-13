@@ -383,6 +383,18 @@ pub struct BlindPatternHole {
 }
 pub const MAX_BLIND_PATTERN_HOLES: usize = 16;
 
+/// A named, full-height capsule cut in the native stock frame.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SlotPatternSlot {
+    pub id: String,
+    pub center: [f64; 2],
+    pub direction: [f64; 2],
+    pub centerline_length: f64,
+    pub radius: f64,
+}
+pub const MAX_SLOT_PATTERN_SLOTS: usize = 4;
+
 /// A closed outer path whose coordinates come from solved sketch points.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -484,6 +496,16 @@ pub enum Feature {
         holes: Vec<BlindPatternHole>,
         op_version: u32,
     },
+    SlotPattern {
+        id: String,
+        body: String,
+        frame_origin: [f64; 3],
+        frame_x_direction: [f64; 3],
+        frame_y_direction: [f64; 3],
+        #[serde(rename = "pattern_slots")]
+        slots: Vec<SlotPatternSlot>,
+        op_version: u32,
+    },
     ChamferFaces {
         id: String,
         body: String,
@@ -569,6 +591,10 @@ impl<'de> Deserialize<'de> for Feature {
                 let mut x_direction_hint = None;
                 let mut origin_offset = None;
                 let mut pattern_holes = None;
+                let mut pattern_slots = None;
+                let mut frame_origin = None;
+                let mut frame_x_direction = None;
+                let mut frame_y_direction = None;
                 let mut faces = None;
                 let mut distance = None;
                 let mut offset = None;
@@ -612,6 +638,10 @@ impl<'de> Deserialize<'de> for Feature {
                         "x_direction_hint" => read_field!(x_direction_hint, [f64; 3]),
                         "origin_offset" => read_field!(origin_offset, [f64; 2]),
                         "pattern_holes" => read_field!(pattern_holes, Vec<BlindPatternHole>),
+                        "pattern_slots" => read_field!(pattern_slots, Vec<SlotPatternSlot>),
+                        "frame_origin" => read_field!(frame_origin, [f64; 3]),
+                        "frame_x_direction" => read_field!(frame_x_direction, [f64; 3]),
+                        "frame_y_direction" => read_field!(frame_y_direction, [f64; 3]),
                         "distance" => read_field!(distance, f64),
                         "offset" => read_field!(offset, [f64; 3]),
                         "rotation" => read_field!(rotation, [f64; 4]),
@@ -645,6 +675,10 @@ impl<'de> Deserialize<'de> for Feature {
                                     "x_direction_hint",
                                     "origin_offset",
                                     "pattern_holes",
+                                    "pattern_slots",
+                                    "frame_origin",
+                                    "frame_x_direction",
+                                    "frame_y_direction",
                                     "distance",
                                     "offset",
                                     "rotation",
@@ -701,6 +735,16 @@ impl<'de> Deserialize<'de> for Feature {
                         "sketch",
                         "pattern_holes",
                     ],
+                    "slot_pattern" => &[
+                        "op",
+                        "id",
+                        "op_version",
+                        "body",
+                        "pattern_slots",
+                        "frame_origin",
+                        "frame_x_direction",
+                        "frame_y_direction",
+                    ],
                     "chamfer_faces" => &["op", "id", "op_version", "body", "faces", "distance"],
                     "chamfer" => &["op", "id", "op_version", "body", "face_normals", "distance"],
                     "translate" => &["op", "id", "op_version", "body", "offset"],
@@ -721,6 +765,7 @@ impl<'de> Deserialize<'de> for Feature {
                                 "revolve",
                                 "fillet",
                                 "hole_pattern",
+                                "slot_pattern",
                                 "chamfer_faces",
                                 "chamfer",
                                 "translate",
@@ -821,6 +866,16 @@ impl<'de> Deserialize<'de> for Feature {
                         holes: pattern_holes
                             .ok_or_else(|| M::Error::missing_field("pattern_holes"))?,
                     },
+                    "slot_pattern" => Feature::SlotPattern {
+                        id,
+                        op_version,
+                        body: body.ok_or_else(|| M::Error::missing_field("body"))?,
+                        frame_origin: frame_origin.unwrap_or([0., 0., 0.]),
+                        frame_x_direction: frame_x_direction.unwrap_or([1., 0., 0.]),
+                        frame_y_direction: frame_y_direction.unwrap_or([0., 1., 0.]),
+                        slots: pattern_slots
+                            .ok_or_else(|| M::Error::missing_field("pattern_slots"))?,
+                    },
                     "chamfer_faces" => Feature::ChamferFaces {
                         id,
                         op_version,
@@ -891,6 +946,7 @@ impl Feature {
             | Self::Revolve { id, .. }
             | Self::Fillet { id, .. }
             | Self::HolePattern { id, .. }
+            | Self::SlotPattern { id, .. }
             | Self::ChamferFaces { id, .. }
             | Self::Chamfer { id, .. }
             | Self::Translate { id, .. }
@@ -925,6 +981,7 @@ impl Feature {
                 dependencies
             }
             Self::Chamfer { body, .. }
+            | Self::SlotPattern { body, .. }
             | Self::Translate { body, .. }
             | Self::Transform { body, .. } => vec![body],
             Self::Union { left, right, .. }
@@ -953,6 +1010,7 @@ impl Feature {
             | Self::Revolve { op_version, .. }
             | Self::Fillet { op_version, .. }
             | Self::HolePattern { op_version, .. }
+            | Self::SlotPattern { op_version, .. }
             | Self::ChamferFaces { op_version, .. }
             | Self::Chamfer { op_version, .. }
             | Self::Translate { op_version, .. }
@@ -973,6 +1031,7 @@ impl Feature {
             Self::Revolve { .. } => "revolve",
             Self::Fillet { .. } => "fillet",
             Self::HolePattern { .. } => "hole_pattern",
+            Self::SlotPattern { .. } => "slot_pattern",
             Self::ChamferFaces { .. } => "chamfer_faces",
             Self::Chamfer { .. } => "chamfer",
             Self::Translate { .. } => "translate",
@@ -1147,6 +1206,8 @@ pub enum BuildError {
     Sketch { feature: String, message: String },
     #[error("hole_pattern requires recipe schema version 2")]
     HolePatternSchema,
+    #[error("slot_pattern requires recipe schema version 2")]
+    SlotPatternSchema,
     #[error("sketch feature '{feature}' did not solve completely")]
     SketchSolveFailed {
         feature: String,
@@ -1562,6 +1623,18 @@ fn hash_feature(
             for value in x_direction_hint.iter().chain(origin_offset.iter()) {
                 hash.update(&value.to_le_bytes());
             }
+        }
+        Feature::SlotPattern {
+            slots,
+            frame_origin,
+            frame_x_direction,
+            frame_y_direction,
+            ..
+        } => {
+            hash.update(
+                &serde_json::to_vec(&(slots, frame_origin, frame_x_direction, frame_y_direction))
+                    .expect("validated slot intent serializes"),
+            );
         }
         Feature::ChamferFaces {
             body,
@@ -2078,6 +2151,89 @@ impl BuildEngine {
                         dimension(id, "blind hole depth", hole.depth)?;
                     }
                 }
+                Feature::SlotPattern {
+                    id,
+                    slots,
+                    frame_origin,
+                    frame_x_direction,
+                    frame_y_direction,
+                    ..
+                } => {
+                    if recipe.schema_version != 2 {
+                        return Err(BuildError::SlotPatternSchema);
+                    }
+                    if slots.is_empty() || slots.len() > MAX_SLOT_PATTERN_SLOTS {
+                        return Err(BuildError::ResourceLimit {
+                            resource: "slots per pattern",
+                            limit: MAX_SLOT_PATTERN_SLOTS,
+                        });
+                    }
+                    if frame_origin
+                        .iter()
+                        .chain(frame_x_direction.iter())
+                        .chain(frame_y_direction.iter())
+                        .any(|v| !v.is_finite())
+                        || (frame_x_direction.iter().map(|v| v * v).sum::<f64>().sqrt() - 1.).abs()
+                            > 128. * f64::EPSILON
+                        || (frame_y_direction.iter().map(|v| v * v).sum::<f64>().sqrt() - 1.).abs()
+                            > 128. * f64::EPSILON
+                        || frame_x_direction
+                            .iter()
+                            .zip(frame_y_direction)
+                            .map(|(a, b)| a * b)
+                            .sum::<f64>()
+                            .abs()
+                            > 128. * f64::EPSILON
+                    {
+                        return Err(BuildError::Sketch {
+                            feature: id.clone(),
+                            message: "slot pattern requires a finite orthonormal source frame"
+                                .into(),
+                        });
+                    }
+                    let mut names = BTreeSet::new();
+                    for slot in slots {
+                        if slot.id.is_empty()
+                            || slot.id.len() > 64
+                            || !slot.id.as_bytes()[0].is_ascii_alphabetic()
+                            || !slot
+                                .id
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+                            || !names.insert(slot.id.to_ascii_lowercase())
+                        {
+                            return Err(BuildError::Sketch {
+                                feature: id.clone(),
+                                message: format!("invalid or duplicate slot ID '{}'", slot.id),
+                            });
+                        }
+                        if slot
+                            .center
+                            .iter()
+                            .chain(slot.direction.iter())
+                            .any(|v| !v.is_finite())
+                            || !slot.centerline_length.is_finite()
+                            || !slot.radius.is_finite()
+                        {
+                            return Err(BuildError::Sketch {
+                                feature: id.clone(),
+                                message: format!("slot '{}' values must be finite", slot.id),
+                            });
+                        }
+                        dimension(id, "slot centerline length", slot.centerline_length)?;
+                        dimension(id, "slot radius", slot.radius)?;
+                        let unit = slot.direction[0].hypot(slot.direction[1]);
+                        if (unit - 1.).abs() > 128. * f64::EPSILON {
+                            return Err(BuildError::Sketch {
+                                feature: id.clone(),
+                                message: format!(
+                                    "slot '{}' direction must be a unit vector",
+                                    slot.id
+                                ),
+                            });
+                        }
+                    }
+                }
                 Feature::ChamferFaces {
                     id,
                     faces,
@@ -2279,6 +2435,85 @@ impl BuildEngine {
             };
             let mut pattern_cap = None;
             let mut pattern_holes = None;
+            let mut pattern_slots = None;
+            if let Feature::SlotPattern {
+                id,
+                body,
+                frame_origin,
+                frame_x_direction,
+                frame_y_direction,
+                slots,
+                ..
+            } = feature
+            {
+                let stock = cad_kernel::obround_slot_frame(&evaluated[body].model, tolerance)
+                    .map_err(|e| BuildError::Kernel {
+                        feature: id.clone(),
+                        message: e.to_string(),
+                    })?;
+                let dot3 =
+                    |a: [f64; 3], b: [f64; 3]| a.iter().zip(b).map(|(x, y)| x * y).sum::<f64>();
+                let scale = frame_origin
+                    .iter()
+                    .chain(stock.origin.iter())
+                    .chain(slots.iter().flat_map(|s| s.center.iter()))
+                    .map(|v| v.abs())
+                    .fold(stock.height.max(1.), f64::max);
+                let error = scale * 4096. * f64::EPSILON;
+                if !error.is_finite() || error > tolerance.linear / 16. {
+                    return Err(BuildError::Kernel {
+                        feature: id.clone(),
+                        message: "slot source frame exceeds arithmetic budget".into(),
+                    });
+                }
+                let tangent = dot3(*frame_x_direction, stock.axis).abs() <= 128. * f64::EPSILON
+                    && dot3(*frame_y_direction, stock.axis).abs() <= 128. * f64::EPSILON;
+                let origin_delta = std::array::from_fn(|i| frame_origin[i] - stock.origin[i]);
+                let plane = dot3(origin_delta, stock.axis);
+                if !tangent || (plane.abs() > error && (plane - stock.height).abs() > error) {
+                    return Err(BuildError::Kernel {
+                        feature: id.clone(),
+                        message: "slot source frame must lie on and align with a native stock cap"
+                            .into(),
+                    });
+                }
+                let converted = slots
+                    .iter()
+                    .map(|slot| {
+                        let point: [f64; 3] = std::array::from_fn(|i| {
+                            frame_origin[i]
+                                + frame_x_direction[i] * slot.center[0]
+                                + frame_y_direction[i] * slot.center[1]
+                        });
+                        let delta: [f64; 3] = std::array::from_fn(|i| point[i] - stock.origin[i]);
+                        let direction: [f64; 3] = std::array::from_fn(|i| {
+                            frame_x_direction[i] * slot.direction[0]
+                                + frame_y_direction[i] * slot.direction[1]
+                        });
+                        cad_kernel::ObroundSlot {
+                            id: slot.id.clone(),
+                            center: [
+                                dot3(delta, stock.x_direction),
+                                dot3(delta, stock.y_direction),
+                            ],
+                            direction: [
+                                dot3(direction, stock.x_direction),
+                                dot3(direction, stock.y_direction),
+                            ],
+                            centerline_length: slot.centerline_length,
+                            radius: slot.radius,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let mut binding = blake3::Hasher::new();
+                binding.update(hash.as_bytes());
+                binding.update(
+                    &serde_json::to_vec(&(&stock, &converted))
+                        .expect("slot frame and conversion serialize"),
+                );
+                hash = binding.finalize().to_hex().to_string();
+                pattern_slots = Some(converted);
+            }
             if let Feature::HolePattern {
                 id,
                 body,
@@ -2475,6 +2710,13 @@ impl BuildEngine {
                             pattern_holes
                                 .as_deref()
                                 .expect("hole pattern solved before cache"),
+                            tolerance,
+                        ),
+                        Feature::SlotPattern { body, .. } => cad_kernel::cut_obround_slots(
+                            &evaluated[body].model,
+                            pattern_slots
+                                .as_deref()
+                                .expect("slot coordinates resolved before cache"),
                             tolerance,
                         ),
                         Feature::ChamferFaces { body, distance, .. } => cad_kernel::chamfer(
@@ -2743,5 +2985,121 @@ mod hole_pattern_tests {
             engine.build(&old_schema),
             Err(BuildError::HolePatternSchema)
         ));
+    }
+}
+
+#[cfg(test)]
+mod slot_pattern_tests {
+    use super::*;
+
+    fn recipe() -> Recipe {
+        serde_json::from_value(serde_json::json!({
+            "schema_version":2,"units":"mm",
+            "features":[
+                {"op":"polygon","id":"p","points":[[0,0],[80,0],[80,50],[0,50]]},
+                {"op":"extrude","id":"stock","profile":"p","height":6},
+                {"op":"slot_pattern","id":"slots","body":"stock",
+                 "frame_origin":[0,0,0],"frame_x_direction":[1,0,0],"frame_y_direction":[0,1,0],
+                 "pattern_slots":[
+                    {"id":"left","center":[15,12],"direction":[1,0],"centerline_length":8,"radius":3},
+                    {"id":"right","center":[65,38],"direction":[0,1],"centerline_length":6,"radius":3}]}
+            ],"outputs":[{"name":"stock","feature":"stock"},{"name":"slotted","feature":"slots"}]
+        })).unwrap()
+    }
+
+    #[test]
+    fn native_slots_preserve_cap_lineage_and_invalidate_warm_geometry_cache() {
+        let mut engine = BuildEngine::default();
+        let initial = engine.build(&recipe()).unwrap();
+        for (anchor, role) in [
+            ("slots", "slot_left_wall_0"),
+            ("slots", "slot_right_wall_0"),
+            ("stock", "end_cap"),
+        ] {
+            let resolved = initial.resolve_faces(&FaceSelector {
+                anchor_feature: anchor.into(),
+                role: role.into(),
+                target_feature: "slots".into(),
+                cardinality: FaceCardinality::Exactly { count: 1 },
+            });
+            assert_eq!(
+                resolved.status,
+                FaceResolutionStatus::Resolved,
+                "{role}: {}",
+                resolved.diagnostic
+            );
+        }
+        let same = engine.build(&recipe()).unwrap();
+        assert!(same.stats.cache_hits >= 2);
+        assert_eq!(
+            initial.feature_hashes["slots"],
+            same.feature_hashes["slots"]
+        );
+        let mut changed = recipe();
+        if let Feature::SlotPattern { slots, .. } = &mut changed.features[2] {
+            slots[0].centerline_length = 4.;
+        }
+        let revised = engine.build(&changed).unwrap();
+        assert_ne!(
+            initial.feature_hashes["slots"],
+            revised.feature_hashes["slots"]
+        );
+        assert_eq!(
+            initial.feature_hashes["stock"],
+            revised.feature_hashes["stock"]
+        );
+    }
+
+    #[test]
+    fn selected_builds_preflight_slot_structure_and_warm_cache_cannot_hide_bad_frame() {
+        let mut engine = BuildEngine::default();
+        engine.build(&recipe()).unwrap();
+        let mut displaced = recipe();
+        if let Feature::SlotPattern { frame_origin, .. } = &mut displaced.features[2] {
+            *frame_origin = [0., 0., 1.];
+        }
+        let error = engine.build(&displaced).unwrap_err().to_string();
+        assert!(error.contains("native stock cap"), "{error}");
+        let mut duplicate = recipe();
+        if let Feature::SlotPattern { slots, .. } = &mut duplicate.features[2] {
+            slots[1].id = "LEFT".into();
+        }
+        let error = engine
+            .build_outputs(&duplicate, &["stock".into()])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("duplicate slot ID"), "{error}");
+        let mut old = recipe();
+        old.schema_version = 1;
+        assert!(matches!(
+            engine.build_outputs(&old, &["stock".into()]),
+            Err(BuildError::SlotPatternSchema)
+        ));
+    }
+
+    #[test]
+    fn rotated_authored_frame_produces_same_native_slot_geometry() {
+        let mut rotated = recipe();
+        if let Feature::SlotPattern {
+            frame_x_direction,
+            frame_y_direction,
+            slots,
+            ..
+        } = &mut rotated.features[2]
+        {
+            *frame_x_direction = [0., 1., 0.];
+            *frame_y_direction = [-1., 0., 0.];
+            for slot in slots {
+                slot.center = [slot.center[1], -slot.center[0]];
+                slot.direction = [slot.direction[1], -slot.direction[0]];
+            }
+        }
+        let mut engine = BuildEngine::default();
+        let a = engine.build(&recipe()).unwrap();
+        let b = engine.build(&rotated).unwrap();
+        assert_eq!(
+            serde_json::to_value(&a.outputs["slotted"].result.model).unwrap(),
+            serde_json::to_value(&b.outputs["slotted"].result.model).unwrap()
+        );
     }
 }

@@ -38,6 +38,7 @@ pub(crate) fn cut(
                 radius: cylinder.inner_radius,
             }]
         },
+        slot_holes: vec![],
         origin: cylinder.origin,
         axis: cylinder.axis,
         x_direction: cylinder.x_direction,

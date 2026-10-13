@@ -59,6 +59,23 @@ The [accepted offline replay](evidence/native-seating-replay-local.json)
 matches 150 artifacts and 28 manifest fields after restart. These receipts cover
 the bounded nominal planar seating domain; all five commercial gates remain open.
 
+The next modeling slice is now native full-height obround slots: the drive's
+four fixed base bores become source-owned adjustable mounting slots after its
+existing corner fillets. Acceptance covers independent capsule moments and STEP
+solids, transformed source frames, section/mesh topology, incremental rebuilding,
+strict boundary refusals and captured-source replay. General pockets, blind
+slots, curved Booleans and the commercial modeling gate remain open.
+
+The [slot oracle](evidence/obround-slots-local.json) retains nine
+geometry cases and nine publication-preserving refusals, with independent
+capsule moments, oblique source frames and zero bidirectional STEP volume
+difference. The [complete drive checks](evidence/slotted-drive-local.json)
+cover five configurations with slot center spacings from 2 to 8 mm and
+22 rejected edits. Slot-length-only changes rebuild one solid feature.
+The [accepted offline replay](evidence/slotted-base-replay-local.json)
+matches 150 artifacts and 28 manifest fields. These bounded checks leave
+the five commercial release gates open.
+
 M3's large-assembly gate also includes the architecture's
 [exact-body admission contract](architecture.md#exact-body-admission-and-oversized-operations):
 test one oversized unique-body operation as well as repeated-part assemblies,

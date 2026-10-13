@@ -640,11 +640,11 @@ def annotation_style_variants(cad,directory,baseline):
                         'unchanged_geometry_file_count':len(geometry_files),'style':style}
     return results
 
-def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
-    tag=f'd{diameter}-p{pitch}-turn{sign}-r{radius}-depth{depth}-cover{thickness}';out=directory/tag
+def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2,slot_length=6):
+    tag=f'd{diameter}-p{pitch}-turn{sign}-r{radius}-depth{depth}-cover{thickness}-slot{slot_length}';out=directory/tag
     parameters=dict(shaft_diameter=diameter,mounting_pitch=pitch,
                     turn_radians=sign*math.tau,base_corner_radius=radius,
-                    pilot_depth=depth,cover_thickness=thickness)
+                    pilot_depth=depth,cover_thickness=thickness,base_slot_length=slot_length)
     result=c.run(cad,d.ROOT/'examples/drive_module_rotation.star',out,parameters)
     d.require(result.returncode==0,result.stderr);manifest=json.loads(result.stdout)
     report=json.loads((out/'rigid-rotation-groups.json').read_text());group=report['groups']['rotor']
@@ -679,10 +679,17 @@ def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
     base=f.filleted(points,6,radius,[0,1,2,3])
     for x in [33,pitch+33]:
         for y in [-28,28]:
-            cutter=f.BRepPrimAPI_MakeCylinder(f.gp_Ax2(f.gp_Pnt(x,y,0),f.gp_Dir(0,0,1)),3,6).Shape()
-            base=k.boolean(BRepAlgoAPI_Cut,base,cutter)
+            rectangle=d.bored_polygon([(x-slot_length/2,y-3),(x+slot_length/2,y-3),
+                                       (x+slot_length/2,y+3),(x-slot_length/2,y+3)],6,[])
+            base=k.boolean(BRepAlgoAPI_Cut,base,rectangle)
+            for cx in [x-slot_length/2,x+slot_length/2]:
+                cutter=f.BRepPrimAPI_MakeCylinder(f.gp_Ax2(f.gp_Pnt(cx,y,0),f.gp_Dir(0,0,1)),3,6).Shape()
+                base=k.boolean(BRepAlgoAPI_Cut,base,cutter)
     references[('base',)]=base
-    d.close(k.properties(base)[0],6*(80*(pitch+90)-36*math.pi-(4-math.pi)*radius**2),'rounded base closed-form volume')
+    base_volume=6*(80*(pitch+90)-4*(9*math.pi+6*slot_length)-(4-math.pi)*radius**2)
+    d.close(k.properties(base)[0],base_volume,'slotted rounded base closed-form volume')
+    d.close(manifest['outputs']['base']['volume_mm3'],base_volume,'native slotted base volume')
+    d.require('base_slotted' in manifest['feature_hashes'],'native slot feature identity')
     shapes={path:leaf['shape'] for path,leaf in leaves.items()}
     for path,shape in shapes.items():
         d.require(leaves[path]['part']==part_ids[path],'STEP part identity '+str(path))
@@ -834,6 +841,7 @@ def run_case(cad,directory,diameter,pitch,sign,radius,depth=5,thickness=2):
                 native_machining_dimensions=native_dimensions,
                 conditional_axial_size_allowances=axial_allowances,
                 native_nominal_seating=seating,
+                mounting_slots={"count":4,"radius_mm":3,"centerline_length_mm":slot_length,"base_volume_mm3":base_volume},
                 published_machining_rows=sheet_rows,
                 nominal_contacts=nominal_contacts,
                 actual_native_queries=query_count,proofs=proofs,
@@ -854,7 +862,8 @@ def rejected_edits(cad,directory):
                   'shank_band_loses_axial_allowance',
                   'seating_wrong_cover_cap','seating_impossible_disk',
                   'seating_unknown_screw_face','seating_open_gap',
-                  'seating_face_penetration']:
+                  'seating_face_penetration','slot_off_cap','slot_hits_edge',
+                  'slot_overlap','slot_wrong_direction']:
         changed=json.loads(json.dumps(original))
         if label=='offset_axis':changed['rigid_rotation_groups'][0]['pivot']=[1,0,0]
         elif label=='missing_reference':changed['rigid_rotation_groups'][0]['reference_instance_path']=['base']
@@ -880,6 +889,12 @@ def rejected_edits(cad,directory):
         elif label=='shank_band_loses_axial_allowance':
             dimension=next(x for x in changed['datum_dimensions'] if x['id']=='left_cover_minus_shank')
             dimension['tolerance']['upper']=.4
+        elif label in {'slot_off_cap','slot_hits_edge','slot_overlap','slot_wrong_direction'}:
+            feature=next(x for x in changed['features'] if x['id']=='base_slotted')
+            if label=='slot_off_cap':feature['frame_origin'][2]=.01
+            elif label=='slot_hits_edge':feature['pattern_slots'][0]['center']=[1,-28]
+            elif label=='slot_overlap':feature['pattern_slots'][1]['center']=feature['pattern_slots'][0]['center'][:]
+            else:feature['pattern_slots'][0]['direction']=[2,0]
         elif label=='seating_wrong_cover_cap':
             check=next(x for x in changed['nominal_seating_checks'] if x['id']=='left_cover_flange_seat')
             check['right']['datum']='start'
@@ -902,7 +917,8 @@ def rejected_edits(cad,directory):
         d.require(diagnostic.get('code') in ['invalid_rotation_group','rotation_group_failed',
                   'clearance_check_failed','invalid_drawing_sheet','invalid_graph',
                   'datum_dimension_failed','tolerance_stack_failed',
-                  'nominal_seating_check_failed','invalid_nominal_seating_check'] or
+                  'nominal_seating_check_failed','invalid_nominal_seating_check',
+                  'kernel_operation_failed','sketch_failed','invalid_sketch'] or
                   label in {'pilot_reaches_opposite_cap','impossible_paper_annotation_layout'}
                   and isinstance(diagnostic.get('code'),str),
                   'structured failure '+label)
@@ -930,11 +946,11 @@ def main():
     cad=args.cad.resolve();source=d.ROOT/'examples/drive_module_rotation.star'
     executable_sha256,source_sha256,script_sha256=digest(cad),digest(source),digest(__file__)
     cases=[run_case(cad,args.out_dir,*configuration) for configuration in
-           [(12,60,1,6,5,2),
-            (14,72,-1,2,4.5,2),
-            (10,90,1,10,5,2.5),
-            (16,90,1,10,4,1.5),
-            (16,90,-1,10,6,3)]]
+           [(12,60,1,6,5,2,6),
+            (14,72,-1,2,4.5,2,2),
+            (10,90,1,10,5,2.5,8),
+            (16,90,1,10,4,1.5,4),
+            (16,90,-1,10,6,3,8)]]
     annotation_variants=annotation_style_variants(cad,args.out_dir,
                                                    args.out_dir/cases[0]['case'])
     failures=rejected_edits(cad,args.out_dir)
@@ -946,7 +962,7 @@ def main():
                 python_version=platform.python_version(),
                 ocp_distribution=importlib.metadata.version('cadquery-ocp'),
                 cases=cases,annotation_variants=annotation_variants,rejected_edits=failures,
-                scope='Native continuous named-pair proofs, conservative full-turn bounds for 54 fixed/rotor pairs, six local nominal planar seating disks independently checked on trimmed STEP faces, fourteen drawing rows bound to STEP measurements, and four authored independent-interval axial allowances conditional on nominal seating. No general assembly collision, thread, preload, installation or load certification')
+                scope='Four exact obround mounting slots independently reconstructed in the rounded base; native continuous named-pair proofs, conservative full-turn bounds for 54 fixed/rotor pairs, six local nominal planar seating disks independently checked on trimmed STEP faces, fourteen drawing rows bound to STEP measurements, and four authored independent-interval axial allowances conditional on nominal seating. No general assembly collision, thread, preload, installation or load certification')
     (args.out_dir/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 
 if __name__=='__main__':main()

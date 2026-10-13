@@ -56,6 +56,31 @@ mod hole_pattern_tests {
     }
 }
 
+#[cfg(test)]
+mod slot_pattern_tests {
+    use super::*;
+
+    #[test]
+    fn source_frame_and_named_capsules_round_trip_strict_schema_two_ir() {
+        let source = "p=polygon(id='p',points=[[0,0],[40,0],[40,30],[0,30]])\nb=extrude(id='b',profile=p,height=6)\ns=slot_pattern(id='s',body=b,slots=[{'id':'fixture','center':[12,15],'direction':[1,0],'centerline_length':6,'radius':2}],frame_origin=[0,0,0],frame_x_direction=[1,0,0],frame_y_direction=[0,1,0])\noutput(name='slotted',feature=s)";
+        let recipe = from_starlark("slot.star", source).unwrap();
+        assert_eq!(recipe.schema_version, 2);
+        let ir = serde_json::to_value(&recipe).unwrap();
+        assert_eq!(ir["features"][2]["pattern_slots"][0]["id"], "fixture");
+        assert_eq!(
+            ir["features"][2]["frame_origin"],
+            serde_json::json!([0., 0., 0.])
+        );
+        assert_eq!(
+            serde_json::to_value(serde_json::from_value::<Recipe>(ir.clone()).unwrap()).unwrap(),
+            ir
+        );
+        let mut wrong = ir;
+        wrong["features"][2]["slots"] = serde_json::json!([]);
+        assert!(serde_json::from_value::<Recipe>(wrong).is_err());
+    }
+}
+
 #[derive(Default, Debug, ProvidesStaticType)]
 struct GraphStore {
     features: RefCell<Vec<serde_json::Value>>,
@@ -538,6 +563,40 @@ fn cad_functions(builder: &mut GlobalsBuilder) {
             "body":body,"face":face,"x_direction_hint":x_direction_hint,
             "origin_offset":origin_offset,"sketch":sketch,"pattern_holes":holes}),
         )?;
+        Ok(id.to_owned())
+    }
+    /// Native full-height obround cuts in the input prism's canonical stock frame.
+    fn slot_pattern(
+        id: &str,
+        body: &str,
+        slots: Value,
+        frame_origin: Option<Value>,
+        frame_x_direction: Option<Value>,
+        frame_y_direction: Option<Value>,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<String> {
+        let slots: Vec<cad_build::SlotPatternSlot> = serde_json::from_str(&slots.to_json()?)
+            .map_err(|e| anyhow::anyhow!("invalid obround slot declarations: {e}"))?;
+        anyhow::ensure!(
+            !slots.is_empty() && slots.len() <= cad_build::MAX_SLOT_PATTERN_SLOTS,
+            "slot pattern requires 1..={} slots",
+            cad_build::MAX_SLOT_PATTERN_SLOTS
+        );
+        let read_frame =
+            |value: Option<Value>, default: [f64; 3], label: &str| -> anyhow::Result<[f64; 3]> {
+                match value {
+                    Some(value) => serde_json::from_str(&value.to_json()?)
+                        .map_err(|_| anyhow::anyhow!("{label} requires three finite numbers")),
+                    None => Ok(default),
+                }
+            };
+        let frame_origin = read_frame(frame_origin, [0., 0., 0.], "frame_origin")?;
+        let frame_x_direction = read_frame(frame_x_direction, [1., 0., 0.], "frame_x_direction")?;
+        let frame_y_direction = read_frame(frame_y_direction, [0., 1., 0.], "frame_y_direction")?;
+        store(eval)?.feature(serde_json::json!({"op":"slot_pattern","id":id,
+            "op_version":1,"body":body,"pattern_slots":slots,
+            "frame_origin":frame_origin,"frame_x_direction":frame_x_direction,
+            "frame_y_direction":frame_y_direction}))?;
         Ok(id.to_owned())
     }
     fn chamfer_faces(
@@ -1759,7 +1818,7 @@ pub fn from_starlark_with_modules(
         .features
         .borrow()
         .iter()
-        .any(|feature| feature["op"] == "hole_pattern");
+        .any(|feature| feature["op"] == "hole_pattern" || feature["op"] == "slot_pattern");
     let mut value = serde_json::json!({
         "schema_version": if hole_pattern_schema || !motion_studies.is_empty() || !mechanisms.is_empty() || !mechanism_bindings.is_empty() || assembly_schema || !face_assertions.is_empty() || !face_datums.is_empty() || !property_assertions.is_empty() || !exchange_requirements.is_empty() || !section_views.is_empty() || !drawing_sheets.is_empty() || !tolerance_stacks.is_empty() || !clearance_checks.is_empty() || !datum_dimensions.is_empty() || !nominal_seating_checks.is_empty() || !rigid_rotation_groups.is_empty() { 2 } else { 1 },
         "units": "mm",

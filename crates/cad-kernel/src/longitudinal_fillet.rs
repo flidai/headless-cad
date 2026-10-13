@@ -385,6 +385,7 @@ pub fn fillet_longitudinal(
     let g = ArcPrismGeometry {
         path,
         circular_holes: circles,
+        slot_holes: vec![],
         origin: stock.origin,
         axis: stock.axis,
         x_direction: stock.x,

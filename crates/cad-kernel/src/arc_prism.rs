@@ -31,10 +31,58 @@ impl PathSegment {
 pub struct ArcPrismGeometry {
     pub path: PlanarPath,
     pub circular_holes: Vec<CircleHole>,
+    pub slot_holes: Vec<SlotHole>,
     pub origin: [f64; 3],
     pub axis: [f64; 3],
     pub x_direction: [f64; 3],
     pub height: f64,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct SlotHole {
+    pub center: [f64; 2],
+    pub direction: [f64; 2],
+    pub centerline_length: f64,
+    pub radius: f64,
+}
+impl SlotHole {
+    fn endpoints(&self) -> ([f64; 2], [f64; 2]) {
+        let h = self.centerline_length / 2.;
+        (
+            [
+                self.center[0] - h * self.direction[0],
+                self.center[1] - h * self.direction[1],
+            ],
+            [
+                self.center[0] + h * self.direction[0],
+                self.center[1] + h * self.direction[1],
+            ],
+        )
+    }
+    fn path(&self) -> PlanarPath {
+        let (a, b) = self.endpoints();
+        let v = [
+            -self.direction[1] * self.radius,
+            self.direction[0] * self.radius,
+        ];
+        let off = |p: [f64; 2], sign: f64| [p[0] + sign * v[0], p[1] + sign * v[1]];
+        PlanarPath {
+            start: off(a, -1.),
+            segments: vec![
+                PathSegment::LineTo { end: off(b, -1.) },
+                PathSegment::ArcTo {
+                    center: b,
+                    end: off(b, 1.),
+                    clockwise: false,
+                },
+                PathSegment::LineTo { end: off(a, 1.) },
+                PathSegment::ArcTo {
+                    center: a,
+                    end: off(a, -1.),
+                    clockwise: false,
+                },
+            ],
+        }
+    }
 }
 #[derive(Clone)]
 struct Segment {
@@ -400,6 +448,94 @@ pub(crate) fn construct(
             loops: vec![LoopId(l + 2)],
         });
     }
+    for slot in &g.slot_holes {
+        let path = slot.path();
+        let parts = segments(&path, tol)?;
+        let v = m.vertices.len();
+        let e = m.edges.len();
+        let l = m.loops.len();
+        for z in [0., g.height] {
+            for part in &parts {
+                m.vertices.push(Vertex {
+                    position: point(g, part.a, z),
+                });
+            }
+        }
+        for (layer, z) in [0., g.height].into_iter().enumerate() {
+            for (i, part) in parts.iter().enumerate() {
+                let curve = if let Some((c, r, _, sweep)) = part.arc {
+                    Curve::CircularArc(CircularArc {
+                        circle: Circle {
+                            origin: point(g, c, z),
+                            axis: g.axis,
+                            x_direction: vector(g, sub2(part.a, c).map(|x| x / r)),
+                            radius: r,
+                        },
+                        sweep_radians: sweep,
+                    })
+                } else {
+                    let d = sub2(part.b, part.a);
+                    Curve::Line(Line {
+                        origin: point(g, part.a, z),
+                        direction: vector(g, d.map(|x| x / len(d))),
+                    })
+                };
+                m.edges.push(Edge {
+                    vertices: [
+                        VertexId(v + layer * 4 + i),
+                        VertexId(v + layer * 4 + (i + 1) % 4),
+                    ],
+                    curve,
+                });
+            }
+        }
+        for (i, part) in parts.iter().enumerate() {
+            m.edges.push(Edge {
+                vertices: [VertexId(v + i), VertexId(v + 4 + i)],
+                curve: Curve::Line(Line {
+                    origin: point(g, part.a, 0.),
+                    direction: g.axis,
+                }),
+            });
+        }
+        m.loops.push(Loop {
+            edges: (0..4).map(|i| eu(e + i, false)).collect(),
+        });
+        m.loops.push(Loop {
+            edges: (0..4).rev().map(|i| eu(e + 4 + i, true)).collect(),
+        });
+        m.faces[0].loops.push(LoopId(l));
+        m.faces[1].loops.push(LoopId(l + 1));
+        for (i, part) in parts.iter().enumerate() {
+            m.loops.push(Loop {
+                edges: vec![
+                    eu(e + i, true),
+                    eu(e + 8 + i, false),
+                    eu(e + 4 + i, false),
+                    eu(e + 8 + (i + 1) % 4, true),
+                ],
+            });
+            let surface = if let Some((c, r, _, _)) = part.arc {
+                Surface::Cylinder(Cylinder {
+                    origin: point(g, c, 0.),
+                    axis: g.axis,
+                    x_direction: vector(g, sub2(part.a, c).map(|x| x / r)),
+                    radius: r,
+                    inward: true,
+                })
+            } else {
+                let d = sub2(part.b, part.a);
+                Surface::Plane(Plane {
+                    origin: point(g, part.a, 0.),
+                    normal: vector(g, [-d[1] / len(d), d[0] / len(d)]),
+                })
+            };
+            m.faces.push(Face {
+                surface,
+                loops: vec![LoopId(l + 2 + i)],
+            });
+        }
+    }
     m.shells.push(Shell {
         faces: (0..m.faces.len()).map(FaceId).collect(),
     });
@@ -443,6 +579,7 @@ pub fn extrude_path(
     let g = ArcPrismGeometry {
         path: path.clone(),
         circular_holes: holes.to_vec(),
+        slot_holes: vec![],
         origin: [0.; 3],
         axis: [0., 0., 1.],
         x_direction: [1., 0., 0.],
@@ -556,6 +693,7 @@ fn line_integral(a: [f64; 2], b: [f64; 2], px: usize, py: usize, dy: bool) -> f6
 fn integrals(
     seg: &[Segment],
     holes: &[CircleHole],
+    slots: &[SlotHole],
     reference: [f64; 2],
 ) -> Result<([f64; 6], [f64; 6]), KernelError> {
     let mut sums = [0.; 6];
@@ -605,6 +743,29 @@ fn integrals(
             -a * c[0] * c[1],
         ])?;
     }
+    for s in slots {
+        let l = s.centerline_length;
+        let r = s.radius;
+        let a = 2. * r * l + std::f64::consts::PI * r * r;
+        let longitudinal = r * l.powi(3) / 6.
+            + std::f64::consts::PI * r * r * l * l / 4.
+            + 4. * l * r.powi(3) / 3.
+            + std::f64::consts::PI * r.powi(4) / 4.;
+        let transverse = 2. * l * r.powi(3) / 3. + std::f64::consts::PI * r.powi(4) / 4.;
+        let [u, v] = s.direction;
+        let c = sub2(s.center, reference);
+        let xx = longitudinal * u * u + transverse * v * v;
+        let yy = longitudinal * v * v + transverse * u * u;
+        let xy = (longitudinal - transverse) * u * v;
+        add([
+            -a,
+            -a * c[0],
+            -a * c[1],
+            -(xx + a * c[0] * c[0]),
+            -(yy + a * c[1] * c[1]),
+            -(xy + a * c[0] * c[1]),
+        ])?;
+    }
     if sums.iter().chain(absolute.iter()).any(|v| !v.is_finite())
         || sums[0] <= absolute[0] * 65536. * f64::EPSILON
     {
@@ -615,7 +776,12 @@ fn integrals(
 impl ArcPrismGeometry {
     pub(crate) fn properties(&self, tol: Tolerance) -> Result<MassProperties, KernelError> {
         let seg = segments(&self.path, tol)?;
-        let (first, first_absolute) = integrals(&seg, &self.circular_holes, self.path.start)?;
+        let (first, first_absolute) = integrals(
+            &seg,
+            &self.circular_holes,
+            &self.slot_holes,
+            self.path.start,
+        )?;
         for i in [1, 2] {
             let error = (first_absolute[i] + first[i].abs() * first_absolute[0] / first[0])
                 * 4096.
@@ -629,7 +795,8 @@ impl ArcPrismGeometry {
             self.path.start[0] + first[1] / first[0],
             self.path.start[1] + first[2] / first[0],
         ];
-        let (centered, centered_absolute) = integrals(&seg, &self.circular_holes, center)?;
+        let (centered, centered_absolute) =
+            integrals(&seg, &self.circular_holes, &self.slot_holes, center)?;
         if [3, 4]
             .iter()
             .any(|&i| centered[i] <= centered_absolute[i] * 65536. * f64::EPSILON)
@@ -689,10 +856,10 @@ pub(crate) fn recognize(
         return Err(KernelError::InvalidTolerance);
     }
     if m.faces.len() < 4
-        || m.faces.len() > MAX_POLYGON_POINTS + MAX_POLYGON_HOLES + 2
-        || m.vertices.len() > 2 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES)
-        || m.edges.len() > 3 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES)
-        || m.loops.len() > MAX_POLYGON_POINTS + 3 * MAX_POLYGON_HOLES + 2
+        || m.faces.len() > MAX_POLYGON_POINTS + MAX_POLYGON_HOLES + 18
+        || m.vertices.len() > 2 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES) + 32
+        || m.edges.len() > 3 * (MAX_POLYGON_POINTS + MAX_POLYGON_HOLES) + 48
+        || m.loops.len() > MAX_POLYGON_POINTS + 3 * MAX_POLYGON_HOLES + 26
     {
         return Err(bad());
     }
@@ -781,24 +948,63 @@ pub(crate) fn recognize(
         return Err(bad());
     }
     let mut holes = vec![];
+    let mut slots = vec![];
     for id in m.faces[0].loops.iter().skip(1) {
         let l = m.loops.get(id.0).ok_or_else(bad)?;
-        if l.edges.len() != 1 {
-            return Err(bad());
+        match l.edges.len() {
+            1 if slots.is_empty() => {
+                let e = m.edges.get(l.edges[0].edge.0).ok_or_else(bad)?;
+                let Curve::Circle(c) = &e.curve else {
+                    return Err(bad());
+                };
+                holes.push(CircleHole {
+                    center: project(c.origin),
+                    radius: c.radius,
+                });
+            }
+            4 => {
+                let edges = l
+                    .edges
+                    .iter()
+                    .map(|u| m.edges.get(u.edge.0).ok_or_else(bad))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let (
+                    Curve::Line(_),
+                    Curve::CircularArc(right),
+                    Curve::Line(_),
+                    Curve::CircularArc(left),
+                ) = (
+                    &edges[0].curve,
+                    &edges[1].curve,
+                    &edges[2].curve,
+                    &edges[3].curve,
+                )
+                else {
+                    return Err(bad());
+                };
+                let a = project(left.circle.origin);
+                let b = project(right.circle.origin);
+                let d = sub2(b, a);
+                let length = len(d);
+                if !length.is_normal() {
+                    return Err(bad());
+                }
+                slots.push(SlotHole {
+                    center: [(a[0] + b[0]) / 2., (a[1] + b[1]) / 2.],
+                    direction: d.map(|x| x / length),
+                    centerline_length: length,
+                    radius: right.circle.radius,
+                });
+            }
+            _ => return Err(bad()),
         }
-        let e = m.edges.get(l.edges[0].edge.0).ok_or_else(bad)?;
-        let Curve::Circle(c) = &e.curve else {
-            return Err(bad());
-        };
-        holes.push(CircleHole {
-            center: project(c.origin),
-            radius: c.radius,
-        });
     }
     validate_path(&path, &holes, tol)?;
+    crate::obround_slot::validate_slots(&path, &holes, &slots, tol)?;
     let g = ArcPrismGeometry {
         path,
         circular_holes: holes,
+        slot_holes: slots,
         origin,
         axis,
         x_direction: x,
@@ -989,6 +1195,16 @@ pub(crate) fn tessellate(
         counts[a] = count;
         counts[b] = count;
     }
+    let slot_base = 3 * n + 3 * g.circular_holes.len();
+    for slot in 0..g.slot_holes.len() {
+        for edge in 0..4 {
+            let a = slot_base + 12 * slot + edge;
+            let b = a + 4;
+            let count = counts[a].max(counts[b]);
+            counts[a] = count;
+            counts[b] = count;
+        }
+    }
     for (i, e) in m.edges.iter().enumerate() {
         let (circle, sweep) = match &e.curve {
             Curve::CircularArc(a) => (Some(&a.circle), a.sweep_radians),
@@ -1054,6 +1270,33 @@ pub(crate) fn tessellate(
                 normal: normal.map(|v| v / length),
                 boundary_edges: vec![Some(EdgeId(lower)), None, Some(EdgeId(upper)), None],
             });
+        }
+    }
+    let face_base = n + 2 + g.circular_holes.len();
+    for slot in 0..g.slot_holes.len() {
+        for edge in 0..4 {
+            let lower = slot_base + 12 * slot + edge;
+            let upper = lower + 4;
+            let bottom = &sampled[&EdgeId(lower)];
+            let top = &sampled[&EdgeId(upper)];
+            if bottom.len() != top.len() {
+                return Err(bad());
+            }
+            for k in 0..bottom.len() - 1 {
+                let j = k + 1;
+                let points = vec![bottom[j], bottom[k], top[k], top[j]];
+                let normal = cross(sub(points[1], points[0]), sub(points[2], points[0]));
+                let length = norm(normal);
+                if !length.is_normal() {
+                    return Err(KernelError::NumericRange);
+                }
+                patches.push(MeshPatch {
+                    face: FaceId(face_base + 4 * slot + edge),
+                    points,
+                    normal: normal.map(|v| v / length),
+                    boundary_edges: vec![Some(EdgeId(lower)), None, Some(EdgeId(upper)), None],
+                });
+            }
         }
     }
     for id in 0..2 {

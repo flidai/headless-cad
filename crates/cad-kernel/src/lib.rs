@@ -61,6 +61,8 @@ pub use convex_clearance::{
 pub use convex_intersection::chamfer;
 mod longitudinal_fillet;
 pub use longitudinal_fillet::fillet_longitudinal;
+mod obround_slot;
+pub use obround_slot::{cut_obround_slots, obround_slot_frame, ObroundSlot, SlotStockFrame};
 mod face_frame;
 mod mass_properties;
 mod math;
@@ -85,7 +87,9 @@ mod validation;
 pub use analytic::{
     extrude_annulus, extrude_circle, validate_annulus, validate_circle, CylinderGeometry,
 };
-pub use arc_prism::{extrude_path, validate_path, ArcPrismGeometry, PathSegment, PlanarPath};
+pub use arc_prism::{
+    extrude_path, validate_path, ArcPrismGeometry, PathSegment, PlanarPath, SlotHole,
+};
 pub use bored_prism::{BoredPrismGeometry, PrismBore};
 pub use cap_holes::{drill_cap_pattern, CapBlindHole, MAX_CAP_BLIND_HOLES};
 pub use face_frame::FaceFrame;

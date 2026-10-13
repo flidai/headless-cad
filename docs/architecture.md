@@ -2099,6 +2099,49 @@ This is conditional on the modeled seating arrangement, not a contact solution
 or a thread/preload/load model. The full report includes all four screw
 occurrences; the sheet displays one representative shank dimension per side.
 
+A schema-2 `slot_pattern` feature extends native prism machining to named
+full-height capsules. The build layer validates the explicit source coordinate
+frame and resolves it against the canonical stock frame before cache lookup;
+feature identity includes the source declaration and resolved conversion. Frame
+origin must lie on either cap support plane within a bounded arithmetic budget,
+and frame axes must be orthonormal and parallel to it. No numerical snapping or
+automatic direction normalization repairs invalid declarations.
+
+The kernel extends canonical arc-prism topology with at most four slot loops.
+Each loop has two straight segments and two semicircles, four corresponding
+inward walls, and cap loops sharing the same native edges. Prior cap, outer-wall
+and circular-hole identities retain lineage. Strict recognition reconstructs the
+expected native model and reconciles every support and topology record. Closed-
+form capsule moments subtract from the stock's area moments; extrusion yields
+volume, centroid and inertia. Meshing samples shared native boundaries and
+retains its explicit chordal-error budget. Native sections and analytic STEP
+consume the same authoritative surfaces.
+
+Admission requires a strictly convex polygon formed by outer segment endpoints,
+no inward-bending outer arcs, and capsule clearance from that conservative
+inscribed polygon, all circles, and every other slot. This deliberately refuses
+some cuts that would fit closer to a rounded corner. Slot-bearing inputs to
+unsupported machining, fillet and clearance consumers reject explicitly, so no
+consumer may silently treat a slot as retained material. The drive applies slots
+after all four corner fillets and keeps their semantic radius references.
+
+| Slot input | Supported contract |
+| --- | --- |
+| Convex polygon / outward-rounded prism, optional circular through-bores | At most four named, separated full-height capsules in one pattern |
+| Explicit rotated source frame / rigidly transformed stock | Native cap-plane and frame arithmetic checks before cache reuse |
+| Slot-to-circle, slot-to-slot or outer contact | Refusal preserving the prior complete generation |
+| Existing slots, blind slots, arbitrary curved inner loops, concave outer arcs | Explicitly outside the initial operation domain |
+
+The [slot oracle](evidence/obround-slots-local.json) retains nine
+geometry cases and nine publication-preserving refusals, with independent
+capsule moments, oblique source frames and zero bidirectional STEP volume
+difference. The [complete drive checks](evidence/slotted-drive-local.json)
+cover five configurations with slot center spacings from 2 to 8 mm and
+22 rejected edits. Slot-length-only changes rebuild one solid feature.
+The [accepted offline replay](evidence/slotted-base-replay-local.json)
+matches 150 artifacts and 28 manifest fields. These bounded checks leave
+the five commercial release gates open.
+
 Source-owned `nominal_seating_check` obligations now bind two exact leaf paths
 and semantic planar face datums. The original Rust kernel admits canonical
 full-turn linear-meridian revolution annuli and convex polygon prism caps with

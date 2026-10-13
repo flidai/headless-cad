@@ -234,6 +234,9 @@ pub(crate) fn admit(m: &ModelSnapshot, t: Tolerance) -> Result<HoledEnvelope, Ke
 
 fn admit_arc(m: &ModelSnapshot, t: Tolerance) -> Result<HoledEnvelope, KernelError> {
     let geometry = crate::arc_prism::recognize(m, t)?;
+    if !geometry.slot_holes.is_empty() {
+        return Err(unsupported());
+    }
     if geometry.circular_holes.is_empty()
         || !geometry
             .path

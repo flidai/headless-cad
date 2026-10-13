@@ -64,6 +64,12 @@ const assert=require('node:assert/strict');
      assert.ok(report.offline_replay.semantic_manifest_fields.includes('nominal_seating_checks'));
     }
    }
+   if(source.includes('base_slotted = slot_pattern(')){
+    assert.equal(fixture.native_obround_mounting_slots,4);
+    const section=await(await page.request.get(`${base}/${name}/section-mounting_plan.json`)).json();
+    const baseSection=section.occurrences.find(o=>JSON.stringify(o.instance_path)==='["base"]');
+    assert.equal(baseSection.section.loops.filter(l=>l.segments.length===4&&l.segments.filter(s=>s.curve.kind==='arc').length===2).length,4);
+   }
    const expectedChecks=source.includes('left_cover_shaft_gap')?13:11;
    assert.equal(Object.keys(manifest.clearance_checks).length,expectedChecks);
    if(fixture)assert.equal(fixture.named_continuous_clearance_checks,expectedChecks);

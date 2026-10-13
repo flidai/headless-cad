@@ -271,6 +271,9 @@ fn validate(m: &ModelSnapshot, t: Tolerance) -> Result<Option<Geometry>, KernelE
             return Ok(Some(Geometry::Cylinder(g)));
         }
         if let Ok(g) = crate::arc_prism::recognize(m, t) {
+            if !g.slot_holes.is_empty() {
+                return Err(unsupported());
+            }
             arc::convex(&g)?;
             return Ok(Some(Geometry::ArcPrism(g)));
         }

@@ -142,6 +142,7 @@ impl Geometry {
                 ],
             },
             circular_holes: vec![],
+            slot_holes: vec![],
             origin: self.point([0., 0., self.c]),
             axis: self.axis,
             x_direction: self.x,

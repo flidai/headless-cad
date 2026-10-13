@@ -22,7 +22,7 @@ fn success(output: std::process::Output) -> Value {
     );
     serde_json::from_slice(&output.stdout).unwrap()
 }
-fn verify(report: &Value, out: &Path, radius: f64, pitch: f64) {
+fn verify(report: &Value, out: &Path, radius: f64, pitch: f64, slot_length: f64) {
     assert_eq!(report["outputs"]["drive_module_release"]["instances"], 30);
     assert_eq!(report["outputs"]["drive_module_release"]["definitions"], 14);
     assert_eq!(report["clearance_checks"].as_object().unwrap().len(), 13);
@@ -58,11 +58,39 @@ fn verify(report: &Value, out: &Path, radius: f64, pitch: f64) {
     }
     let volume = 6.
         * (80. * (pitch + 90.)
-            - 36. * std::f64::consts::PI
+            - 4. * (9. * std::f64::consts::PI + 6. * slot_length)
             - (4. - std::f64::consts::PI) * radius * radius);
     assert!((report["outputs"]["base"]["volume_mm3"].as_f64().unwrap() - volume).abs() < 1e-7);
     let section: Value =
         serde_json::from_slice(&fs::read(out.join("section-mounting_plan.json")).unwrap()).unwrap();
+    let base_section = section["occurrences"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["instance_path"] == serde_json::json!(["base"]))
+        .unwrap();
+    let slots: Vec<_> = base_section["section"]["loops"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|loop_| loop_["segments"].as_array().unwrap().len() == 4)
+        .collect();
+    assert_eq!(slots.len(), 4);
+    for slot in slots {
+        let segments = slot["segments"].as_array().unwrap();
+        let arcs: Vec<_> = segments
+            .iter()
+            .filter(|s| s["curve"]["kind"] == "arc")
+            .collect();
+        assert_eq!(arcs.len(), 2);
+        for arc in arcs {
+            assert!((arc["curve"]["radius"].as_f64().unwrap() - 3.).abs() < 1e-9);
+            assert!(
+                (arc["curve"]["sweep_angle"].as_f64().unwrap().abs() - std::f64::consts::PI).abs()
+                    < 1e-9
+            );
+        }
+    }
     let dims = section["section_view"]["circle_dimensions"]
         .as_array()
         .unwrap();
@@ -130,7 +158,7 @@ fn rounded_main_drive_preserves_engineering_and_publishes_fitting_native_radius_
     let out = dir.path().join("release");
     let cache = dir.path().join("cache");
     let first = success(run(&source, &out, &cache, &[]));
-    verify(&first, &out, 6., 60.);
+    verify(&first, &out, 6., 60., 6.);
     let warm = success(run(&source, &out, &cache, &[]));
     assert_eq!(warm["stats"]["computed_solids"], 0);
     assert_eq!(warm["clearance_checks"], first["clearance_checks"]);
@@ -152,8 +180,8 @@ fn rounded_main_drive_preserves_engineering_and_publishes_fitting_native_radius_
         &cache,
         &["--param", "base_corner_radius=2"],
     ));
-    verify(&radius_only, &radius_out, 2., 60.);
-    assert_eq!(radius_only["stats"]["computed_solids"], 4);
+    verify(&radius_only, &radius_out, 2., 60., 6.);
+    assert_eq!(radius_only["stats"]["computed_solids"], 5);
     assert_ne!(
         radius_only["outputs"]["base"]["content_hash"],
         first["outputs"]["base"]["content_hash"]
@@ -172,6 +200,37 @@ fn rounded_main_drive_preserves_engineering_and_publishes_fitting_native_radius_
     ] {
         assert_eq!(
             radius_only["outputs"][part]["content_hash"],
+            first["outputs"][part]["content_hash"]
+        );
+    }
+    let slot_out = dir.path().join("slot_revision");
+    let slot_revision = success(run(
+        &source,
+        &slot_out,
+        &cache,
+        &["--param", "base_slot_length=8"],
+    ));
+    verify(&slot_revision, &slot_out, 6., 60., 8.);
+    assert_eq!(slot_revision["stats"]["computed_solids"], 1);
+    assert_eq!(
+        slot_revision["feature_hashes"]["base_body"],
+        first["feature_hashes"]["base_body"]
+    );
+    assert_ne!(
+        slot_revision["outputs"]["base"]["content_hash"],
+        first["outputs"]["base"]["content_hash"]
+    );
+    for part in [
+        "shaft",
+        "drive_disc",
+        "housing",
+        "right_housing",
+        "end_cover",
+        "cover_screw_envelope",
+        "sleeve",
+    ] {
+        assert_eq!(
+            slot_revision["outputs"][part]["content_hash"],
             first["outputs"][part]["content_hash"]
         );
     }
@@ -210,6 +269,6 @@ fn rounded_main_drive_preserves_engineering_and_publishes_fitting_native_radius_
             &cache,
             &["--param", &r, "--param", &p, "--param", &d],
         ));
-        verify(&variant, &output, radius, pitch);
+        verify(&variant, &output, radius, pitch, 6.);
     }
 }
